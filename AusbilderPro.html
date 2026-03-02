@@ -151,7 +151,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .pool-all-btn{width:100%;margin-bottom:8px;font-size:.68rem;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:7px;color:#2563eb;padding:7px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600;transition:all .12s;}
 .pool-all-btn:hover{background:rgba(59,130,246,.2);}
 .fehlt-hdr{padding:8px 14px;border-top:2px solid rgba(239,68,68,.3);border-bottom:1px solid var(--brd);font-size:.6rem;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;background:rgba(239,68,68,.05);flex-shrink:0;}
-.fehlt-body{min-height:60px;max-height:160px;overflow-y:auto;padding:6px 8px;background:#f0f2f8;flex-shrink:0;}
+.fehlt-body{min-height:100px;max-height:280px;overflow-y:auto;padding:6px 8px;background:#f0f2f8;flex-shrink:0;}
 .fehlt-body.fehlt-dropover{background:rgba(239,68,68,.1);outline:2px dashed #ef4444;outline-offset:-4px;}
 .fehlt-card{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:7px 10px;margin-bottom:4px;cursor:grab;display:flex;align-items:center;gap:8px;transition:all .12s;}
 .fehlt-card:hover{border-color:#ef4444;}
@@ -2164,6 +2164,7 @@ function _pwHash(s){
 // TEILNEHMERPOOL (HBZ-Verknüpfung)
 // ═══════════════════════════════════════════════
 let _poolDragId = null;
+let _wiederholerSeatId = null; // tracks local wiederholer card origin seat
 let _poolDragTnId = null;
 let _poolDragKursId = null;
 let _seatDragId = null;
@@ -2270,7 +2271,13 @@ function setupSeatDropTargets(){
       const id=el.id.replace('seat-','');
       const inst=curInst(); if(!inst) return;
       const existing=inst.seats[id]||{};
-      const card=document.querySelector('.pool-card[data-name="'+CSS.escape(_poolDragId)+'"]');
+      // Wiederholer-Karte: Originalsitz-Flag entfernen
+      if(_wiederholerSeatId){
+        if(inst.seats[_wiederholerSeatId]) delete inst.seats[_wiederholerSeatId].wiederholer;
+        _wiederholerSeatId=null;
+      }
+      const card=document.querySelector('.pool-card[data-name="'+CSS.escape(_poolDragId)+'"]')
+                 || document.querySelector('.wiederholer-card[data-name="'+CSS.escape(_poolDragId)+'"]');
       inst.seats[id]={ ...existing, name:_poolDragId, company:card?card.dataset.company:'', profession:card?card.dataset.profession:'', ausbjahr:card?card.dataset.ausbjahr:'', poolTnId:_poolDragTnId, poolKursId:_poolDragKursId };
       if(_db && _poolDragKursId && _poolDragTnId)
         _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId).collection('teilnehmer').doc(_poolDragTnId).update({status:'attending'}).catch(()=>{});
@@ -2380,9 +2387,16 @@ function renderWiederholer(kursId){
       const initials=d.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
       const card=document.createElement('div');
       card.className='wiederholer-card';
+      card.draggable=true;
       card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
         +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(d.name)+'</div>'
         +'<div class="pool-sub">↩ Wiederholer</div></div>';
+      card.addEventListener('dragstart',ev=>{
+        _poolDragId=d.name; _poolDragTnId=null; _poolDragKursId=null;
+        _wiederholerSeatId=sid;
+        card.classList.add('dragging'); ev.dataTransfer.effectAllowed='copy';
+      });
+      card.addEventListener('dragend',()=>card.classList.remove('dragging'));
       body.appendChild(card);
     });
     return;
