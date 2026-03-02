@@ -2293,7 +2293,7 @@ function setupSeatDropTargets(){
       _seatDragId=id;
       e.dataTransfer.effectAllowed='move';
     });
-    el.addEventListener('dragend',()=>{ _seatDragId=null; });
+    el.addEventListener('dragend',()=>{ _seatDragId=null; _poolDragId=null; _wiederholerSeatId=null; });
   });
 }
 
@@ -2388,6 +2388,7 @@ function renderWiederholer(kursId){
       const card=document.createElement('div');
       card.className='wiederholer-card';
       card.draggable=true;
+      card.dataset.name=d.name; card.dataset.company=d.company||''; card.dataset.profession=d.profession||''; card.dataset.ausbjahr=d.ausbjahr||'';
       card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
         +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(d.name)+'</div>'
         +'<div class="pool-sub">↩ Wiederholer</div></div>';
@@ -2396,9 +2397,10 @@ function renderWiederholer(kursId){
         _wiederholerSeatId=sid;
         card.classList.add('dragging'); ev.dataTransfer.effectAllowed='copy';
       });
-      card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+      card.addEventListener('dragend',()=>{ card.classList.remove('dragging'); });
       body.appendChild(card);
     });
+    setupSeatDropTargets();
     return;
   }
 
