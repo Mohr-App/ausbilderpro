@@ -158,6 +158,34 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 /* UPLOAD AREA */
 .upload-area{border:2px dashed var(--brd);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border .15s;font-size:.78rem;color:var(--mu);}
 .upload-area:hover{border-color:var(--acc);color:var(--acc);}
+
+/* ORDNER BAUM */
+.folder-root{border:2px solid var(--brd);border-radius:13px;overflow:hidden;}
+.folder-hdr{display:flex;align-items:center;gap:10px;padding:13px 16px;background:rgba(59,130,246,.06);border-bottom:1px solid var(--brd);font-weight:700;font-size:.9rem;cursor:pointer;user-select:none;transition:background .12s;}
+.folder-hdr:hover{background:rgba(59,130,246,.1);}
+.folder-hdr .arr{font-size:.7rem;transition:transform .15s;color:var(--mu);}
+.folder-hdr.open .arr{transform:rotate(90deg);}
+.folder-body{display:none;padding:0;}
+.folder-body.open{display:block;}
+.ausb-row{border-bottom:1px solid var(--brd);}
+.ausb-hdr{display:flex;align-items:center;gap:10px;padding:11px 20px;cursor:pointer;font-weight:600;font-size:.82rem;background:var(--sur2);transition:background .12s;user-select:none;}
+.ausb-hdr:hover{background:rgba(59,130,246,.06);}
+.ausb-hdr .arr{font-size:.65rem;transition:transform .15s;color:var(--mu);}
+.ausb-hdr.open .arr{transform:rotate(90deg);}
+.ausb-body{display:none;padding:0 0 0 14px;border-top:1px solid var(--brd);}
+.ausb-body.open{display:block;}
+.kurs-folder{border-bottom:1px solid rgba(42,48,80,.5);}
+.kurs-folder:last-child{border-bottom:none;}
+.kurs-fold-hdr{display:flex;align-items:center;gap:8px;padding:9px 20px;cursor:pointer;font-size:.78rem;font-weight:600;color:var(--tx);transition:background .12s;user-select:none;}
+.kurs-fold-hdr:hover{background:rgba(59,130,246,.04);}
+.kurs-fold-hdr .arr{font-size:.6rem;transition:transform .15s;color:var(--mu);}
+.kurs-fold-hdr.open .arr{transform:rotate(90deg);}
+.kurs-fold-body{display:none;padding:8px 20px 12px 38px;}
+.kurs-fold-body.open{display:block;}
+.fold-upload{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.fold-upload-btn{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:7px;color:var(--acc);font-size:.72rem;padding:6px 12px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600;transition:all .12s;}
+.fold-upload-btn:hover{background:rgba(59,130,246,.2);}
+.fold-prog{font-size:.68rem;color:var(--mu);font-family:'JetBrains Mono',monospace;}
 </style>
 </head>
 <body>
@@ -199,6 +227,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </button>
       <button class="nav-btn" onclick="showPage('dokumente')" id="nav-dokumente">
         <span class="nav-icon">📁</span>Dokumente
+      </button>
+      <button class="nav-btn" onclick="showPage('ordner')" id="nav-ordner">
+        <span class="nav-icon">🗂</span>Ausbildermeister
       </button>
     </div>
 
@@ -356,6 +387,26 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
 
+      <!-- ORDNER: AUSBILDERMEISTER -->
+      <div class="page" id="page-ordner">
+        <div class="page-title">🗂 Ausbildermeister</div>
+        <div class="page-sub">Alle Ausbilder · Lehrgänge · Dokumente</div>
+        <div class="folder-root">
+          <div class="folder-hdr open" onclick="toggleEl(this,'folder-body-root')">
+            <span class="arr">▶</span>
+            <span>📁</span>
+            <span>Ausbildermeister</span>
+            <span id="ausbMeisterCount" style="margin-left:auto;font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace;font-weight:400"></span>
+          </div>
+          <div class="folder-body open" id="folder-body-root">
+            <div class="empty" id="ordnerLoading">Lädt…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HIDDEN FILE INPUT for folder uploads -->
+      <input type="file" id="foldFileIn" style="display:none" onchange="foldUploadFile(event)">
+
     </div><!-- /main -->
   </div><!-- /body -->
 </div><!-- /appWrap -->
@@ -445,6 +496,7 @@ function showPage(id){
   if(id==='kurse') renderKursList();
   if(id==='teilnehmer') populateKursSelects();
   if(id==='dokumente') populateKursSelects();
+  if(id==='ordner') loadOrdner();
 }
 
 // ── Load All ──
@@ -727,6 +779,156 @@ function deleteKursDoc(docId,path,kursId){
   st.ref(path).delete().catch(()=>{});
   db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('docs').doc(docId).delete()
     .then(()=>renderKursDocs(kursId));
+}
+
+// ── Ordner / Ausbildermeister ──
+let _foldUploadKursId = null;
+let _foldUploadProgEl = null;
+
+function loadOrdner(){
+  const root = document.getElementById('folder-body-root');
+  root.innerHTML = '<div class="empty">Lädt…</div>';
+  // Alle Kurse laden und nach ausbilderEmail gruppieren
+  db.collection('shared').doc('kurse').collection('list')
+    .orderBy('createdAt','desc').get()
+    .then(snap=>{
+      const grouped = {}; // email → [{id, data}]
+      snap.forEach(doc=>{
+        const d = doc.data();
+        const key = d.ausbilderEmail || '(kein Ausbilder)';
+        if(!grouped[key]) grouped[key] = [];
+        grouped[key].push({id:doc.id, d});
+      });
+      const emails = Object.keys(grouped).sort();
+      document.getElementById('ausbMeisterCount').textContent = emails.length + ' Ausbilder · ' + snap.size + ' Lehrgänge';
+      root.innerHTML = '';
+      if(!emails.length){ root.innerHTML='<div class="empty">Noch keine Kurse angelegt</div>'; return; }
+      emails.forEach(email => renderAusbFolder(root, email, grouped[email]));
+    }).catch(()=>{ root.innerHTML='<div class="empty" style="color:var(--bad)">Fehler beim Laden</div>'; });
+}
+
+function renderAusbFolder(container, email, kurse){
+  const uid = email.replace(/[^a-z0-9]/gi,'_');
+  const displayName = email === '(kein Ausbilder)' ? '(kein Ausbilder)' : email.split('@')[0];
+  const row = document.createElement('div');
+  row.className = 'ausb-row';
+  row.innerHTML = `
+    <div class="ausb-hdr" onclick="toggleEl(this,'ausb-body-${uid}')">
+      <span class="arr">▶</span>
+      <span>👤</span>
+      <span>${esc(displayName)}</span>
+      <span style="font-size:.62rem;color:var(--mu);font-family:'JetBrains Mono',monospace;font-weight:400;margin-left:6px">${esc(email!==displayName?email:'')}</span>
+      <span style="margin-left:auto;font-size:.63rem;color:var(--mu);font-family:'JetBrains Mono',monospace">${kurse.length} LG</span>
+    </div>
+    <div class="ausb-body" id="ausb-body-${uid}"></div>`;
+  container.appendChild(row);
+  // Kurse rein
+  const body = row.querySelector('.ausb-body');
+  kurse.forEach(k => renderKursFolderItem(body, k.id, k.d));
+}
+
+function renderKursFolderItem(container, kursId, d){
+  const uid = kursId;
+  const label = (d.name||'Kurs') + ' · ' + (d.von||'?') + ' – ' + (d.bis||'?');
+  const item = document.createElement('div');
+  item.className = 'kurs-folder';
+  item.innerHTML = `
+    <div class="kurs-fold-hdr" onclick="toggleKursDocs(this,'kfb-${uid}','${kursId}')">
+      <span class="arr">▶</span>
+      <span>📋</span>
+      <span>${esc(label)}</span>
+    </div>
+    <div class="kurs-fold-body" id="kfb-${uid}">
+      <div class="fold-upload">
+        <button class="fold-upload-btn" onclick="foldStartUpload('${kursId}','fprog-${uid}')">⬆ Dokument hochladen</button>
+        <span class="fold-prog" id="fprog-${uid}"></span>
+      </div>
+      <div id="fdocs-${uid}"><div class="empty" style="padding:8px">Lädt…</div></div>
+    </div>`;
+  container.appendChild(item);
+}
+
+function toggleKursDocs(hdr, bodyId, kursId){
+  const body = document.getElementById(bodyId);
+  const isOpen = body.classList.contains('open');
+  hdr.classList.toggle('open', !isOpen);
+  body.classList.toggle('open', !isOpen);
+  if(!isOpen) renderFoldDocs(kursId, 'fdocs-'+kursId);
+}
+
+function renderFoldDocs(kursId, elId){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.innerHTML = '<div class="empty" style="padding:6px">Lädt…</div>';
+  db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('docs')
+    .orderBy('ts','desc').get()
+    .then(snap=>{
+      if(snap.empty){ el.innerHTML='<div class="empty" style="padding:8px">Noch keine Dokumente</div>'; return; }
+      el.innerHTML='';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const icon=d.type&&d.type.startsWith('image')?'🖼':d.type==='application/pdf'?'📄':'📎';
+        const size=d.size>1024*1024?(d.size/1024/1024).toFixed(1)+' MB':Math.round(d.size/1024)+' KB';
+        const item=document.createElement('div');
+        item.className='doc-item';
+        item.style.marginBottom='5px';
+        item.innerHTML=`<div class="doc-icon">${icon}</div>
+          <div class="doc-info"><div class="doc-name">${esc(d.name)}</div>
+          <div class="doc-meta">${size} · ${new Date(d.ts).toLocaleDateString('de-DE')} · ${esc(d.uploadedBy||'')}</div></div>
+          <button class="doc-open" onclick="window.open(this.dataset.url,'_blank')" data-url="${esc(d.url)}">Öffnen</button>
+          <button class="doc-del" onclick="foldDeleteDoc('${doc.id}','${esc(d.path)}','${kursId}','${elId}')">🗑</button>`;
+        el.appendChild(item);
+      });
+    }).catch(()=>{ el.innerHTML='<div class="empty" style="color:var(--bad);padding:8px">Fehler</div>'; });
+}
+
+function foldStartUpload(kursId, progId){
+  _foldUploadKursId = kursId;
+  _foldUploadProgEl = document.getElementById(progId);
+  document.getElementById('foldFileIn').click();
+}
+
+function foldUploadFile(e){
+  const file=e.target.files[0];
+  if(!file||!_foldUploadKursId) return;
+  e.target.value='';
+  const kursId=_foldUploadKursId;
+  const prog=_foldUploadProgEl;
+  if(file.size>20*1024*1024){ toast('Datei zu groß (max 20 MB)','bad'); return; }
+  const path='shared/kurse/'+kursId+'/'+Date.now()+'_'+file.name;
+  if(prog) prog.textContent='⬆ 0%';
+  const ref=st.ref(path);
+  ref.put(file).on('state_changed',
+    snap=>{ const p=Math.round(snap.bytesTransferred/snap.totalBytes*100); if(prog) prog.textContent='⬆ '+p+'%'; },
+    err=>{ if(prog) prog.textContent='❌ '+err.message; },
+    ()=>{
+      ref.getDownloadURL().then(url=>{
+        db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('docs').add({
+          name:file.name, url, path, size:file.size, type:file.type, ts:Date.now(), uploadedBy:_email
+        }).then(()=>{
+          if(prog) prog.textContent='✓ Hochgeladen';
+          setTimeout(()=>{ if(prog) prog.textContent=''; },3000);
+          renderFoldDocs(kursId, 'fdocs-'+kursId);
+          toast('Dokument hochgeladen ✓');
+        });
+      });
+    }
+  );
+}
+
+function foldDeleteDoc(docId, path, kursId, elId){
+  if(!confirm('Dokument wirklich löschen?')) return;
+  st.ref(path).delete().catch(()=>{});
+  db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('docs').doc(docId).delete()
+    .then(()=>renderFoldDocs(kursId, elId));
+}
+
+function toggleEl(hdr, bodyId){
+  const body=document.getElementById(bodyId);
+  if(!body) return;
+  const open=body.classList.contains('open');
+  hdr.classList.toggle('open',!open);
+  body.classList.toggle('open',!open);
 }
 
 // ── Utils ──
