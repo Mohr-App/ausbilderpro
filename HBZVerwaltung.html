@@ -427,6 +427,49 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="page-sub">Ausbilder · Lehrgangsarten · Berufsgruppen verwalten</div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:18px">
+        <!-- FIRESTORE RULES HINWEIS -->
+        <div class="card" id="rulesHintCard" style="grid-column:1/-1;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:.85rem;font-weight:700;color:#f59e0b">⚠️ Firestore-Regeln prüfen</div>
+            <button class="btn-sm" onclick="document.getElementById('rulesHintCard').style.display='none'" style="font-size:.68rem;padding:3px 8px;opacity:.6">✕ Ausblenden</button>
+          </div>
+          <div style="font-size:.75rem;color:var(--mu);margin-bottom:10px">
+            Damit Ausbilder, Lehrgangsarten und Berufsgruppen gespeichert werden können, muss <code>shared/kursSettings</code> in den Firestore Security Rules erlaubt sein.<br>
+            <strong style="color:var(--tx)">Firebase Console → Firestore → Regeln</strong> — ersetze die bestehenden Regeln durch:
+          </div>
+          <pre id="rulesCode" style="background:var(--sur2);border-radius:8px;padding:12px;font-size:.7rem;font-family:'JetBrains Mono',monospace;color:#86efac;overflow-x:auto;white-space:pre;line-height:1.6">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if isAdmin();
+    }
+
+    match /shared/{docId} {
+      allow read, write: if isAdmin();
+      match /{sub}/{subDoc} {
+        allow read, write: if isAdmin();
+        match /{deep}/{deepDoc} {
+          allow read, write: if isAdmin();
+        }
+      }
+    }
+
+    match /globalTN/{doc} {
+      allow read, write: if isAdmin();
+    }
+  }
+}</pre>
+          <button class="btn-sm btn-ok" onclick="copyRules()" style="margin-top:8px;font-size:.72rem">📋 Regeln kopieren</button>
+        </div>
+
+
 
           <!-- AUSBILDER KARTE -->
           <div class="card">
@@ -779,6 +822,16 @@ function toggleSbSection(treeId, arrId){
 }
 
 // ── Sidebar Ausbildungsmeister Baum ──
+function copyRules(){
+  const txt = document.getElementById('rulesCode').textContent;
+  navigator.clipboard.writeText(txt).then(()=>toast('Regeln kopiert ✓')).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=txt; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('Regeln kopiert ✓');
+  });
+}
+
 function populateAusbBerufSelect(){
   const sel = document.getElementById('addAusbBerufInp');
   if(!sel) return;
@@ -1269,10 +1322,11 @@ function renderAusbListSettings(){
 function openAddAusbModal(){
   document.getElementById('addAusbId').value = '';
   document.getElementById('addAusbNameInp').value = '';
-  document.getElementById('addAusbBerufInp').value = '';
   document.getElementById('addAusbEmailInp').value = '';
   document.getElementById('addAusbDelBtn').style.display = 'none';
   document.getElementById('addAusbModalTit').textContent = 'Ausbilder hinzufügen';
+  populateAusbBerufSelect();
+  document.getElementById('addAusbBerufInp').value = '';
   document.getElementById('addAusbModal').classList.add('open');
   setTimeout(()=>document.getElementById('addAusbNameInp').focus(),60);
 }
@@ -1282,6 +1336,7 @@ function openEditAusbSettings(id){
   document.getElementById('addAusbId').value = id;
   document.getElementById('addAusbNameInp').value = a.name||'';
   document.getElementById('addAusbEmailInp').value = a.email||'';
+  populateAusbBerufSelect();
   document.getElementById('addAusbBerufInp').value = a.berufId||'';
   document.getElementById('addAusbDelBtn').style.display = 'flex';
   document.getElementById('addAusbModalTit').textContent = 'Ausbilder bearbeiten';
