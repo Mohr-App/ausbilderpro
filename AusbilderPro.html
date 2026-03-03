@@ -2380,10 +2380,18 @@ function dropToFehlt(e){
 
   // Fall 3: Aus Pool (mit Firestore-ID) in Fehlt
   if(_poolDragTnId && _poolDragKursId){
-    // Wiederholer-Flag vom Sitz entfernen (falls Schüler vorher als Wiederholer markiert war)
     const inst3=curInst();
     if(inst3 && _poolDragId){
-      Object.values(inst3.seats).forEach(d=>{ if(d && d.name===_poolDragId) delete d.wiederholer; });
+      // Sitz komplett leeren (Wiederholer-Schüler sitzt noch auf seinem Platz)
+      Object.entries(inst3.seats).forEach(([sid,d])=>{
+        if(d && d.name===_poolDragId){
+          ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst3.seats[sid][k]);
+        }
+      });
+      // In fehltStudents sichern
+      if(!inst3.fehltStudents) inst3.fehltStudents=[];
+      if(!inst3.fehltStudents.find(f=>f.name===_poolDragId))
+        inst3.fehltStudents.push({name:_poolDragId, company:'', profession:'', ausbjahr:'', poolTnId:_poolDragTnId, poolKursId:_poolDragKursId});
       persist(); renderSeats();
     }
     _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
