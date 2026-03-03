@@ -270,12 +270,31 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .history-item{padding:8px 10px;border-radius:8px;background:var(--sur2);border:1px solid var(--brd);margin-bottom:5px;}
 .hi-name{font-size:.78rem;font-weight:700;}
 .hi-meta{font-size:.63rem;color:var(--mu);font-family:monospace;}
-/* Sidebar Lehrjahr buttons */
-.sb-lj-item{margin-bottom:2px;}
-.sb-lj-btn{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:.75rem;font-weight:600;color:var(--tx);transition:all .12s;}
-.sb-lj-btn:hover{background:rgba(59,130,246,.1);color:var(--acc);}
-/* TN grid for wide layout */
-#globalTNList{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:6px;}
+/* Sidebar Beruf items */
+.sb-beruf-item{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 18px;border-radius:8px;cursor:pointer;font-size:.76rem;font-weight:500;color:var(--tx);transition:all .12s;margin-bottom:1px;}
+.sb-beruf-item:hover{background:rgba(59,130,246,.08);color:var(--acc);}
+.sb-beruf-item.active{background:rgba(59,130,246,.14);color:var(--acc);font-weight:700;}
+.sb-beruf-cnt{margin-left:auto;font-size:.62rem;color:var(--mu);background:var(--sur2);border-radius:10px;padding:1px 6px;min-width:18px;text-align:center;}
+/* TN grid */
+#globalTNList,#kursDetailTNGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:7px;}
+
+.kurs-section{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--brd);}
+.kurs-section:last-of-type{border-bottom:none;}
+.kurs-sec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.kurs-sec-num{width:20px;height:20px;border-radius:50%;background:var(--acc);color:#fff;font-size:.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.kurs-sec-hdr>span:not(.kurs-sec-num){font-size:.78rem;font-weight:700;color:var(--tx);flex:1;}
+.ks-add-btn{background:none;border:1px solid var(--acc);color:var(--acc);border-radius:6px;font-size:.68rem;padding:2px 8px;cursor:pointer;font-family:'Sora',sans-serif;transition:all .12s;}
+.ks-add-btn:hover{background:rgba(59,130,246,.1);}
+.ks-subform{display:flex;flex-direction:column;gap:6px;margin-top:6px;background:var(--sur2);border-radius:8px;padding:10px;}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px;min-height:28px;}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.72rem;font-weight:600;border:1.5px solid var(--brd);background:var(--sur2);color:var(--tx);cursor:pointer;transition:all .12s;}
+.chip:hover{border-color:var(--acc);color:var(--acc);}
+.chip.selected{background:rgba(59,130,246,.15);border-color:var(--acc);color:var(--acc);}
+.chip-edit{background:none;border:none;color:inherit;cursor:pointer;font-size:.7rem;opacity:.5;padding:0;line-height:1;}
+.chip-edit:hover{opacity:1;}
+.drow{display:flex;align-items:center;gap:4px;}
+.dpsel{flex:1;padding:6px 4px;border:1px solid var(--brd);border-radius:6px;background:var(--sur2);color:var(--tx);font-size:.76rem;}
+.dsep{color:var(--mu);font-weight:700;}
 </style>
 </head>
 <body>
@@ -310,10 +329,24 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <div id="sbAusbTree" class="sb-tree"><div class="sb-loading">Lädt…</div></div>
 
+      <div class="sb-sec-hdr" onclick="toggleSbSection('sbKurseTree','sbKurseArr')">
+        <span>📚 KURSE</span><span id="sbKurseArr" class="sb-arr">▼</span>
+      </div>
+      <div id="sbKurseTree" class="sb-tree"><div class="sb-loading">Laedt...</div></div>
+
       <div class="sb-sec-hdr" onclick="toggleSbSection('sbTnTree','sbTnArr')">
         <span>👥 TEILNEHMER</span><span id="sbTnArr" class="sb-arr">▼</span>
       </div>
-      <div id="sbTnTree" class="sb-tree"><div class="sb-loading">Lädt…</div></div>
+      <div id="sbTnTree" class="sb-tree">
+        <div class="sb-beruf-item" onclick="showTNByBeruf('elektro')" id="sbberuf-elektro">⚡ Elektro</div>
+        <div class="sb-beruf-item" onclick="showTNByBeruf('sanitaer')" id="sbberuf-sanitaer">🔧 Sanitär</div>
+        <div class="sb-beruf-item" onclick="showTNByBeruf('schreiner')" id="sbberuf-schreiner">🪵 Schreiner</div>
+        <div class="sb-beruf-item" onclick="showTNByBeruf('maler')" id="sbberuf-maler">🎨 Maler</div>
+        <div class="sb-beruf-item" onclick="showTNByBeruf('kfz')" id="sbberuf-kfz">🔩 KFZ</div>
+        <div class="sb-beruf-item" onclick="showTNByBeruf('metallbauer')" id="sbberuf-metallbauer">⚙️ Metallbauer</div>
+        <div class="sb-beruf-item" onclick="showTNByBeruf('baecker')" id="sbberuf-baecker">🍞 Bäcker</div>
+        <div class="sb-beruf-item" onclick="showTNByBeruf('baeckereifachverkauf')" id="sbberuf-baeckereifachverkauf">🥐 Bäckereifachverk.</div>
+      </div>
 
       <div style="flex:1"></div>
       <button class="sb-new-btn" onclick="showPage('kurse')">➕ Neuen Kurs erstellen</button>
@@ -363,28 +396,72 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
       <!-- KURSE -->
       <div class="page" id="page-kurse">
-        <div class="page-title">Kurse</div>
-        <div class="page-sub">Kurse erstellen und verwalten</div>
-        <div class="grid2">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0">
           <div>
-            <div class="card">
-              <div class="card-title">➕ Neuer Kurs</div>
-              <div class="fg"><label class="fl">Kursname / Lehrgangsbezeichnung</label><input class="fi" id="newKursName" placeholder="z.B. Elektroniker EuG 2024"></div>
-              <div class="form-row">
-                <div class="fg"><label class="fl">Von</label><input class="fi" type="date" id="newKursVon"></div>
-                <div class="fg"><label class="fl">Bis</label><input class="fi" type="date" id="newKursBis"></div>
-              </div>
-              <div class="fg"><label class="fl">E-Mail des Ausbilders <span style="color:var(--bad)">*</span></label>
-                <input class="fi" id="newKursAusbilder" placeholder="ausbilder@hbz.de" type="email" list="ausbilderEmailList">
-                <datalist id="ausbilderEmailList"></datalist>
-              </div>
-              <button class="btn-sm btn-ok" onclick="createKurs()" style="width:100%;margin-top:6px">✓ Kurs erstellen</button>
-            </div>
+            <div class="page-title" id="kursePageTitle">Kurse</div>
+            <div class="page-sub" id="kursePageSub">Bitte Kurs in der Sidebar auswählen</div>
           </div>
-          <div>
-            <div class="card" style="max-height:500px;overflow-y:auto">
-              <div class="card-title">📚 Alle Kurse <span id="kursCnt" style="font-size:.7rem;color:var(--mu);font-weight:400"></span></div>
-              <div id="kursList"><div class="empty">Lädt…</div></div>
+          <button class="btn-sm btn-ok" onclick="openNewKursModal()" style="padding:8px 16px;font-size:.8rem">+ Neuer Kurs</button>
+        </div>
+
+        <!-- Kurs Detail oder Übersicht -->
+        <div id="kurseDetailWrap" style="height:calc(100vh - 200px);overflow-y:auto">
+          <div class="empty" style="padding:60px;text-align:center">👈 Kurs in der Sidebar auswählen</div>
+        </div>
+      </div>
+
+      <!-- NEUER KURS MODAL -->
+      <div class="ov" id="newKursModal" onclick="if(event.target===this)closeNewKursModal()">
+        <div class="modal" style="max-width:500px">
+          <div class="mhd"><div class="mtit" id="kursModalTit">Neuen Kurs erstellen</div><button class="xcls" onclick="closeNewKursModal()">&#10005;</button></div>
+          <div class="mbdy">
+            <!-- 1: AUSBILDER -->
+            <div class="kurs-section">
+              <div class="kurs-sec-hdr"><span class="kurs-sec-num">1</span><span>Ausbilder</span><button class="ks-add-btn" onclick="toggleNewAusbForm()">+ Neu anlegen</button></div>
+              <div id="ausbChips" class="chip-row"></div>
+              <div id="newAusbForm" class="ks-subform" style="display:none">
+                <input class="fi" id="newAusbName" placeholder="Name des Ausbilders">
+                <input class="fi" id="newAusbEmail" placeholder="E-Mail (optional)" type="email">
+                <button class="btn-sm btn-ok" onclick="saveNewAusbilder()" style="align-self:flex-end">&#10003; Speichern</button>
+              </div>
+            </div>
+            <!-- 2: LEHRGANGSART -->
+            <div class="kurs-section">
+              <div class="kurs-sec-hdr"><span class="kurs-sec-num">2</span><span>Lehrgangsart</span><button class="ks-add-btn" onclick="toggleNewLgartForm()">+ Neu anlegen</button></div>
+              <div id="lgartChips" class="chip-row"></div>
+              <div id="newLgartForm" class="ks-subform" style="display:none">
+                <input class="fi" id="newLgartName" placeholder="z.B. Elektroniker EuG, Sanitärinstallateur …">
+                <button class="btn-sm btn-ok" onclick="saveNewLgart()" style="align-self:flex-end">&#10003; Speichern</button>
+              </div>
+            </div>
+            <!-- 3: DATUM -->
+            <div class="kurs-section">
+              <div class="kurs-sec-hdr"><span class="kurs-sec-num">3</span><span>Lehrgangsdatum</span></div>
+              <div class="form-row" style="gap:10px">
+                <div class="fg" style="flex:1"><label class="fl">Von</label>
+                  <div class="drow"><select class="dpsel" id="kVonD"><option value="">TT</option></select><span class="dsep">.</span><select class="dpsel" id="kVonM"></select><span class="dsep">.</span><select class="dpsel" id="kVonY"><option value="">JJJJ</option></select></div>
+                </div>
+                <div class="fg" style="flex:1"><label class="fl">Bis</label>
+                  <div class="drow"><select class="dpsel" id="kBisD"><option value="">TT</option></select><span class="dsep">.</span><select class="dpsel" id="kBisM"></select><span class="dsep">.</span><select class="dpsel" id="kBisY"><option value="">JJJJ</option></select></div>
+                </div>
+              </div>
+            </div>
+            <button class="btn-sm btn-ok" onclick="createKurs()" style="width:100%;margin-top:10px">&#10003; Kurs erstellen</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUSBILDER BEARBEITEN MODAL -->
+      <div class="ov" id="editAusbModal" onclick="if(event.target===this)closeEditAusbModal()">
+        <div class="modal" style="max-width:380px">
+          <div class="mhd"><div class="mtit">Ausbilder bearbeiten</div><button class="xcls" onclick="closeEditAusbModal()">&#10005;</button></div>
+          <div class="mbdy">
+            <input type="hidden" id="editAusbId">
+            <div class="fg"><label class="fl">Name</label><input class="fi" id="editAusbName"></div>
+            <div class="fg"><label class="fl">E-Mail</label><input class="fi" id="editAusbEmail" type="email"></div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="btn-sm" style="flex:1;background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)" onclick="deleteAusbilder()">&#128465; Löschen</button>
+              <button class="btn-sm btn-ok" style="flex:2" onclick="saveEditAusbilder()">&#10003; Speichern</button>
             </div>
           </div>
         </div>
@@ -392,43 +469,22 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <!-- TEILNEHMER -->
       <div class="page" id="page-teilnehmer">
-        <div class="page-title">Teilnehmer</div>
-        <div class="page-sub">Globale Datenbank</div>
-        <div style="display:flex;flex-direction:column;gap:10px;height:calc(100vh - 140px)">
-
-          <!-- Suchleiste + Filter -->
-          <div class="card" style="padding:12px;flex-shrink:0">
-            <div style="display:flex;gap:8px;margin-bottom:10px">
-              <input class="fi" id="tnSearch" placeholder="&#128269; Name, Firma, Beruf..." oninput="filterGlobalTN()" style="flex:1;padding:8px 12px">
-              <button class="btn-sm btn-ok" onclick="openNewTNModal()" style="padding:8px 14px;white-space:nowrap;font-size:.8rem">+ Neu</button>
-            </div>
-            <!-- Berufsgruppen Tabs -->
-            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
-              <button class="tn-filter active" data-bg="alle" onclick="setTNBerufFilter('alle')">Alle Berufe</button>
-              <button class="tn-filter" data-bg="elektro" onclick="setTNBerufFilter('elektro')">⚡ Elektro</button>
-              <button class="tn-filter" data-bg="schreiner" onclick="setTNBerufFilter('schreiner')">🪵 Schreiner</button>
-              <button class="tn-filter" data-bg="kfz" onclick="setTNBerufFilter('kfz')">🔧 KFZ</button>
-              <button class="tn-filter" data-bg="hls" onclick="setTNBerufFilter('hls')">🔨 Sanitär / HLS</button>
-              <button class="tn-filter" data-bg="bau" onclick="setTNBerufFilter('bau')">🏗 Bau</button>
-              <button class="tn-filter" data-bg="maler" onclick="setTNBerufFilter('maler')">🎨 Maler</button>
-              <button class="tn-filter" data-bg="andere" onclick="setTNBerufFilter('andere')">Sonstige</button>
-            </div>
-            <!-- Kurs-Status Filter -->
-            <div style="display:flex;gap:5px;flex-wrap:wrap">
-              <button class="tn-filter active" data-f="all" onclick="setTNFilter('all')">Alle</button>
-              <button class="tn-filter" data-f="offen" onclick="setTNFilter('offen')">&#9675; Ohne Kurs</button>
-              <button class="tn-filter" data-f="aktiv" onclick="setTNFilter('aktiv')">&#10003; Im Kurs</button>
-            </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0">
+          <div>
+            <div class="page-title" id="tnPageTitle">Teilnehmer</div>
+            <div class="page-sub" id="tnPageSub">Bitte Berufsgruppe in der Sidebar auswählen</div>
           </div>
+          <button class="btn-sm btn-ok" onclick="openNewTNModal()" style="padding:8px 16px;font-size:.8rem">+ Neu anlegen</button>
+        </div>
 
-          <!-- TN Liste -->
-          <div class="card" style="flex:1;overflow-y:auto;padding:10px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)" id="tnListLabel">TEILNEHMER</div>
-              <span id="tnListCnt" style="font-size:.7rem;color:var(--mu)"></span>
-            </div>
-            <div id="globalTNList"><div class="empty">Lädt…</div></div>
-          </div>
+        <!-- Suchleiste -->
+        <div class="card" style="padding:10px 12px;margin-bottom:10px;flex-shrink:0">
+          <input class="fi" id="tnSearch" placeholder="&#128269; Name, Firma suchen…" oninput="filterGlobalTN()" style="width:100%;padding:7px 12px;box-sizing:border-box">
+        </div>
+
+        <!-- TN Liste -->
+        <div class="card" style="flex:1;overflow-y:auto;padding:12px;height:calc(100vh - 240px);overflow-y:auto">
+          <div id="globalTNList"><div class="empty" style="padding:40px;text-align:center">👈 Berufsgruppe in der Sidebar auswählen</div></div>
         </div>
       </div>
 
@@ -612,8 +668,7 @@ function showPage(id){
   const navBtn=document.getElementById('nav-'+id);
   if(navBtn) navBtn.classList.add('active');
   if(id==='dashboard') loadDashboard();
-  if(id==='kurse') renderKursList();
-  if(id==='teilnehmer'){populateKursSelects();initGlobalTN();}
+  if(id==='teilnehmer') initGlobalTN();
   if(id==='dokumente') populateKursSelects();
   if(id==='ordner') loadOrdner();
 }
@@ -678,33 +733,27 @@ function renderSbAusbTree(){
 
 // ── Sidebar Teilnehmer Baum (nur Lehrjahr) ──
 function renderSbTnTree(){
-  const root=document.getElementById('sbTnTree');
-  if(!root) return;
-  const list=_globalTN;
-  if(!list.length){root.innerHTML='<div class="sb-loading">Keine Teilnehmer</div>';return;}
-  const byLj={};
-  list.forEach(t=>{
-    const lj=t.ausbjahr?String(t.ausbjahr):'?';
-    if(!byLj[lj]) byLj[lj]=[];
-    byLj[lj].push(t);
+  // Counts per beruf key from globalTN
+  const counts={};
+  _globalTN.forEach(t=>{
+    const k=getBerufKey(t.beruf);
+    counts[k]=(counts[k]||0)+1;
   });
-  root.innerHTML='';
-  ['1','2','3','4','?'].forEach(lj=>{
-    const tns=byLj[lj];
-    if(!tns||!tns.length) return;
-    const label=lj==='?'?'Lehrjahr unbekannt':lj+'. Lehrjahr';
-    const filterVal=lj==='?'?'':lj;
-    const div=document.createElement('div');
-    div.className='sb-lj-item';
-    div.innerHTML='<div class="sb-lj-btn" onclick="setTNLjFilter(\''+filterVal+'\')">'+
-      '<span>🎓</span><span style="flex:1">'+label+'</span>'+
-      '<span style="font-size:.6rem;color:var(--mu)">'+tns.length+'</span></div>';
-    root.appendChild(div);
+  // Update counts in sidebar items
+  Object.keys(BERUFE).forEach(key=>{
+    const el=document.getElementById('sbberuf-'+key);
+    if(!el) return;
+    const n=counts[key]||0;
+    // Show count badge
+    let badge=el.querySelector('.sb-beruf-cnt');
+    if(!badge){badge=document.createElement('span');badge.className='sb-beruf-cnt';el.appendChild(badge);}
+    badge.textContent=n||'';
   });
 }
 
 // ── Load All ──
 function loadAll(){
+  loadKursSettings();
   db.collection('shared').doc('kurse').collection('list')
     .orderBy('createdAt','desc').onSnapshot(snap=>{
       _kurse = [];
@@ -713,6 +762,7 @@ function loadAll(){
       populateKursSelects();
       loadDashboard();
       renderSbAusbTree();
+      renderSbKurseTree();
       renderSbTnTree();
       if(window._globalTNLoaded) filterGlobalTN();
     });
@@ -815,49 +865,331 @@ function loadDashboard(){
 }
 
 // ── Kurse ──
-function createKurs(){
-  const name = document.getElementById('newKursName').value.trim();
-  const ausb = document.getElementById('newKursAusbilder').value.trim();
-  if(!name){ toast('Bitte Kursname eingeben','bad'); return; }
-  if(!ausb||!ausb.includes('@')){ toast('Bitte gültige E-Mail des Ausbilders eingeben','bad'); return; }
-  const von  = document.getElementById('newKursVon').value;
-  const bis  = document.getElementById('newKursBis').value;
-  db.collection('shared').doc('kurse').collection('list').add({
-    name, von, bis, ausbilderEmail: ausb.toLowerCase(),
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: _uid
-  }).then(()=>{
-    document.getElementById('newKursName').value='';
-    document.getElementById('newKursVon').value='';
-    document.getElementById('newKursBis').value='';
-    document.getElementById('newKursAusbilder').value='';
-    toast('Kurs erstellt ✓');
-  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+
+// ── Kurs Settings (Ausbilder + Lehrgangsarten) ──────────────────────────
+let _ausbilder = [];  // [{id,name,email}]
+let _lehrgangsarten = []; // [{id,name}]
+let _kursForm = { ausbId: null, lgartId: null }; // selected in modal
+
+function loadKursSettings() {
+  db.collection('shared').doc('kursSettings').collection('ausbilder')
+    .orderBy('name').onSnapshot(snap => {
+      _ausbilder = [];
+      snap.forEach(doc => _ausbilder.push({id: doc.id, ...doc.data()}));
+      renderAusbChips();
+    });
+  db.collection('shared').doc('kursSettings').collection('lehrgangsarten')
+    .orderBy('name').onSnapshot(snap => {
+      _lehrgangsarten = [];
+      snap.forEach(doc => _lehrgangsarten.push({id: doc.id, ...doc.data()}));
+      renderLgartChips();
+    });
 }
 
-function renderKursList(){
-  const el = document.getElementById('kursList');
-  document.getElementById('kursCnt').textContent = '('+_kurse.length+')';
-  if(!_kurse.length){ el.innerHTML='<div class="empty">Noch keine Kurse</div>'; return; }
-  el.innerHTML = _kurse.map(k=>`
-    <div class="kurs-item">
-      <div class="kurs-dot"></div>
-      <div class="kurs-info">
-        <div class="kurs-name">${esc(k.name)}</div>
-        <div class="kurs-meta">${k.von||'?'} – ${k.bis||'?'}${k.ausbilderEmail?' · '+esc(k.ausbilderEmail):''}</div>
-        <div class="kurs-cnt" id="kcnt-${k.id}">…</div>
-      </div>
-      <button class="kurs-del" onclick="deleteKurs('${k.id}',event)">🗑</button>
-    </div>`).join('');
-  // Load teilnehmer counts
-  _kurse.forEach(k=>{
-    db.collection('shared').doc('kurse').collection('list').doc(k.id).collection('teilnehmer').get()
-      .then(s=>{ const el2=document.getElementById('kcnt-'+k.id); if(el2)el2.textContent=s.size+' Teilnehmer'; });
+function renderAusbChips() {
+  const row = document.getElementById('ausbChips');
+  if (!row) return;
+  if (!_ausbilder.length) { row.innerHTML = '<span style="font-size:.7rem;color:var(--mu)">Noch kein Ausbilder angelegt</span>'; return; }
+  row.innerHTML = '';
+  _ausbilder.forEach(a => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (_kursForm.ausbId === a.id ? ' selected' : '');
+    chip.innerHTML = esc(a.name)
+      + '<button class="chip-edit" onclick="event.stopPropagation();openEditAusbilder(\'' + a.id + '\')" title="Bearbeiten">&#9998;</button>';
+    chip.onclick = function() { _kursForm.ausbId = a.id; renderAusbChips(); };
+    row.appendChild(chip);
   });
 }
 
+function renderLgartChips() {
+  const row = document.getElementById('lgartChips');
+  if (!row) return;
+  if (!_lehrgangsarten.length) { row.innerHTML = '<span style="font-size:.7rem;color:var(--mu)">Noch keine Lehrgangsart angelegt</span>'; return; }
+  row.innerHTML = '';
+  _lehrgangsarten.forEach(l => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (_kursForm.lgartId === l.id ? ' selected' : '');
+    chip.innerHTML = esc(l.name);
+    chip.onclick = function() { _kursForm.lgartId = l.id; renderLgartChips(); };
+    row.appendChild(chip);
+  });
+}
+
+function toggleNewAusbForm() {
+  const f = document.getElementById('newAusbForm');
+  f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+  if (f.style.display === 'flex') setTimeout(() => document.getElementById('newAusbName').focus(), 60);
+}
+function toggleNewLgartForm() {
+  const f = document.getElementById('newLgartForm');
+  f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+  if (f.style.display === 'flex') setTimeout(() => document.getElementById('newLgartName').focus(), 60);
+}
+
+function saveNewAusbilder() {
+  const name = (document.getElementById('newAusbName').value || '').trim();
+  const email = (document.getElementById('newAusbEmail').value || '').trim().toLowerCase();
+  if (!name) { toast('Bitte Namen eingeben', 'bad'); return; }
+  db.collection('shared').doc('kursSettings').collection('ausbilder').add({ name, email })
+    .then(ref => {
+      _kursForm.ausbId = ref.id;
+      document.getElementById('newAusbName').value = '';
+      document.getElementById('newAusbEmail').value = '';
+      document.getElementById('newAusbForm').style.display = 'none';
+      toast('Ausbilder gespeichert ✓');
+    }).catch(err => toast('Fehler: ' + err.message, 'bad'));
+}
+
+function saveNewLgart() {
+  const name = (document.getElementById('newLgartName').value || '').trim();
+  if (!name) { toast('Bitte Bezeichnung eingeben', 'bad'); return; }
+  db.collection('shared').doc('kursSettings').collection('lehrgangsarten').add({ name })
+    .then(ref => {
+      _kursForm.lgartId = ref.id;
+      document.getElementById('newLgartName').value = '';
+      document.getElementById('newLgartForm').style.display = 'none';
+      toast('Lehrgangsart gespeichert ✓');
+    }).catch(err => toast('Fehler: ' + err.message, 'bad'));
+}
+
+// Ausbilder edit modal
+function openEditAusbilder(id) {
+  const a = _ausbilder.find(x => x.id === id);
+  if (!a) return;
+  document.getElementById('editAusbId').value = id;
+  document.getElementById('editAusbName').value = a.name || '';
+  document.getElementById('editAusbEmail').value = a.email || '';
+  document.getElementById('editAusbModal').classList.add('open');
+}
+function closeEditAusbModal() { document.getElementById('editAusbModal').classList.remove('open'); }
+function saveEditAusbilder() {
+  const id = document.getElementById('editAusbId').value;
+  const name = (document.getElementById('editAusbName').value || '').trim();
+  const email = (document.getElementById('editAusbEmail').value || '').trim().toLowerCase();
+  if (!name) { toast('Name darf nicht leer sein', 'bad'); return; }
+  db.collection('shared').doc('kursSettings').collection('ausbilder').doc(id)
+    .update({ name, email })
+    .then(() => { closeEditAusbModal(); toast('Gespeichert ✓'); })
+    .catch(err => toast('Fehler: ' + err.message, 'bad'));
+}
+function deleteAusbilder() {
+  const id = document.getElementById('editAusbId').value;
+  if (!confirm('Ausbilder wirklich löschen?')) return;
+  db.collection('shared').doc('kursSettings').collection('ausbilder').doc(id).delete()
+    .then(() => { closeEditAusbModal(); toast('Gelöscht'); })
+    .catch(err => toast('Fehler: ' + err.message, 'bad'));
+}
+
+// Date select helpers
+function buildDateSelects() {
+  const months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  ['kVonD','kBisD'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel || sel.options.length > 1) return;
+    for (let d = 1; d <= 31; d++) { const o = document.createElement('option'); o.value = String(d).padStart(2,'0'); o.textContent = String(d).padStart(2,'0'); sel.appendChild(o); }
+  });
+  ['kVonM','kBisM'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel || sel.options.length > 0) return;
+    sel.innerHTML = '<option value="">MM</option>';
+    months.forEach((m,i) => { const o = document.createElement('option'); o.value = String(i+1).padStart(2,'0'); o.textContent = m; sel.appendChild(o); });
+  });
+  const yr = new Date().getFullYear();
+  ['kVonY','kBisY'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel || sel.options.length > 1) return;
+    for (let y = yr-1; y <= yr+5; y++) { const o = document.createElement('option'); o.value = String(y); o.textContent = String(y); sel.appendChild(o); }
+  });
+}
+
+function getDateFromSelects(pref) {
+  const d = document.getElementById(pref+'D').value;
+  const m = document.getElementById(pref+'M').value;
+  const y = document.getElementById(pref+'Y').value;
+  if (!d || !m || !y) return '';
+  return y + '-' + m + '-' + d;
+}
+
+function createKurs(){
+  const ausbObj = _ausbilder.find(a => a.id === _kursForm.ausbId);
+  if (!ausbObj) { toast('Bitte Ausbilder auswählen oder anlegen', 'bad'); return; }
+  const lgartObj = _lehrgangsarten.find(l => l.id === _kursForm.lgartId);
+  if (!lgartObj) { toast('Bitte Lehrgangsart auswählen oder anlegen', 'bad'); return; }
+  const von = getDateFromSelects('kVon');
+  const bis = getDateFromSelects('kBis');
+  const name = lgartObj.name;
+  db.collection('shared').doc('kurse').collection('list').add({
+    name,
+    lehrgangsart: lgartObj.name,
+    lehrgangsartId: lgartObj.id,
+    ausbilderName: ausbObj.name,
+    ausbilderEmail: ausbObj.email || '',
+    ausbilderId: ausbObj.id,
+    von, bis,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    createdBy: _uid
+  }).then(() => {
+    closeNewKursModal();
+    toast('Kurs erstellt ✓');
+  }).catch(err => toast('Fehler: ' + err.message, 'bad'));
+}
+
+
+function renderKursList(){
+  // kept for compatibility – just re-renders sidebar
+  renderSbKurseTree();
+}
+
+function renderSbKurseTree(){
+  const root=document.getElementById('sbKurseTree');
+  if(!root) return;
+  if(!_kurse.length){root.innerHTML='<div class="sb-loading">Keine Kurse</div>';return;}
+  const today=new Date().toISOString().slice(0,10);
+  // Beruf -> Ausbilder -> Kurse
+  const byBeruf={};
+  _kurse.forEach(k=>{
+    const bKey=getBerufKey(k.name);
+    const bDef=BERUFE[bKey];
+    if(!byBeruf[bKey]) byBeruf[bKey]={label:bDef?bDef.label:'Sonstige',ausbilder:{}};
+    const aKey=(k.ausbilderEmail||'unbekannt').toLowerCase();
+    const aLabel=aKey==='unbekannt'?'Kein Ausbilder':aKey.split('@')[0];
+    if(!byBeruf[bKey].ausbilder[aKey]) byBeruf[bKey].ausbilder[aKey]={label:aLabel,kurse:[]};
+    byBeruf[bKey].ausbilder[aKey].kurse.push(k);
+  });
+  root.innerHTML='';
+  Object.keys(BERUFE).forEach(bKey=>{
+    const beruf=byBeruf[bKey];
+    if(!beruf) return;
+    const tot=Object.values(beruf.ausbilder).reduce((s,a)=>s+a.kurse.length,0);
+    // Beruf-Ebene (aufklappbar)
+    const bDiv=document.createElement('div'); bDiv.className='sb-branche';
+    const bHdr=document.createElement('div'); bHdr.className='sb-branche-hdr';
+    bHdr.innerHTML='<span class="sba">&#9654;</span><span>'+beruf.label+'</span><span style="margin-left:auto;font-size:.6rem;color:var(--mu)">'+tot+'</span>';
+    const bBody=document.createElement('div'); bBody.className='sb-branche-body';
+    bHdr.onclick=function(){this.classList.toggle('open');bBody.classList.toggle('open');};
+    // Ausbilder-Ebene
+    Object.entries(beruf.ausbilder).forEach(function(ent){
+      const ausb=ent[1];
+      const aDiv=document.createElement('div'); aDiv.className='sb-ausb';
+      const aHdr=document.createElement('div'); aHdr.className='sb-ausb-hdr';
+      aHdr.innerHTML='<span class="sa">&#9654;</span><span>&#128100;</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis">'+esc(ausb.label)+'</span><span style="font-size:.6rem;color:var(--mu)">'+ausb.kurse.length+'</span>';
+      const aBody=document.createElement('div'); aBody.className='sb-ausb-body';
+      aHdr.onclick=function(){this.classList.toggle('open');aBody.classList.toggle('open');};
+      // Lehrgang-Ebene
+      ausb.kurse.forEach(function(k){
+        const lauf=k.von&&k.bis&&today>=k.von&&today<=k.bis;
+        const lg=document.createElement('div');
+        lg.className='sb-lg'+(_kurseSelected===k.id?' active':'');
+        lg.innerHTML='<div class="sb-lg-dot" style="background:'+(lauf?'#22c55e':'var(--brd)')+'"></div>'
+          +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis">'+esc(k.name)+'</span>'
+          +(lauf?'<span style="font-size:.5rem;color:#22c55e">&#9654;</span>':'');
+        lg.onclick=function(){showKursDetail(k.id);};
+        aBody.appendChild(lg);
+      });
+      aDiv.appendChild(aHdr); aDiv.appendChild(aBody); bBody.appendChild(aDiv);
+    });
+    bDiv.appendChild(bHdr); bDiv.appendChild(bBody); root.appendChild(bDiv);
+  });
+}
+
+function showKurseByBeruf(key){
+  const def=BERUFE[key];
+  // Sidebar highlight
+  document.querySelectorAll('[id^="sbkberuf-"]').forEach(el=>el.classList.toggle('active',el.id==='sbkberuf-'+key));
+  // Page header
+  const titleEl=document.getElementById('kursePageTitle');
+  const subEl=document.getElementById('kursePageSub');
+  if(titleEl) titleEl.textContent=def?def.label:'Kurse';
+  if(subEl) subEl.textContent='Alle Kurse dieser Berufsgruppe';
+  showPage('kurse');
+  // Filter courses by beruf
+  const today=new Date().toISOString().slice(0,10);
+  const filtered=_kurse.filter(k=>getBerufKey(k.name)===key);
+  const wrap=document.getElementById('kurseDetailWrap');
+  if(!filtered.length){
+    wrap.innerHTML='<div class="card"><div class="empty" style="padding:40px;text-align:center">Keine Kurse für diese Berufsgruppe</div></div>';
+    return;
+  }
+  wrap.innerHTML='<div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu);margin-bottom:8px">KURSE ('+filtered.length+')</div><div id="kurseBerufList"></div>';
+  const list=document.getElementById('kurseBerufList');
+  filtered.forEach(k=>{
+    const laufend=k.von&&k.bis&&today>=k.von&&today<=k.bis;
+    const item=document.createElement('div');
+    item.className='kurs-item';
+    item.style.cursor='pointer';
+    item.onclick=()=>showKursDetail(k.id);
+    item.innerHTML=
+      '<div class="kurs-dot" style="background:'+(laufend?'#22c55e':'var(--mu)')+'"></div>'+
+      '<div class="kurs-info" style="flex:1">'+
+        '<div class="kurs-name">'+esc(k.name)+'</div>'+
+        '<div class="kurs-meta">'+(k.von||'?')+' – '+(k.bis||'?')+(k.ausbilderEmail?' · '+esc(k.ausbilderEmail.split('@')[0]):'')+(laufend?' <span style="color:#22c55e;font-weight:700">● Laufend</span>':'')+'</div>'+
+      '</div>'+
+      '<span class="sb-beruf-cnt" id="kcnt-'+k.id+'">…</span>'+
+      '<button class="kurs-del" onclick="deleteKurs(\''+k.id+'\',event)" title="Löschen">🗑</button>';
+    list.appendChild(item);
+    db.collection('globalTN').where('aktiverKursId','==',k.id).get()
+      .then(s=>{const e=document.getElementById('kcnt-'+k.id);if(e)e.textContent=s.size+' TN';});
+  });
+}
+
+let _kurseSelected=null;
+
+function showKursDetail(kursId){
+  _kurseSelected=kursId;
+  const k=_kurse.find(x=>x.id===kursId);
+  if(!k) return;
+  const titleEl=document.getElementById('kursePageTitle');
+  const subEl=document.getElementById('kursePageSub');
+  if(titleEl) titleEl.textContent=k.name;
+  const today=new Date().toISOString().slice(0,10);
+  const laufend=k.von&&k.bis&&today>=k.von&&today<=k.bis;
+  if(subEl) subEl.innerHTML=(laufend?'<span style="color:#22c55e">● Laufend</span>':'<span style="color:var(--mu)">○ Inaktiv</span>')+
+    ' &middot; '+(k.von||'?')+' – '+(k.bis||'?')+(k.ausbilderEmail?' &middot; '+esc(k.ausbilderEmail):'');
+  const wrap=document.getElementById('kurseDetailWrap');
+  wrap.innerHTML='<div class="empty">Lädt…</div>';
+  db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
+    const tns=[];
+    snap.forEach(doc=>tns.push({id:doc.id,...doc.data()}));
+    tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||''));
+    if(!tns.length){
+      wrap.innerHTML='<div class="card"><div class="empty" style="padding:40px;text-align:center">Noch keine Teilnehmer in diesem Kurs</div></div>';
+      return;
+    }
+    wrap.innerHTML='<div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu);margin-bottom:8px">TEILNEHMER ('+tns.length+')</div><div id="kursDetailTNGrid"></div>';
+    const grid=document.getElementById('kursDetailTNGrid');
+    tns.forEach(t=>{
+      const name=(t.vorname||'')+' '+(t.nachname||'');
+      const init=((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
+      const vtag=t.verkuerzer?' <span class="gtn-badge" style="background:rgba(99,102,241,.12);color:#6366f1">Verk.</span>':'';
+      const wtag=t.wiederholer?' <span class="gtn-badge" style="background:rgba(245,158,11,.12);color:#d97706">Wdh.</span>':'';
+      const card=document.createElement('div');
+      card.className='gtn-card';
+      card.innerHTML=
+        '<div class="gtn-av av-ok">'+esc(init)+'</div>'+
+        '<div class="gtn-info">'+
+          '<div class="gtn-name">'+esc(name.trim())+vtag+wtag+'</div>'+
+          '<div class="gtn-sub">'+(t.beruf||'kein Beruf')+(t.ausbjahr?' · '+t.ausbjahr+'. Lj':'')+(t.firma?' · '+esc(t.firma):'')+'</div>'+
+        '</div>'+
+        '<button class="gtn-open" onclick="openTNProfile(\''+t.id+'\')">Profil</button>';
+      grid.appendChild(card);
+    });
+  }).catch(err=>{wrap.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
+}
+
+function openNewKursModal(){
+  _kursForm = { ausbId: null, lgartId: null };
+  ['newAusbForm','newLgartForm'].forEach(id=>{ const e=document.getElementById(id); if(e)e.style.display='none'; });
+  ['newAusbName','newAusbEmail','newLgartName'].forEach(id=>{ const e=document.getElementById(id); if(e)e.value=''; });
+  buildDateSelects();
+  renderAusbChips();
+  renderLgartChips();
+  document.getElementById('newKursModal').classList.add('open');
+}
+function closeNewKursModal(){document.getElementById('newKursModal').classList.remove('open');}
+
 function deleteKurs(id,e){
   e.stopPropagation();
-  if(!confirm('Kurs wirklich löschen? Alle Teilnehmer und Dokumente werden ebenfalls gelöscht!')) return;
+  if(!confirm('Kurs wirklich löschen?')) return;
   db.collection('shared').doc('kurse').collection('list').doc(id).delete().then(()=>toast('Kurs gelöscht'));
 }
 
@@ -873,16 +1205,25 @@ function populateKursSelects(){
 }
 
 // ── Globale Teilnehmer DB ──
-let _globalTN=[],_tnFilter='all',_tnBerufFilter='alle',_tnLjFilter='',_dragTNId=null;
+let _globalTN=[],_tnBerufFilter='',_dragTNId=null;
 
-function getBerufGruppe(beruf){
+// Beruf-Schlüssel → Anzeigetext + Keywords
+const BERUFE={
+  elektro:    {label:'⚡ Elektro',           keys:/elektro|mechatronik|elektronik/},
+  sanitaer:   {label:'🔧 Sanitär',           keys:/sanitär|heizung|klima|gas|rohr|installateur/},
+  schreiner:  {label:'🪵 Schreiner',         keys:/schreiner|tischler/},
+  maler:      {label:'🎨 Maler',             keys:/maler|lackier/},
+  kfz:        {label:'🔩 KFZ',              keys:/kfz|kraftfahrzeug|fahrzeug|auto/},
+  metallbauer:{label:'⚙️ Metallbauer',       keys:/metall|metallbauer|zerspanungs/},
+  baecker:    {label:'🍞 Bäcker',            keys:/bäcker(?!eifach)/},
+  baeckereifachverkauf:{label:'🥐 Bäckereifachverk.',keys:/bäckereifach/}
+};
+
+function getBerufKey(beruf){
   const b=(beruf||'').toLowerCase();
-  if(/elektro|mechatronik|elektronik/.test(b)) return 'elektro';
-  if(/schreiner|tischler/.test(b)) return 'schreiner';
-  if(/kfz|kraftfahrzeug|fahrzeug|auto/.test(b)) return 'kfz';
-  if(/sanitär|heizung|klima|hls|gas|rohr|installateur/.test(b)) return 'hls';
-  if(/bau|maurer|zimmerer|stuckat|fliesen|estrich/.test(b)) return 'bau';
-  if(/maler|lackier/.test(b)) return 'maler';
+  for(const [key,def] of Object.entries(BERUFE)){
+    if(def.keys.test(b)) return key;
+  }
   return 'andere';
 }
 
@@ -890,78 +1231,58 @@ function loadGlobalTN(){
   db.collection('globalTN').orderBy('nachname').onSnapshot(snap=>{
     _globalTN=[];
     snap.forEach(doc=>_globalTN.push({id:doc.id,...doc.data()}));
-    filterGlobalTN();
     renderSbTnTree();
+    if(_tnBerufFilter) filterGlobalTN();
   });
+}
+
+function showTNByBeruf(key){
+  _tnBerufFilter=key;
+  // Sidebar highlight
+  document.querySelectorAll('.sb-beruf-item').forEach(el=>el.classList.toggle('active',el.id==='sbberuf-'+key));
+  // Update page header
+  const def=BERUFE[key];
+  const titleEl=document.getElementById('tnPageTitle');
+  const subEl=document.getElementById('tnPageSub');
+  if(titleEl) titleEl.textContent=def?def.label:'Teilnehmer';
+  if(subEl) subEl.textContent='Globale Datenbank';
+  // Navigate and load
+  showPage('teilnehmer');
+  initGlobalTN();
+  setTimeout(filterGlobalTN, 80);
 }
 
 function filterGlobalTN(){
   const q=(document.getElementById('tnSearch')?.value||'').toLowerCase();
   let list=_globalTN;
-  if(_tnFilter==='offen') list=list.filter(t=>!t.aktiverKursId);
-  if(_tnFilter==='aktiv') list=list.filter(t=>!!t.aktiverKursId);
-  if(_tnBerufFilter!=='alle') list=list.filter(t=>getBerufGruppe(t.beruf)===_tnBerufFilter);
-  if(_tnLjFilter) list=list.filter(t=>String(t.ausbjahr)===String(_tnLjFilter));
+  if(_tnBerufFilter) list=list.filter(t=>getBerufKey(t.beruf)===_tnBerufFilter);
   if(q) list=list.filter(t=>(t.vorname+' '+t.nachname+' '+(t.firma||'')+' '+(t.beruf||'')).toLowerCase().includes(q));
-  const cnt=document.getElementById('tnListCnt');
-  if(cnt) cnt.textContent=list.length+' TN';
-  const lbl=document.getElementById('tnListLabel');
-  if(lbl){
-    let parts=[];
-    if(_tnLjFilter) parts.push(_tnLjFilter+'. LEHRJAHR');
-    if(_tnBerufFilter!=='alle') parts.push(_tnBerufFilter.toUpperCase());
-    lbl.textContent=parts.length?parts.join(' · '):'ALLE TEILNEHMER';
-  }
   renderGlobalTNList(list);
-}
-
-function setTNFilter(f){
-  _tnFilter=f;
-  document.querySelectorAll('.tn-filter[data-f]').forEach(b=>b.classList.toggle('active',b.dataset.f===f));
-  filterGlobalTN();
-}
-
-function setTNBerufFilter(bg){
-  _tnBerufFilter=bg;
-  document.querySelectorAll('.tn-filter[data-bg]').forEach(b=>b.classList.toggle('active',b.dataset.bg===bg));
-  filterGlobalTN();
-}
-
-function setTNLjFilter(lj){
-  _tnLjFilter=lj;
-  showPage('teilnehmer');
-  setTimeout(()=>{initGlobalTN();filterGlobalTN();},100);
 }
 
 function renderGlobalTNList(list){
   const el=document.getElementById('globalTNList');
   if(!el) return;
-  if(!list.length){el.innerHTML='<div class="empty">Keine Teilnehmer</div>';return;}
+  if(!list.length){el.innerHTML='<div class="empty">Keine Teilnehmer gefunden</div>';return;}
   el.innerHTML='';
   list.forEach(t=>{
     const name=(t.vorname||'')+' '+(t.nachname||'');
     const init=((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
     const inKurs=!!t.aktiverKursId;
     const kursName=inKurs?(_kurse.find(k=>k.id===t.aktiverKursId)?.name||'Kurs'):'';
-    const card=document.createElement('div');
-    card.className='gtn-card'+(inKurs?' in-kurs':'');
-    card.draggable=!inKurs;
-    card.dataset.tnid=t.id;
     const vtag=t.verkuerzer?' <span class="gtn-badge" style="background:rgba(99,102,241,.12);color:#6366f1">Verk.</span>':'';
     const wtag=t.wiederholer?' <span class="gtn-badge" style="background:rgba(245,158,11,.12);color:#d97706">Wdh.</span>':'';
+    const card=document.createElement('div');
+    card.className='gtn-card';
     card.innerHTML=
       '<div class="gtn-av'+(inKurs?' av-ok':'')+'">'+esc(init)+'</div>'+
       '<div class="gtn-info">'+
         '<div class="gtn-name">'+esc(name.trim())+vtag+wtag+'</div>'+
-        '<div class="gtn-sub">'+(t.beruf||'kein Beruf')+(t.ausbjahr?' / '+t.ausbjahr+'.Lj':'')+(t.firma?' / '+esc(t.firma):'')+'</div>'+
-        (inKurs?'<div class="gtn-sub" style="color:#22c55e">Kurs: '+esc(kursName)+'</div>':'')+
+        '<div class="gtn-sub">'+(t.beruf||'kein Beruf')+(t.ausbjahr?' · '+t.ausbjahr+'. Lj':'')+(t.firma?' · '+esc(t.firma):'')+'</div>'+
+        (inKurs?'<div class="gtn-sub" style="color:#22c55e;margin-top:1px">📚 '+esc(kursName)+'</div>':
+                '<div class="gtn-sub" style="color:var(--mu);margin-top:1px">○ Kein aktiver Kurs</div>')+
       '</div>'+
       '<button class="gtn-open" onclick="openTNProfile(\''+t.id+'\')">Profil</button>';
-    card.addEventListener('dragstart',e=>{
-      if(inKurs){e.preventDefault();toast('TN ist bereits in einem Kurs. Zuerst entfernen.','bad');return;}
-      _dragTNId=t.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed='copy';
-    });
-    card.addEventListener('dragend',()=>card.classList.remove('dragging'));
     el.appendChild(card);
   });
 }
