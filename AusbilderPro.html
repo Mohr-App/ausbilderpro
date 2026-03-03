@@ -2197,7 +2197,13 @@ function loadPool(){
     renderWiederholer(null);
     return;
   }
-  if(!_db){ body.innerHTML='<div class="pool-empty">Nicht eingeloggt</div>'; return; }
+  if(!_db){ 
+    // Offline: Pool leer, aber lokale Container rendern
+    body.innerHTML='<div class="pool-empty">Kein Pool (Offline-Modus)</div>';
+    renderFehlt(null);
+    renderWiederholer(null);
+    return; 
+  }
   body.innerHTML='<div class="pool-empty">Lädt…</div>';
   const kursRef = _db.collection('shared').doc('kurse').collection('list').doc(kursId);
   kursRef.get().then(kursDoc=>{
@@ -2392,13 +2398,11 @@ function dropToFehlt(e){
   if(_poolDragTnId && _poolDragKursId){
     const inst3=curInst();
     if(inst3 && _poolDragId){
-      // Sitz komplett leeren (Wiederholer-Schüler sitzt noch auf seinem Platz)
       Object.entries(inst3.seats).forEach(([sid,d])=>{
         if(d && d.name===_poolDragId){
           ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst3.seats[sid][k]);
         }
       });
-      // In fehltStudents sichern
       if(!inst3.fehltStudents) inst3.fehltStudents=[];
       if(!inst3.fehltStudents.find(f=>f.name===_poolDragId))
         inst3.fehltStudents.push({name:_poolDragId, company:'', profession:'', ausbjahr:'', poolTnId:_poolDragTnId, poolKursId:_poolDragKursId});
@@ -2407,6 +2411,28 @@ function dropToFehlt(e){
     _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
       .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'})
       .then(()=>loadPool()).catch(()=>loadPool());
+    _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
+    return;
+  }
+
+  // Fall 4: Lokaler Schüler ohne Firestore-ID (Offline-Modus oder manuell eingetragen)
+  if(_poolDragId){
+    const inst4=curInst();
+    if(inst4){
+      // Sitz leeren falls Schüler sitzt (z.B. Wiederholer)
+      Object.entries(inst4.seats).forEach(([sid,d])=>{
+        if(d && d.name===_poolDragId)
+          ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst4.seats[sid][k]);
+      });
+      if(!inst4.fehltStudents) inst4.fehltStudents=[];
+      // Daten aus fehlt-card holen falls vorhanden
+      const fc=document.querySelector('.fehlt-card[data-name="'+CSS.escape(_poolDragId)+'"]')
+            || document.querySelector('.wiederholer-card[data-name="'+CSS.escape(_poolDragId)+'"]');
+      if(!inst4.fehltStudents.find(f=>f.name===_poolDragId))
+        inst4.fehltStudents.push({name:_poolDragId, company:fc?.dataset.company||'', profession:fc?.dataset.profession||'', ausbjahr:fc?.dataset.ausbjahr||'', poolTnId:null, poolKursId:null});
+      persist(); renderSeats();
+    }
+    loadPool();
     _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
   }
 }
@@ -2609,7 +2635,10 @@ function renderFehlt(kursId){
 }
 
 function openPoolLink(){
-  if(!_db){ return; }
+  if(!_db){ 
+    alert('Kursverknüpfung ist nur im Online-Modus (mit Login) verfügbar.\nIm Offline-Modus kannst du Schüler manuell auf Sitzplätze eintragen.');
+    return; 
+  }
   const modal=document.getElementById('poolLinkModal');
   const sel=document.getElementById('poolKursSelect');
   sel.innerHTML='<option value="">Lädt…</option>';
