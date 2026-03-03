@@ -2380,6 +2380,12 @@ function dropToFehlt(e){
 
   // Fall 3: Aus Pool (mit Firestore-ID) in Fehlt
   if(_poolDragTnId && _poolDragKursId){
+    // Wiederholer-Flag vom Sitz entfernen (falls Schüler vorher als Wiederholer markiert war)
+    const inst3=curInst();
+    if(inst3 && _poolDragId){
+      Object.values(inst3.seats).forEach(d=>{ if(d && d.name===_poolDragId) delete d.wiederholer; });
+      persist(); renderSeats();
+    }
     _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
       .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'})
       .then(()=>loadPool()).catch(()=>loadPool());
