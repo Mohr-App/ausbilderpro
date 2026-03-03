@@ -270,6 +270,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .history-item{padding:8px 10px;border-radius:8px;background:var(--sur2);border:1px solid var(--brd);margin-bottom:5px;}
 .hi-name{font-size:.78rem;font-weight:700;}
 .hi-meta{font-size:.63rem;color:var(--mu);font-family:monospace;}
+/* Sidebar Lehrjahr buttons */
+.sb-lj-item{margin-bottom:2px;}
+.sb-lj-btn{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:.75rem;font-weight:600;color:var(--tx);transition:all .12s;}
+.sb-lj-btn:hover{background:rgba(59,130,246,.1);color:var(--acc);}
+/* TN grid for wide layout */
+#globalTNList{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:6px;}
 </style>
 </head>
 <body>
@@ -387,47 +393,41 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <!-- TEILNEHMER -->
       <div class="page" id="page-teilnehmer">
         <div class="page-title">Teilnehmer</div>
-        <div class="page-sub">Globale Datenbank &middot; Drag &amp; Drop in Kurse</div>
-        <div style="display:flex;gap:14px;height:calc(100vh - 140px)">
+        <div class="page-sub">Globale Datenbank</div>
+        <div style="display:flex;flex-direction:column;gap:10px;height:calc(100vh - 140px)">
 
-          <!-- LINKS: Suchleiste + TN Liste -->
-          <div style="width:320px;flex-shrink:0;display:flex;flex-direction:column;gap:10px">
-            <div class="card" style="padding:12px;flex-shrink:0">
-              <div style="display:flex;gap:8px;margin-bottom:10px">
-                <input class="fi" id="tnSearch" placeholder="&#128269; Name, Firma, Beruf..." oninput="filterGlobalTN()" style="flex:1;padding:8px 12px">
-                <button class="btn-sm btn-ok" onclick="openNewTNModal()" style="padding:8px 12px;white-space:nowrap">+ Neu</button>
-              </div>
-              <div style="display:flex;gap:5px;flex-wrap:wrap">
-                <button class="tn-filter active" data-f="all" onclick="setTNFilter('all')">Alle</button>
-                <button class="tn-filter" data-f="offen" onclick="setTNFilter('offen')">&#9675; Ohne Kurs</button>
-                <button class="tn-filter" data-f="aktiv" onclick="setTNFilter('aktiv')">&#10003; Im Kurs</button>
-              </div>
+          <!-- Suchleiste + Filter -->
+          <div class="card" style="padding:12px;flex-shrink:0">
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <input class="fi" id="tnSearch" placeholder="&#128269; Name, Firma, Beruf..." oninput="filterGlobalTN()" style="flex:1;padding:8px 12px">
+              <button class="btn-sm btn-ok" onclick="openNewTNModal()" style="padding:8px 14px;white-space:nowrap;font-size:.8rem">+ Neu</button>
             </div>
-            <div class="card" style="flex:1;overflow-y:auto;padding:8px">
-              <div id="globalTNList"><div class="empty">Lädt…</div></div>
+            <!-- Berufsgruppen Tabs -->
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
+              <button class="tn-filter active" data-bg="alle" onclick="setTNBerufFilter('alle')">Alle Berufe</button>
+              <button class="tn-filter" data-bg="elektro" onclick="setTNBerufFilter('elektro')">⚡ Elektro</button>
+              <button class="tn-filter" data-bg="schreiner" onclick="setTNBerufFilter('schreiner')">🪵 Schreiner</button>
+              <button class="tn-filter" data-bg="kfz" onclick="setTNBerufFilter('kfz')">🔧 KFZ</button>
+              <button class="tn-filter" data-bg="hls" onclick="setTNBerufFilter('hls')">🔨 Sanitär / HLS</button>
+              <button class="tn-filter" data-bg="bau" onclick="setTNBerufFilter('bau')">🏗 Bau</button>
+              <button class="tn-filter" data-bg="maler" onclick="setTNBerufFilter('maler')">🎨 Maler</button>
+              <button class="tn-filter" data-bg="andere" onclick="setTNBerufFilter('andere')">Sonstige</button>
+            </div>
+            <!-- Kurs-Status Filter -->
+            <div style="display:flex;gap:5px;flex-wrap:wrap">
+              <button class="tn-filter active" data-f="all" onclick="setTNFilter('all')">Alle</button>
+              <button class="tn-filter" data-f="offen" onclick="setTNFilter('offen')">&#9675; Ohne Kurs</button>
+              <button class="tn-filter" data-f="aktiv" onclick="setTNFilter('aktiv')">&#10003; Im Kurs</button>
             </div>
           </div>
 
-          <!-- RECHTS: Kurs Dropzone -->
-          <div style="flex:1;display:flex;flex-direction:column;gap:10px;min-width:0">
-            <div class="card" style="padding:12px;flex-shrink:0">
-              <div style="display:flex;align-items:center;gap:10px">
-                <select class="fi" id="tnKursSelect" onchange="loadKursTNView()" style="flex:1">
-                  <option value="">- Kurs auswahlen -</option>
-                </select>
-                <span id="tnKursInfo" style="font-size:.7rem;color:var(--mu);white-space:nowrap"></span>
-              </div>
+          <!-- TN Liste -->
+          <div class="card" style="flex:1;overflow-y:auto;padding:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)" id="tnListLabel">TEILNEHMER</div>
+              <span id="tnListCnt" style="font-size:.7rem;color:var(--mu)"></span>
             </div>
-            <div class="card" style="flex:1;overflow-y:auto;padding:10px" id="kursTNDropZone"
-              ondragover="event.preventDefault();this.classList.add('drop-active')"
-              ondragleave="this.classList.remove('drop-active')"
-              ondrop="dropTNIntoKurs(event)">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-                <div class="card-title" style="margin:0">&#128101; Kursteilnehmer</div>
-                <span id="kursTNCnt" style="font-size:.7rem;color:var(--mu)"></span>
-              </div>
-              <div id="kursTNList"><div class="empty" style="border:2px dashed var(--brd);border-radius:10px;padding:30px;text-align:center;color:var(--mu)">&larr; Teilnehmer hierher ziehen</div></div>
-            </div>
+            <div id="globalTNList"><div class="empty">Lädt…</div></div>
           </div>
         </div>
       </div>
@@ -676,75 +676,30 @@ function renderSbAusbTree(){
   });
 }
 
-// ── Sidebar Teilnehmer Baum ──
+// ── Sidebar Teilnehmer Baum (nur Lehrjahr) ──
 function renderSbTnTree(){
   const root=document.getElementById('sbTnTree');
   if(!root) return;
-  // Alle TN aus allen Kursen laden
-  root.innerHTML='<div class="sb-loading">Lädt…</div>';
-  const promises=_kurse.map(k=>
-    db.collection('shared').doc('kurse').collection('list').doc(k.id)
-      .collection('teilnehmer').get()
-      .then(snap=>{
-        const tns=[];
-        snap.forEach(doc=>tns.push({...doc.data(),_kursId:k.id,_kursName:k.name||'?',_ausbilder:k.ausbilderEmail||''}));
-        return tns;
-      }).catch(()=>[])
-  );
-  Promise.all(promises).then(results=>{
-    const allTN=results.flat();
-    if(!allTN.length){root.innerHTML='<div class="sb-loading">Keine Teilnehmer</div>';return;}
-    // Gruppe nach beruf (Branche)
-    const byBeruf={};
-    allTN.forEach(t=>{
-      const b=t.beruf||'(ohne Beruf)';
-      if(!byBeruf[b]) byBeruf[b]=[];
-      byBeruf[b].push(t);
-    });
-    root.innerHTML='';
-    Object.keys(byBeruf).sort().forEach(beruf=>{
-      const tns=byBeruf[beruf];
-      const buid='br_'+beruf.replace(/[^a-z0-9]/gi,'_');
-      // Gruppe nach Lehrjahr
-      const byLj={};
-      tns.forEach(t=>{
-        const lj=t.ausbjahr?t.ausbjahr+'. Lehrjahr':'Lehrjahr unbekannt';
-        if(!byLj[lj]) byLj[lj]=[];
-        byLj[lj].push(t);
-      });
-      let ljHtml='';
-      Object.keys(byLj).sort().forEach(lj=>{
-        const ljTns=byLj[lj];
-        const ljTnHtml=ljTns.map(t=>{
-          const name=(t.vorname||'')+' '+(t.nachname||'');
-          const init=((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
-          const badge=t.status==='absent'?'<span class="sb-tn-badge badge-absent">✗</span>':
-                      t.status==='wiederholer'?'<span class="sb-tn-badge badge-wdh">↩</span>':
-                      t.status==='attending'?'<span class="sb-tn-badge badge-ok">✓</span>':'';
-          return `<div class="sb-tn-row" onclick="showPage('teilnehmer');setTimeout(()=>{document.getElementById('tnKursSelect').value='${t._kursId}';loadTeilnehmer();},100)">
-            <span>${esc(name.trim())}</span>${badge}
-          </div>`;
-        }).join('');
-        ljHtml+=`<div>
-          <div class="sb-lj-hdr" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
-            <span class="slja">▶</span>
-            <span>${esc(lj)}</span>
-            <span style="margin-left:auto;font-size:.6rem">${ljTns.length}</span>
-          </div>
-          <div class="sb-lj-body">${ljTnHtml}</div>
-        </div>`;
-      });
-      const div=document.createElement('div');
-      div.className='sb-branche';
-      div.innerHTML=`
-        <div class="sb-branche-hdr" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
-          <span class="sba">▶</span><span>⚡</span>
-          <span style="flex:1">${esc(beruf)}</span>
-          <span style="font-size:.6rem;color:var(--mu)">${tns.length}</span>
-        </div>
-        <div class="sb-branche-body">${ljHtml}</div>`;
-      root.appendChild(div);
-    });
+  const list=_globalTN;
+  if(!list.length){root.innerHTML='<div class="sb-loading">Keine Teilnehmer</div>';return;}
+  const byLj={};
+  list.forEach(t=>{
+    const lj=t.ausbjahr?String(t.ausbjahr):'?';
+    if(!byLj[lj]) byLj[lj]=[];
+    byLj[lj].push(t);
+  });
+  root.innerHTML='';
+  ['1','2','3','4','?'].forEach(lj=>{
+    const tns=byLj[lj];
+    if(!tns||!tns.length) return;
+    const label=lj==='?'?'Lehrjahr unbekannt':lj+'. Lehrjahr';
+    const filterVal=lj==='?'?'':lj;
+    const div=document.createElement('div');
+    div.className='sb-lj-item';
+    div.innerHTML='<div class="sb-lj-btn" onclick="setTNLjFilter(\''+filterVal+'\')">'+
+      '<span>🎓</span><span style="flex:1">'+label+'</span>'+
+      '<span style="font-size:.6rem;color:var(--mu)">'+tns.length+'</span></div>';
+    root.appendChild(div);
   });
 }
 
@@ -918,7 +873,18 @@ function populateKursSelects(){
 }
 
 // ── Globale Teilnehmer DB ──
-let _globalTN=[],_tnFilter='all',_dragTNId=null;
+let _globalTN=[],_tnFilter='all',_tnBerufFilter='alle',_tnLjFilter='',_dragTNId=null;
+
+function getBerufGruppe(beruf){
+  const b=(beruf||'').toLowerCase();
+  if(/elektro|mechatronik|elektronik/.test(b)) return 'elektro';
+  if(/schreiner|tischler/.test(b)) return 'schreiner';
+  if(/kfz|kraftfahrzeug|fahrzeug|auto/.test(b)) return 'kfz';
+  if(/sanitär|heizung|klima|hls|gas|rohr|installateur/.test(b)) return 'hls';
+  if(/bau|maurer|zimmerer|stuckat|fliesen|estrich/.test(b)) return 'bau';
+  if(/maler|lackier/.test(b)) return 'maler';
+  return 'andere';
+}
 
 function loadGlobalTN(){
   db.collection('globalTN').orderBy('nachname').onSnapshot(snap=>{
@@ -934,14 +900,37 @@ function filterGlobalTN(){
   let list=_globalTN;
   if(_tnFilter==='offen') list=list.filter(t=>!t.aktiverKursId);
   if(_tnFilter==='aktiv') list=list.filter(t=>!!t.aktiverKursId);
+  if(_tnBerufFilter!=='alle') list=list.filter(t=>getBerufGruppe(t.beruf)===_tnBerufFilter);
+  if(_tnLjFilter) list=list.filter(t=>String(t.ausbjahr)===String(_tnLjFilter));
   if(q) list=list.filter(t=>(t.vorname+' '+t.nachname+' '+(t.firma||'')+' '+(t.beruf||'')).toLowerCase().includes(q));
+  const cnt=document.getElementById('tnListCnt');
+  if(cnt) cnt.textContent=list.length+' TN';
+  const lbl=document.getElementById('tnListLabel');
+  if(lbl){
+    let parts=[];
+    if(_tnLjFilter) parts.push(_tnLjFilter+'. LEHRJAHR');
+    if(_tnBerufFilter!=='alle') parts.push(_tnBerufFilter.toUpperCase());
+    lbl.textContent=parts.length?parts.join(' · '):'ALLE TEILNEHMER';
+  }
   renderGlobalTNList(list);
 }
 
 function setTNFilter(f){
   _tnFilter=f;
-  document.querySelectorAll('.tn-filter').forEach(b=>b.classList.toggle('active',b.dataset.f===f));
+  document.querySelectorAll('.tn-filter[data-f]').forEach(b=>b.classList.toggle('active',b.dataset.f===f));
   filterGlobalTN();
+}
+
+function setTNBerufFilter(bg){
+  _tnBerufFilter=bg;
+  document.querySelectorAll('.tn-filter[data-bg]').forEach(b=>b.classList.toggle('active',b.dataset.bg===bg));
+  filterGlobalTN();
+}
+
+function setTNLjFilter(lj){
+  _tnLjFilter=lj;
+  showPage('teilnehmer');
+  setTimeout(()=>{initGlobalTN();filterGlobalTN();},100);
 }
 
 function renderGlobalTNList(list){
