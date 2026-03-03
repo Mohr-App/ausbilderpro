@@ -2177,6 +2177,13 @@ function loadPool(){
   const body = document.getElementById('poolSbBody');
   const hdr  = document.getElementById('poolSbHdr');
   if(!body) return;
+
+  // Container IMMER sofort leeren beim Lehrgang-Wechsel
+  const fehltBody = document.getElementById('fehltBody');
+  const wiederholerBody = document.getElementById('wiederholerBody');
+  if(fehltBody) fehltBody.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>';
+  if(wiederholerBody) wiederholerBody.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>';
+
   if(!inst){
     body.innerHTML='<div class="pool-empty">Kein Lehrgang ausgewählt</div>';
     return;
@@ -2185,6 +2192,9 @@ function loadPool(){
   if(!kursId){
     ['pool-sb-kursname','pool-sb-dates'].forEach(cls=>{ const el=hdr.querySelector('.'+cls); if(el) el.remove(); });
     body.innerHTML='<div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>';
+    // Auch ohne Firestore lokale Container rendern
+    renderFehlt(null);
+    renderWiederholer(null);
     return;
   }
   if(!_db){ body.innerHTML='<div class="pool-empty">Nicht eingeloggt</div>'; return; }
@@ -2453,6 +2463,9 @@ function renderWiederholer(kursId){
   const body=document.getElementById('wiederholerBody');
   if(!body) return;
 
+  // Snapshot-Guard
+  const snapKat=S.curKat, snapInst=S.curInst;
+
   // Lokale Wiederholer aus Sitzplatzdaten sammeln (funktioniert auch ohne Kursverknüpfung)
   const inst=curInst();
   const localWiederholer=[];
@@ -2491,6 +2504,8 @@ function renderWiederholer(kursId){
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').where('status','==','wiederholer').get()
     .then(snap=>{
+      // Abbrechen wenn Nutzer inzwischen anderen Lehrgang gewählt hat
+      if(S.curKat!==snapKat || S.curInst!==snapInst) return;
       body.innerHTML='';
       const shown=new Set();
 
@@ -2538,6 +2553,8 @@ function renderFehlt(kursId){
   if(!body) return;
 
   const inst=curInst();
+  // Snapshot-Guard: merke aktuellen Inst-Key
+  const snapKat=S.curKat, snapInst=S.curInst;
   const localFehlt = (inst && inst.fehltStudents) ? inst.fehltStudents : [];
 
   function makeCard(name, company, tnId, fsKursId, profession, ausbjahr){
@@ -2571,6 +2588,8 @@ function renderFehlt(kursId){
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').where('status','==','absent').get()
     .then(snap=>{
+      // Abbrechen wenn Nutzer inzwischen anderen Lehrgang gewählt hat
+      if(S.curKat!==snapKat || S.curInst!==snapInst) return;
       body.innerHTML='';
       const shown=new Set();
       snap.forEach(doc=>{
