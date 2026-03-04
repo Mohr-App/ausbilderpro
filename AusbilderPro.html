@@ -2163,6 +2163,7 @@ let _fehltLocal = false; // tracks if dragged card is a local fehlt entry
 let _poolDragTnId = null;
 let _poolDragKursId = null;
 let _seatDragId = null;
+let _poolLoadGen = 0; // Generation counter – stale async responses get discarded
 
 function loadPool(){
   const inst = curInst();
@@ -2170,11 +2171,19 @@ function loadPool(){
   const hdr  = document.getElementById('poolSbHdr');
   if(!body) return;
 
+  // Neue Generation – alle vorherigen async Callbacks werden ignoriert
+  const gen = ++_poolLoadGen;
+  const snapKat = S.curKat, snapInst = S.curInst;
+  function isStale(){ return _poolLoadGen !== gen || S.curKat !== snapKat || S.curInst !== snapInst; }
+
   // Container IMMER sofort leeren beim Lehrgang-Wechsel
   const fehltBody = document.getElementById('fehltBody');
   const wiederholerBody = document.getElementById('wiederholerBody');
   if(fehltBody) fehltBody.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>';
   if(wiederholerBody) wiederholerBody.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>';
+
+  // Pool-Header aufräumen wenn kein Kurs verknüpft
+  ['pool-sb-kursname','pool-sb-dates'].forEach(cls=>{ const el=hdr.querySelector('.'+cls); if(el) el.remove(); });
 
   if(!inst){
     body.innerHTML='<div class="pool-empty">Kein Lehrgang ausgewählt</div>';
@@ -2182,7 +2191,6 @@ function loadPool(){
   }
   const kursId = inst.sharedKursId;
   if(!kursId){
-    ['pool-sb-kursname','pool-sb-dates'].forEach(cls=>{ const el=hdr.querySelector('.'+cls); if(el) el.remove(); });
     body.innerHTML='<div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>';
     // Auch ohne Firestore lokale Container rendern
     renderFehlt(null);
@@ -2199,16 +2207,20 @@ function loadPool(){
   body.innerHTML='<div class="pool-empty">Lädt…</div>';
   const kursRef = _db.collection('shared').doc('kurse').collection('list').doc(kursId);
   kursRef.get().then(kursDoc=>{
+    // ── Snapshot-Guard: User hat inzwischen gewechselt → ignorieren ──
+    if(isStale()) return;
     const kd = kursDoc.exists ? kursDoc.data() : {};
-    let knEl = hdr.querySelector('.pool-sb-kursname');
-    if(!knEl){ knEl=document.createElement('div'); knEl.className='pool-sb-kursname'; hdr.insertBefore(knEl, hdr.querySelector('.pool-link-btn')); }
+    let knEl = document.createElement('div'); knEl.className='pool-sb-kursname';
     knEl.textContent = kd.name||'';
-    let dtEl = hdr.querySelector('.pool-sb-dates');
-    if(!dtEl){ dtEl=document.createElement('div'); dtEl.className='pool-sb-dates'; hdr.insertBefore(dtEl, hdr.querySelector('.pool-link-btn')); }
+    hdr.insertBefore(knEl, hdr.querySelector('.pool-link-btn'));
+    let dtEl = document.createElement('div'); dtEl.className='pool-sb-dates';
     dtEl.textContent = (kd.von&&kd.bis) ? kd.von+' – '+kd.bis : (kd.von||'');
+    hdr.insertBefore(dtEl, hdr.querySelector('.pool-link-btn'));
     kursRef.collection('teilnehmer').orderBy('nachname').get()
     .then(snap=>{
-      if(snap.empty){ body.innerHTML='<div class="pool-empty">Keine Teilnehmer im Kurs</div>'; return; }
+      // ── Snapshot-Guard ──
+      if(isStale()) return;
+      if(snap.empty){ body.innerHTML='<div class="pool-empty">Keine Teilnehmer im Kurs</div>'; renderFehlt(kursId); renderWiederholer(kursId); return; }
       const seats = curSeats();
       const placed = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
       const allTN = [];
@@ -2248,7 +2260,7 @@ function loadPool(){
       setupSeatDropTargets();
       renderFehlt(kursId);
       renderWiederholer(kursId);
-    }).catch(()=>{ body.innerHTML='<div class="pool-empty">Fehler beim Laden</div>'; });
+    }).catch(()=>{ if(!isStale()) body.innerHTML='<div class="pool-empty">Fehler beim Laden</div>'; });
   });
 }
 
