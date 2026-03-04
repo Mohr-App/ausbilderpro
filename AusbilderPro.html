@@ -92,6 +92,22 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .sb-sec{padding:10px 12px 4px;font-family:'JetBrains Mono',monospace;font-size:.56rem;color:#8896b0;text-transform:uppercase;letter-spacing:.12em;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .sb-add-kat{background:none;border:none;color:var(--acc);font-size:.9rem;cursor:pointer;padding:2px 5px;border-radius:4px;opacity:.7;transition:opacity .13s;line-height:1;}
 .sb-add-kat:hover{opacity:1;}
+
+/* HBZ-KURSE SIDEBAR */
+.hbz-sec{padding:10px 12px 4px;font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--acc);text-transform:uppercase;letter-spacing:.12em;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px dashed rgba(59,130,246,.25);}
+.hbz-sec-cnt{background:rgba(59,130,246,.15);color:var(--acc);font-size:.55rem;padding:1px 6px;border-radius:3px;font-weight:700;}
+.hbz-kurs-card{display:flex;align-items:center;gap:8px;padding:7px 10px;margin:3px 8px;background:rgba(59,130,246,.06);border:1px dashed rgba(59,130,246,.3);border-radius:7px;cursor:grab;transition:all .13s;user-select:none;flex-shrink:0;}
+.hbz-kurs-card:hover{background:rgba(59,130,246,.12);border-color:var(--acc);}
+.hbz-kurs-card.dragging{opacity:.35;border-style:solid;}
+.hbz-kurs-icon{font-size:.9rem;flex-shrink:0;}
+.hbz-kurs-info{flex:1;min-width:0;}
+.hbz-kurs-name{font-size:.76rem;font-weight:700;color:#1e2433;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hbz-kurs-dates{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--acc);}
+.hbz-kurs-tn{font-family:'JetBrains Mono',monospace;font-size:.55rem;color:#8896b0;margin-top:1px;}
+.hbz-drop-new{margin:4px 8px 8px;padding:10px;border:2px dashed #c4cce0;border-radius:8px;text-align:center;font-size:.68rem;color:#8896b0;font-family:'JetBrains Mono',monospace;transition:all .15s;flex-shrink:0;}
+.hbz-drop-new.hbz-drop-active{border-color:var(--acc);color:var(--acc);background:rgba(59,130,246,.08);}
+.kat-row.hbz-drop-target{background:rgba(59,130,246,.12)!important;border-radius:7px;outline:2px dashed var(--acc);outline-offset:-2px;}
+.hbz-divider{height:1px;background:linear-gradient(90deg,transparent,#c4cce0,transparent);margin:6px 12px;flex-shrink:0;}
 .kat-row{display:flex;align-items:center;padding:8px 10px 8px 11px;cursor:pointer;transition:background .12s;flex-shrink:0;}
 .kat-row:hover{background:#e2e8f0;}
 .kat-drag{font-size:.85rem;color:transparent;cursor:grab;padding:2px 5px 2px 0;flex-shrink:0;transition:color .12s;line-height:1;}
@@ -624,6 +640,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <div class="wrap">
   <div class="sb" id="sb">
+    <div id="hbzKurseSection"></div>
     <div class="sb-sec">Lehrgangsarten <button class="sb-add-kat" onclick="openKatModal()" title="Hinzufügen / Wiederherstellen">+</button></div>
     <div id="katList"></div>
   </div>
@@ -1054,7 +1071,7 @@ function renderSidebar(){
       toggleKat(id);
     });
 
-    // drag events
+    // drag events (kat reorder + HBZ kurs drop)
     row.addEventListener('dragstart',e=>{
       _dragSrcId=id;
       e.dataTransfer.effectAllowed='move';
@@ -1062,19 +1079,32 @@ function renderSidebar(){
     });
     row.addEventListener('dragend',()=>{
       _dragSrcId=null;
-      document.querySelectorAll('.kat-row').forEach(r=>r.classList.remove('dragging','drag-over'));
+      document.querySelectorAll('.kat-row').forEach(r=>r.classList.remove('dragging','drag-over','hbz-drop-target'));
     });
     row.addEventListener('dragover',e=>{
       e.preventDefault();
-      e.dataTransfer.dropEffect='move';
       if(_dragSrcId && _dragSrcId!==id){
+        e.dataTransfer.dropEffect='move';
         document.querySelectorAll('.kat-row').forEach(r=>r.classList.remove('drag-over'));
         row.classList.add('drag-over');
       }
+      if(_hbzDragKursId){
+        e.dataTransfer.dropEffect='copy';
+        document.querySelectorAll('.kat-row').forEach(r=>r.classList.remove('hbz-drop-target'));
+        row.classList.add('hbz-drop-target');
+      }
     });
-    row.addEventListener('dragleave',()=>row.classList.remove('drag-over'));
+    row.addEventListener('dragleave',()=>{ row.classList.remove('drag-over','hbz-drop-target'); });
     row.addEventListener('drop',e=>{
       e.preventDefault();
+      row.classList.remove('hbz-drop-target','drag-over');
+      // HBZ Kurs drop → in diese Lehrgangsart einfügen
+      if(_hbzDragKursId && _hbzDragData){
+        linkHBZKurs(_hbzDragKursId, _hbzDragData, id);
+        _hbzDragKursId=null; _hbzDragData=null;
+        return;
+      }
+      // Kat reorder drop
       if(!_dragSrcId||_dragSrcId===id)return;
       const fromIdx=S.katOrder.indexOf(_dragSrcId);
       const toIdx=S.katOrder.indexOf(id);
@@ -1138,7 +1168,143 @@ function delInst(katId,instId,e){
   if(!confirm('Lehrgang '+instLabel(inst)+' löschen?'))return;
   delete S.kats[katId].instances[instId];
   if(S.curKat===katId&&S.curInst===instId) S.curInst=Object.keys(S.kats[katId].instances)[0]||null;
-  persist();renderAll();
+  persist();renderAll();loadHBZKurse();
+}
+
+// ─── HBZ-KURSE (automatische Verknüpfung) ───
+let _hbzDragKursId=null, _hbzDragData=null;
+
+function getLinkedKursIds(){
+  const linked=new Set();
+  Object.values(S.kats).forEach(k=>{
+    Object.values(k.instances||{}).forEach(inst=>{
+      if(inst.sharedKursId) linked.add(inst.sharedKursId);
+    });
+  });
+  return linked;
+}
+
+function loadHBZKurse(){
+  const section=document.getElementById('hbzKurseSection');
+  if(!section) return;
+  if(!_db||!_auth||!_auth.currentUser){ section.innerHTML=''; return; }
+
+  _db.collection('shared').doc('kurse').collection('list')
+    .where('ausbilderEmail','==',_auth.currentUser.email.toLowerCase())
+    .get().then(snap=>{
+      const linked=getLinkedKursIds();
+      const unlinked=[];
+      snap.forEach(doc=>{
+        if(!linked.has(doc.id)) unlinked.push({id:doc.id,...doc.data()});
+      });
+
+      if(!unlinked.length){ section.innerHTML=''; return; }
+
+      section.innerHTML='';
+      // Header
+      const hdr=document.createElement('div'); hdr.className='hbz-sec';
+      hdr.innerHTML='📋 HBZ-Kurse <span class="hbz-sec-cnt">'+unlinked.length+'</span>';
+      section.appendChild(hdr);
+
+      // Kurs-Karten
+      unlinked.forEach(k=>{
+        const lgart=k.lehrgangsart||k.name||'Kurs';
+        const vonBis=(k.von||'?')+' – '+(k.bis||'?');
+        const card=document.createElement('div');
+        card.className='hbz-kurs-card';
+        card.draggable=true;
+        card.dataset.kursId=k.id;
+        card.innerHTML='<span class="hbz-kurs-icon">📋</span>'
+          +'<div class="hbz-kurs-info">'
+          +'<div class="hbz-kurs-name">'+esc(lgart)+'</div>'
+          +'<div class="hbz-kurs-dates">'+esc(vonBis)+'</div>'
+          +'</div>';
+
+        card.addEventListener('dragstart',e=>{
+          _hbzDragKursId=k.id;
+          _hbzDragData=k;
+          card.classList.add('dragging');
+          e.dataTransfer.effectAllowed='copy';
+        });
+        card.addEventListener('dragend',()=>{
+          card.classList.remove('dragging');
+          _hbzDragKursId=null; _hbzDragData=null;
+          document.querySelectorAll('.kat-row.hbz-drop-target,.hbz-drop-new.hbz-drop-active').forEach(r=>r.classList.remove('hbz-drop-target','hbz-drop-active'));
+        });
+        section.appendChild(card);
+      });
+
+      // Drop-Zone: "Neue Lehrgangsart erstellen"
+      const dropNew=document.createElement('div');
+      dropNew.className='hbz-drop-new';
+      dropNew.textContent='↓ Hierher ziehen = neue Lehrgangsart';
+      dropNew.addEventListener('dragover',e=>{
+        e.preventDefault();
+        if(_hbzDragKursId) dropNew.classList.add('hbz-drop-active');
+      });
+      dropNew.addEventListener('dragleave',()=>dropNew.classList.remove('hbz-drop-active'));
+      dropNew.addEventListener('drop',e=>{
+        e.preventDefault();
+        dropNew.classList.remove('hbz-drop-active');
+        if(!_hbzDragKursId||!_hbzDragData) return;
+        linkHBZKurs(_hbzDragKursId, _hbzDragData, null);
+        _hbzDragKursId=null; _hbzDragData=null;
+      });
+      section.appendChild(dropNew);
+
+      // Divider
+      const div=document.createElement('div'); div.className='hbz-divider';
+      section.appendChild(div);
+    }).catch(()=>{});
+}
+
+function linkHBZKurs(kursId, kursData, targetKatId){
+  // Datumsteile aus kursData parsen (ISO "2026-03-04" oder deutsch "04.03.2026")
+  function parseDateParts(dateStr){
+    if(!dateStr) return {d:'01',m:'01',y:'2026'};
+    if(dateStr.includes('-')){
+      const p=dateStr.split('-');
+      return {y:p[0], m:p[1]||'01', d:p[2]||'01'};
+    }
+    const p=dateStr.split('.');
+    return {d:p[0]||'01', m:p[1]||'01', y:p[2]||'2026'};
+  }
+  const von=parseDateParts(kursData.von);
+  const bis=parseDateParts(kursData.bis);
+
+  // Lehrgangsart finden oder erstellen
+  if(!targetKatId){
+    const label=kursData.lehrgangsart||kursData.name||'HBZ-Kurs';
+    // Prüfen ob Lehrgangsart mit gleichem Namen schon existiert
+    const existing=Object.entries(S.kats).find(([,k])=>k.label.toLowerCase()===label.toLowerCase());
+    if(existing){
+      targetKatId=existing[0];
+    } else {
+      targetKatId='kat_c_'+gid();
+      S.kats[targetKatId]={label:label, predefined:false, open:true, instances:{}};
+      S.katOrder.push(targetKatId);
+    }
+  }
+
+  // Neuen Lehrgang (Instance) anlegen + verknüpfen
+  const instId=gid();
+  const rows=[
+    {id:'r1',label:'',seats:[...DEFAULT_LEFT]},
+    {id:'r2',label:'',seats:[...DEFAULT_RIGHT]}
+  ];
+  S.kats[targetKatId].instances[instId]={
+    sD:von.d, sM:von.m, sY:von.y,
+    eD:bis.d, eM:bis.m, eY:bis.y,
+    rows, seatCnt:13, seats:{}, nextSeatNum:13, seatLabels:{},
+    sharedKursId: kursId
+  };
+  S.curKat=targetKatId;
+  S.curInst=instId;
+  S.kats[targetKatId].open=true;
+
+  persist();
+  renderAll();
+  loadHBZKurse();
 }
 
 // Kat modal
@@ -2701,6 +2867,7 @@ function savePoolLink(){
   persist();
   closePoolLink();
   loadPool();
+  loadHBZKurse();
 }
 
 function removePoolLink(){
@@ -2710,6 +2877,7 @@ function removePoolLink(){
   persist();
   closePoolLink();
   loadPool();
+  loadHBZKurse();
 }
 
 function closePoolLink(){ document.getElementById('poolLinkModal').classList.remove('open'); }
@@ -2991,10 +3159,12 @@ function fbLoadData(){
         }catch(e){}
       }
       renderAll();
+      loadHBZKurse();
       ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||'');
     })
     .catch(()=>{
       hydrate(); renderAll();
+      loadHBZKurse();
       ci.textContent='☁ Offline';
     });
 }
