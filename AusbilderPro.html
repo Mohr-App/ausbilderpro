@@ -501,7 +501,26 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   .li{font-size:.64rem;}
   .main-dates{font-size:.9rem;}
   .es{padding:32px 14px;}
+  /* mobile list view */
+  .mob-view-toggle{display:inline-flex!important;background:var(--acc)!important;color:#fff!important;font-size:.7rem!important;padding:5px 10px!important;border-radius:6px!important;font-weight:700!important;}
 }
+/* MOBILE LIST VIEW */
+.mob-view-toggle{display:none;}
+.mob-list-view{display:flex;flex-direction:column;gap:6px;padding:4px 0;}
+.ml-card{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--sur2);border:2px solid var(--brd);border-radius:11px;transition:all .12s;}
+.ml-card.ml-present{border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.06);}
+.ml-card.ml-absent{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.06);opacity:.6;}
+.ml-info{flex:1;min-width:0;}
+.ml-name{font-size:.88rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ml-sub{font-size:.62rem;color:var(--mu);font-family:'JetBrains Mono',monospace;}
+.ml-actions{display:flex;gap:6px;flex-shrink:0;}
+.ml-btn{width:40px;height:40px;border-radius:10px;border:2px solid var(--brd);background:var(--sur2);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;}
+.ml-btn:active{transform:scale(.92);}
+.ml-btn.ml-ok{border-color:rgba(52,211,153,.4);color:#34d399;}
+.ml-btn.ml-ok.active{background:#34d399;color:#fff;border-color:#34d399;}
+.ml-btn.ml-no{border-color:rgba(239,68,68,.3);color:#ef4444;}
+.ml-btn.ml-no.active{background:#ef4444;color:#fff;border-color:#ef4444;}
+.ml-empty{text-align:center;padding:30px;color:var(--mu);font-size:.82rem;}
 </style>
 </head>
 <body>
@@ -608,7 +627,17 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" onclick="gdriveAction()"><span class="mni">☁</span>☁ Drive</button>
 </div>
 <input type="file" id="impFileMob" accept=".json,.hbz" style="display:none" onchange="doImport(event)">
-<div class="copyright">© AusbilderPro ─ Entwickler Stefan Mohr</div>
+<div class="copyright">© AusbilderPro v2.6.0 ─ Entwickler Stefan Mohr ─ <a href="#" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+
+<!-- CHANGELOG MODAL -->
+<div class="ov" id="changelogModal" onclick="if(event.target===this)this.classList.remove('open')">
+<div class="modal" style="max-width:480px">
+<div class="mhd"><div class="mtit">📋 Was ist neu?</div><button class="xcls" onclick="document.getElementById('changelogModal').classList.remove('open')">&#10005;</button></div>
+<div class="mbdy" style="max-height:60vh;overflow-y:auto">
+<div id="changelogBody"></div>
+</div>
+</div>
+</div>
 
 <!-- GOOGLE DRIVE MODAL -->
 <div class="dpov" id="driveModal" onclick="if(event.target===this)closeDriveModal()">
@@ -883,6 +912,19 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Lehrgangsarten an
+const APP_VERSION = 'v2.6.0';
+const APP_BUILD = '2026-03-04';
+const CHANGELOG = [
+  {v:'v2.6.0', d:'04.03.2026', items:['🔄 Berufe dynamisch aus Firestore (statt hardcoded)','📊 Anwesenheit → HBZ Sync (aggregiert pro TN)','📱 Mobile Listenansicht synct jetzt auch nach Firestore']},
+  {v:'v2.5.0', d:'04.03.2026', items:['📋 HBZ-Kurse: Drag & Drop Verknüpfung in Sidebar','📱 Mobile Listenansicht für schnelle Anwesenheit','📊 Status-Sync: Fehlt/Wiederholer jetzt in HBZ sichtbar','🛡 Pool Snapshot-Guard gegen Kurs-Überlappung','📅 Datumsformat überall einheitlich deutsch','📦 Versionierung mit Changelog']},
+  {v:'v2.4.0', d:'01.03.2026', items:['📁 Dokumente-Upload pro Kurs (Firebase Storage)','☁ Google Drive Backup & Restore','🔍 Globale Suche über Schüler und Noten']},
+];
+function showChangelog(){
+  const body=document.getElementById('changelogBody');
+  body.innerHTML=CHANGELOG.map(c=>'<div style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-weight:800;color:var(--acc);font-size:.85rem">'+c.v+'</span><span style="font-size:.62rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+c.d+'</span></div><div style="font-size:.76rem;line-height:1.6;color:var(--tx)">'+c.items.join('<br>')+'</div></div>').join('<hr style="border:none;border-top:1px solid var(--brd);margin:12px 0">');
+  document.getElementById('changelogModal').classList.add('open');
+}
+
 const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const DEFAULT_LEFT  = ['6','5','4','3','2','1'];   // rendered top→bottom, so 1 is nearest tafel
 const DEFAULT_RIGHT = ['12','11','10','9','8','7']; // 7 nearest tafel
@@ -1017,7 +1059,9 @@ function getDateFromSelects(){
   if(!d||!m||!y) return '';
   return y+'-'+m+'-'+d;
 }
-function instLabel(i){ const s=i.sD&&i.sM&&i.sY?i.sD+'.'+i.sM+'.'+i.sY:'?'; const e=i.eD&&i.eM&&i.eY?i.eD+'.'+i.eM+'.'+i.eY:'?'; return s+' – '+e; }
+// ISO "2026-03-04" → deutsch "04.03.2026"
+function fmtDE(d){ if(!d||d.length<10) return d||'?'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
+function instLabel(i){ const s=i.sD&&i.sM&&i.sY?String(i.sD).padStart(2,'0')+'.'+String(i.sM).padStart(2,'0')+'.'+i.sY:'?'; const e=i.eD&&i.eM&&i.eY?String(i.eD).padStart(2,'0')+'.'+String(i.eM).padStart(2,'0')+'.'+i.eY:'?'; return s+' – '+e; }
 function fillDays(id,val){ const s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">TT</option>';for(let d=1;d<=31;d++){const o=document.createElement('option');o.value=String(d).padStart(2,'0');o.textContent=String(d).padStart(2,'0');s.appendChild(o);}if(val)s.value=val; }
 function fillMonths(id,val){ const s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">MM</option>';MONTHS.forEach((m,i)=>{const o=document.createElement('option');o.value=String(i+1).padStart(2,'0');o.textContent=m;s.appendChild(o);});if(val)s.value=val; }
 function fillYears(id,val){ const s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">JJJJ</option>';const y=new Date().getFullYear();for(let i=y-4;i<=y+10;i++){const o=document.createElement('option');o.value=i;o.textContent=i;s.appendChild(o);}if(val)s.value=val; }
@@ -1209,7 +1253,7 @@ function loadHBZKurse(){
       // Kurs-Karten
       unlinked.forEach(k=>{
         const lgart=k.lehrgangsart||k.name||'Kurs';
-        const vonBis=(k.von||'?')+' – '+(k.bis||'?');
+        const vonBis=fmtDE(k.von)+' – '+fmtDE(k.bis);
         const card=document.createElement('div');
         card.className='hbz-kurs-card';
         card.draggable=true;
@@ -1370,9 +1414,10 @@ function renderMain(){
     return;
   }
   el.innerHTML=
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+'</div><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button></div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+'</div><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn mob-view-toggle" id="viewToggle" onclick="toggleMobileView()">☰ Liste</button></div></div>'
     +'</div>'
-    +'<div class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
+    +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
+    +'<div id="seatingWrap" class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
     +'<div class="tafel">&#9616; Tafel / Lehrerpult &#9612;</div>'
     +'<div class="legend">'
     +'<div class="li"><div class="ld" style="background:#34d399"></div>Anwesend</div>'
@@ -1385,6 +1430,18 @@ function renderMain(){
     +'</div>';
   renderSeats();
   loadPool();
+  // Mobile-Modus wiederherstellen
+  if(_mobileListMode){
+    const listEl=document.getElementById('mobileListView');
+    const seatWrap=document.getElementById('seatingWrap');
+    const tafel=document.querySelector('.tafel');
+    const btn=document.getElementById('viewToggle');
+    if(listEl) listEl.style.display='';
+    if(seatWrap) seatWrap.style.display='none';
+    if(tafel) tafel.style.display='none';
+    if(btn) btn.textContent='⊞ Sitzplan';
+    renderMobileList();
+  }
 }
 
 function getRows(inst){
@@ -1447,6 +1504,130 @@ function renderSeats(){
 }
 function scaleSeating(){} // disabled
 window.addEventListener('resize', ()=>scaleSeating());
+
+// ─── MOBILE LIST VIEW ───
+let _mobileListMode=false;
+function toggleMobileView(){
+  _mobileListMode=!_mobileListMode;
+  const btn=document.getElementById('viewToggle');
+  const listEl=document.getElementById('mobileListView');
+  const seatWrap=document.getElementById('seatingWrap');
+  const tafel=document.querySelector('.tafel');
+  if(_mobileListMode){
+    if(btn) btn.textContent='⊞ Sitzplan';
+    if(listEl) listEl.style.display='';
+    if(seatWrap) seatWrap.style.display='none';
+    if(tafel) tafel.style.display='none';
+    renderMobileList();
+  } else {
+    if(btn) btn.textContent='☰ Liste';
+    if(listEl) listEl.style.display='none';
+    if(seatWrap) seatWrap.style.display='';
+    if(tafel) tafel.style.display='';
+  }
+}
+function renderMobileList(){
+  const el=document.getElementById('mobileListView');
+  if(!el||!_mobileListMode) return;
+  const inst=curInst(); if(!inst){ el.innerHTML='<div class="ml-empty">Kein Lehrgang ausgewählt</div>'; return; }
+  const date=getDateFromSelects();
+  const att=(inst.attendance||{})[date]||{};
+  // Alle belegten Sitzplätze sammeln
+  const students=[];
+  getRows(inst).forEach(r=>{
+    r.seats.forEach(sid=>{
+      const d=inst.seats[sid];
+      if(d&&d.name) students.push({sid,name:d.name,company:d.company||'',beruf:d.beruf||'',status:att[sid]||''});
+    });
+  });
+  if(!students.length){ el.innerHTML='<div class="ml-empty">Keine Schüler eingetragen</div>'; return; }
+  students.sort((a,b)=>a.name.localeCompare(b.name));
+  el.innerHTML='';
+  students.forEach(s=>{
+    const isP=s.status==='P', isA=s.status==='A';
+    const card=document.createElement('div');
+    card.className='ml-card'+(isP?' ml-present':'')+(isA?' ml-absent':'');
+    card.innerHTML=
+      '<div class="ml-info"><div class="ml-name">'+esc(s.name)+'</div>'
+      +'<div class="ml-sub">'+(s.beruf?esc(s.beruf)+' · ':'')+esc(s.company||'Platz '+s.sid)+'</div></div>'
+      +'<div class="ml-actions">'
+      +'<button class="ml-btn ml-ok'+(isP?' active':'')+'" data-sid="'+s.sid+'" data-st="P">✓</button>'
+      +'<button class="ml-btn ml-no'+(isA?' active':'')+'" data-sid="'+s.sid+'" data-st="A">✗</button>'
+      +'</div>';
+    card.querySelectorAll('.ml-btn').forEach(btn=>{
+      btn.addEventListener('click',e=>{
+        e.stopPropagation();
+        const sid=btn.dataset.sid, st=btn.dataset.st;
+        mlSetAtt(sid,st,date);
+      });
+    });
+    el.appendChild(card);
+  });
+  // Zusammenfassung
+  const pCnt=students.filter(s=>s.status==='P').length;
+  const aCnt=students.filter(s=>s.status==='A').length;
+  const sum=document.createElement('div');
+  sum.style.cssText='text-align:center;padding:10px;font-size:.68rem;color:var(--mu);font-family:"JetBrains Mono",monospace';
+  sum.textContent='✓ '+pCnt+' / ✗ '+aCnt+' / ○ '+(students.length-pCnt-aCnt)+' von '+students.length;
+  el.appendChild(sum);
+}
+function mlSetAtt(sid,st,date){
+  const inst=curInst(); if(!inst) return;
+  if(!inst.attendance) inst.attendance={};
+  if(!inst.attendance[date]) inst.attendance[date]={};
+  // Toggle: wenn gleicher Status nochmal → löschen
+  if(inst.attendance[date][sid]===st) delete inst.attendance[date][sid];
+  else inst.attendance[date][sid]=st;
+  persist();
+  renderMobileList();
+  renderSeats(); // sync Sitzplan
+  // Firestore Sync (debounced)
+  syncMobileAttDebounced(sid);
+}
+
+let _mlSyncTimers={};
+function syncMobileAttDebounced(sid){
+  if(_mlSyncTimers[sid]) clearTimeout(_mlSyncTimers[sid]);
+  _mlSyncTimers[sid]=setTimeout(()=>syncMobileAttToFirestore(sid),2000);
+}
+function syncMobileAttToFirestore(sid){
+  if(!_db) return;
+  const inst=curInst(); if(!inst) return;
+  const d=inst.seats[sid]; if(!d) return;
+  const tnId=d.poolTnId;
+  const kursId=d.poolKursId||inst.sharedKursId;
+  if(!tnId||!kursId) return;
+  // Aggregiere inst.attendance (Quick-Checks) + seat.attendance (Detail-Einträge)
+  let present=0,absentE=0,absentU=0,sick=0,berufsschule=0,late=0,early=0;
+  // 1. Detail-Attendance aus Seat
+  const seatAtt=d.attendance||[];
+  seatAtt.forEach(e=>{
+    if(e.type==='present'){ present++; if(e.lateMins>0)late++; if(e.earlyMins>0)early++; }
+    else if(e.type==='absent_e') absentE++;
+    else if(e.type==='absent_u') absentU++;
+    else if(e.type==='sick') sick++;
+    else if(e.type==='berufsschule') berufsschule++;
+  });
+  // 2. Quick-Checks aus inst.attendance (nur Tage die nicht schon in Detail sind)
+  const detailDates=new Set(seatAtt.map(e=>e.date));
+  Object.entries(inst.attendance||{}).forEach(([date,slots])=>{
+    if(detailDates.has(date)) return; // Detail hat Vorrang
+    const st=slots[sid];
+    if(st==='P') present++;
+    else if(st==='A') absentU++; // Quick-Absent = unentschuldigt
+  });
+  const total=present+absentE+absentU+sick+berufsschule;
+  if(!total) return;
+  const attPercent=Math.round((present/total)*100);
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(tnId).update({
+      attTotal:total,attPresent:present,
+      attAbsentE:absentE,attAbsentU:absentU,
+      attSick:sick,attBerufsschule:berufsschule,
+      attLate:late,attEarly:early,
+      attPercent,attLastSync:Date.now()
+    }).catch(()=>{});
+}
 
 let _dragSeatId=null;
 
@@ -1675,7 +1856,8 @@ function updBadge(){
 }
 
 // ─── SEAT MODAL ───
-const PROF_LIST=[
+// Fallback-Berufe (wird durch Firestore-Daten ersetzt wenn online)
+const PROF_LIST_FALLBACK=[
   'Elektroniker – Energie- und Gebäudetechnik (EuG)',
   'Elektroniker – Automatisierungstechnik (AT)',
   'Elektroniker – Betriebstechnik (BT)',
@@ -1695,6 +1877,25 @@ const PROF_LIST=[
   'Maler und Lackierer – Kirchenmalerei und Denkmalpflege',
   'Maler und Lackierer – Bauten- und Korrosionsschutz',
 ];
+let _profListDynamic = null; // wird aus Firestore geladen
+
+function loadBerufeFromFirestore(){
+  if(!_db) return;
+  _db.collection('shared').doc('kursSettings').collection('berufe')
+    .orderBy('order').get().then(snap=>{
+      if(snap.empty) return;
+      const list=[];
+      snap.forEach(doc=>{
+        const d=doc.data();
+        if(d.name) list.push(d.name);
+      });
+      if(list.length) _profListDynamic=list;
+    }).catch(()=>{});
+}
+
+function getProfList(){
+  return _profListDynamic || PROF_LIST_FALLBACK;
+}
 let _acNames=[], _acCos=[];
 let _acSelIdx={acName:-1,acCo:-1,acProf:-1};
 
@@ -1715,7 +1916,7 @@ function refreshDataLists(){
 function acGetList(dropId){
   if(dropId==='acName') return _acNames;
   if(dropId==='acCo') return _acCos;
-  return PROF_LIST;
+  return getProfList();
 }
 
 function acInput(inpId, dropId){
@@ -2023,6 +2224,47 @@ function saveSeat(){
     attendance:tmpAtt,
   };
   persist();renderSeats();updBadge();renderSidebar();closeModal();
+  // Attendance an HBZ synchronisieren
+  syncAttendanceToFirestore(curSeat);
+}
+
+// ─── ATTENDANCE → FIRESTORE SYNC ───
+function syncAttendanceToFirestore(seatId){
+  if(!_db) return;
+  const inst=curInst(); if(!inst) return;
+  const d=inst.seats[seatId]; if(!d) return;
+  const tnId=d.poolTnId;
+  const kursId=d.poolKursId || inst.sharedKursId;
+  if(!tnId || !kursId) return;
+  // Aggregation aus Detail-Attendance + Quick-Checks
+  let present=0, absentE=0, absentU=0, sick=0, berufsschule=0, late=0, early=0;
+  const seatAtt=d.attendance||[];
+  seatAtt.forEach(e=>{
+    if(e.type==='present'){ present++; if(e.lateMins>0)late++; if(e.earlyMins>0)early++; }
+    else if(e.type==='absent_e') absentE++;
+    else if(e.type==='absent_u') absentU++;
+    else if(e.type==='sick') sick++;
+    else if(e.type==='berufsschule') berufsschule++;
+  });
+  // Quick-Checks aus inst.attendance (nur Tage die nicht in Detail sind)
+  const detailDates=new Set(seatAtt.map(e=>e.date));
+  Object.entries(inst.attendance||{}).forEach(([date,slots])=>{
+    if(detailDates.has(date)) return;
+    const st=slots[seatId];
+    if(st==='P') present++;
+    else if(st==='A') absentU++;
+  });
+  const total=present+absentE+absentU+sick+berufsschule;
+  if(!total) return;
+  const attPercent=total>0?Math.round((present/total)*100):0;
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(tnId).update({
+      attTotal:total, attPresent:present,
+      attAbsentE:absentE, attAbsentU:absentU,
+      attSick:sick, attBerufsschule:berufsschule,
+      attLate:late, attEarly:early,
+      attPercent, attLastSync:Date.now()
+    }).catch(()=>{});
 }
 function clearSeat(){
   if(!curSeat||!S.curKat||!S.curInst)return;
@@ -2380,7 +2622,7 @@ function loadPool(){
     knEl.textContent = kd.name||'';
     hdr.insertBefore(knEl, hdr.querySelector('.pool-link-btn'));
     let dtEl = document.createElement('div'); dtEl.className='pool-sb-dates';
-    dtEl.textContent = (kd.von&&kd.bis) ? kd.von+' – '+kd.bis : (kd.von||'');
+    dtEl.textContent = (kd.von&&kd.bis) ? fmtDE(kd.von)+' – '+fmtDE(kd.bis) : fmtDE(kd.von);
     hdr.insertBefore(dtEl, hdr.querySelector('.pool-link-btn'));
     kursRef.collection('teilnehmer').orderBy('nachname').get()
     .then(snap=>{
@@ -2837,7 +3079,7 @@ function openPoolLink(){
         const d=doc.data();
         const o=document.createElement('option');
         o.value=doc.id;
-        o.textContent=d.name+(d.von?' ('+d.von+')':'');
+        o.textContent=d.name+(d.von?' ('+fmtDE(d.von)+')':'');
         sel.appendChild(o);
       });
       // Aktuell verknüpften Kurs vorauswählen
@@ -3160,6 +3402,7 @@ function fbLoadData(){
       }
       renderAll();
       loadHBZKurse();
+      loadBerufeFromFirestore();
       ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||'');
     })
     .catch(()=>{

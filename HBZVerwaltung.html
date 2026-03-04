@@ -32,7 +32,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .btn{width:100%;padding:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;border-radius:9px;color:#fff;font-family:'Sora',sans-serif;font-size:.87rem;font-weight:700;cursor:pointer;transition:all .15s;}
 .btn:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(59,130,246,.35);}
 .err{color:var(--bad);font-size:.72rem;text-align:center;min-height:18px;}
-.copyright{position:fixed;bottom:8px;right:12px;z-index:97;font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--mu);opacity:.45;pointer-events:none;user-select:none;letter-spacing:.04em;}
+.copyright{position:fixed;bottom:8px;right:12px;z-index:97;font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--mu);opacity:.45;pointer-events:auto;user-select:none;letter-spacing:.04em;}
 
 /* APP LAYOUT */
 #appWrap{display:none;flex-direction:column;min-height:100vh;}
@@ -549,6 +549,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div class="page-sub" id="kdSub"></div>
           </div>
           <button class="btn-sm btn-ok" onclick="openEditKursModal()">✏️ Bearbeiten</button>
+          <button class="btn-sm" id="kdArchiveBtn" onclick="toggleArchiveKurs()" style="padding:6px 12px">📦 Archivieren</button>
           <button class="btn-sm btn-bad" onclick="deleteSelectedKurs()">🗑 Löschen</button>
         </div>
         <div class="card" style="overflow-y:auto;max-height:calc(100vh - 220px);padding:14px">
@@ -617,9 +618,11 @@ service cloud.firestore {
         match /{deep}/{deepDoc} {
           allow read: if request.auth != null;
           allow write: if isAdmin();
-          // Ausbilder darf TN-Status im Kurs aktualisieren (Fehlt/Wiederholer/Attending)
+          // Ausbilder darf TN-Status + Attendance-Aggregat aktualisieren
           allow update: if request.auth != null
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+              ['status','attTotal','attPresent','attAbsentE','attAbsentU','attSick','attBerufsschule','attLate','attEarly','attPercent','attLastSync']
+            );
         }
       }
     }
@@ -794,6 +797,20 @@ service cloud.firestore {
 <div class="toast" id="toast"></div>
 
 <script>
+// ── Version ──
+const APP_VERSION = 'v1.4.0';
+const APP_BUILD = '2026-03-04';
+const CHANGELOG = [
+  {v:'v1.4.0', d:'04.03.2026', items:['📊 Anwesenheits-Daten vom Ausbilder sichtbar (% + Details pro TN)','📊 Kursdetail zeigt Anwesenheits-Zusammenfassung','👤 TN-Profil zeigt detaillierte Anwesenheitsstatistik']},
+  {v:'v1.3.0', d:'04.03.2026', items:['📅 Datumsformat überall einheitlich deutsch (TT.MM.JJJJ)','📦 Kurs-Lebenszyklus: Laufend → Beendet → Archiviert','👆 TN-Picker: Teilnehmer per Tap zuweisen (mobilfreundlich)','🔄 Wiederholer/Fehlt-TN in neuen Kurs umsetzbar per Drag & Drop','🏷 Sidebar-Badges: ✗ Fehlt / ↻ Wdh. statt generischem ● Kurs','📋 Versionierung mit Changelog']},
+  {v:'v1.2.0', d:'01.03.2026', items:['📁 Dokumente-Upload pro Kurs','🔍 Globale Suche über TN und Kurse','👥 Ausbilder-Baum in der Sidebar']},
+];
+function showChangelog(){
+  const body=document.getElementById('changelogBody');
+  body.innerHTML=CHANGELOG.map(c=>'<div style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-weight:800;color:var(--acc);font-size:.85rem">'+c.v+'</span><span style="font-size:.62rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+c.d+'</span></div><div style="font-size:.76rem;line-height:1.6;color:var(--tx)">'+c.items.join('<br>')+'</div></div>').join('<hr style="border:none;border-top:1px solid var(--brd);margin:12px 0">');
+  document.getElementById('changelogModal').classList.add('open');
+}
+
 // ── Firebase ──
 const FB_CFG = {
   apiKey:"AIzaSyCI5hJLj22FTiAJoVIPis7VhoQqJiMLAZQ",
@@ -918,7 +935,7 @@ function _runSearch(){
       html += '<div class="sr-item" onclick="searchSelect(\'kurs\',\''+k.id+'\')">'+
         '<div class="sr-av sr-av-kurs"><span style="color:'+dotColor+'">'+dot+'</span></div>'+
         '<div class="sr-info"><div class="sr-name">'+esc(k.name||'?')+'</div>'+
-        '<div class="sr-meta">'+(k.von||'?')+' – '+(k.bis||'?')+
+        '<div class="sr-meta">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+
         (k.ausbilderName?' · '+esc(k.ausbilderName):'')+' · '+cnt+' TN</div></div></div>';
     });
   }
@@ -1114,7 +1131,7 @@ function renderSbAusbTree(){
             lg.className = 'sb-lg' + (running ? ' sb-lg-active' : '');
             lg.innerHTML =
               '<div class="sb-lg-dot" style="background:' + (running ? '#22c55e' : 'var(--brd)') + '"></div>'
-              + '<span style="flex:1">' + (k.von||'?') + ' – ' + (k.bis||'?') + '</span>'
+              + '<span style="flex:1">' + fmtDE(k.von) + ' – ' + fmtDE(k.bis) + '</span>'
               + (running ? '<span style="font-size:.55rem;color:#22c55e">&#9654;</span>' : '');
             lg.onclick = function(){ showKursDetail(k.id); };
             lgBody.appendChild(lg);
@@ -1286,9 +1303,9 @@ function loadDashboard(){
   const dd=document.getElementById('dashDate');
   if(dd) dd.textContent='Stand: '+new Date().toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
-  document.getElementById('statKurse').textContent = _kurse.length;
+  document.getElementById('statKurse').textContent = _kurse.filter(k=>!k.archiviert).length;
   const today=new Date().toISOString().slice(0,10);
-  const aktiv=_kurse.filter(k=>(!k.bis||k.bis>=today)&&(!k.von||k.von<=today)).length;
+  const aktiv=_kurse.filter(k=>!k.archiviert&&(!k.bis||k.bis>=today)&&(!k.von||k.von<=today)).length;
   document.getElementById('statAktiv').textContent = aktiv;
 
   // ── Statistiken aus globalTN berechnen (KEIN extra Firestore-Read!) ──
@@ -1340,32 +1357,58 @@ function loadDashboard(){
     }).join('');
   }
 
-  // Kurse Liste: laufende und kommende zuerst
+  // Kurse Liste: laufende und kommende zuerst, archivierte separat
   const dl=document.getElementById('dashKursList');
   if(!dl) return;
   if(!_kurse.length){ dl.innerHTML='<div class="empty">Noch keine Kurse</div>'; return; }
-  const sorted=[..._kurse].sort((a,b)=>{
-    const aAkt=(!a.bis||a.bis>=today)&&(!a.von||a.von<=today);
-    const bAkt=(!b.bis||b.bis>=today)&&(!b.von||b.von<=today);
-    if(aAkt&&!bAkt) return -1; if(!aAkt&&bAkt) return 1;
-    return (b.von||'')>(a.von||'')?1:-1;
+  // Status helper
+  function kursStatus(k){
+    if(k.archiviert) return 'archiviert';
+    if(!k.von || today < k.von) return 'geplant';
+    if(!k.bis || today <= k.bis) return 'laufend';
+    return 'abgeschlossen';
+  }
+  const active=[], done=[], archived=[];
+  _kurse.forEach(k=>{
+    const st=kursStatus(k);
+    if(st==='archiviert') archived.push(k);
+    else if(st==='abgeschlossen') done.push(k);
+    else active.push(k);
   });
-  dl.innerHTML=sorted.slice(0,8).map(k=>{
-    const isAkt=(!k.bis||k.bis>=today)&&(!k.von||k.von<=today);
-    const dot=isAkt?'background:#22c55e':'background:var(--brd)';
+  active.sort((a,b)=>(b.von||'')>(a.von||'')?1:-1);
+  done.sort((a,b)=>(b.bis||'')>(a.bis||'')?1:-1);
+
+  const statusDot={'laufend':'#22c55e','geplant':'#3b82f6','abgeschlossen':'#9ca3af','archiviert':'#6b7280'};
+  const statusLabel={'laufend':'● Laufend','geplant':'◐ Geplant','abgeschlossen':'○ Beendet','archiviert':'▪ Archiviert'};
+
+  function renderKursRow(k){
+    const st=kursStatus(k);
     const cnt=_kursTNCounts[k.id]||0;
     return `<div class="kurs-item" onclick="showKursDetail('${k.id}')"
       ondragover="event.preventDefault();this.classList.add('kurs-drop-hover')"
       ondragleave="this.classList.remove('kurs-drop-hover')"
       ondrop="event.preventDefault();this.classList.remove('kurs-drop-hover');reassignTNToKurs(event,'${k.id}')">
-      <div class="kurs-dot" style="${dot}"></div>
+      <div class="kurs-dot" style="background:${statusDot[st]}"></div>
       <div class="kurs-info">
         <div class="kurs-name">${esc(k.name||'?')}</div>
-        <div class="kurs-meta">${k.von||'?'} – ${k.bis||'?'}${k.ausbilderEmail?' · '+esc(k.ausbilderEmail.split('@')[0]):''}${isAkt?' <span style="color:#22c55e;font-weight:700">● Laufend</span>':''}</div>
+        <div class="kurs-meta">${fmtDE(k.von)} – ${fmtDE(k.bis)}${k.ausbilderEmail?' · '+esc(k.ausbilderEmail.split('@')[0]):''} <span style="color:${statusDot[st]};font-weight:700">${statusLabel[st]}</span></div>
       </div>
       <div class="kurs-cnt">${cnt} TN</div>
     </div>`;
-  }).join('');
+  }
+
+  let html='';
+  if(active.length) html += active.slice(0,8).map(renderKursRow).join('');
+  if(done.length){
+    html += '<div style="margin:12px 0 6px;font-size:.6rem;letter-spacing:.1em;color:var(--mu);font-family:\'JetBrains Mono\',monospace;text-transform:uppercase">Abgeschlossen</div>';
+    html += done.slice(0,5).map(renderKursRow).join('');
+  }
+  if(archived.length){
+    html += '<details style="margin-top:8px"><summary style="font-size:.6rem;letter-spacing:.1em;color:var(--mu);font-family:\'JetBrains Mono\',monospace;cursor:pointer;text-transform:uppercase">Archiviert ('+archived.length+')</summary>';
+    html += archived.map(renderKursRow).join('');
+    html += '</details>';
+  }
+  dl.innerHTML=html||'<div class="empty">Noch keine Kurse</div>';
 }
 
 // ── Kurse ──
@@ -1737,30 +1780,70 @@ function showKursDetail(kursId){
   const subEl=document.getElementById('kdSub');
   if(titleEl) titleEl.textContent=k.name||'Kurs';
   const today=new Date().toISOString().slice(0,10);
-  const laufend=k.von&&k.bis&&today>=k.von&&today<=k.bis;
+  // Status ermitteln
+  let kdSt, kdStColor;
+  if(k.archiviert){ kdSt='▪ Archiviert'; kdStColor='#6b7280'; }
+  else if(!k.von||today<k.von){ kdSt='◐ Geplant'; kdStColor='#3b82f6'; }
+  else if(!k.bis||today<=k.bis){ kdSt='● Laufend'; kdStColor='#22c55e'; }
+  else { kdSt='○ Beendet'; kdStColor='#9ca3af'; }
   if(subEl) subEl.innerHTML=
-    (laufend?'<span style="color:#22c55e">● Laufend</span>':'<span style="color:var(--mu)">○ Inaktiv</span>')+
-    ' &middot; '+(k.von||'?')+' – '+(k.bis||'?')+
+    '<span style="color:'+kdStColor+'">'+kdSt+'</span>'+
+    ' &middot; '+fmtDE(k.von)+' – '+fmtDE(k.bis)+
     (k.ausbilderName?' &middot; '+esc(k.ausbilderName):'')+
     (k.ausbilderEmail?' ('+esc(k.ausbilderEmail)+')':'');
+  // Archiv-Button aktualisieren
+  const archBtn=document.getElementById('kdArchiveBtn');
+  if(archBtn) archBtn.textContent=k.archiviert?'📤 Wiederherstellen':'📦 Archivieren';
 
   const wrap=document.getElementById('kdTNList');
   wrap.innerHTML='<div class="empty">Lädt…</div>';
-  db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
+  // Beide Sources parallel laden: globalTN für Basisdaten, Kurs-Subcollection für Attendance
+  Promise.all([
+    db.collection('globalTN').where('aktiverKursId','==',kursId).get(),
+    db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').get()
+  ]).then(([gSnap, kSnap])=>{
     const tns=[];
-    snap.forEach(doc=>tns.push({id:doc.id,...doc.data()}));
+    gSnap.forEach(doc=>tns.push({id:doc.id,...doc.data()}));
+    // Attendance-Daten aus Kurs-Subcollection mappen
+    const attMap={};
+    kSnap.forEach(doc=>{ const d=doc.data(); if(d.attTotal) attMap[doc.id]=d; });
     tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||''));
     if(!tns.length){
       wrap.innerHTML='<div class="empty" style="padding:40px;text-align:center">Noch keine Teilnehmer in diesem Kurs<br><br><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.8rem;padding:8px 18px">+ Teilnehmer hinzufügen</button></div>';
       return;
     }
-    wrap.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)">TEILNEHMER ('+tns.length+')</div><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.7rem;padding:5px 12px">+ Hinzufügen</button></div><div id="kdTNGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:7px"></div>';
+    // Attendance-Zusammenfassung oben
+    const allAtt=Object.values(attMap);
+    let attSummary='';
+    if(allAtt.length){
+      const avgPct=Math.round(allAtt.reduce((s,a)=>s+(a.attPercent||0),0)/allAtt.length);
+      const totSick=allAtt.reduce((s,a)=>s+(a.attSick||0),0);
+      const totAbsU=allAtt.reduce((s,a)=>s+(a.attAbsentU||0),0);
+      attSummary='<div class="kd-att-sum" style="display:flex;gap:14px;align-items:center;padding:10px 14px;background:var(--sur2);border:1px solid var(--brd);border-radius:9px;margin-bottom:10px;font-size:.7rem;font-family:\'JetBrains Mono\',monospace">'
+        +'<span style="font-weight:800;color:'+(avgPct>=80?'#22c55e':avgPct>=60?'#f59e0b':'#ef4444')+'">⌀ '+avgPct+'% Anwesenheit</span>'
+        +'<span style="color:var(--mu)">'+allAtt.length+'/'+tns.length+' mit Daten</span>'
+        +(totSick?'<span style="color:#fcd34d">🤒 '+totSick+'× krank</span>':'')
+        +(totAbsU?'<span style="color:#ef4444">❌ '+totAbsU+'× unentsch.</span>':'')
+        +'</div>';
+    }
+    wrap.innerHTML=attSummary+'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)">TEILNEHMER ('+tns.length+')</div><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.7rem;padding:5px 12px">+ Hinzufügen</button></div><div id="kdTNGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:7px"></div>';
     const grid=document.getElementById('kdTNGrid');
     tns.forEach(t=>{
       const name=(t.vorname||'')+' '+(t.nachname||'');
       const init=((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
       const vtag=t.verkuerzer?' <span class="gtn-badge" style="background:rgba(99,102,241,.12);color:#6366f1">Verk.</span>':'';
       const wtag=t.wiederholer?' <span class="gtn-badge" style="background:rgba(245,158,11,.12);color:#d97706">Wdh.</span>':'';
+      // Attendance-Badge
+      const att=attMap[t.id];
+      let attBadge='';
+      if(att && att.attTotal){
+        const pct=att.attPercent||0;
+        const col=pct>=80?'#22c55e':pct>=60?'#f59e0b':'#ef4444';
+        attBadge='<span class="gtn-badge" style="background:rgba('+(pct>=80?'34,197,94':pct>=60?'245,158,11':'239,68,68')+',.12);color:'+col+'">'+pct+'%'
+          +(att.attSick?' · '+att.attSick+'×🤒':'')
+          +(att.attAbsentU?' · '+att.attAbsentU+'×❌':'')
+          +'</span>';
+      }
       const card=document.createElement('div');
       card.className='gtn-card';
       card.innerHTML=
@@ -1768,12 +1851,28 @@ function showKursDetail(kursId){
         '<div class="gtn-info">'+
           '<div class="gtn-name">'+esc(name.trim())+vtag+wtag+'</div>'+
           '<div class="gtn-sub">'+(t.beruf||'kein Beruf')+(t.ausbjahr?' · '+t.ausbjahr+'. Lj':'')+(t.firma?' · '+esc(t.firma):'')+'</div>'+
+          (attBadge?'<div style="margin-top:3px">'+attBadge+'</div>':'')+
         '</div>'+
         '<button class="gtn-open" onclick="openTNProfile(\''+t.id+'\')" style="margin-right:4px">Profil</button>'+
         '<button class="ktn-rm" onclick="removeTNFromKursDetail(\''+t.id+'\',\''+kursId+'\')" title="Aus Kurs entfernen">✕</button>';
       grid.appendChild(card);
     });
   }).catch(err=>{wrap.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
+}
+
+function toggleArchiveKurs(){
+  if(!_selectedKursId) return;
+  const k=_kurse.find(x=>x.id===_selectedKursId);
+  if(!k) return;
+  const isArchived=!!k.archiviert;
+  const action=isArchived?'wiederherstellen':'archivieren';
+  if(!confirm('Kurs "'+k.name+'" '+action+'?')) return;
+  const update=isArchived
+    ? {archiviert:firebase.firestore.FieldValue.delete()}
+    : {archiviert:true, archiviertAm:new Date().toISOString().slice(0,10)};
+  db.collection('shared').doc('kurse').collection('list').doc(_selectedKursId).update(update)
+    .then(()=>{ toast(isArchived?'Wiederhergestellt ✓':'Archiviert ✓'); setTimeout(()=>showKursDetail(_selectedKursId), 300); })
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 function deleteSelectedKurs(){
@@ -1970,7 +2069,7 @@ function loadKursTNView(){
   const emptyMsg='<div class="empty" style="border:2px dashed var(--brd);border-radius:10px;padding:30px;text-align:center;color:var(--mu)">Teilnehmer per Drag &amp; Drop hierher ziehen</div>';
   if(!kursId){if(listEl)listEl.innerHTML=emptyMsg;if(infoEl)infoEl.textContent='';if(cntEl)cntEl.textContent='';return;}
   const kurs=_kurse.find(k=>k.id===kursId);
-  if(infoEl) infoEl.textContent=(kurs?.von||'')+' – '+(kurs?.bis||'');
+  if(infoEl) infoEl.textContent=fmtDE(kurs?.von)+' – '+fmtDE(kurs?.bis);
   if(listEl) listEl.innerHTML='<div class="empty">Lädt…</div>';
   db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
     if(cntEl) cntEl.textContent=snap.size+' TN';
@@ -2117,13 +2216,47 @@ function openTNProfile(tnId){
   html+=hist.length?hist.map((h,i)=>
     '<div class="history-item">'+(i===0&&t.aktiverKursId===h.kursId?'<span style="float:right;font-size:.65rem;color:#22c55e">Aktuell</span>':'')+
     '<div class="hi-name">'+esc(h.kursName||h.kursId)+'</div>'+
-    '<div class="hi-meta">'+(h.von||'?')+' – '+(h.bis||'?')+'</div></div>').join(''):
+    '<div class="hi-meta">'+fmtDE(h.von)+' – '+fmtDE(h.bis)+'</div></div>').join(''):
     '<div class="empty" style="padding:12px">Noch keine Kurshistorie</div>';
+  // Anwesenheits-Sektion (wird async nachgeladen)
+  html+='<div id="tnProfileAtt" style="margin-top:12px"></div>';
   html+='<div style="display:flex;gap:8px;margin-top:16px">'+
     '<button class="btn-sm btn-ok" onclick="openEditTNModal(\''+tnId+'\')" style="flex:1">Bearbeiten</button>'+
     '<button class="btn-sm btn-bad" onclick="deleteGlobalTN(\''+tnId+'\')" style="flex:1">Löschen</button></div>';
   document.getElementById('tnModalBody').innerHTML=html;
   document.getElementById('tnProfileModal').classList.add('open');
+  // Attendance async laden
+  loadTNProfileAttendance(tnId, t.aktiverKursId);
+}
+
+function loadTNProfileAttendance(tnId, kursId){
+  const el=document.getElementById('tnProfileAtt');
+  if(!el||!kursId) return;
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(tnId).get().then(doc=>{
+      if(!doc.exists) return;
+      const d=doc.data();
+      if(!d.attTotal) return;
+      const pct=d.attPercent||0;
+      const col=pct>=80?'#22c55e':pct>=60?'#f59e0b':'#ef4444';
+      el.innerHTML=
+        '<div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu);margin-bottom:8px">ANWESENHEIT</div>'+
+        '<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:9px;padding:12px 14px">'+
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
+            '<div style="font-size:1.4rem;font-weight:900;color:'+col+'">'+pct+'%</div>'+
+            '<div style="font-size:.68rem;color:var(--mu)">Anwesenheitsquote<br>'+d.attPresent+' von '+d.attTotal+' Tagen</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.65rem;font-family:\'JetBrains Mono\',monospace">'+
+            (d.attPresent?'<span style="color:#22c55e">✅ '+d.attPresent+'× anwesend</span>':'')+
+            (d.attSick?'<span style="color:#fcd34d">🤒 '+d.attSick+'× krank</span>':'')+
+            (d.attAbsentE?'<span style="color:#22d3ee">📋 '+d.attAbsentE+'× entsch.</span>':'')+
+            (d.attAbsentU?'<span style="color:#ef4444">❌ '+d.attAbsentU+'× unentsch.</span>':'')+
+            (d.attBerufsschule?'<span style="color:#818cf8">🏫 '+d.attBerufsschule+'× Berufsschule</span>':'')+
+            (d.attLate?'<span style="color:#fb923c">🕐 '+d.attLate+'× zu spät</span>':'')+
+            (d.attEarly?'<span style="color:#fb923c">🚶 '+d.attEarly+'× früher weg</span>':'')+
+          '</div>'+
+        '</div>';
+    }).catch(()=>{});
 }
 function closeTNModal(){document.getElementById('tnProfileModal').classList.remove('open');}
 
@@ -2329,7 +2462,7 @@ function renderAusbFolder(container, email, kurse){
 
 function renderKursFolderItem(container, kursId, d){
   const uid = kursId;
-  const label = (d.name||'Kurs') + ' · ' + (d.von||'?') + ' – ' + (d.bis||'?');
+  const label = (d.name||'Kurs') + ' · ' + fmtDE(d.von) + ' – ' + fmtDE(d.bis);
   const item = document.createElement('div');
   item.className = 'kurs-folder';
   item.innerHTML = `
@@ -2894,6 +3027,8 @@ function loadAusbilderEmails(){
 }
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// ISO "2026-03-04" → deutsch "04.03.2026"
+function fmtDE(d){ if(!d||d.length<10) return d||'?'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
 let _toastTimer;
 function toast(msg,type){
   const el=document.getElementById('toast');
@@ -2906,6 +3041,14 @@ function toast(msg,type){
 }
 function closeKursModal(){ document.getElementById('kursModal').classList.remove('open'); }
 </script>
-<div class="copyright">© AusbilderPro · Entwickler Stefan Mohr</div>
+<div class="copyright">© HBZVerwaltung v1.4.0 · <a href="#" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+
+<!-- CHANGELOG -->
+<div class="ov" id="changelogModal" onclick="if(event.target===this)this.classList.remove('open')">
+<div class="modal" style="max-width:480px">
+<div class="mhd"><div class="mtit">📋 Was ist neu?</div><button class="xcls" onclick="document.getElementById('changelogModal').classList.remove('open')">&#10005;</button></div>
+<div class="mbdy" style="max-height:60vh;overflow-y:auto"><div id="changelogBody"></div></div>
+</div>
+</div>
 </body>
 </html>
