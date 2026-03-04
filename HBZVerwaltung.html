@@ -1867,14 +1867,44 @@ function toggleArchiveKurs(){
   const k=_kurse.find(x=>x.id===_selectedKursId);
   if(!k) return;
   const isArchived=!!k.archiviert;
-  const action=isArchived?'wiederherstellen':'archivieren';
-  if(!confirm('Kurs "'+k.name+'" '+action+'?')) return;
-  const update=isArchived
-    ? {archiviert:firebase.firestore.FieldValue.delete()}
-    : {archiviert:true, archiviertAm:new Date().toISOString().slice(0,10)};
-  db.collection('shared').doc('kurse').collection('list').doc(_selectedKursId).update(update)
-    .then(()=>{ toast(isArchived?'Wiederhergestellt ✓':'Archiviert ✓'); setTimeout(()=>showKursDetail(_selectedKursId), 300); })
+  const kursId=_selectedKursId;
+
+  if(isArchived){
+    // Wiederherstellen – einfach Flag entfernen
+    if(!confirm('Kurs "'+k.name+'" wiederherstellen?')) return;
+    db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .update({archiviert:firebase.firestore.FieldValue.delete()})
+      .then(()=>{ toast('Wiederhergestellt ✓'); setTimeout(()=>showKursDetail(kursId), 300); })
+      .catch(err=>toast('Fehler: '+err.message,'bad'));
+  } else {
+    // Archivieren – TN freigeben
+    if(!confirm('Kurs "'+k.name+'" archivieren?\n\nAlle Teilnehmer werden freigegeben und können einem neuen Kurs zugewiesen werden.')) return;
+    // 1. Kurs als archiviert markieren
+    db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .update({archiviert:true, archiviertAm:new Date().toISOString().slice(0,10)})
+    .then(()=>{
+      // 2. Alle TN freigeben (aktiverKursId + status/wiederholer entfernen)
+      return db.collection('globalTN').where('aktiverKursId','==',kursId).get();
+    })
+    .then(snap=>{
+      if(snap.empty) return;
+      const batch=db.batch();
+      snap.forEach(doc=>{
+        batch.update(doc.ref, {
+          aktiverKursId: firebase.firestore.FieldValue.delete(),
+          status: firebase.firestore.FieldValue.delete(),
+          wiederholer: firebase.firestore.FieldValue.delete()
+        });
+      });
+      return batch.commit();
+    })
+    .then(()=>{
+      toast('Archiviert ✓ · '+' TN freigegeben');
+      filterGlobalTN(); // Sidebar + Dashboard aktualisieren
+      setTimeout(()=>showKursDetail(kursId), 300);
+    })
     .catch(err=>toast('Fehler: '+err.message,'bad'));
+  }
 }
 
 function deleteSelectedKurs(){
