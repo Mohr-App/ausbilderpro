@@ -275,6 +275,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .gtn-card.dragging{opacity:.4;}
 .gtn-av{width:34px;height:34px;border-radius:50%;background:rgba(59,130,246,.12);border:2px solid rgba(59,130,246,.25);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:var(--acc);flex-shrink:0;}
 .gtn-av.av-ok{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.3);color:#22c55e;}
+.gtn-av.av-busy{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#ef4444;}
+.gtn-av.av-free{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.25);color:var(--acc);}
 .gtn-info{flex:1;min-width:0;}
 .gtn-name{font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .gtn-sub{font-size:.65rem;color:var(--mu);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -335,7 +337,30 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .bld-tn-card .gtn-av{width:30px;height:30px;font-size:.7rem;}
 .bld-tn-rm{background:none;border:none;color:var(--mu);font-size:1rem;cursor:pointer;padding:2px 6px;border-radius:4px;margin-left:auto;flex-shrink:0;line-height:1;}
 .bld-tn-rm:hover{color:var(--bad);background:rgba(239,68,68,.1);}
+.bld-add-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;margin-top:8px;border:1px dashed var(--acc);border-radius:8px;background:rgba(59,130,246,.04);color:var(--acc);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .13s;font-family:'Sora',sans-serif;}
+.bld-add-btn:hover{background:rgba(59,130,246,.1);border-style:solid;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* TN-PICKER MODAL */
+.tn-pick-ov{display:none;position:fixed;inset:0;background:rgba(15,20,40,.6);z-index:1200;align-items:center;justify-content:center;padding:16px;}
+.tn-pick-ov.open{display:flex;}
+.tn-pick-box{background:var(--sur);border-radius:14px;width:100%;max-width:520px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);}
+.tn-pick-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--brd);flex-shrink:0;}
+.tn-pick-hdr .pick-title{flex:1;font-weight:700;font-size:.9rem;}
+.tn-pick-search{padding:10px 16px;border-bottom:1px solid var(--brd);flex-shrink:0;}
+.tn-pick-search input{width:100%;padding:9px 12px;border:1.5px solid var(--brd);border-radius:8px;background:var(--sur2);color:var(--tx);font-size:.8rem;font-family:'Sora',sans-serif;outline:none;}
+.tn-pick-search input:focus{border-color:var(--acc);}
+.tn-pick-list{flex:1;overflow-y:auto;padding:6px 0;}
+.tn-pick-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:background .1s;}
+.tn-pick-item:hover{background:var(--sur2);}
+.tn-pick-item.added{opacity:.4;pointer-events:none;}
+.tn-pick-item.in-kurs{opacity:.3;pointer-events:none;}
+.tn-pick-item .gtn-av{width:32px;height:32px;font-size:.68rem;flex-shrink:0;}
+.tn-pick-info{flex:1;min-width:0;}
+.tn-pick-name{font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tn-pick-sub{font-size:.65rem;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tn-pick-badge{font-size:.6rem;padding:2px 7px;border-radius:4px;font-weight:700;flex-shrink:0;font-family:'JetBrains Mono',monospace;}
+.tn-pick-empty{text-align:center;padding:30px 16px;color:var(--mu);font-size:.78rem;}
 
 /* Sidebar draggable TN */
 .sb-tn-drag{display:flex;align-items:center;gap:6px;padding:4px 8px 4px 20px;font-size:.68rem;color:var(--tx);cursor:grab;border-radius:5px;transition:all .12s;user-select:none;}
@@ -502,8 +527,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div id="bldDropZone" class="builder-drop"
                ondrop="bldDrop(event)" ondragover="bldDragOver(event)" ondragleave="bldDragLeave(event)">
             <div id="bldTNList" class="bld-tn-grid"></div>
-            <div class="builder-empty" id="bldEmpty">👈 Teilnehmer aus der linken Sidebar hierher ziehen</div>
+            <div class="builder-empty" id="bldEmpty" onclick="openTNPicker()" style="cursor:pointer">👆 Tippen oder Teilnehmer aus der Sidebar hierher ziehen</div>
           </div>
+          <button class="bld-add-btn" onclick="openTNPicker()">+ Teilnehmer hinzufügen</button>
         </div>
 
         <button class="btn" onclick="bldUebertragen()" style="margin-top:16px;width:100%;font-size:.95rem;padding:14px">
@@ -744,6 +770,20 @@ service cloud.firestore {
     <div class="mbdy">
       <div id="kursModalBody"></div>
     </div>
+  </div>
+</div>
+
+<!-- TN-PICKER MODAL -->
+<div class="tn-pick-ov" id="tnPickerModal" onclick="if(event.target===this)closeTNPicker()">
+  <div class="tn-pick-box">
+    <div class="tn-pick-hdr">
+      <span class="pick-title">👥 Teilnehmer auswählen</span>
+      <button style="background:none;border:none;color:var(--mu);font-size:1.1rem;cursor:pointer;padding:4px 8px" onclick="closeTNPicker()">✕</button>
+    </div>
+    <div class="tn-pick-search">
+      <input type="text" id="tnPickSearch" placeholder="Suchen…" oninput="renderTNPicker()" autocomplete="off">
+    </div>
+    <div class="tn-pick-list" id="tnPickList"></div>
   </div>
 </div>
 
@@ -1691,10 +1731,10 @@ function showKursDetail(kursId){
     snap.forEach(doc=>tns.push({id:doc.id,...doc.data()}));
     tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||''));
     if(!tns.length){
-      wrap.innerHTML='<div class="empty" style="padding:40px;text-align:center">Noch keine Teilnehmer in diesem Kurs</div>';
+      wrap.innerHTML='<div class="empty" style="padding:40px;text-align:center">Noch keine Teilnehmer in diesem Kurs<br><br><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.8rem;padding:8px 18px">+ Teilnehmer hinzufügen</button></div>';
       return;
     }
-    wrap.innerHTML='<div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu);margin-bottom:8px">TEILNEHMER ('+tns.length+')</div><div id="kdTNGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:7px"></div>';
+    wrap.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)">TEILNEHMER ('+tns.length+')</div><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.7rem;padding:5px 12px">+ Hinzufügen</button></div><div id="kdTNGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:7px"></div>';
     const grid=document.getElementById('kdTNGrid');
     tns.forEach(t=>{
       const name=(t.vorname||'')+' '+(t.nachname||'');
@@ -2457,6 +2497,112 @@ function bldDrop(e){
 function bldRemoveTN(tnId){
   _bldTNIds = _bldTNIds.filter(id=>id!==tnId);
   renderBldTNList();
+}
+
+// ── TN-PICKER MODAL (Mobile-freundlich) ──
+let _tnPickMode = 'builder'; // 'builder' or 'kursdetail'
+
+function openTNPicker(){
+  _tnPickMode = 'builder';
+  document.getElementById('tnPickSearch').value='';
+  document.querySelector('#tnPickerModal .pick-title').textContent='👥 Teilnehmer auswählen';
+  document.getElementById('tnPickerModal').classList.add('open');
+  renderTNPicker();
+  setTimeout(()=>document.getElementById('tnPickSearch').focus(), 100);
+}
+function openTNPickerForKurs(){
+  if(!_selectedKursId){ toast('Kein Kurs ausgewählt','bad'); return; }
+  _tnPickMode = 'kursdetail';
+  document.getElementById('tnPickSearch').value='';
+  const k=_kurse.find(x=>x.id===_selectedKursId);
+  document.querySelector('#tnPickerModal .pick-title').textContent='👥 TN zu '+(k?.name||'Kurs')+' hinzufügen';
+  document.getElementById('tnPickerModal').classList.add('open');
+  renderTNPicker();
+  setTimeout(()=>document.getElementById('tnPickSearch').focus(), 100);
+}
+function closeTNPicker(){
+  document.getElementById('tnPickerModal').classList.remove('open');
+}
+function renderTNPicker(){
+  const list=document.getElementById('tnPickList');
+  const q=(document.getElementById('tnPickSearch').value||'').trim().toLowerCase();
+  const filtered=_globalTN.filter(t=>{
+    if(!q) return true;
+    const full=((t.vorname||'')+' '+(t.nachname||'')+' '+(t.firma||'')+' '+(t.beruf||'')).toLowerCase();
+    return full.includes(q);
+  });
+  if(!filtered.length){
+    list.innerHTML='<div class="tn-pick-empty">Keine Teilnehmer gefunden</div>';
+    return;
+  }
+  list.innerHTML='';
+  filtered.forEach(t=>{
+    const name=((t.vorname||'')+' '+(t.nachname||'')).trim();
+    const init=((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
+    // Status je nach Modus
+    let alreadyAdded, inOtherKurs;
+    if(_tnPickMode==='builder'){
+      alreadyAdded=_bldTNIds.includes(t.id);
+      inOtherKurs=!!t.aktiverKursId;
+    } else {
+      alreadyAdded=t.aktiverKursId===_selectedKursId;
+      inOtherKurs=!!t.aktiverKursId && t.aktiverKursId!==_selectedKursId;
+    }
+    const item=document.createElement('div');
+    item.className='tn-pick-item'+(alreadyAdded?' added':'')+(inOtherKurs&&!alreadyAdded?' in-kurs':'');
+    let badge='';
+    if(alreadyAdded) badge='<span class="tn-pick-badge" style="background:rgba(34,197,94,.12);color:#22c55e">✓ Hinzugefügt</span>';
+    else if(inOtherKurs){
+      const kursName=_kurse.find(k=>k.id===t.aktiverKursId)?.name||'Kurs';
+      badge='<span class="tn-pick-badge" style="background:rgba(239,68,68,.1);color:#ef4444">In '+esc(kursName)+'</span>';
+    }
+    item.innerHTML=
+      '<div class="gtn-av'+(alreadyAdded?' av-ok':inOtherKurs?' av-busy':' av-free')+'">'+esc(init)+'</div>'+
+      '<div class="tn-pick-info">'+
+        '<div class="tn-pick-name">'+esc(name)+'</div>'+
+        '<div class="tn-pick-sub">'+(t.beruf||'')+(t.firma?' · '+esc(t.firma):'')+'</div>'+
+      '</div>'+badge;
+    if(!alreadyAdded && !inOtherKurs){
+      item.addEventListener('click',()=>{
+        if(_tnPickMode==='builder') pickTN(t.id);
+        else pickTNForKurs(t.id);
+      });
+    }
+    list.appendChild(item);
+  });
+}
+function pickTN(tnId){
+  if(_bldTNIds.includes(tnId)) return;
+  const tn=_globalTN.find(t=>t.id===tnId);
+  if(!tn) return;
+  if(tn.aktiverKursId){ toast(tn.vorname+' '+tn.nachname+' ist bereits in einem anderen Kurs','bad'); return; }
+  _bldTNIds.push(tnId);
+  renderBldTNList();
+  renderTNPicker();
+  toast(tn.vorname+' '+tn.nachname+' hinzugefügt ✓');
+}
+
+function pickTNForKurs(tnId){
+  const kursId=_selectedKursId;
+  if(!kursId) return;
+  const tn=_globalTN.find(t=>t.id===tnId);
+  if(!tn) return;
+  if(tn.aktiverKursId){ toast(tn.vorname+' '+tn.nachname+' ist bereits in einem anderen Kurs','bad'); return; }
+  // Direkt in Firestore zuweisen
+  db.collection('globalTN').doc(tnId).update({
+    aktiverKursId: kursId,
+    kursHistory: firebase.firestore.FieldValue.arrayUnion({kursId, von:new Date().toISOString().slice(0,10)})
+  });
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(tnId).set({
+      vorname:tn.vorname||'', nachname:tn.nachname||'', firma:tn.firma||'',
+      beruf:tn.beruf||'', ausbjahr:tn.ausbjahr||'',
+      addedAt:Date.now(), globalTNId:tnId
+    });
+  toast(tn.vorname+' '+tn.nachname+' hinzugefügt ✓');
+  renderTNPicker();
+  // Kursdetail nach kurzer Pause aktualisieren
+  setTimeout(()=>showKursDetail(kursId), 600);
 }
 
 function renderBldTNList(){
