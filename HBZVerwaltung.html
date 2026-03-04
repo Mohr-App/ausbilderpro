@@ -580,17 +580,26 @@ service cloud.firestore {
     }
 
     match /shared/{docId} {
-      allow read, write: if isAdmin();
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
       match /{sub}/{subDoc} {
-        allow read, write: if isAdmin();
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
         match /{deep}/{deepDoc} {
-          allow read, write: if isAdmin();
+          allow read: if request.auth != null;
+          allow write: if isAdmin();
+          // Ausbilder darf TN-Status im Kurs aktualisieren (Fehlt/Wiederholer/Attending)
+          allow update: if request.auth != null
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
         }
       }
     }
 
     match /globalTN/{doc} {
       allow read, write: if isAdmin();
+      // Ausbilder darf nur status + wiederholer Felder ändern (Sync aus AusbilderPro)
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'wiederholer']);
     }
   }
 }</pre>

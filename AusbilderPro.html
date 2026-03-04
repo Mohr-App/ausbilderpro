@@ -638,7 +638,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>
     </div>
     <!-- FEHLT BEREICH -->
-    <div class="fehlt-hdr">✗ Nicht erschienen</div>
+    <div class="fehlt-hdr">✗ Nicht angetreten (Fehlt)</div>
     <div class="fehlt-body" id="fehltBody" 
       ondragover="event.preventDefault();this.classList.add('fehlt-dropover')" 
       ondragleave="this.classList.remove('fehlt-dropover')" 
@@ -753,7 +753,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <input class="fi" type="text" id="iProf" placeholder="z.B. Elektroniker EuG" autocomplete="off" oninput="acInput('iProf','acProf')" onkeydown="acKey(event,'acProf')" onfocus="acInput('iProf','acProf')" onblur="acBlur('acProf')">
           <div class="ac-drop" id="acProf"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr;gap:8px;max-width:200px">
           <div class="fg">
             <label class="fl">Ausbildungsjahr</label>
             <select class="fi" id="iAusbjahr" style="cursor:pointer">
@@ -763,29 +763,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
               <option value="3">3. Jahr</option>
               <option value="4">4. Jahr</option>
             </select>
-          </div>
-          <div class="fg">
-            <label class="fl">Schuljahr</label>
-            <select class="fi" id="iSchuljahr" style="cursor:pointer">
-              <option value="">–</option>
-              <option value="1">1. Klasse</option>
-              <option value="2">2. Klasse</option>
-              <option value="3">3. Klasse</option>
-              <option value="4">4. Klasse</option>
-              <option value="5">5. Klasse</option>
-              <option value="6">6. Klasse</option>
-              <option value="7">7. Klasse</option>
-              <option value="8">8. Klasse</option>
-              <option value="9">9. Klasse</option>
-              <option value="10">10. Klasse</option>
-              <option value="11">11. Klasse</option>
-              <option value="12">12. Klasse</option>
-              <option value="13">13. Klasse</option>
-            </select>
-          </div>
-          <div class="fg">
-            <label class="fl">Klasse</label>
-            <input class="fi" type="text" id="iKlasse" placeholder="z.B. 10a" autocomplete="off">
           </div>
         </div>
         <div class="fg"><label class="fl">Notizen</label><textarea class="fi ni" id="iNote" placeholder="Freitext..."></textarea></div>
@@ -1636,8 +1613,6 @@ function openModal(id){
   document.getElementById('iCo').value=d.company||'';
   document.getElementById('iProf').value=d.profession||'';
   document.getElementById('iAusbjahr').value=d.ausbjahr||'';
-  document.getElementById('iSchuljahr').value=d.schuljahr||'';
-  document.getElementById('iKlasse').value=d.klasse||'';
   document.getElementById('iNote').value=d.note||'';
   // Foto laden
   loadPhotoPreview(d.photo||null);
@@ -1873,8 +1848,6 @@ function saveSeat(){
     company:document.getElementById('iCo').value.trim(),
     profession:document.getElementById('iProf').value.trim(),
     ausbjahr:document.getElementById('iAusbjahr').value,
-    schuljahr:document.getElementById('iSchuljahr').value,
-    klasse:document.getElementById('iKlasse').value.trim(),
     note:document.getElementById('iNote').value.trim(),
     photo:_tmpPhoto!==undefined ? _tmpPhoto : (curInst().seats[curSeat]?.photo||null),
     mitarbeit:fixed.mitarbeit,
@@ -1896,6 +1869,7 @@ function clearSeat(){
     _db.collection('shared').doc('kurse').collection('list').doc(kursId)
       .collection('teilnehmer').doc(d.poolTnId)
       .update({status: firebase.firestore.FieldValue.delete()}).catch(()=>{});
+    syncGlobalTNStatus(d.poolTnId, 'clear');
   }
   delete inst.seats[curSeat];
   persist(); renderSeats(); updBadge(); renderSidebar(); closeModal(); loadPool();
@@ -2165,6 +2139,24 @@ function _pwHash(s){
 // ═══════════════════════════════════════════════
 // TEILNEHMERPOOL (HBZ-Verknüpfung)
 // ═══════════════════════════════════════════════
+
+// ── Status-Sync: globalTN in HBZVerwaltung aktualisieren ──
+// Wird aufgerufen wenn Ausbilder in APro den Status ändert (Fehlt/Wiederholer/Zurück)
+function syncGlobalTNStatus(tnId, statusType){
+  // tnId = globalTN doc ID (= kurs subcollection doc ID)
+  // statusType: 'absent' | 'wiederholer' | 'clear'
+  if(!_db || !tnId) return;
+  const ref = _db.collection('globalTN').doc(tnId);
+  if(statusType === 'absent'){
+    ref.update({status:'absent', wiederholer: firebase.firestore.FieldValue.delete()}).catch(()=>{});
+  } else if(statusType === 'wiederholer'){
+    ref.update({wiederholer:true, status: firebase.firestore.FieldValue.delete()}).catch(()=>{});
+  } else {
+    // clear – back to normal
+    ref.update({status: firebase.firestore.FieldValue.delete(), wiederholer: firebase.firestore.FieldValue.delete()}).catch(()=>{});
+  }
+}
+
 let _poolDragId = null;
 let _wiederholerSeatId = null; // tracks local wiederholer card origin seat
 let _fehltLocal = false; // tracks if dragged card is a local fehlt entry
@@ -2275,7 +2267,10 @@ function poolPlaceAll(allTN, kursId){
   for(let i=0;i<count;i++){
     const t=unplaced[i];
     inst.seats[freeSeats[i]] = {...(inst.seats[freeSeats[i]]||{}), name:t.name, company:t.company, profession:t.profession, ausbjahr:t.ausbjahr, poolTnId:t.id, poolKursId:kursId};
-    if(_db && kursId && t.id) _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(t.id).update({status:'attending'}).catch(()=>{});
+    if(_db && kursId && t.id){
+      _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(t.id).update({status:'attending'}).catch(()=>{});
+      syncGlobalTNStatus(t.id, 'clear');
+    }
   }
   persist(); renderSeats(); loadPool();
 }
@@ -2320,6 +2315,7 @@ function setupSeatDropTargets(){
         _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
           .collection('teilnehmer').doc(_poolDragTnId)
           .update({status:'attending'}).then(()=>loadPool()).catch(()=>loadPool());
+        syncGlobalTNStatus(_poolDragTnId, 'clear');
       } else {
         loadPool();
       }
@@ -2365,6 +2361,7 @@ function dropToFehlt(e){
       _db.collection('shared').doc('kurse').collection('list').doc(kursId)
         .collection('teilnehmer').doc(tnId).update({status:'absent'})
         .then(()=>loadPool()).catch(()=>loadPool());
+      syncGlobalTNStatus(tnId, 'absent');
     } else { loadPool(); }
     _seatDragId=null;
     return;
@@ -2385,10 +2382,12 @@ function dropToFehlt(e){
       ['name','company','profession','ausbjahr','poolTnId','poolKursId'].forEach(k=>delete inst.seats[_wiederholerSeatId][k]);
       persist(); renderSeats();
     }
-    if(_db && _poolDragKursId && _poolDragTnId)
+    if(_db && _poolDragKursId && _poolDragTnId){
       _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
         .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'})
         .then(()=>loadPool()).catch(()=>loadPool());
+      syncGlobalTNStatus(_poolDragTnId, 'absent');
+    }
     else loadPool();
     _poolDragId=null; _wiederholerSeatId=null;
     return;
@@ -2411,6 +2410,7 @@ function dropToFehlt(e){
     _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
       .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'})
       .then(()=>loadPool()).catch(()=>loadPool());
+    syncGlobalTNStatus(_poolDragTnId, 'absent');
     _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
     return;
   }
@@ -2453,6 +2453,7 @@ function dropToWiederholer(e){
       _db.collection('shared').doc('kurse').collection('list').doc(kursId)
         .collection('teilnehmer').doc(tnId).update({status:'wiederholer'})
         .then(()=>loadPool()).catch(()=>loadPool());
+      syncGlobalTNStatus(tnId, 'wiederholer');
     } else {
       loadPool();
       renderWiederholer(null);
@@ -2480,6 +2481,7 @@ function dropToWiederholer(e){
       _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
         .collection('teilnehmer').doc(_poolDragTnId).update({status:'wiederholer'})
         .then(()=>loadPool()).catch(()=>loadPool());
+      syncGlobalTNStatus(_poolDragTnId, 'wiederholer');
     } else { loadPool(); }
     _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
   }
