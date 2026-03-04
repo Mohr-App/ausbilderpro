@@ -1144,7 +1144,9 @@ function renderSbTnTree(){
       tns.forEach(t=>{
         const name = ((t.vorname||'')[0]||'') + '. ' + (t.nachname||'');
         const inKurs = !!t.aktiverKursId;
-        const ljTag = t.ausbjahr ? '<span style="font-size:.5rem;color:var(--mu);margin-left:auto;flex-shrink:0;font-family:\'JetBrains Mono\',monospace">'+t.ausbjahr+'.Lj</span>' : '';
+        const histCount = (t.kursHistory||[]).length + (inKurs && !(t.kursHistory||[]).some(h=>h.kursId===t.aktiverKursId) ? 1 : 0);
+        const ljTag = t.ausbjahr ? '<span style="font-size:.5rem;color:var(--mu);flex-shrink:0;font-family:\'JetBrains Mono\',monospace">'+t.ausbjahr+'.Lj</span>' : '';
+        const cntTag = histCount ? '<span style="font-size:.5rem;font-weight:800;color:'+(histCount>=3?'#22c55e':histCount>=2?'#f59e0b':'var(--mu)')+';flex-shrink:0;font-family:\'JetBrains Mono\',monospace">'+histCount+'×</span>' : '';
         const el = document.createElement('div');
         el.className = 'sb-tn-drag';
         el.draggable = true;
@@ -1152,9 +1154,9 @@ function renderSbTnTree(){
         el.innerHTML =
           '<span class="drag-handle">⠿</span>' +
           '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(name) + '</span>' +
-          ljTag +
+          '<span style="display:flex;gap:4px;align-items:center;margin-left:auto;flex-shrink:0">' + ljTag + cntTag + '</span>' +
           (inKurs ? '<span class="tn-inkurs">● Kurs</span>' : '');
-        el.title = (t.vorname||'') + ' ' + (t.nachname||'') + (t.firma ? ' – ' + t.firma : '') + (inKurs ? ' (in Kurs)' : '');
+        el.title = (t.vorname||'') + ' ' + (t.nachname||'') + (t.firma ? ' – ' + t.firma : '') + ' · ' + histCount + ' Lehrgang' + (histCount!==1?'e':'') + (inKurs ? ' (aktuell in Kurs)' : '');
         el.ondragstart = function(e){
           e.dataTransfer.setData('text/plain', t.id);
           e.dataTransfer.effectAllowed = 'copy';
