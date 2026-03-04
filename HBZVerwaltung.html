@@ -100,6 +100,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 /* KURS LIST */
 .kurs-item{background:var(--sur2);border:2px solid var(--brd);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer;transition:border .12s;}
 .kurs-item:hover{border-color:var(--acc);}
+.kurs-item.kurs-drop-hover{border-color:#22c55e;background:rgba(34,197,94,.08);box-shadow:0 0 0 2px rgba(34,197,94,.2);}
 .kurs-item.selected{border-color:var(--acc);background:rgba(59,130,246,.06);}
 .kurs-dot{width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0;}
 .kurs-info{flex:1;}
@@ -260,6 +261,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .sb-new-btn{margin:10px 12px;padding:9px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;border-radius:9px;color:#fff;font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s;text-align:center;}
 .sb-new-btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(59,130,246,.35);}
 .status-alert{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;margin-bottom:7px;cursor:pointer;transition:filter .12s;}
+.status-alert[draggable="true"]{cursor:grab;}
+.status-alert[draggable="true"]:active{cursor:grabbing;}
 .status-alert:hover{filter:brightness(1.1);}
 .sa-absent{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);}
 .sa-wdh{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);}
@@ -1193,9 +1196,15 @@ function renderSbTnTree(){
       tns.forEach(t=>{
         const name = ((t.vorname||'')[0]||'') + '. ' + (t.nachname||'');
         const inKurs = !!t.aktiverKursId;
+        const isWdh = !!t.wiederholer;
+        const isAbsent = t.status==='absent';
         const histCount = (t.kursHistory||[]).length + (inKurs && !(t.kursHistory||[]).some(h=>h.kursId===t.aktiverKursId) ? 1 : 0);
         const ljTag = t.ausbjahr ? '<span style="font-size:.5rem;color:var(--mu);flex-shrink:0;font-family:\'JetBrains Mono\',monospace">'+t.ausbjahr+'.Lj</span>' : '';
         const cntTag = histCount ? '<span style="font-size:.5rem;font-weight:800;color:'+(histCount>=3?'#22c55e':histCount>=2?'#f59e0b':'var(--mu)')+';flex-shrink:0;font-family:\'JetBrains Mono\',monospace">'+histCount+'×</span>' : '';
+        let statusBadge='';
+        if(isAbsent) statusBadge='<span class="tn-inkurs" style="color:#ef4444">✗ Fehlt</span>';
+        else if(isWdh) statusBadge='<span class="tn-inkurs" style="color:#d97706">↻ Wdh.</span>';
+        else if(inKurs) statusBadge='<span class="tn-inkurs">● Kurs</span>';
         const el = document.createElement('div');
         el.className = 'sb-tn-drag';
         el.draggable = true;
@@ -1204,7 +1213,7 @@ function renderSbTnTree(){
           '<span class="drag-handle">⠿</span>' +
           '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(name) + '</span>' +
           '<span style="display:flex;gap:4px;align-items:center;margin-left:auto;flex-shrink:0">' + ljTag + cntTag + '</span>' +
-          (inKurs ? '<span class="tn-inkurs">● Kurs</span>' : '');
+          statusBadge;
         el.title = (t.vorname||'') + ' ' + (t.nachname||'') + (t.firma ? ' – ' + t.firma : '') + ' · ' + histCount + ' Lehrgang' + (histCount!==1?'e':'') + (inKurs ? ' (aktuell in Kurs)' : '');
         el.ondragstart = function(e){
           e.dataTransfer.setData('text/plain', t.id);
@@ -1297,17 +1306,21 @@ function loadDashboard(){
     if(!kurs) return;
     const name=(t.vorname||'')+' '+(t.nachname||'');
     const meta=esc(kurs.name||'')+(kurs.ausbilderEmail?' · '+kurs.ausbilderEmail.split('@')[0]:'')+(t.beruf?' · '+t.beruf:'');
-    if(t.status==='absent')  absentList.push({name,meta,kursId:kurs.id});
-    if(t.wiederholer)        wdhList.push({name,meta,kursId:kurs.id});
+    if(t.status==='absent')  absentList.push({name,meta,kursId:kurs.id,tnId:t.id});
+    if(t.wiederholer)        wdhList.push({name,meta,kursId:kurs.id,tnId:t.id});
   });
 
   if(absentEl){
     if(!absentList.length){ absentEl.innerHTML='<div class="empty">Keine Fehlenden</div>'; }
     else absentEl.innerHTML=absentList.map(x=>{
       const init=x.name.trim().split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      return `<div class="status-alert sa-absent" onclick="showKursDetail('${x.kursId}')">
+      return `<div class="status-alert sa-absent" draggable="true"
+        ondragstart="event.dataTransfer.setData('text/plain','${x.tnId}');event.dataTransfer.effectAllowed='copy';this.style.opacity='.4';_dragTNId='${x.tnId}'"
+        ondragend="this.style.opacity=''"
+        onclick="showKursDetail('${x.kursId}')">
         <div class="sa-avatar">${init}</div>
         <div class="sa-info"><div class="sa-name">${esc(x.name.trim())}</div><div class="sa-meta">${x.meta}</div></div>
+        <div style="margin-left:auto;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">⠿ ziehen</div>
       </div>`;
     }).join('');
   }
@@ -1316,9 +1329,13 @@ function loadDashboard(){
     if(!wdhList.length){ wdhEl.innerHTML='<div class="empty">Keine Wiederholer</div>'; }
     else wdhEl.innerHTML=wdhList.map(x=>{
       const init=x.name.trim().split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      return `<div class="status-alert sa-wdh" onclick="showKursDetail('${x.kursId}')">
+      return `<div class="status-alert sa-wdh" draggable="true"
+        ondragstart="event.dataTransfer.setData('text/plain','${x.tnId}');event.dataTransfer.effectAllowed='copy';this.style.opacity='.4';_dragTNId='${x.tnId}'"
+        ondragend="this.style.opacity=''"
+        onclick="showKursDetail('${x.kursId}')">
         <div class="sa-avatar">${init}</div>
         <div class="sa-info"><div class="sa-name">${esc(x.name.trim())}</div><div class="sa-meta">${x.meta}</div></div>
+        <div style="margin-left:auto;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">⠿ ziehen</div>
       </div>`;
     }).join('');
   }
@@ -1337,7 +1354,10 @@ function loadDashboard(){
     const isAkt=(!k.bis||k.bis>=today)&&(!k.von||k.von<=today);
     const dot=isAkt?'background:#22c55e':'background:var(--brd)';
     const cnt=_kursTNCounts[k.id]||0;
-    return `<div class="kurs-item" onclick="showKursDetail('${k.id}')">
+    return `<div class="kurs-item" onclick="showKursDetail('${k.id}')"
+      ondragover="event.preventDefault();this.classList.add('kurs-drop-hover')"
+      ondragleave="this.classList.remove('kurs-drop-hover')"
+      ondrop="event.preventDefault();this.classList.remove('kurs-drop-hover');reassignTNToKurs(event,'${k.id}')">
       <div class="kurs-dot" style="${dot}"></div>
       <div class="kurs-info">
         <div class="kurs-name">${esc(k.name||'?')}</div>
@@ -1983,7 +2003,16 @@ function dropTNIntoKurs(e){
   const tn=_globalTN.find(t=>t.id===_dragTNId);
   if(!tn){_dragTNId=null;return;}
   if(tn.aktiverKursId===kursId){toast('Bereits in diesem Kurs','bad');_dragTNId=null;return;}
-  if(tn.aktiverKursId){toast('TN ist noch in einem anderen aktiven Kurs','bad');_dragTNId=null;return;}
+  // Wenn TN in anderem Kurs aber Fehlt/Wiederholer → Umsetzen erlauben
+  if(tn.aktiverKursId && !(tn.status==='absent'||tn.wiederholer)){
+    toast('TN ist noch in einem anderen aktiven Kurs','bad');_dragTNId=null;return;
+  }
+  // Wenn Fehlt/Wiederholer → über reassign abwickeln (räumt alten Kurs auf)
+  if(tn.aktiverKursId && (tn.status==='absent'||tn.wiederholer)){
+    e.dataTransfer = e.dataTransfer || {getData:()=>_dragTNId};
+    reassignTNToKurs(e, kursId);
+    return;
+  }
   const kurs=_kurse.find(k=>k.id===kursId);
   const kursName=kurs?.name||kursId;
   const histEntry={kursId,kursName,von:kurs?.von||'',bis:kurs?.bis||'',addedAt:Date.now()};
@@ -2007,6 +2036,58 @@ function removeTNFromKurs(tnId,kursId){
   .then(()=>db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId).delete())
   .then(()=>{toast('Entfernt');loadKursTNView();filterGlobalTN();})
   .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// ── TN aus Fehlt/Wiederholer in neuen Kurs umsetzen ──
+function reassignTNToKurs(e, newKursId){
+  e.stopPropagation(); // Kein showKursDetail auslösen
+  const tnId = e.dataTransfer.getData('text/plain');
+  if(!tnId) return;
+  const tn = _globalTN.find(t=>t.id===tnId);
+  if(!tn){ toast('Teilnehmer nicht gefunden','bad'); return; }
+  if(tn.aktiverKursId===newKursId){ toast('Bereits in diesem Kurs','bad'); return; }
+
+  const oldKursId = tn.aktiverKursId;
+  const newKurs = _kurse.find(k=>k.id===newKursId);
+  const newKursName = newKurs?.name || newKursId;
+  const tnName = (tn.vorname||'')+' '+(tn.nachname||'');
+
+  if(!confirm(tnName.trim()+' in Kurs "'+newKursName+'" umsetzen?')) return;
+
+  const histEntry = {kursId:newKursId, kursName:newKursName, von:newKurs?.von||'', bis:newKurs?.bis||'', addedAt:Date.now()};
+
+  // 1. globalTN: neuen Kurs setzen + Status/Wiederholer aufräumen
+  const tnUpdate = {
+    aktiverKursId: newKursId,
+    kursHistory: firebase.firestore.FieldValue.arrayUnion(histEntry)
+  };
+  // Status-Felder entfernen (clean slate im neuen Kurs)
+  if(tn.status) tnUpdate.status = firebase.firestore.FieldValue.delete();
+  if(tn.wiederholer) tnUpdate.wiederholer = firebase.firestore.FieldValue.delete();
+
+  db.collection('globalTN').doc(tnId).update(tnUpdate)
+  .then(()=>{
+    // 2. Aus altem Kurs-Subcollection entfernen
+    if(oldKursId){
+      return db.collection('shared').doc('kurse').collection('list').doc(oldKursId)
+        .collection('teilnehmer').doc(tnId).delete().catch(()=>{});
+    }
+  })
+  .then(()=>{
+    // 3. In neuen Kurs-Subcollection eintragen
+    return db.collection('shared').doc('kurse').collection('list').doc(newKursId)
+      .collection('teilnehmer').doc(tnId).set({
+        vorname:tn.vorname||'', nachname:tn.nachname||'',
+        firma:tn.firma||'', beruf:tn.beruf||'', ausbjahr:tn.ausbjahr||'',
+        addedAt:Date.now(), globalTNId:tnId
+      });
+  })
+  .then(()=>{
+    toast(tnName.trim()+' → '+newKursName+' ✓');
+    filterGlobalTN();
+  })
+  .catch(err=>toast('Fehler: '+err.message,'bad'));
+  _dragTNId = null;
 }
 
 function openTNProfile(tnId){
@@ -2488,7 +2569,8 @@ function bldDrop(e){
   if(_bldTNIds.includes(tnId)){ toast('Bereits hinzugefügt','bad'); return; }
   const tn = _globalTN.find(t=>t.id===tnId);
   if(!tn){ toast('Teilnehmer nicht gefunden','bad'); return; }
-  if(tn.aktiverKursId){ toast(tn.vorname+' '+tn.nachname+' ist bereits in einem anderen Kurs','bad'); return; }
+  const isReassignable = tn.status==='absent' || tn.wiederholer;
+  if(tn.aktiverKursId && !isReassignable){ toast(tn.vorname+' '+tn.nachname+' ist bereits in einem aktiven Kurs','bad'); return; }
   _bldTNIds.push(tnId);
   renderBldTNList();
   toast(tn.vorname+' '+tn.nachname+' hinzugefügt ✓');
@@ -2541,23 +2623,28 @@ function renderTNPicker(){
     const init=((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
     // Status je nach Modus
     let alreadyAdded, inOtherKurs;
+    const isAbsent = t.status==='absent';
+    const isWdh = !!t.wiederholer;
+    const canReassign = !!t.aktiverKursId && (isAbsent || isWdh);
     if(_tnPickMode==='builder'){
       alreadyAdded=_bldTNIds.includes(t.id);
-      inOtherKurs=!!t.aktiverKursId;
+      inOtherKurs=!!t.aktiverKursId && !isAbsent && !isWdh;
     } else {
       alreadyAdded=t.aktiverKursId===_selectedKursId;
-      inOtherKurs=!!t.aktiverKursId && t.aktiverKursId!==_selectedKursId;
+      inOtherKurs=!!t.aktiverKursId && t.aktiverKursId!==_selectedKursId && !isAbsent && !isWdh;
     }
     const item=document.createElement('div');
     item.className='tn-pick-item'+(alreadyAdded?' added':'')+(inOtherKurs&&!alreadyAdded?' in-kurs':'');
     let badge='';
     if(alreadyAdded) badge='<span class="tn-pick-badge" style="background:rgba(34,197,94,.12);color:#22c55e">✓ Hinzugefügt</span>';
+    else if(canReassign && isAbsent) badge='<span class="tn-pick-badge" style="background:rgba(239,68,68,.1);color:#ef4444">✗ Fehlt – verfügbar</span>';
+    else if(canReassign && isWdh) badge='<span class="tn-pick-badge" style="background:rgba(245,158,11,.1);color:#d97706">↻ Wdh. – verfügbar</span>';
     else if(inOtherKurs){
       const kursName=_kurse.find(k=>k.id===t.aktiverKursId)?.name||'Kurs';
       badge='<span class="tn-pick-badge" style="background:rgba(239,68,68,.1);color:#ef4444">In '+esc(kursName)+'</span>';
     }
     item.innerHTML=
-      '<div class="gtn-av'+(alreadyAdded?' av-ok':inOtherKurs?' av-busy':' av-free')+'">'+esc(init)+'</div>'+
+      '<div class="gtn-av'+(alreadyAdded?' av-ok':inOtherKurs?' av-busy':canReassign?' av-free':' av-free')+'">'+esc(init)+'</div>'+
       '<div class="tn-pick-info">'+
         '<div class="tn-pick-name">'+esc(name)+'</div>'+
         '<div class="tn-pick-sub">'+(t.beruf||'')+(t.firma?' · '+esc(t.firma):'')+'</div>'+
@@ -2575,7 +2662,8 @@ function pickTN(tnId){
   if(_bldTNIds.includes(tnId)) return;
   const tn=_globalTN.find(t=>t.id===tnId);
   if(!tn) return;
-  if(tn.aktiverKursId){ toast(tn.vorname+' '+tn.nachname+' ist bereits in einem anderen Kurs','bad'); return; }
+  const isReassignable = tn.status==='absent' || tn.wiederholer;
+  if(tn.aktiverKursId && !isReassignable){ toast(tn.vorname+' '+tn.nachname+' ist bereits in einem aktiven Kurs','bad'); return; }
   _bldTNIds.push(tnId);
   renderBldTNList();
   renderTNPicker();
@@ -2676,17 +2764,29 @@ function bldUebertragen(){
 
       // 2. Alle TN dem Kurs zuordnen (Batch für Performance)
       const batch = db.batch();
+      const oldKursCleanups = []; // Promises für alte Kurs-Subcollection-Löschungen
       _bldTNIds.forEach(tnId=>{
         const tn = _globalTN.find(t=>t.id===tnId);
         if(!tn) return;
         const histEntry = {kursId, kursName, von, bis, addedAt:Date.now()};
 
-        // globalTN updaten
+        // globalTN updaten – Status/Wiederholer aufräumen
         const tnRef = db.collection('globalTN').doc(tnId);
-        batch.update(tnRef, {
+        const tnUpdate = {
           aktiverKursId: kursId,
           kursHistory: firebase.firestore.FieldValue.arrayUnion(histEntry)
-        });
+        };
+        if(tn.status) tnUpdate.status = firebase.firestore.FieldValue.delete();
+        if(tn.wiederholer) tnUpdate.wiederholer = firebase.firestore.FieldValue.delete();
+        batch.update(tnRef, tnUpdate);
+
+        // Alten Kurs-Eintrag löschen falls TN aus Fehlt/Wiederholer kommt
+        if(tn.aktiverKursId && tn.aktiverKursId !== kursId){
+          oldKursCleanups.push(
+            db.collection('shared').doc('kurse').collection('list').doc(tn.aktiverKursId)
+              .collection('teilnehmer').doc(tnId).delete().catch(()=>{})
+          );
+        }
 
         // In Kurs-Subcollection eintragen
         const kursTNRef = db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId);
@@ -2697,7 +2797,7 @@ function bldUebertragen(){
         });
       });
 
-      return batch.commit().then(()=>kursId);
+      return Promise.all([batch.commit(), ...oldKursCleanups]).then(()=>kursId);
     })
     .then(kursId=>{
       toast('✓ Lehrgang erstellt und '+_bldTNIds.length+' TN übertragen!');
