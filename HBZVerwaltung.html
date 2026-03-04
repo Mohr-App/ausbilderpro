@@ -56,6 +56,26 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .nav-icon{font-size:1rem;width:22px;text-align:center;}
 
 /* MAIN */
+/* GLOBAL SEARCH */
+.hdr-search-wrap{position:relative;flex:1;max-width:360px;margin:0 12px;}
+.hdr-search{width:100%;padding:7px 12px;border:1px solid var(--brd);border-radius:8px;background:var(--sur2);color:var(--tx);font-size:.78rem;font-family:'Sora',sans-serif;outline:none;box-sizing:border-box;transition:border .15s;}
+.hdr-search:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(59,130,246,.15);}
+.hdr-search::placeholder{color:var(--mu);font-size:.72rem;}
+.search-results{display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--sur);border:1px solid var(--brd);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.4);max-height:420px;overflow-y:auto;z-index:200;padding:6px;}
+.search-results.open{display:block;}
+.sr-section{font-size:.6rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;padding:6px 10px 3px;font-family:'JetBrains Mono',monospace;}
+.sr-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .1s;font-size:.78rem;}
+.sr-item:hover{background:var(--sur2);}
+.sr-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;flex-shrink:0;}
+.sr-av-tn{background:rgba(59,130,246,.12);color:var(--acc);border:1.5px solid rgba(59,130,246,.25);}
+.sr-av-kurs{background:rgba(34,197,94,.12);color:#22c55e;border:1.5px solid rgba(34,197,94,.25);}
+.sr-info{flex:1;min-width:0;}
+.sr-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sr-meta{font-size:.65rem;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sr-empty{text-align:center;padding:16px;font-size:.78rem;color:var(--mu);}
+.sr-hint{font-size:.6rem;color:var(--mu);text-align:center;padding:2px 8px 6px;font-family:'JetBrains Mono',monospace;}
+
+/* MAIN */
 .main{flex:1;padding:24px;overflow-y:auto;}
 .page{display:none;}
 .page.active{display:block;}
@@ -330,6 +350,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:149;}
 @media(max-width:768px){
   .hdr-burger{display:block;}
+  .hdr-search-wrap{max-width:none;margin:0 6px;}
+  .hdr-badge{display:none;}
   .sb{position:fixed;left:-300px;top:54px;bottom:0;width:280px;z-index:150;transition:left .25s ease;box-shadow:none;}
   .sb.mobile-open{left:0;box-shadow:4px 0 24px rgba(0,0,0,.5);}
   .sb-overlay.show{display:block;}
@@ -364,6 +386,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <button class="hdr-burger" onclick="toggleMobileSb()" id="burgerBtn">☰</button>
     <div class="hdr-logo">HBZ<span>Verwaltung</span></div>
     <div class="hdr-badge">ADMIN PORTAL</div>
+    <div class="hdr-search-wrap">
+      <input class="hdr-search" id="globalSearch" type="text" placeholder="🔍 Teilnehmer oder Kurs suchen…" oninput="doGlobalSearch()" onfocus="doGlobalSearch()" autocomplete="off">
+      <div class="search-results" id="searchResults"></div>
+    </div>
     <div class="hdr-sep"></div>
     <div class="hdr-user" id="hdrUser"></div>
     <button class="hdr-btn" onclick="doLogout()">⎋ Abmelden</button>
@@ -778,6 +804,101 @@ function doLogout(){ auth.signOut(); }
 function showErr(m){ document.getElementById('lErr').textContent = m; }
 
 // ── Navigation ──
+
+// ── Globale Suche ──
+let _searchDebounce = null;
+function doGlobalSearch(){
+  clearTimeout(_searchDebounce);
+  _searchDebounce = setTimeout(_runSearch, 120);
+}
+
+function _runSearch(){
+  const q = (document.getElementById('globalSearch').value||'').trim().toLowerCase();
+  const box = document.getElementById('searchResults');
+  if(!q || q.length < 2){
+    box.classList.remove('open');
+    return;
+  }
+
+  // Teilnehmer durchsuchen
+  const tnHits = _globalTN.filter(t=>{
+    const haystack = ((t.vorname||'')+' '+(t.nachname||'')+' '+(t.firma||'')+' '+(t.beruf||'')+' '+(t.email||'')).toLowerCase();
+    return haystack.includes(q);
+  }).slice(0, 8);
+
+  // Kurse durchsuchen
+  const kursHits = _kurse.filter(k=>{
+    const haystack = ((k.name||'')+' '+(k.lehrgangsart||'')+' '+(k.ausbilderName||'')+' '+(k.ausbilderEmail||'')+' '+(k.von||'')+' '+(k.bis||'')).toLowerCase();
+    return haystack.includes(q);
+  }).slice(0, 6);
+
+  if(!tnHits.length && !kursHits.length){
+    box.innerHTML = '<div class="sr-empty">Keine Ergebnisse für „'+esc(q)+'"</div>';
+    box.classList.add('open');
+    return;
+  }
+
+  let html = '';
+
+  if(tnHits.length){
+    html += '<div class="sr-section">👥 Teilnehmer ('+tnHits.length+')</div>';
+    tnHits.forEach(t=>{
+      const name = (t.vorname||'')+' '+(t.nachname||'');
+      const init = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
+      const meta = [t.beruf, t.firma, t.email].filter(Boolean).join(' · ');
+      const inKurs = t.aktiverKursId ? _kurse.find(k=>k.id===t.aktiverKursId) : null;
+      const kursTag = inKurs ? ' <span style="color:#22c55e;font-size:.6rem">● '+esc(inKurs.name)+'</span>' : '';
+      html += '<div class="sr-item" onclick="searchSelect(\'tn\',\''+t.id+'\')">'+
+        '<div class="sr-av sr-av-tn">'+esc(init)+'</div>'+
+        '<div class="sr-info"><div class="sr-name">'+esc(name.trim())+kursTag+'</div>'+
+        '<div class="sr-meta">'+esc(meta)+'</div></div></div>';
+    });
+  }
+
+  if(kursHits.length){
+    html += '<div class="sr-section">📚 Kurse ('+kursHits.length+')</div>';
+    const today = new Date().toISOString().slice(0,10);
+    kursHits.forEach(k=>{
+      const laufend = k.von && k.bis && today >= k.von && today <= k.bis;
+      const dot = laufend ? '●' : '○';
+      const dotColor = laufend ? '#22c55e' : 'var(--mu)';
+      const cnt = _kursTNCounts[k.id] || 0;
+      html += '<div class="sr-item" onclick="searchSelect(\'kurs\',\''+k.id+'\')">'+
+        '<div class="sr-av sr-av-kurs"><span style="color:'+dotColor+'">'+dot+'</span></div>'+
+        '<div class="sr-info"><div class="sr-name">'+esc(k.name||'?')+'</div>'+
+        '<div class="sr-meta">'+(k.von||'?')+' – '+(k.bis||'?')+
+        (k.ausbilderName?' · '+esc(k.ausbilderName):'')+' · '+cnt+' TN</div></div></div>';
+    });
+  }
+
+  html += '<div class="sr-hint">Enter oder Ergebnis anklicken</div>';
+  box.innerHTML = html;
+  box.classList.add('open');
+}
+
+function searchSelect(type, id){
+  document.getElementById('searchResults').classList.remove('open');
+  document.getElementById('globalSearch').value = '';
+  if(type === 'tn') openTNProfile(id);
+  if(type === 'kurs') showKursDetail(id);
+}
+
+// Suche schließen bei Klick außerhalb
+document.addEventListener('click', function(e){
+  const wrap = document.querySelector('.hdr-search-wrap');
+  if(wrap && !wrap.contains(e.target)){
+    document.getElementById('searchResults').classList.remove('open');
+  }
+});
+
+// ESC schließt Suche
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    document.getElementById('searchResults').classList.remove('open');
+    document.getElementById('globalSearch').blur();
+  }
+});
+
 function toggleMobileSb(){
   const sb=document.querySelector('.sb');
   const ov=document.getElementById('sbOverlay');
@@ -1013,10 +1134,17 @@ function renderSbTnTree(){
     if(!tns.length){
       body.innerHTML = '<div style="padding:4px 20px;font-size:.65rem;color:var(--mu);font-style:italic">Keine Teilnehmer</div>';
     } else {
-      tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||''));
+      // Absteigend nach Lehrjahr, dann alphabetisch nach Nachname
+      tns.sort((a,b)=>{
+        const ljA = parseInt(a.ausbjahr)||0;
+        const ljB = parseInt(b.ausbjahr)||0;
+        if(ljB !== ljA) return ljB - ljA;
+        return (a.nachname||'').localeCompare(b.nachname||'');
+      });
       tns.forEach(t=>{
         const name = ((t.vorname||'')[0]||'') + '. ' + (t.nachname||'');
         const inKurs = !!t.aktiverKursId;
+        const ljTag = t.ausbjahr ? '<span style="font-size:.5rem;color:var(--mu);margin-left:auto;flex-shrink:0;font-family:\'JetBrains Mono\',monospace">'+t.ausbjahr+'.Lj</span>' : '';
         const el = document.createElement('div');
         el.className = 'sb-tn-drag';
         el.draggable = true;
@@ -1024,6 +1152,7 @@ function renderSbTnTree(){
         el.innerHTML =
           '<span class="drag-handle">⠿</span>' +
           '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(name) + '</span>' +
+          ljTag +
           (inKurs ? '<span class="tn-inkurs">● Kurs</span>' : '');
         el.title = (t.vorname||'') + ' ' + (t.nachname||'') + (t.firma ? ' – ' + t.firma : '') + (inKurs ? ' (in Kurs)' : '');
         el.ondragstart = function(e){
