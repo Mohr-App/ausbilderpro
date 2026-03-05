@@ -1501,6 +1501,8 @@ function renderSeats(){
   addBtn.onclick=addRow;
   addCol.appendChild(addBtn); wrap.appendChild(addCol);
   requestAnimationFrame(scaleSeating);
+  // Drop-Targets für Pool-Drag auf den neuen Seat-Elementen einrichten
+  if(typeof setupSeatDropTargets==='function') setupSeatDropTargets();
 }
 function scaleSeating(){} // disabled
 window.addEventListener('resize', ()=>scaleSeating());
@@ -2660,6 +2662,7 @@ function loadPool(){
           +'<div class="pool-sub">'+(isPlaced?'✓ Platziert':esc(d.firma||d.beruf||''))+'</div></div>';
         card.addEventListener('dragstart',e=>{
           _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
+          e.dataTransfer.setData('text/plain',fullName);
           card.classList.add('dragging'); e.dataTransfer.effectAllowed='copy';
         });
         card.addEventListener('dragend',()=>card.classList.remove('dragging'));
@@ -2939,6 +2942,7 @@ function renderWiederholer(kursId){
       card.addEventListener('dragstart',ev=>{
         _poolDragId=d.name; _poolDragTnId=null; _poolDragKursId=null;
         _wiederholerSeatId=sid;
+        ev.dataTransfer.setData('text/plain',d.name);
         card.classList.add('dragging'); ev.dataTransfer.effectAllowed='copy';
       });
       card.addEventListener('dragend',()=>{ card.classList.remove('dragging'); });
@@ -2973,6 +2977,7 @@ function renderWiederholer(kursId){
           +'<div class="pool-sub">↩ Kurs wiederholen</div></div>';
         card.addEventListener('dragstart',ev=>{
           _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
+          ev.dataTransfer.setData('text/plain',fullName);
           card.classList.add('dragging'); ev.dataTransfer.effectAllowed='copy';
         });
         card.addEventListener('dragend',()=>card.classList.remove('dragging'));
@@ -2980,14 +2985,23 @@ function renderWiederholer(kursId){
       });
 
       // Lokale die nicht in Firestore sind (kein poolTnId)
-      localWiederholer.forEach(({d})=>{
+      localWiederholer.forEach(({sid,d})=>{
         if(shown.has(d.name.toLowerCase())) return;
         const initials=d.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
         const card=document.createElement('div');
         card.className='wiederholer-card';
+        card.draggable=true;
+        card.dataset.name=d.name; card.dataset.company=d.company||''; card.dataset.profession=d.profession||''; card.dataset.ausbjahr=d.ausbjahr||'';
         card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(d.name)+'</div>'
           +'<div class="pool-sub">↩ Kurs wiederholen</div></div>';
+        card.addEventListener('dragstart',ev=>{
+          _poolDragId=d.name; _poolDragTnId=null; _poolDragKursId=null;
+          _wiederholerSeatId=sid;
+          ev.dataTransfer.setData('text/plain',d.name);
+          card.classList.add('dragging'); ev.dataTransfer.effectAllowed='copy';
+        });
+        card.addEventListener('dragend',()=>card.classList.remove('dragging'));
         body.appendChild(card);
       });
 
@@ -3017,6 +3031,7 @@ function renderFehlt(kursId){
     card.addEventListener('dragstart',ev=>{
       _poolDragId=name; _poolDragTnId=tnId||null; _poolDragKursId=fsKursId||null;
       _fehltLocal = !tnId; // flag: ist lokaler Fehlt-Eintrag
+      ev.dataTransfer.setData('text/plain',name);
       card.classList.add('dragging'); ev.dataTransfer.effectAllowed='copy';
     });
     card.addEventListener('dragend',()=>card.classList.remove('dragging'));
