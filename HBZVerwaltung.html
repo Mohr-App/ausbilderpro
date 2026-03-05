@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HBZ Verwaltung</title>
+<title>VerwaltungPro</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -401,14 +401,36 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <!-- LOGIN -->
 <div id="loginWrap">
-  <div class="login-box">
-    <div class="login-logo">HBZ<span>Verwaltung</span></div>
+  <div class="login-box" id="loginBox">
+    <div class="login-logo">Verwaltung<span>Pro</span></div>
     <div class="login-sub">Internes Verwaltungsportal</div>
     <div class="login-badge">🔒 NUR FÜR AUTORISIERTE MITARBEITER</div>
     <div class="fg"><label class="fl">E-Mail</label><input class="fi" type="email" id="lEmail" placeholder="name@hbz.de"></div>
     <div class="fg"><label class="fl">Passwort</label><input class="fi" type="password" id="lPw" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="err" id="lErr"></div>
     <button class="btn" onclick="doLogin()" style="margin-top:8px">Anmelden</button>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn" onclick="showHBZRegister()" style="background:var(--sur2);box-shadow:none;color:var(--mu);font-size:.72rem;padding:8px;flex:1">Registrieren</button>
+      <button class="btn" onclick="doHBZReset()" style="background:var(--sur2);box-shadow:none;color:var(--mu);font-size:.72rem;padding:8px;flex:1">Passwort vergessen</button>
+    </div>
+  </div>
+  <div class="login-box" id="hbzRegBox" style="display:none">
+    <div class="login-logo">Verwaltung<span>Pro</span></div>
+    <div class="login-sub">Neues Konto erstellen</div>
+    <div class="fg"><label class="fl">E-Mail</label><input class="fi" type="email" id="hbzRegEmail" placeholder="name@hbz.de"></div>
+    <div class="fg"><label class="fl">Passwort (min. 6 Zeichen)</label><input class="fi" type="password" id="hbzRegPass" placeholder="••••••••"></div>
+    <div class="fg"><label class="fl">Passwort wiederholen</label><input class="fi" type="password" id="hbzRegPass2" placeholder="••••••••" onkeydown="if(event.key==='Enter')doHBZRegister()"></div>
+    <div class="err" id="hbzRegErr"></div>
+    <button class="btn" onclick="doHBZRegister()" style="margin-top:8px">Konto erstellen</button>
+    <button class="btn" onclick="showHBZLogin()" style="background:var(--sur2);box-shadow:none;color:var(--mu);font-size:.72rem;padding:8px;margin-top:4px">← Zurück zum Login</button>
+  </div>
+  <div class="login-box" id="hbzNoAccess" style="display:none">
+    <div class="login-logo">Verwaltung<span>Pro</span></div>
+    <div style="font-size:2.5rem;text-align:center">🔒</div>
+    <div style="font-size:.85rem;color:#ef4444;font-weight:700;text-align:center">Kein Zugang</div>
+    <div id="hbzNoAccessEmail" style="font-size:.72rem;color:var(--mu);text-align:center;margin:6px 0"></div>
+    <div style="font-size:.75rem;color:var(--tx);text-align:center;line-height:1.6">Deine E-Mail ist nicht als Verwaltung-Mitarbeiter oder Admin registriert.<br>Bitte den Administrator kontaktieren.</div>
+    <button class="btn" onclick="doLogout()" style="background:var(--sur2);box-shadow:none;color:var(--mu);font-size:.72rem;padding:8px;margin-top:8px">← Abmelden</button>
   </div>
 </div>
 
@@ -416,8 +438,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div id="appWrap">
   <div class="hdr">
     <button class="hdr-burger" onclick="toggleMobileSb()" id="burgerBtn">☰</button>
-    <div class="hdr-logo">HBZ<span>Verwaltung</span></div>
-    <div class="hdr-badge">ADMIN PORTAL</div>
+    <div class="hdr-logo">Verwaltung<span>Pro</span></div>
+    <div class="hdr-badge" id="hdrBadge">VERWALTUNGSPORTAL</div>
     <div class="hdr-search-wrap">
       <input class="hdr-search" id="globalSearch" type="text" placeholder="🔍 Teilnehmer oder Kurs suchen…" oninput="doGlobalSearch()" onfocus="doGlobalSearch()" autocomplete="off">
       <div class="search-results" id="searchResults"></div>
@@ -605,7 +627,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return request.auth != null
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'verwaltung');
     }
 
     match /users/{uid} {
@@ -648,6 +671,16 @@ service cloud.firestore {
 
 
 
+          <!-- VERWALTUNG MITARBEITER KARTE -->
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div style="font-size:.85rem;font-weight:700">🏢 Verwaltung-Mitarbeiter</div>
+              <button class="btn-sm btn-ok" onclick="openAddVerwModal()" style="font-size:.72rem;padding:5px 12px">+ Hinzufügen</button>
+            </div>
+            <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Mitarbeiter die sich hier mit E-Mail registrieren, bekommen Zugang zur VerwaltungPro.</div>
+            <div id="verwListSettings"></div>
+          </div>
+
           <!-- AUSBILDER KARTE -->
           <div class="card">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -675,6 +708,22 @@ service cloud.firestore {
             <div id="berufListSettings"></div>
           </div>
 
+        </div>
+      </div>
+
+      <!-- ADD/EDIT VERWALTUNG MODAL -->
+      <div class="ov" id="addVerwModal" onclick="if(event.target===this)closeAddVerwModal()">
+        <div class="modal" style="max-width:380px">
+          <div class="mhd"><div class="mtit" id="addVerwModalTit">Verwaltung-Mitarbeiter hinzufügen</div><button class="xcls" onclick="closeAddVerwModal()">&#10005;</button></div>
+          <div class="mbdy">
+            <input type="hidden" id="addVerwId">
+            <div class="fg"><label class="fl">Name <span style="color:var(--bad)">*</span></label><input class="fi" id="addVerwNameInp" placeholder="Vor- und Nachname"></div>
+            <div class="fg"><label class="fl">E-Mail <span style="color:var(--bad)">*</span></label><input class="fi" id="addVerwEmailInp" type="email" placeholder="name@hbz.de"></div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="btn-sm" id="addVerwDelBtn" style="flex:1;display:none;background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)" onclick="confirmDeleteVerw()">&#128465; Löschen</button>
+              <button class="btn-sm btn-ok" style="flex:2" onclick="saveVerw()">&#10003; Speichern</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -820,7 +869,7 @@ service cloud.firestore {
 
 <script>
 // ── Version ──
-const APP_VERSION = 'v1.4.0';
+const APP_VERSION = 'v1.5.0';
 const APP_BUILD = '2026-03-04';
 const CHANGELOG = [
   {v:'v1.4.0', d:'04.03.2026', items:['📊 Anwesenheits-Daten vom Ausbilder sichtbar (% + Details pro TN)','📊 Kursdetail zeigt Anwesenheits-Zusammenfassung','👤 TN-Profil zeigt detaillierte Anwesenheitsstatistik']},
@@ -859,28 +908,97 @@ auth.onAuthStateChanged(u => {
   if(u){
     _uid = u.uid;
     _email = u.email;
-    // Admin-Check
+    const emailLow = u.email.toLowerCase();
+    // 1. Prüfe bestehende Rolle
     db.collection('users').doc(_uid).get().then(doc => {
       const role = doc.exists ? doc.data().role : null;
-      if(role !== 'admin'){
-        auth.signOut();
-        showErr('Kein Zugriff. Bitte Admin kontaktieren.');
+      if(role === 'admin' || role === 'verwaltung'){
+        // Zugang OK
+        grantAccess(u, role);
         return;
       }
-      document.getElementById('loginWrap').style.display = 'none';
-      document.getElementById('appWrap').style.display = 'flex';
-      document.getElementById('hdrUser').textContent = _email;
-      loadAll();
-      loadAusbilderEmails();
-      // Eigene E-Mail im User-Dokument speichern damit andere sie finden können
-      db.collection('users').doc(_uid).set({email: u.email, role:'admin'}, {merge:true});
+      // 2. Keine Rolle → prüfe ob E-Mail als Verwaltung hinterlegt
+      return db.collection('shared').doc('kursSettings').collection('verwaltung')
+        .where('email','==',emailLow).limit(1).get()
+        .then(snap=>{
+          if(!snap.empty){
+            // Auto-Rolle zuweisen
+            return db.collection('users').doc(_uid).set({email:u.email, role:'verwaltung'},{merge:true})
+              .then(()=>grantAccess(u,'verwaltung'));
+          }
+          // 3. Nicht berechtigt
+          showNoAccessHBZ(emailLow);
+        });
+    }).catch(()=>{
+      showNoAccessHBZ(u.email);
     });
   } else {
     _uid = null;
     document.getElementById('loginWrap').style.display = 'flex';
     document.getElementById('appWrap').style.display = 'none';
+    showHBZLogin();
   }
 });
+
+function grantAccess(u, role){
+  document.getElementById('loginWrap').style.display = 'none';
+  document.getElementById('appWrap').style.display = 'flex';
+  document.getElementById('hdrUser').textContent = _email;
+  // Badge zeigt Rolle
+  const badge = document.getElementById('hdrBadge');
+  if(badge) badge.textContent = role==='admin' ? 'ADMIN' : 'VERWALTUNG';
+  // Einstellungen nur für Admin
+  if(role !== 'admin'){
+    const settingsBtn = document.getElementById('nav-einstellungen');
+    if(settingsBtn) settingsBtn.style.display='none';
+  }
+  loadAll();
+  loadAusbilderEmails();
+  db.collection('users').doc(_uid).set({email:u.email, role:role},{merge:true}).catch(()=>{});
+}
+
+function showNoAccessHBZ(email){
+  document.getElementById('loginBox').style.display='none';
+  document.getElementById('hbzRegBox').style.display='none';
+  document.getElementById('hbzNoAccess').style.display='flex';
+  document.getElementById('hbzNoAccessEmail').textContent='Angemeldet als: '+email;
+}
+
+function showHBZRegister(){
+  document.getElementById('loginBox').style.display='none';
+  document.getElementById('hbzRegBox').style.display='flex';
+  document.getElementById('hbzNoAccess').style.display='none';
+}
+
+function showHBZLogin(){
+  document.getElementById('loginBox').style.display='flex';
+  document.getElementById('hbzRegBox').style.display='none';
+  document.getElementById('hbzNoAccess').style.display='none';
+}
+
+function doHBZRegister(){
+  const email=document.getElementById('hbzRegEmail').value.trim();
+  const pass=document.getElementById('hbzRegPass').value;
+  const pass2=document.getElementById('hbzRegPass2').value;
+  const errEl=document.getElementById('hbzRegErr');
+  errEl.textContent='';
+  if(!email||!pass){errEl.textContent='Bitte alle Felder ausfüllen';return;}
+  if(pass!==pass2){errEl.textContent='Passwörter stimmen nicht überein';return;}
+  if(pass.length<6){errEl.textContent='Passwort muss mindestens 6 Zeichen haben';return;}
+  auth.createUserWithEmailAndPassword(email,pass)
+    .catch(e=>{
+      const map={'auth/email-already-in-use':'E-Mail bereits registriert','auth/invalid-email':'Ungültige E-Mail'};
+      errEl.textContent=map[e.code]||e.message;
+    });
+}
+
+function doHBZReset(){
+  const email=document.getElementById('lEmail').value.trim();
+  if(!email){showErr('Bitte zuerst E-Mail eingeben');return;}
+  auth.sendPasswordResetEmail(email)
+    .then(()=>showErr('✓ Reset-Mail gesendet'))
+    .catch(e=>showErr(e.message));
+}
 
 function doLogin(){
   const e = document.getElementById('lEmail').value.trim();
@@ -1439,6 +1557,7 @@ function loadDashboard(){
 
 // ── Kurs Settings (Ausbilder + Lehrgangsarten) ──────────────────────────
 let _ausbilder = [];  // [{id,name,email}]
+let _verwaltung = []; // [{id,name,email}]
 let _lehrgangsarten = []; // [{id,name}]
 let _kursForm = { ausbId: null, lgartId: null }; // selected in modal
 
@@ -1463,6 +1582,13 @@ function loadKursSettings() {
       renderLgartChips();
       renderLgartListSettings();
     }, err => toast('Fehler Lehrgangsarten laden: ' + err.message, 'bad'));
+  // Verwaltung-Mitarbeiter
+  db.collection('shared').doc('kursSettings').collection('verwaltung')
+    .orderBy('name').onSnapshot(snap => {
+      _verwaltung = [];
+      snap.forEach(doc => _verwaltung.push({id: doc.id, ...doc.data()}));
+      renderVerwListSettings();
+    }, err => console.warn('Verwaltung laden:', err.message));
 }
 
 function renderAusbChips() {
@@ -1781,6 +1907,58 @@ function confirmDeleteBeruf(){
   if(!confirm('Berufsgruppe wirklich löschen?')) return;
   db.collection('shared').doc('kursSettings').collection('berufe').doc(id).delete()
     .then(()=>{ closeAddBerufModal(); toast('Gelöscht'); })
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// ── VERWALTUNG-MITARBEITER SETTINGS ──
+function renderVerwListSettings(){
+  const el=document.getElementById('verwListSettings');
+  if(!el) return;
+  if(!_verwaltung.length){ el.innerHTML='<div style="font-size:.72rem;color:var(--mu);font-style:italic">Noch keine Verwaltung-Mitarbeiter angelegt</div>'; return; }
+  el.innerHTML=_verwaltung.map(v=>
+    '<div class="settings-row" onclick="openEditVerw(\''+v.id+'\')">'
+    +'<div><div class="settings-row-name">🏢 '+esc(v.name)+'</div>'
+    +'<div class="settings-row-sub">'+esc(v.email||'')+'</div></div>'
+    +'</div>'
+  ).join('');
+}
+
+function openAddVerwModal(){
+  document.getElementById('addVerwId').value='';
+  document.getElementById('addVerwNameInp').value='';
+  document.getElementById('addVerwEmailInp').value='';
+  document.getElementById('addVerwModalTit').textContent='Verwaltung-Mitarbeiter hinzufügen';
+  document.getElementById('addVerwDelBtn').style.display='none';
+  document.getElementById('addVerwModal').classList.add('open');
+}
+function openEditVerw(id){
+  const v=_verwaltung.find(x=>x.id===id); if(!v) return;
+  document.getElementById('addVerwId').value=id;
+  document.getElementById('addVerwNameInp').value=v.name||'';
+  document.getElementById('addVerwEmailInp').value=v.email||'';
+  document.getElementById('addVerwModalTit').textContent='Verwaltung-Mitarbeiter bearbeiten';
+  document.getElementById('addVerwDelBtn').style.display='';
+  document.getElementById('addVerwModal').classList.add('open');
+}
+function closeAddVerwModal(){ document.getElementById('addVerwModal').classList.remove('open'); }
+
+function saveVerw(){
+  const id=document.getElementById('addVerwId').value;
+  const name=(document.getElementById('addVerwNameInp').value||'').trim();
+  const email=(document.getElementById('addVerwEmailInp').value||'').trim().toLowerCase();
+  if(!name){toast('Bitte Name eingeben','bad');return;}
+  if(!email){toast('Bitte E-Mail eingeben','bad');return;}
+  const col=db.collection('shared').doc('kursSettings').collection('verwaltung');
+  const data={name,email};
+  const p=id?col.doc(id).update(data):col.add(data);
+  p.then(()=>{closeAddVerwModal();toast('Gespeichert ✓');})
+   .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+function confirmDeleteVerw(){
+  const id=document.getElementById('addVerwId').value;
+  if(!confirm('Verwaltung-Mitarbeiter wirklich löschen?')) return;
+  db.collection('shared').doc('kursSettings').collection('verwaltung').doc(id).delete()
+    .then(()=>{closeAddVerwModal();toast('Gelöscht');})
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
@@ -3192,7 +3370,7 @@ function toast(msg,type){
 }
 function closeKursModal(){ document.getElementById('kursModal').classList.remove('open'); }
 </script>
-<div class="copyright">© HBZVerwaltung v1.4.0 · <a href="#" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.5.0 · <a href="#" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal" onclick="if(event.target===this)this.classList.remove('open')">

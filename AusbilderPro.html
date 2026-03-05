@@ -666,7 +666,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <span style="font-size:1.2rem">📋</span> Als Ausbilder
     </button>
     <button class="pw-btn" onclick="window.location.href='HBZVerwaltung.html'" style="display:flex;align-items:center;gap:10px;justify-content:center;background:linear-gradient(135deg,#065f46,#059669)">
-      <span style="font-size:1.2rem">🏢</span> Als HBZ-Verwaltung
+      <span style="font-size:1.2rem">🏢</span> Als VerwaltungPro
     </button>
     <button style="background:none;border:none;color:var(--mu);font-size:.72rem;cursor:pointer;padding:4px" onclick="fbLogout()">Abmelden</button>
   </div>
@@ -681,7 +681,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div id="noAccessEmail" style="font-size:.75rem;color:var(--mu);text-align:center"></div>
     <div style="font-size:.78rem;color:var(--tx);text-align:center;line-height:1.6;padding:0 8px">
       Deine E-Mail-Adresse ist nicht als Ausbilder registriert.<br><br>
-      Bitte wende dich an die <strong>HBZ-Verwaltung</strong>, damit deine E-Mail unter<br>
+      Bitte wende dich an die <strong>VerwaltungPro</strong>, damit deine E-Mail unter<br>
       <span style="color:var(--acc)">⚙️ Einstellungen → Ausbilder</span><br>
       freigeschaltet wird.
     </div>
@@ -747,7 +747,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <button class="xcls" onclick="closePoolLink()">✕</button>
     </div>
     <div class="dpm-bd">
-      <div style="font-size:.75rem;color:var(--mu);margin-bottom:12px">Wähle einen von der HBZ-Verwaltung angelegten Kurs. Die Teilnehmerliste erscheint dann im Pool.</div>
+      <div style="font-size:.75rem;color:var(--mu);margin-bottom:12px">Wähle einen von der VerwaltungPro angelegten Kurs. Die Teilnehmerliste erscheint dann im Pool.</div>
       <div class="fg"><label class="fl">HBZ-Kurs auswählen</label>
         <select class="fi" id="poolKursSelect"><option value="">– Kurs wählen –</option></select>
       </div>
@@ -3180,7 +3180,7 @@ function openPoolLink(){
       sel.innerHTML='<option value="">– Kurs wählen –</option>';
       if(snap.empty){
         sel.innerHTML='<option value="">Keine Kurse für dich angelegt</option>';
-        document.getElementById('poolLinkInfo').textContent='Die HBZ-Verwaltung hat noch keinen Kurs mit deiner E-Mail-Adresse verknüpft.';
+        document.getElementById('poolLinkInfo').textContent='Die VerwaltungPro hat noch keinen Kurs mit deiner E-Mail-Adresse verknüpft.';
         modal.classList.add('open');
         return;
       }
@@ -3375,6 +3375,12 @@ try{
       const role = doc.exists ? doc.data().role : null;
       if(role === 'admin'){
         showRoleChoice(user.email);
+        return;
+      }
+      if(role === 'verwaltung'){
+        // Verwaltung → kein Zugang zu AusbilderPro
+        alert('Dieses Konto hat die Rolle "Verwaltung".\nBitte VerwaltungPro nutzen.');
+        _auth.signOut();
         return;
       }
       // 2. Ausbilder-Berechtigung prüfen: E-Mail in shared/kursSettings/ausbilder?
