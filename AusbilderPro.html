@@ -672,6 +672,23 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- KEIN ZUGANG -->
+<div class="pw-screen" id="noAccessScreen" style="display:none">
+  <div class="pw-box" style="gap:14px">
+    <div class="pw-logo">Ausbilder<span>Pro</span></div>
+    <div style="font-size:2.5rem;text-align:center">🔒</div>
+    <div class="pw-sub" style="color:#ef4444;font-weight:700;font-size:.85rem">Kein Zugang</div>
+    <div id="noAccessEmail" style="font-size:.75rem;color:var(--mu);text-align:center"></div>
+    <div style="font-size:.78rem;color:var(--tx);text-align:center;line-height:1.6;padding:0 8px">
+      Deine E-Mail-Adresse ist nicht als Ausbilder registriert.<br><br>
+      Bitte wende dich an die <strong>HBZ-Verwaltung</strong>, damit deine E-Mail unter<br>
+      <span style="color:var(--acc)">⚙️ Einstellungen → Ausbilder</span><br>
+      freigeschaltet wird.
+    </div>
+    <button class="pw-btn" onclick="fbLogout()" style="background:var(--sur2);box-shadow:none;color:var(--mu)">← Abmelden & andere E-Mail nutzen</button>
+  </div>
+</div>
+
 <div class="wrap">
   <div class="sb" id="sb">
     <div id="hbzKurseSection"></div>
@@ -3352,25 +3369,32 @@ try{
   _auth.onAuthStateChanged(user=>{
   if(user){
     _fbUid=user.uid;
-    // Rolle prüfen – Admin → Verwaltungsportal
+    const email = user.email.toLowerCase();
+    // 1. Rolle prüfen (Admin?)
     _db.collection('users').doc(_fbUid).get().then(doc=>{
       const role = doc.exists ? doc.data().role : null;
       if(role === 'admin'){
-        // Admin: Auswahl anbieten
         showRoleChoice(user.email);
-      } else {
-        // Normaler Ausbilder – E-Mail speichern damit Verwaltung sie sieht
-        _db.collection('users').doc(_fbUid).set({email: user.email}, {merge:true}).catch(()=>{});
-        document.getElementById('pwScreen').style.display='none';
-        document.getElementById('fbLogoutBtn').style.display='';
-        document.getElementById('cloudInd').textContent='☁ '+user.email.split('@')[0];
-        fbLoadData();
+        return;
       }
+      // 2. Ausbilder-Berechtigung prüfen: E-Mail in shared/kursSettings/ausbilder?
+      return checkAusbilderAccess(email).then(allowed=>{
+        if(allowed){
+          _db.collection('users').doc(_fbUid).set({email: user.email}, {merge:true}).catch(()=>{});
+          document.getElementById('pwScreen').style.display='none';
+          document.getElementById('noAccessScreen').style.display='none';
+          document.getElementById('fbLogoutBtn').style.display='';
+          document.getElementById('cloudInd').textContent='☁ '+email.split('@')[0];
+          fbLoadData();
+        } else {
+          showNoAccess(email);
+        }
+      });
     }).catch(()=>{
-      // Kein Dokument = normaler Ausbilder
+      // Firestore-Fehler → Offline-Fallback mit localStorage
       document.getElementById('pwScreen').style.display='none';
       document.getElementById('fbLogoutBtn').style.display='';
-      document.getElementById('cloudInd').textContent='☁ '+user.email.split('@')[0];
+      document.getElementById('cloudInd').textContent='☁ '+email.split('@')[0];
       fbLoadData();
     });
   } else {
@@ -3379,8 +3403,23 @@ try{
     document.getElementById('fbLogoutBtn').style.display='none';
     document.getElementById('cloudInd').textContent='☁ —';
     document.getElementById('roleChoice').style.display='none';
+    document.getElementById('noAccessScreen').style.display='none';
   }
 });
+
+function checkAusbilderAccess(email){
+  return _db.collection('shared').doc('kursSettings').collection('ausbilder')
+    .where('email','==',email).limit(1).get()
+    .then(snap=>!snap.empty)
+    .catch(()=>false);
+}
+
+function showNoAccess(email){
+  document.getElementById('pwScreen').style.display='none';
+  document.getElementById('roleChoice').style.display='none';
+  document.getElementById('noAccessScreen').style.display='flex';
+  document.getElementById('noAccessEmail').textContent='Angemeldet als: '+email;
+}
 
 function showRoleChoice(email){
   document.getElementById('pwScreen').style.display='none';
