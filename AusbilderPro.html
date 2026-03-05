@@ -2661,8 +2661,11 @@ function loadPool(){
       if(isStale()) return;
       if(snap.empty){ body.innerHTML='<div class="pool-empty">Keine Teilnehmer im Kurs</div>'; renderFehlt(kursId); renderWiederholer(kursId); return; }
       const seats = curSeats();
-      const placedNames = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
+      // Robust normalization: collapse spaces, trim, lowercase
+      function normName(n){ return (n||'').replace(/\s+/g,' ').trim().toLowerCase(); }
+      const placedNames = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>normName(d.name)));
       const placedTnIds = new Set(Object.values(seats).filter(d=>d&&d.poolTnId).map(d=>d.poolTnId));
+      console.log('[Pool] Seats:', Object.keys(seats).length, 'placedNames:', [...placedNames], 'placedTnIds:', [...placedTnIds]);
       const allTN = [];
       body.innerHTML='';
       const allBtn = document.createElement('button');
@@ -2675,7 +2678,8 @@ function loadPool(){
         // Im Fehlt- oder Wiederholer-Container → nicht im Pool anzeigen
         if(d.status==='absent' || d.status==='wiederholer') return;
         const fullName = (d.vorname+' '+d.nachname).trim();
-        const isPlaced = placedTnIds.has(doc.id) || placedNames.has(fullName.toLowerCase());
+        const isPlaced = placedTnIds.has(doc.id) || placedNames.has(normName(fullName));
+        if(!isPlaced) console.log('[Pool] NOT placed:', fullName, 'tnId:', doc.id, 'normName:', normName(fullName));
         allTN.push({id:doc.id, name:fullName, company:d.firma||'', profession:d.beruf||'', ausbjahr:d.ausbjahr||''});
         const initials = fullName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
         const card = document.createElement('div');
@@ -2717,9 +2721,10 @@ function poolPlaceAll(allTN, kursId){
   const rows = getRows(inst); const freeSeats = [];
   rows.forEach(row=>row.seats.forEach(sid=>{ const d=inst.seats[sid]; if(!d||!d.name) freeSeats.push(sid); }));
   const seats = curSeats();
-  const placedNames = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>d.name.trim().toLowerCase()));
+  function normName(n){ return (n||'').replace(/\s+/g,' ').trim().toLowerCase(); }
+  const placedNames = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>normName(d.name)));
   const placedTnIds = new Set(Object.values(seats).filter(d=>d&&d.poolTnId).map(d=>d.poolTnId));
-  const unplaced = allTN.filter(t=>!placedTnIds.has(t.id) && !placedNames.has(t.name.toLowerCase()));
+  const unplaced = allTN.filter(t=>!placedTnIds.has(t.id) && !placedNames.has(normName(t.name)));
   if(!unplaced.length){ alert('Alle Teilnehmer sind bereits platziert!'); return; }
   if(freeSeats.length < unplaced.length){
     if(!confirm(freeSeats.length+' freie Plätze, aber '+unplaced.length+' Teilnehmer. Es werden '+freeSeats.length+' platziert. Trotzdem?')) return;
