@@ -214,6 +214,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .sb{width:280px;background:var(--sur);border-right:1px solid var(--brd);display:flex;flex-direction:column;padding:10px 0 0;overflow-y:auto;flex-shrink:0;}
 .sb-sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;font-size:.62rem;font-family:'JetBrains Mono',monospace;color:var(--mu);text-transform:uppercase;letter-spacing:.1em;cursor:pointer;user-select:none;transition:background .12s;font-weight:700;}
 .sb-sec-hdr:hover{background:rgba(59,130,246,.05);}
+.sb-sort-btn{background:var(--sur2);border:1px solid var(--brd);border-radius:4px;color:var(--mu);font-size:.52rem;font-family:'JetBrains Mono',monospace;padding:2px 5px;cursor:pointer;transition:all .12s;font-weight:700;}
+.sb-sort-btn:hover{background:rgba(59,130,246,.15);color:var(--acc);border-color:var(--acc);}
+.sb-branche.drag-over-top{border-top:2px solid var(--acc);}
+.sb-branche.drag-over-bot{border-bottom:2px solid var(--acc);}
+.sb-branche-hdr .sb-drag-h{cursor:grab;color:var(--mu);font-size:.55rem;opacity:.4;transition:opacity .12s;flex-shrink:0;}
+.sb-branche-hdr:hover .sb-drag-h{opacity:1;}
 .sb-arr{font-size:.55rem;transition:transform .15s;}
 .sb-arr.closed{transform:rotate(-90deg);}
 .sb-tree{overflow:hidden;}
@@ -460,12 +466,20 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <!-- SIDEBAR NAV -->
     <div class="sb">
       <div class="sb-sec-hdr" onclick="toggleSbSection('sbAusbTree','sbAusbArr')">
-        <span>👷 AUSBILDER</span><span id="sbAusbArr" class="sb-arr">▼</span>
+        <span>👷 AUSBILDER</span>
+        <span style="display:flex;gap:4px;align-items:center;margin-left:auto">
+          <button class="sb-sort-btn" onclick="event.stopPropagation();sortBerufAlpha('ausb')" title="A-Z sortieren">A↓</button>
+          <span id="sbAusbArr" class="sb-arr">▼</span>
+        </span>
       </div>
       <div id="sbAusbTree" class="sb-tree"><div class="sb-loading">Lädt…</div></div>
 
       <div class="sb-sec-hdr" onclick="toggleSbSection('sbTnTree','sbTnArr')">
-        <span>👥 TEILNEHMER</span><span id="sbTnArr" class="sb-arr">▼</span>
+        <span>👥 TEILNEHMER</span>
+        <span style="display:flex;gap:4px;align-items:center;margin-left:auto">
+          <button class="sb-sort-btn" onclick="event.stopPropagation();sortBerufAlpha('tn')" title="A-Z sortieren">A↓</button>
+          <span id="sbTnArr" class="sb-arr">▼</span>
+        </span>
       </div>
       <div id="sbTnTree" class="sb-tree"></div>
 
@@ -1216,6 +1230,7 @@ function renderSbAusbTree(){
   // Render Berufsgruppe level (ohne "andere")
   const berufOrder = Object.keys(BERUFE);
   const berufKeys = [...new Set([...berufOrder, ...Object.keys(byBeruf)])].filter(k=>k!=='andere');
+  berufKeys.sort((a,b)=>(BERUFE[a]?.order||99)-(BERUFE[b]?.order||99));
 
   berufKeys.forEach(bKey => {
     const berufData = byBeruf[bKey];
@@ -1228,10 +1243,14 @@ function renderSbAusbTree(){
     const totalKurse = ausbEntries.reduce((s,[,a]) => s + a.kurse.length, 0);
 
     const bDiv  = document.createElement('div'); bDiv.className = 'sb-branche';
+    bDiv.draggable = true;
+    bDiv.dataset.berufKey = bKey;
+    bDiv.dataset.section = 'ausb';
     const bHdr  = document.createElement('div'); bHdr.className = 'sb-branche-hdr';
     const bBody = document.createElement('div'); bBody.className = 'sb-branche-body';
     bHdr.innerHTML =
-      '<span class="sba">&#9654;</span>'
+      '<span class="sb-drag-h">⠿</span>'
+      + '<span class="sba">&#9654;</span>'
       + '<span>' + berufLabel + '</span>'
       + '<span style="margin-left:auto;font-size:.6rem;color:var(--mu)">' + ausbEntries.length + ' | ' + totalKurse + ' LG</span>';
     bHdr.onclick = function(){ this.classList.toggle('open'); bBody.classList.toggle('open'); };
@@ -1301,6 +1320,33 @@ function renderSbAusbTree(){
 
     bDiv.appendChild(bHdr);
     bDiv.appendChild(bBody);
+    // Drag-and-drop für Berufsgruppen-Sortierung
+    bDiv.addEventListener('dragstart',e=>{
+      if(e.target.closest&&e.target.closest('.sb-ausb,.sb-kurs,.sb-lg')) return;
+      _brancheDragKey=bKey; _brancheDragSection='ausb';
+      e.dataTransfer.setData('application/beruf',bKey);
+      e.dataTransfer.effectAllowed='move';
+      bDiv.style.opacity='.4';
+    });
+    bDiv.addEventListener('dragend',()=>{ bDiv.style.opacity=''; _brancheDragKey=null; });
+    bDiv.addEventListener('dragover',e=>{
+      if(!_brancheDragKey||_brancheDragKey===bKey) return;
+      e.preventDefault();
+      const rect=bDiv.getBoundingClientRect();
+      const mid=rect.top+rect.height/2;
+      bDiv.classList.toggle('drag-over-top',e.clientY<mid);
+      bDiv.classList.toggle('drag-over-bot',e.clientY>=mid);
+    });
+    bDiv.addEventListener('dragleave',()=>{ bDiv.classList.remove('drag-over-top','drag-over-bot'); });
+    bDiv.addEventListener('drop',e=>{
+      e.preventDefault();
+      bDiv.classList.remove('drag-over-top','drag-over-bot');
+      if(!_brancheDragKey||_brancheDragKey===bKey) return;
+      const rect=bDiv.getBoundingClientRect();
+      const before=e.clientY<rect.top+rect.height/2;
+      reorderBeruf(_brancheDragKey,bKey,before);
+      _brancheDragKey=null;
+    });
     root.appendChild(bDiv);
   });
 }
@@ -1330,15 +1376,21 @@ function renderSbTnTree(){
     return;
   }
 
-  berufKeys.forEach(key=>{
+  berufKeys.sort((a,b)=>(BERUFE[a]?.order||99)-(BERUFE[b]?.order||99));
+
+  berufKeys.forEach((key,idx)=>{
     const def = BERUFE[key];
     const tns = groups[key] || [];
 
     const wrap = document.createElement('div');
     wrap.className = 'sb-branche';
+    wrap.draggable = true;
+    wrap.dataset.berufKey = key;
+    wrap.dataset.section = 'tn';
     const hdr = document.createElement('div');
     hdr.className = 'sb-branche-hdr';
     hdr.innerHTML =
+      '<span class="sb-drag-h">⠿</span>' +
       '<span class="sba">&#9654;</span>' +
       '<span>' + (def ? def.label : key) + '</span>' +
       '<span style="margin-left:auto;font-size:.6rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">' + tns.length + '</span>';
@@ -1420,6 +1472,33 @@ function renderSbTnTree(){
 
     wrap.appendChild(hdr);
     wrap.appendChild(body);
+    // Drag-and-drop für Berufsgruppen-Sortierung
+    wrap.addEventListener('dragstart',e=>{
+      if(e.target.closest&&e.target.closest('.sb-tn-drag')) return; // TN-Drag, nicht Branche
+      _brancheDragKey=key; _brancheDragSection='tn';
+      e.dataTransfer.setData('application/beruf',key);
+      e.dataTransfer.effectAllowed='move';
+      wrap.style.opacity='.4';
+    });
+    wrap.addEventListener('dragend',()=>{ wrap.style.opacity=''; _brancheDragKey=null; });
+    wrap.addEventListener('dragover',e=>{
+      if(!_brancheDragKey||_brancheDragKey===key) return;
+      e.preventDefault();
+      const rect=wrap.getBoundingClientRect();
+      const mid=rect.top+rect.height/2;
+      wrap.classList.toggle('drag-over-top',e.clientY<mid);
+      wrap.classList.toggle('drag-over-bot',e.clientY>=mid);
+    });
+    wrap.addEventListener('dragleave',()=>{ wrap.classList.remove('drag-over-top','drag-over-bot'); });
+    wrap.addEventListener('drop',e=>{
+      e.preventDefault();
+      wrap.classList.remove('drag-over-top','drag-over-bot');
+      if(!_brancheDragKey||_brancheDragKey===key) return;
+      const rect=wrap.getBoundingClientRect();
+      const before=e.clientY<rect.top+rect.height/2;
+      reorderBeruf(_brancheDragKey,key,before);
+      _brancheDragKey=null;
+    });
     root.appendChild(wrap);
   });
 }
@@ -2248,6 +2327,43 @@ function berufKeyFromName(name){
   return name.toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,30);
 }
 
+// ── Berufsgruppen Sortierung ──
+let _brancheDragKey=null, _brancheDragSection=null;
+
+function reorderBeruf(dragKey, targetKey, insertBefore){
+  // Aktuelle Reihenfolge nach order sortiert
+  const keys=Object.keys(BERUFE).sort((a,b)=>(BERUFE[a]?.order||99)-(BERUFE[b]?.order||99));
+  // dragKey entfernen
+  const filtered=keys.filter(k=>k!==dragKey);
+  // Position von targetKey finden
+  const targetIdx=filtered.indexOf(targetKey);
+  if(targetIdx===-1) return;
+  // Einfügen
+  const insertIdx=insertBefore?targetIdx:targetIdx+1;
+  filtered.splice(insertIdx,0,dragKey);
+  // Neue Order-Werte in Firestore schreiben
+  const batch=db.batch();
+  filtered.forEach((k,i)=>{
+    const ref=db.collection('shared').doc('kursSettings').collection('berufe').doc(k);
+    batch.update(ref,{order:i});
+  });
+  batch.commit().then(()=>{
+    toast('Reihenfolge gespeichert ✓');
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function sortBerufAlpha(){
+  const keys=Object.keys(BERUFE).sort((a,b)=>(BERUFE[a]?.name||'').localeCompare(BERUFE[b]?.name||'','de'));
+  const batch=db.batch();
+  keys.forEach((k,i)=>{
+    const ref=db.collection('shared').doc('kursSettings').collection('berufe').doc(k);
+    batch.update(ref,{order:i});
+  });
+  batch.commit().then(()=>{
+    toast('Alphabetisch sortiert ✓');
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
 function buildBEREUFEFromDocs(docs){
   BERUFE = {};
   docs.forEach(d=>{
@@ -2255,7 +2371,7 @@ function buildBEREUFEFromDocs(docs){
     const keyStr = d.keyStr || d.keys || '';
     const parts = keyStr.split(',').map(s=>s.trim()).filter(Boolean);
     const rx = parts.length ? new RegExp(parts.join('|')) : new RegExp(d.name.toLowerCase());
-    BERUFE[k] = {label: (d.emoji||'') + ' ' + d.name, emoji: d.emoji||'', name: d.name, keys: rx, keyStr};
+    BERUFE[k] = {label: (d.emoji||'') + ' ' + d.name, emoji: d.emoji||'', name: d.name, keys: rx, keyStr, order: d.order!=null?d.order:99};
   });
 }
 
