@@ -2362,22 +2362,27 @@ function deleteGlobalTN(tnId){
   const name = t ? (t.vorname+' '+t.nachname).trim() : 'Teilnehmer';
   if(!confirm(name+' wirklich löschen?')) return;
 
-  const kursId = t ? t.aktiverKursId : null;
+  // Alle Kurs-IDs sammeln (aktiver + Historie)
+  const kursIds = new Set();
+  if(t){
+    if(t.aktiverKursId) kursIds.add(t.aktiverKursId);
+    (t.kursHistory||[]).forEach(h=>{ if(h.kursId) kursIds.add(h.kursId); });
+  }
+
   const promises = [db.collection('globalTN').doc(tnId).delete()];
 
-  // Auch aus Kurs-Subcollection entfernen falls zugeordnet
-  if(kursId){
+  // Aus ALLEN Kurs-Subcollections entfernen
+  kursIds.forEach(kursId=>{
     promises.push(
       db.collection('shared').doc('kurse').collection('list').doc(kursId)
         .collection('teilnehmer').doc(tnId).delete().catch(()=>{})
     );
-  }
+  });
 
   Promise.all(promises)
     .then(()=>{
       toast(name+' gelöscht');
       closeTNModal();
-      // Dashboard sofort aktualisieren
       loadDashboard();
     })
     .catch(err=>toast('Fehler: '+err.message,'bad'));
