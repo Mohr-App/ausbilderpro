@@ -619,6 +619,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </div>
     <div id="mobSearchDrop" style="margin-top:5px;"></div>
   </div>
+  <div id="hbzKurseSectionMob" style="flex-shrink:0"></div>
   <div class="sb-sec" style="flex-shrink:0;">Lehrgangsarten <button class="sb-add-kat" onclick="drawerClose();openKatModal()">+</button></div>
   <div class="mob-drawer-scroll" id="mobKatList"></div>
 </div>
@@ -1237,8 +1238,9 @@ function getLinkedKursIds(){
 
 function loadHBZKurse(){
   const section=document.getElementById('hbzKurseSection');
+  const sectionMob=document.getElementById('hbzKurseSectionMob');
   if(!section) return;
-  if(!_db||!_auth||!_auth.currentUser){ section.innerHTML=''; return; }
+  if(!_db||!_auth||!_auth.currentUser){ section.innerHTML=''; if(sectionMob) sectionMob.innerHTML=''; return; }
 
   _db.collection('shared').doc('kurse').collection('list')
     .where('ausbilderEmail','==',_auth.currentUser.email.toLowerCase())
@@ -1249,7 +1251,7 @@ function loadHBZKurse(){
         if(!linked.has(doc.id)) unlinked.push({id:doc.id,...doc.data()});
       });
 
-      if(!unlinked.length){ section.innerHTML=''; return; }
+      if(!unlinked.length){ section.innerHTML=''; if(sectionMob) sectionMob.innerHTML=''; return; }
 
       section.innerHTML='';
       // Header
@@ -1306,6 +1308,36 @@ function loadHBZKurse(){
       // Divider
       const div=document.createElement('div'); div.className='hbz-divider';
       section.appendChild(div);
+
+      // ── MOBILE: Tap-basierte Karten ──
+      if(sectionMob){
+        sectionMob.innerHTML='';
+        const mHdr=document.createElement('div'); mHdr.className='hbz-sec';
+        mHdr.innerHTML='📋 NEUE HBZ-KURSE <span class="hbz-sec-cnt">'+unlinked.length+'</span>';
+        sectionMob.appendChild(mHdr);
+        unlinked.forEach(k=>{
+          const lgart=k.lehrgangsart||k.name||'Kurs';
+          const vonBis=fmtDE(k.von)+' – '+fmtDE(k.bis);
+          const card=document.createElement('div');
+          card.className='hbz-kurs-card';
+          card.style.cursor='pointer';
+          card.innerHTML='<span class="hbz-kurs-icon">📋</span>'
+            +'<div class="hbz-kurs-info">'
+            +'<div class="hbz-kurs-name">'+esc(lgart)+'</div>'
+            +'<div class="hbz-kurs-dates">'+esc(vonBis)+'</div>'
+            +'</div>'
+            +'<span style="font-size:.6rem;color:var(--acc);font-weight:700;margin-left:auto">Tippen →</span>';
+          card.addEventListener('click',()=>{
+            if(confirm('Kurs "'+lgart+'" ('+vonBis+') verknüpfen?')){
+              drawerClose();
+              linkHBZKurs(k.id, k, null);
+            }
+          });
+          sectionMob.appendChild(card);
+        });
+        const mDiv=document.createElement('div'); mDiv.style.cssText='border-bottom:1px solid var(--brd);margin:4px 0';
+        sectionMob.appendChild(mDiv);
+      }
     }).catch(()=>{});
 }
 
