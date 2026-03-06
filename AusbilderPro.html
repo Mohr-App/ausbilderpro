@@ -1877,6 +1877,11 @@ function mkSeat(id,seats){
   else{
     el.classList.add('filled');
     if(d.wiederholer) el.classList.add('wiederholer');
+    // Profilbild
+    const photoUrl=d.poolTnId&&_tnPhotos[d.poolTnId]?_tnPhotos[d.poolTnId]:null;
+    if(photoUrl){
+      el.innerHTML+='<div style="position:absolute;top:4px;right:4px;width:28px;height:28px;border-radius:50%;overflow:hidden;border:2px solid rgba(59,130,246,.4);z-index:2"><img src="'+esc(photoUrl)+'" style="width:100%;height:100%;object-fit:cover"></div>';
+    }
     const att=d.attendance||[];
     // one dot per day – oldest left, newest right, max 14
     const dayMap=new Map();
@@ -3606,6 +3611,7 @@ const _fbCfg={
   appId:"1:937082794250:web:eb99bc41d8f39908df8af3"
 };
 let _auth=null,_db=null,_st=null,_fbUid=null,_syncTimer=null;
+let _tnPhotos={}; // {tnId: photoUrl}
 try{
   firebase.initializeApp(_fbCfg);
   _auth=firebase.auth();
@@ -3793,6 +3799,7 @@ function fbLoadData(){
       loadHBZKurse();
       loadBerufeFromFirestore();
       resolveAllPoolTnIds();
+      loadTNPhotos();
       ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||'');
     })
     .catch(()=>{
@@ -3800,6 +3807,19 @@ function fbLoadData(){
       loadHBZKurse();
       ci.textContent='☁ Offline';
     });
+}
+
+function loadTNPhotos(){
+  if(!_db) return;
+  _db.collection('globalTN').where('photoUrl','!=','').get()
+    .then(snap=>{
+      snap.forEach(doc=>{
+        const d=doc.data();
+        if(d.photoUrl) _tnPhotos[doc.id]=d.photoUrl;
+      });
+      // Re-render seats to show photos
+      if(curInst()) renderSeats();
+    }).catch(()=>{});
 }
 
 // Hook für persist() → Cloud-Sync

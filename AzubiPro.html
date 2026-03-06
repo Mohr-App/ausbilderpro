@@ -94,6 +94,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .profil-avatar-init{width:100%;height:100%;background:rgba(16,185,129,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:800;color:var(--acc);}
 .profil-avatar-badge{position:absolute;bottom:-2px;right:-2px;width:24px;height:24px;background:var(--acc);border:2px solid var(--sur);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;color:#fff;}
 .profil-photo-hint{font-size:.58rem;color:var(--mu);text-align:center;margin-top:4px;font-family:'JetBrains Mono',monospace;}
+/* Bestätigung */
+.kurs-unconfirmed{border-color:var(--warn)!important;background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(245,158,11,.04))!important;animation:pulseWarn 2s infinite;}
+@keyframes pulseWarn{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.2)}50%{box-shadow:0 0 0 8px rgba(245,158,11,0)}}
+.confirm-btn{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;font-family:'Sora',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;margin-top:10px;transition:all .15s;}
+.confirm-btn:active{transform:scale(.97);}
 </style>
 </head>
 <body>
@@ -318,14 +323,38 @@ function loadKurse(){
 
     if(!_kurse.length){ el.innerHTML='<div class="empty">Keine Kursdaten gefunden.</div>'; return; }
 
-    // Aktiver/nächster Kurs oben
+    // Bestätigungsstatus für jeden Kurs laden
+    const confirmPromises=_kurse.map(k=>
+      db.collection('shared').doc('kurse').collection('list').doc(k.id)
+        .collection('teilnehmer').doc(_tnId).get()
+        .then(doc=>{ k._tnDoc=doc.exists?doc.data():{}; })
+        .catch(()=>{ k._tnDoc={}; })
+    );
+
+    return Promise.all(confirmPromises).then(()=>{
     const aktiv=_kurse.find(k=>k.von&&k.bis&&today>=k.von&&today<=k.bis);
     const naechster=_kurse.find(k=>k.von&&k.von>today);
     const highlight=aktiv||naechster;
 
     let html='';
 
-    if(highlight){
+    // Unbestätigte Kurse ganz oben
+    const unconfirmed=_kurse.filter(k=>!k._tnDoc?.bestaetigtAm && (k.von>=today || (k.von&&k.bis&&today>=k.von&&today<=k.bis)));
+    if(unconfirmed.length){
+      html+='<div style="margin-bottom:14px">';
+      unconfirmed.forEach(k=>{
+        html+='<div class="kurs-card kurs-unconfirmed" style="cursor:default">';
+        html+='<div style="font-size:.6rem;font-weight:700;color:var(--warn);margin-bottom:6px">⚠️ NEUER LEHRGANG – BITTE BESTÄTIGEN</div>';
+        html+='<div class="kurs-name">'+esc(k.name||k.lehrgangsart||'Lehrgang')+'</div>';
+        html+='<div class="kurs-dates">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div>';
+        html+='<div class="kurs-ausb">'+(k.ausbilderName?'Ausbilder: '+esc(k.ausbilderName):'')+'</div>';
+        html+='<button class="confirm-btn" onclick="event.stopPropagation();confirmKurs(\''+k.id+'\',\''+esc(k.name||k.lehrgangsart||'')+'\')">✅ Zur Kenntnis genommen</button>';
+        html+='</div>';
+      });
+      html+='</div>';
+    }
+
+    if(highlight && !unconfirmed.find(u=>u.id===highlight.id)){
       const isAktiv=aktiv&&highlight.id===aktiv.id;
       const daysUntil=naechster&&!isAktiv?Math.ceil((new Date(naechster.von)-new Date())/(1000*60*60*24)):0;
       html+='<div class="kurs-card" onclick="showKursDetail(\''+highlight.id+'\')">';
@@ -343,9 +372,10 @@ function loadKurse(){
       let st='beendet', stLabel='Beendet';
       if(k.von&&k.bis&&today>=k.von&&today<=k.bis){ st='laufend'; stLabel='● Laufend'; }
       else if(k.von&&k.von>today){ st='geplant'; stLabel='◐ Geplant'; }
+      const confirmed=!!k._tnDoc?.bestaetigtAm;
       html+='<div class="hist-item" style="cursor:pointer" onclick="showKursDetail(\''+k.id+'\')">';
       html+='<div class="hist-dot" style="background:'+(st==='laufend'?'#10b981':st==='geplant'?'#3b82f6':'#6b7a99')+'"></div>';
-      html+='<div style="flex:1"><div class="hist-name">'+esc(k.name||k.lehrgangsart||'?')+'</div>';
+      html+='<div style="flex:1"><div class="hist-name">'+esc(k.name||k.lehrgangsart||'?')+(confirmed?'':' ⚠️')+'</div>';
       html+='<div class="hist-dates">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div></div>';
       html+='<span class="kurs-countdown kurs-status-'+st+'" style="font-size:.55rem">'+stLabel+'</span>';
       html+='</div>';
@@ -353,7 +383,27 @@ function loadKurse(){
     html+='</div>';
 
     el.innerHTML=html;
+    });
   });
+}
+
+// ── Kurs bestätigen ──
+function confirmKurs(kursId, kursName){
+  if(!confirm('Hiermit bestätige ich, dass ich den Lehrgang "'+kursName+'" zur Kenntnis genommen habe.')) return;
+  if(!_tnId){toast('Fehler: TN nicht zugeordnet','bad');return;}
+  const ref=db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(_tnId);
+  ref.update({bestaetigtAm:Date.now(),bestaetigtVon:_email})
+    .then(()=>{
+      toast('✅ Bestätigt');
+      loadKurse();
+    })
+    .catch(()=>{
+      // Doc existiert noch nicht → set
+      ref.set({bestaetigtAm:Date.now(),bestaetigtVon:_email},{merge:true})
+        .then(()=>{ toast('✅ Bestätigt'); loadKurse(); })
+        .catch(err=>toast('Fehler: '+err.message,'bad'));
+    });
 }
 
 // ── Kursdetail ──

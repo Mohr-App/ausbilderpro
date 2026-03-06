@@ -696,6 +696,11 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
               ['status','attTotal','attPresent','attAbsentE','attAbsentU','attSick','attBerufsschule','attLate','attEarly','attPercent','attLastSync']
             );
+          // Azubi darf Kursbestätigung schreiben
+          allow update: if request.auth != null
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+              ['bestaetigtAm','bestaetigtVon']
+            );
           // Ausbilder darf Dokumente hochladen/löschen (dokumente-Subcollection)
           allow create, delete: if request.auth != null && deep == 'dokumente';
         }
@@ -2171,35 +2176,47 @@ function showKursDetail(kursId){
     const tns=[];
     gSnap.forEach(doc=>tns.push({id:doc.id,...doc.data()}));
     // Attendance-Daten aus Kurs-Subcollection mappen
-    const attMap={};
-    kSnap.forEach(doc=>{ const d=doc.data(); if(d.attTotal) attMap[doc.id]=d; });
+    // Attendance + Bestätigung aus Kurs-Subcollection
+    const attMap={}, confirmMap={};
+    kSnap.forEach(doc=>{ const d=doc.data(); if(d.attTotal) attMap[doc.id]=d; if(d.bestaetigtAm) confirmMap[doc.id]={am:d.bestaetigtAm,von:d.bestaetigtVon||''}; });
     tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||''));
     if(!tns.length){
       wrap.innerHTML='<div class="empty" style="padding:40px;text-align:center">Noch keine Teilnehmer in diesem Kurs<br><br><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.8rem;padding:8px 18px">+ Teilnehmer hinzufügen</button></div>';
       return;
     }
-    // Attendance-Zusammenfassung oben
+    // Bestätigungs-Zusammenfassung
+    const confirmedCnt=tns.filter(t=>confirmMap[t.id]).length;
+    const confirmSummary='<div style="display:flex;gap:14px;align-items:center;padding:10px 14px;background:'+(confirmedCnt===tns.length?'rgba(34,197,94,.06)':'rgba(245,158,11,.06)')+';border:1px solid '+(confirmedCnt===tns.length?'rgba(34,197,94,.2)':'rgba(245,158,11,.2)')+';border-radius:9px;margin-bottom:6px;font-size:.7rem;font-family:\'JetBrains Mono\',monospace">'
+      +'<span style="font-weight:800;color:'+(confirmedCnt===tns.length?'#22c55e':'#f59e0b')+'">'+(confirmedCnt===tns.length?'✅':'⚠️')+' '+confirmedCnt+'/'+tns.length+' TN haben bestätigt</span>'
+      +(confirmedCnt<tns.length?'<span style="color:var(--mu)">'+(tns.length-confirmedCnt)+' ausstehend</span>':'')
+      +'</div>';
+    // Attendance-Zusammenfassung
     const allAtt=Object.values(attMap);
     let attSummary='';
     if(allAtt.length){
       const avgPct=Math.round(allAtt.reduce((s,a)=>s+(a.attPercent||0),0)/allAtt.length);
       const totSick=allAtt.reduce((s,a)=>s+(a.attSick||0),0);
       const totAbsU=allAtt.reduce((s,a)=>s+(a.attAbsentU||0),0);
-      attSummary='<div class="kd-att-sum" style="display:flex;gap:14px;align-items:center;padding:10px 14px;background:var(--sur2);border:1px solid var(--brd);border-radius:9px;margin-bottom:10px;font-size:.7rem;font-family:\'JetBrains Mono\',monospace">'
+      attSummary='<div style="display:flex;gap:14px;align-items:center;padding:10px 14px;background:var(--sur2);border:1px solid var(--brd);border-radius:9px;margin-bottom:10px;font-size:.7rem;font-family:\'JetBrains Mono\',monospace">'
         +'<span style="font-weight:800;color:'+(avgPct>=80?'#22c55e':avgPct>=60?'#f59e0b':'#ef4444')+'">⌀ '+avgPct+'% Anwesenheit</span>'
         +'<span style="color:var(--mu)">'+allAtt.length+'/'+tns.length+' mit Daten</span>'
         +(totSick?'<span style="color:#fcd34d">🤒 '+totSick+'× krank</span>':'')
         +(totAbsU?'<span style="color:#ef4444">❌ '+totAbsU+'× unentsch.</span>':'')
         +'</div>';
     }
-    wrap.innerHTML=attSummary+'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)">TEILNEHMER ('+tns.length+')</div><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.7rem;padding:5px 12px">+ Hinzufügen</button></div><div id="kdTNGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:7px"></div>';
+    wrap.innerHTML=confirmSummary+attSummary+'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)">TEILNEHMER ('+tns.length+')</div><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.7rem;padding:5px 12px">+ Hinzufügen</button></div><div id="kdTNGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:7px"></div>';
     const grid=document.getElementById('kdTNGrid');
     tns.forEach(t=>{
       const name=(t.vorname||'')+' '+(t.nachname||'');
       const init=((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
       const vtag=t.verkuerzer?' <span class="gtn-badge" style="background:rgba(99,102,241,.12);color:#6366f1">Verk.</span>':'';
       const wtag=t.wiederholer?' <span class="gtn-badge" style="background:rgba(245,158,11,.12);color:#d97706">Wdh.</span>':'';
-      // Attendance-Badge
+      // Bestätigung Badge
+      const conf=confirmMap[t.id];
+      const confBadge=conf
+        ?'<span class="gtn-badge" style="background:rgba(34,197,94,.1);color:#22c55e">✅ '+new Date(conf.am).toLocaleDateString('de-DE')+'</span>'
+        :'<span class="gtn-badge" style="background:rgba(245,158,11,.1);color:#f59e0b">⚠️ Nicht bestätigt</span>';
+      // Attendance Badge
       const att=attMap[t.id];
       let attBadge='';
       if(att && att.attTotal){
@@ -2210,14 +2227,18 @@ function showKursDetail(kursId){
           +(att.attAbsentU?' · '+att.attAbsentU+'×❌':'')
           +'</span>';
       }
+      // Avatar mit Foto
+      const avHtml=t.photoUrl
+        ?'<div class="gtn-av av-ok" style="overflow:hidden;padding:0"><img src="'+esc(t.photoUrl)+'" style="width:100%;height:100%;object-fit:cover"></div>'
+        :'<div class="gtn-av av-ok">'+esc(init)+'</div>';
       const card=document.createElement('div');
       card.className='gtn-card';
       card.innerHTML=
-        '<div class="gtn-av av-ok">'+esc(init)+'</div>'+
+        avHtml+
         '<div class="gtn-info">'+
           '<div class="gtn-name">'+esc(name.trim())+vtag+wtag+'</div>'+
           '<div class="gtn-sub">'+(t.beruf||'kein Beruf')+(t.ausbjahr?' · '+t.ausbjahr+'. Lj':'')+(t.firma?' · '+esc(t.firma):'')+'</div>'+
-          (attBadge?'<div style="margin-top:3px">'+attBadge+'</div>':'')+
+          '<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">'+confBadge+(attBadge||'')+'</div>'+
         '</div>'+
         '<button class="gtn-open" onclick="openTNProfile(\''+t.id+'\')" style="margin-right:4px">Profil</button>'+
         '<button class="ktn-rm" onclick="removeTNFromKursDetail(\''+t.id+'\',\''+kursId+'\')" title="Aus Kurs entfernen">✕</button>';
@@ -2939,7 +2960,7 @@ function saveNewGlobalTN(){
           // Zugangskarte drucken
           printAccessCard(vn+' '+nn, email, startPw);
         }).catch(err=>{
-          toast('TN gespeichert, aber Konto-Fehler: '+err.message,'bad');
+          toast('TN gespeichert, aber Konto-Fehler: '+(err.code==='auth/email-already-in-use'?'Diese E-Mail hat bereits ein Konto. AzubiPro-Login funktioniert trotzdem mit dem bestehenden Passwort.':err.message),'bad');
           closeNewTNModal();
         });
     } else {
