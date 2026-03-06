@@ -3369,18 +3369,32 @@ function docsHandleUpload(e, scope){
   const maxMB = 20;
   if(file.size > maxMB * 1024 * 1024){ alert('Datei zu groß (max '+maxMB+' MB)'); return; }
 
-  // Build storage path
-  let path;
+  const inst=curInst();
+  const kursId = inst ? inst.sharedKursId : null;
+  let path, isShared=false, isTnShared=false, tnId=null;
+
   if(scope==='course'){
     if(!S.curKat||!S.curInst){ alert('Kein Lehrgang ausgewählt'); return; }
-    path = 'users/'+_fbUid+'/courses/'+S.curKat+'_'+S.curInst+'/'+Date.now()+'_'+file.name;
+    if(kursId){
+      path = 'shared/kurse/'+kursId+'/docs/'+Date.now()+'_'+file.name;
+      isShared = true;
+    } else {
+      path = 'users/'+_fbUid+'/courses/'+S.curKat+'_'+S.curInst+'/'+Date.now()+'_'+file.name;
+    }
   } else {
     if(!curSeat){ return; }
-    path = 'users/'+_fbUid+'/seats/'+S.curKat+'_'+S.curInst+'_'+curSeat+'/'+Date.now()+'_'+file.name;
+    const seatData = inst?.seats[curSeat];
+    tnId = seatData?.poolTnId || null;
+    if(tnId){
+      // Shared TN docs – sichtbar für Verwaltung
+      path = 'shared/tn/'+tnId+'/docs/'+Date.now()+'_'+file.name;
+      isTnShared = true;
+    } else {
+      path = 'users/'+_fbUid+'/seats/'+S.curKat+'_'+S.curInst+'_'+curSeat+'/'+Date.now()+'_'+file.name;
+    }
   }
 
   const listEl = document.getElementById(scope==='course' ? 'docsListCourse' : 'docsListSeat');
-  // Show progress
   const prog = document.createElement('div');
   prog.style.cssText = 'background:var(--sur2);border:2px solid #3a4060;border-radius:8px;padding:10px 12px;font-size:.75rem;color:var(--mu)';
   prog.textContent = '⬆ Lädt hoch: '+file.name+'…';
@@ -3393,18 +3407,26 @@ function docsHandleUpload(e, scope){
     err => { prog.textContent = '❌ Fehler: '+err.message; },
     () => {
       ref.getDownloadURL().then(url => {
-        // Save metadata to Firestore
-        const meta = { name: file.name, url, path, size: file.size, type: file.type, ts: Date.now(), uid: _fbUid };
-        const docPath = scope==='course'
-          ? 'users/'+_fbUid+'/courseDocs/'+S.curKat+'_'+S.curInst
-          : 'users/'+_fbUid+'/seatDocs/'+S.curKat+'_'+S.curInst+'_'+curSeat;
-        _db.collection('users').doc(_fbUid).collection(scope==='course'?'courseDocs':'seatDocs')
-          .doc(scope==='course' ? S.curKat+'_'+S.curInst : S.curKat+'_'+S.curInst+'_'+curSeat)
-          .collection('files').add(meta)
-          .then(() => {
-            prog.remove();
-            docsLoadList(scope);
-          });
+        const meta = {
+          name: file.name, url, path, size: file.size, type: file.type, ts: Date.now(),
+          uploadedBy: _auth.currentUser?.email||'', uploadedByUid: _fbUid
+        };
+        if(isShared){
+          _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+            .collection('dokumente').add(meta)
+            .then(() => { prog.remove(); docsLoadList(scope); });
+        } else if(isTnShared){
+          _db.collection('globalTN').doc(tnId).collection('dokumente').add(meta)
+            .then(() => { prog.remove(); docsLoadList(scope); });
+        } else if(scope==='course'){
+          _db.collection('users').doc(_fbUid).collection('courseDocs')
+            .doc(S.curKat+'_'+S.curInst).collection('files').add(meta)
+            .then(() => { prog.remove(); docsLoadList(scope); });
+        } else {
+          _db.collection('users').doc(_fbUid).collection('seatDocs')
+            .doc(S.curKat+'_'+S.curInst+'_'+curSeat).collection('files').add(meta)
+            .then(() => { prog.remove(); docsLoadList(scope); });
+        }
       });
     }
   );
@@ -3413,14 +3435,31 @@ function docsHandleUpload(e, scope){
 function docsLoadList(scope){
   if(!_fbUid) return;
   const listEl = document.getElementById(scope==='course' ? 'docsListCourse' : 'docsListSeat');
-  const docId = scope==='course'
-    ? S.curKat+'_'+S.curInst
-    : S.curKat+'_'+S.curInst+'_'+curSeat;
-  const col = scope==='course' ? 'courseDocs' : 'seatDocs';
+  const inst=curInst();
+  const kursId = inst ? inst.sharedKursId : null;
 
   listEl.innerHTML = '<div style="color:var(--mu);font-size:.75rem;text-align:center;padding:12px">Lädt…</div>';
-  _db.collection('users').doc(_fbUid).collection(col).doc(docId).collection('files')
-    .orderBy('ts','desc').get()
+
+  let query;
+  if(scope==='course' && kursId){
+    query = _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('dokumente').orderBy('ts','desc');
+  } else if(scope==='course'){
+    const docId = S.curKat+'_'+S.curInst;
+    query = _db.collection('users').doc(_fbUid).collection('courseDocs').doc(docId).collection('files').orderBy('ts','desc');
+  } else {
+    // Seat docs: check for poolTnId
+    const seatData = inst?.seats[curSeat];
+    const tnId = seatData?.poolTnId || null;
+    if(tnId){
+      query = _db.collection('globalTN').doc(tnId).collection('dokumente').orderBy('ts','desc');
+    } else {
+      const docId = S.curKat+'_'+S.curInst+'_'+curSeat;
+      query = _db.collection('users').doc(_fbUid).collection('seatDocs').doc(docId).collection('files').orderBy('ts','desc');
+    }
+  }
+
+  query.get()
     .then(snap => {
       if(snap.empty){ listEl.innerHTML='<div style="color:var(--mu);font-size:.75rem;text-align:center;padding:20px">Keine Dokumente vorhanden</div>'; return; }
       listEl.innerHTML='';
@@ -3431,11 +3470,13 @@ function docsLoadList(scope){
         const icon = d.type&&d.type.startsWith('image') ? '🖼' : d.type==='application/pdf' ? '📄' : '📎';
         const size = d.size > 1024*1024 ? (d.size/1024/1024).toFixed(1)+' MB' : Math.round(d.size/1024)+' KB';
         const date = new Date(d.ts).toLocaleDateString('de-DE');
+        const uploader = d.uploadedBy ? d.uploadedBy.split('@')[0] : '';
+        const canDelete = !d.uploadedByUid || d.uploadedByUid===_fbUid;
         item.innerHTML = '<span style="font-size:1.2rem">'+icon+'</span>'
           +'<div style="flex:1;min-width:0"><div style="font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(d.name)+'</div>'
-          +'<div style="font-size:.62rem;color:var(--mu)">'+size+' · '+date+'</div></div>'
+          +'<div style="font-size:.62rem;color:var(--mu)">'+size+' · '+date+(uploader?' · '+esc(uploader):'')+'</div></div>'
           +'<button onclick="window.open(this.dataset.url,\'_blank\')" data-url="'+esc(d.url)+'" style="color:var(--acc);font-size:.7rem;background:none;border:1px solid var(--acc);border-radius:5px;padding:3px 8px;cursor:pointer">Öffnen</button>'
-          +'<button onclick="docsDelete(\''+doc.id+'\',\''+esc(d.path)+'\',\''+scope+'\')" style="background:none;border:none;color:var(--bad);cursor:pointer;font-size:.85rem;padding:2px 6px">🗑</button>';
+          +(canDelete?'<button onclick="docsDelete(\''+doc.id+'\',\''+esc(d.path)+'\',\''+scope+'\')" style="background:none;border:none;color:var(--bad);cursor:pointer;font-size:.85rem;padding:2px 6px">🗑</button>':'');
         listEl.appendChild(item);
       });
     })
@@ -3444,13 +3485,29 @@ function docsLoadList(scope){
 
 function docsDelete(fileDocId, storagePath, scope){
   if(!confirm('Dokument wirklich löschen?')) return;
-  const docId = scope==='course' ? S.curKat+'_'+S.curInst : S.curKat+'_'+S.curInst+'_'+curSeat;
-  const col = scope==='course' ? 'courseDocs' : 'seatDocs';
-  // Delete from Storage
+  const inst=curInst();
+  const kursId = inst ? inst.sharedKursId : null;
   _st.ref(storagePath).delete().catch(()=>{});
-  // Delete from Firestore
-  _db.collection('users').doc(_fbUid).collection(col).doc(docId).collection('files').doc(fileDocId).delete()
-    .then(()=> docsLoadList(scope));
+  if(scope==='course' && kursId){
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('dokumente').doc(fileDocId).delete()
+      .then(()=> docsLoadList(scope));
+  } else if(scope==='seat'){
+    const seatData = inst?.seats[curSeat];
+    const tnId = seatData?.poolTnId || null;
+    if(tnId){
+      _db.collection('globalTN').doc(tnId).collection('dokumente').doc(fileDocId).delete()
+        .then(()=> docsLoadList(scope));
+    } else {
+      const docId = S.curKat+'_'+S.curInst+'_'+curSeat;
+      _db.collection('users').doc(_fbUid).collection('seatDocs').doc(docId).collection('files').doc(fileDocId).delete()
+        .then(()=> docsLoadList(scope));
+    }
+  } else {
+    const docId = S.curKat+'_'+S.curInst;
+    _db.collection('users').doc(_fbUid).collection('courseDocs').doc(docId).collection('files').doc(fileDocId).delete()
+      .then(()=> docsLoadList(scope));
+  }
 }
 
 function selInstAndOpenDocs(kid,iid,e){
