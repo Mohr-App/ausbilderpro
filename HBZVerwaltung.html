@@ -605,8 +605,19 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <button class="btn-sm" id="kdArchiveBtn" onclick="toggleArchiveKurs()" style="padding:6px 12px">📦 Archivieren</button>
           <button class="btn-sm btn-bad" onclick="deleteSelectedKurs()">🗑 Löschen</button>
         </div>
-        <div class="card" style="overflow-y:auto;max-height:calc(100vh - 220px);padding:14px">
+        <div class="card" style="overflow-y:auto;max-height:calc(100vh - 320px);padding:14px">
           <div id="kdTNList"><div class="empty">Lädt…</div></div>
+        </div>
+        <!-- KURS-DOKUMENTE -->
+        <div class="card" style="margin-top:12px;padding:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-size:.8rem;font-weight:700">📁 Kurs-Dokumente</div>
+            <div style="display:flex;gap:6px">
+              <button class="btn-sm btn-ok" onclick="kdDocsUpload()" style="font-size:.7rem;padding:5px 12px">📁 Hochladen</button>
+              <input type="file" id="kdDocsFileIn" style="display:none" onchange="kdDocsHandleUpload(event)" multiple>
+            </div>
+          </div>
+          <div id="kdDocsList"><div class="empty">Lädt…</div></div>
         </div>
       </div>
 
@@ -685,6 +696,8 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
               ['status','attTotal','attPresent','attAbsentE','attAbsentU','attSick','attBerufsschule','attLate','attEarly','attPercent','attLastSync']
             );
+          // Ausbilder darf Dokumente hochladen/löschen (dokumente-Subcollection)
+          allow create, delete: if request.auth != null && deep == 'dokumente';
         }
       }
     }
@@ -694,6 +707,11 @@ service cloud.firestore {
       // Ausbilder darf nur status + wiederholer Felder ändern (Sync aus AusbilderPro)
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'wiederholer']);
+      // TN-Dokumente (Krankmeldungen, Bescheinigungen)
+      match /dokumente/{fileDoc} {
+        allow read: if request.auth != null;
+        allow create, delete: if request.auth != null;
+      }
     }
   }
 }</pre>
@@ -2178,6 +2196,76 @@ function showKursDetail(kursId){
       grid.appendChild(card);
     });
   }).catch(err=>{wrap.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
+  // Dokumente laden
+  loadKdDocs(kursId);
+}
+
+// ── KURSDETAIL DOKUMENTE ──
+function kdDocsUpload(){ document.getElementById('kdDocsFileIn').click(); }
+
+function kdDocsHandleUpload(e){
+  const files=e.target.files;
+  if(!files.length||!_selectedKursId) return;
+  e.target.value='';
+  const kursId=_selectedKursId;
+  const listEl=document.getElementById('kdDocsList');
+
+  Array.from(files).forEach(file=>{
+    if(file.size>20*1024*1024){ toast('Datei zu groß (max 20 MB): '+file.name,'bad'); return; }
+    const path='shared/kurse/'+kursId+'/docs/'+Date.now()+'_'+file.name;
+    const prog=document.createElement('div');
+    prog.style.cssText='padding:8px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;font-size:.72rem;color:var(--mu);margin-bottom:6px';
+    prog.textContent='⬆ '+file.name+'…';
+    listEl.prepend(prog);
+
+    const ref=firebase.storage().ref(path);
+    ref.put(file).then(()=>ref.getDownloadURL()).then(url=>{
+      return db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('dokumente').add({
+          name:file.name, url, path, size:file.size, type:file.type, ts:Date.now(),
+          uploadedBy:_email||'', uploadedByUid:_uid
+        });
+    }).then(()=>{ prog.remove(); loadKdDocs(kursId); })
+    .catch(err=>{ prog.textContent='❌ '+err.message; });
+  });
+}
+
+function loadKdDocs(kursId){
+  const listEl=document.getElementById('kdDocsList');
+  if(!listEl) return;
+  listEl.innerHTML='<div class="empty">Lädt…</div>';
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('dokumente').orderBy('ts','desc').get()
+    .then(snap=>{
+      if(snap.empty){ listEl.innerHTML='<div class="empty">Keine Dokumente</div>'; return; }
+      listEl.innerHTML='';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const icon=d.type&&d.type.startsWith('image')?'🖼':d.type==='application/pdf'?'📄':'📎';
+        const size=d.size>1024*1024?(d.size/1024/1024).toFixed(1)+' MB':Math.round(d.size/1024)+' KB';
+        const date=new Date(d.ts).toLocaleDateString('de-DE');
+        const uploader=d.uploadedBy?d.uploadedBy.split('@')[0]:'';
+        const canDel=!d.uploadedByUid||d.uploadedByUid===_uid;
+        const item=document.createElement('div');
+        item.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;margin-bottom:6px';
+        item.innerHTML='<span style="font-size:1.1rem">'+icon+'</span>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:.76rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(d.name)+'</div>'
+          +'<div style="font-size:.6rem;color:var(--mu)">'+size+' · '+date+(uploader?' · '+esc(uploader):'')+'</div></div>'
+          +'<a href="'+esc(d.url)+'" target="_blank" style="color:var(--acc);font-size:.68rem;text-decoration:none;border:1px solid var(--acc);border-radius:5px;padding:3px 8px">Öffnen</a>'
+          +(canDel?'<button onclick="kdDocsDelete(\''+doc.id+'\',\''+esc(d.path)+'\',\''+kursId+'\')" style="background:none;border:none;color:var(--bad);cursor:pointer;font-size:.82rem;padding:2px 6px">🗑</button>':'');
+        listEl.appendChild(item);
+      });
+    })
+    .catch(()=>{ listEl.innerHTML='<div class="empty" style="color:var(--bad)">Fehler beim Laden</div>'; });
+}
+
+function kdDocsDelete(docId,storagePath,kursId){
+  if(!confirm('Dokument wirklich löschen?')) return;
+  firebase.storage().ref(storagePath).delete().catch(()=>{});
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('dokumente').doc(docId).delete()
+    .then(()=>loadKdDocs(kursId))
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 function toggleArchiveKurs(){
@@ -2607,13 +2695,23 @@ function openTNProfile(tnId){
     '<div class="empty" style="padding:12px">Noch keine Kurshistorie</div>';
   // Anwesenheits-Sektion (wird async nachgeladen)
   html+='<div id="tnProfileAtt" style="margin-top:12px"></div>';
+  // TN-Dokumente Sektion
+  html+='<div style="margin-top:14px">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+  html+='<div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)">DOKUMENTE</div>';
+  html+='<button class="btn-sm btn-ok" onclick="tnDocsUpload(\''+tnId+'\')" style="font-size:.65rem;padding:4px 10px">📁 Hochladen</button>';
+  html+='<input type="file" id="tnDocsFileIn" style="display:none" onchange="tnDocsHandleUpload(event,\''+tnId+'\')" multiple>';
+  html+='</div>';
+  html+='<div id="tnProfileDocs"><div class="empty">Lädt…</div></div>';
+  html+='</div>';
   html+='<div style="display:flex;gap:8px;margin-top:16px">'+
     '<button class="btn-sm btn-ok" onclick="openEditTNModal(\''+tnId+'\')" style="flex:1">Bearbeiten</button>'+
     '<button class="btn-sm btn-bad" onclick="deleteGlobalTN(\''+tnId+'\')" style="flex:1">Löschen</button></div>';
   document.getElementById('tnModalBody').innerHTML=html;
   document.getElementById('tnProfileModal').classList.add('open');
-  // Attendance async laden
+  // Attendance + Dokumente async laden
   loadTNProfileAttendance(tnId, t.aktiverKursId);
+  loadTNProfileDocs(tnId);
 }
 
 function loadTNProfileAttendance(tnId, kursId){
@@ -2646,6 +2744,69 @@ function loadTNProfileAttendance(tnId, kursId){
     }).catch(()=>{});
 }
 function closeTNModal(){document.getElementById('tnProfileModal').classList.remove('open');}
+
+// ── TN-DOKUMENTE (shared via globalTN/{tnId}/dokumente) ──
+function tnDocsUpload(tnId){ document.getElementById('tnDocsFileIn').click(); }
+
+function tnDocsHandleUpload(e, tnId){
+  const files=e.target.files;
+  if(!files.length) return;
+  e.target.value='';
+  const listEl=document.getElementById('tnProfileDocs');
+
+  Array.from(files).forEach(file=>{
+    if(file.size>20*1024*1024){ toast('Datei zu groß: '+file.name,'bad'); return; }
+    const path='shared/tn/'+tnId+'/docs/'+Date.now()+'_'+file.name;
+    const prog=document.createElement('div');
+    prog.style.cssText='padding:8px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;font-size:.72rem;color:var(--mu);margin-bottom:6px';
+    prog.textContent='⬆ '+file.name+'…';
+    listEl.prepend(prog);
+
+    const ref=firebase.storage().ref(path);
+    ref.put(file).then(()=>ref.getDownloadURL()).then(url=>{
+      return db.collection('globalTN').doc(tnId).collection('dokumente').add({
+        name:file.name, url, path, size:file.size, type:file.type, ts:Date.now(),
+        uploadedBy:_email||'', uploadedByUid:_uid
+      });
+    }).then(()=>{ prog.remove(); loadTNProfileDocs(tnId); })
+    .catch(err=>{ prog.textContent='❌ '+err.message; });
+  });
+}
+
+function loadTNProfileDocs(tnId){
+  const listEl=document.getElementById('tnProfileDocs');
+  if(!listEl) return;
+  listEl.innerHTML='<div class="empty">Lädt…</div>';
+  db.collection('globalTN').doc(tnId).collection('dokumente').orderBy('ts','desc').get()
+    .then(snap=>{
+      if(snap.empty){ listEl.innerHTML='<div class="empty">Keine Dokumente</div>'; return; }
+      listEl.innerHTML='';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const icon=d.type&&d.type.startsWith('image')?'🖼':d.type==='application/pdf'?'📄':'📎';
+        const size=d.size>1024*1024?(d.size/1024/1024).toFixed(1)+' MB':Math.round(d.size/1024)+' KB';
+        const date=new Date(d.ts).toLocaleDateString('de-DE');
+        const uploader=d.uploadedBy?d.uploadedBy.split('@')[0]:'';
+        const item=document.createElement('div');
+        item.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;margin-bottom:6px';
+        item.innerHTML='<span style="font-size:1rem">'+icon+'</span>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:.74rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(d.name)+'</div>'
+          +'<div style="font-size:.58rem;color:var(--mu)">'+size+' · '+date+(uploader?' · '+esc(uploader):'')+'</div></div>'
+          +'<a href="'+esc(d.url)+'" target="_blank" style="color:var(--acc);font-size:.65rem;text-decoration:none;border:1px solid var(--acc);border-radius:5px;padding:3px 8px">Öffnen</a>'
+          +'<button onclick="tnDocsDelete(\''+doc.id+'\',\''+esc(d.path)+'\',\''+tnId+'\')" style="background:none;border:none;color:var(--bad);cursor:pointer;font-size:.8rem;padding:2px 6px">🗑</button>';
+        listEl.appendChild(item);
+      });
+    })
+    .catch(()=>{ listEl.innerHTML='<div class="empty" style="color:var(--bad)">Fehler beim Laden</div>'; });
+}
+
+function tnDocsDelete(docId, storagePath, tnId){
+  if(!confirm('Dokument wirklich löschen?')) return;
+  firebase.storage().ref(storagePath).delete().catch(()=>{});
+  db.collection('globalTN').doc(tnId).collection('dokumente').doc(docId).delete()
+    .then(()=>loadTNProfileDocs(tnId))
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
 
 function openNewTNModal(){
   ['ntnVN','ntnNN','ntnFirma','ntnBeruf','ntnEmail','ntnTel'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
