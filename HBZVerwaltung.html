@@ -821,6 +821,7 @@ service cloud.firestore {
             <div class="fg"><label class="fl">Name <span style="color:var(--bad)">*</span></label><input class="fi" id="addBerufNameInp" placeholder="z.B. Elektroniker"></div>
             <div class="fg"><label class="fl">Emoji / Icon</label><input class="fi" id="addBerufEmojiInp" placeholder="z.B. ⚡" maxlength="4"></div>
             <div class="fg"><label class="fl">Stichwörter (kommagetrennt)</label><input class="fi" id="addBerufKeysInp" placeholder="z.B. elektro, mechatronik, elektronik"></div>
+            <div class="fg"><label class="fl">Fachrichtungen / Berufe (je Zeile einer)</label><textarea class="fi" id="addBerufSubInp" rows="5" placeholder="z.B.&#10;Elektroniker – Energie- und Gebäudetechnik (EuG)&#10;Elektroniker – Betriebstechnik&#10;Mechatroniker" style="resize:vertical;min-height:80px;font-size:.78rem;line-height:1.5"></textarea></div>
             <div style="display:flex;gap:8px;margin-top:10px">
               <button class="btn-sm" id="addBerufDelBtn" style="flex:1;display:none;background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)" onclick="confirmDeleteBeruf()">&#128465; Löschen</button>
               <button class="btn-sm btn-ok" style="flex:2" onclick="saveBeruf()">&#10003; Speichern</button>
@@ -854,7 +855,14 @@ service cloud.firestore {
             </div>
             <div class="fg ac-wrap"><label class="fl">Betrieb</label><input class="fi" id="ntnFirma" placeholder="Firma GmbH" autocomplete="off" oninput="hvAc('ntnFirma','acNF','firma')" onfocus="hvAc('ntnFirma','acNF','firma')" onblur="setTimeout(()=>closeAc('acNF'),200)"><div class="ac-drop" id="acNF"></div></div>
             <div class="form-row">
-              <div class="fg ac-wrap"><label class="fl">Beruf</label><input class="fi" id="ntnBeruf" placeholder="Elektroniker EuG" autocomplete="off" oninput="hvAc('ntnBeruf','acNB','beruf')" onfocus="hvAc('ntnBeruf','acNB','beruf')" onblur="setTimeout(()=>closeAc('acNB'),200)"><div class="ac-drop" id="acNB"></div></div>
+              <div class="fg"><label class="fl">Berufsgruppe *</label>
+                <select class="fi" id="ntnBerufGruppe" onchange="updateBerufSelect()"><option value="">– Berufsgruppe –</option></select>
+              </div>
+              <div class="fg"><label class="fl">Fachrichtung / Beruf</label>
+                <select class="fi" id="ntnBeruf"><option value="">– Erst Berufsgruppe wählen –</option></select>
+              </div>
+            </div>
+            <div class="form-row">
               <div class="fg"><label class="fl">Lehrjahr</label>
                 <select class="fi" id="ntnLj"><option value="">-</option><option value="1">1. Jahr</option><option value="2">2. Jahr</option><option value="3">3. Jahr</option><option value="4">4. Jahr</option></select>
               </div>
@@ -1404,7 +1412,7 @@ function renderSbTnTree(){
   // Group TN by beruf
   const groups = {};
   _globalTN.forEach(t=>{
-    const key = getBerufKey(t.beruf);
+    const key = getBerufKey(t.beruf, t.berufGruppeId);
     if(!groups[key]) groups[key] = [];
     groups[key].push(t);
   });
@@ -2024,6 +2032,7 @@ function openAddBerufModal(){
   document.getElementById('addBerufNameInp').value = '';
   document.getElementById('addBerufEmojiInp').value = '';
   document.getElementById('addBerufKeysInp').value = '';
+  document.getElementById('addBerufSubInp').value = '';
   document.getElementById('addBerufDelBtn').style.display = 'none';
   document.getElementById('addBerufModalTit').textContent = 'Berufsgruppe hinzufügen';
   document.getElementById('addBerufModal').classList.add('open');
@@ -2036,6 +2045,7 @@ function openEditBerufSettings(id){
   document.getElementById('addBerufNameInp').value = b.name||'';
   document.getElementById('addBerufEmojiInp').value = b.emoji||'';
   document.getElementById('addBerufKeysInp').value = b.keyStr||'';
+  document.getElementById('addBerufSubInp').value = (b.berufe||[]).join('\n');
   document.getElementById('addBerufDelBtn').style.display = 'flex';
   document.getElementById('addBerufModalTit').textContent = 'Berufsgruppe bearbeiten';
   document.getElementById('addBerufModal').classList.add('open');
@@ -2046,11 +2056,13 @@ function saveBeruf(){
   const name  = (document.getElementById('addBerufNameInp').value||'').trim();
   const emoji = (document.getElementById('addBerufEmojiInp').value||'').trim();
   const keyStr= (document.getElementById('addBerufKeysInp').value||'').trim();
+  const subRaw= (document.getElementById('addBerufSubInp').value||'');
+  const berufe= subRaw.split('\n').map(s=>s.trim()).filter(Boolean);
   if(!name){ toast('Bitte Name eingeben','bad'); return; }
   const col = db.collection('shared').doc('kursSettings').collection('berufe');
   const docId = id || berufKeyFromName(name);
   const order = id ? (BERUFE[id]?.order||99) : Object.keys(BERUFE).length;
-  col.doc(docId).set({name, emoji, keyStr, order}, {merge:true})
+  col.doc(docId).set({name, emoji, keyStr, order, berufe}, {merge:true})
     .then(()=>{ closeAddBerufModal(); toast('Gespeichert ✓'); })
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
@@ -2485,11 +2497,14 @@ function buildBEREUFEFromDocs(docs){
     const keyStr = d.keyStr || d.keys || '';
     const parts = keyStr.split(',').map(s=>s.trim()).filter(Boolean);
     const rx = parts.length ? new RegExp(parts.join('|')) : new RegExp(d.name.toLowerCase());
-    BERUFE[k] = {label: (d.emoji||'') + ' ' + d.name, emoji: d.emoji||'', name: d.name, keys: rx, keyStr, order: d.order!=null?d.order:99};
+    BERUFE[k] = {label: (d.emoji||'') + ' ' + d.name, emoji: d.emoji||'', name: d.name, keys: rx, keyStr, order: d.order!=null?d.order:99, berufe: d.berufe||[]};
   });
 }
 
-function getBerufKey(beruf){
+function getBerufKey(beruf, berufGruppeId){
+  // Direkter Match über berufGruppeId
+  if(berufGruppeId && BERUFE[berufGruppeId]) return berufGruppeId;
+  // Fallback: Keyword-Matching
   const b=(beruf||'').toLowerCase();
   for(const [key,def] of Object.entries(BERUFE)){
     if(def.keys && def.keys.test(b)) return key;
@@ -2829,7 +2844,7 @@ function tnDocsDelete(docId, storagePath, tnId){
 }
 
 function openNewTNModal(){
-  ['ntnVN','ntnNN','ntnFirma','ntnBeruf','ntnEmail','ntnTel'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['ntnVN','ntnNN','ntnFirma','ntnEmail','ntnTel'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   const lj=document.getElementById('ntnLj');if(lj)lj.value='';
   document.getElementById('ntnVerkuerzer').checked=false;
   document.getElementById('ntnWiederholer').checked=false;
@@ -2838,8 +2853,49 @@ function openNewTNModal(){
   document.getElementById('ntnStartPw').value='Azubi2026!';
   document.getElementById('newTNModalTitle').textContent='Neuen Teilnehmer anlegen';
   const btn=document.getElementById('ntnSaveBtn');if(btn){btn.textContent='Speichern';btn.onclick=saveNewGlobalTN;}
+  populateBerufGruppeSelect('');
+  updateBerufSelect();
   document.getElementById('newTNModal').classList.add('open');
   setTimeout(()=>document.getElementById('ntnVN')?.focus(),100);
+}
+
+function populateBerufGruppeSelect(selectedId){
+  const sel=document.getElementById('ntnBerufGruppe');
+  if(!sel) return;
+  sel.innerHTML='<option value="">– Berufsgruppe –</option>';
+  const keys=Object.keys(BERUFE).sort((a,b)=>(BERUFE[a]?.order||99)-(BERUFE[b]?.order||99));
+  keys.forEach(k=>{
+    const b=BERUFE[k];
+    const o=document.createElement('option');
+    o.value=k;
+    o.textContent=(b.emoji?b.emoji+' ':'')+b.name;
+    if(k===selectedId) o.selected=true;
+    sel.appendChild(o);
+  });
+}
+
+function updateBerufSelect(selectedBeruf){
+  const gruppeId=document.getElementById('ntnBerufGruppe')?.value;
+  const sel=document.getElementById('ntnBeruf');
+  if(!sel) return;
+  sel.innerHTML='';
+  if(!gruppeId){
+    sel.innerHTML='<option value="">– Erst Berufsgruppe –</option>';
+    return;
+  }
+  const b=BERUFE[gruppeId];
+  const berufe=b?.berufe||[];
+  if(!berufe.length){
+    sel.innerHTML='<option value="">Keine Fachrichtungen hinterlegt</option>';
+    return;
+  }
+  sel.innerHTML='<option value="">– Fachrichtung –</option>';
+  berufe.forEach(name=>{
+    const o=document.createElement('option');
+    o.value=name; o.textContent=name;
+    if(name===selectedBeruf) o.selected=true;
+    sel.appendChild(o);
+  });
 }
 function closeNewTNModal(){document.getElementById('newTNModal').classList.remove('open');}
 
@@ -2859,7 +2915,8 @@ function saveNewGlobalTN(){
   const tnData={
     vorname:vn,nachname:nn,
     firma:document.getElementById('ntnFirma')?.value.trim()||'',
-    beruf:document.getElementById('ntnBeruf')?.value.trim()||'',
+    berufGruppeId:document.getElementById('ntnBerufGruppe')?.value||'',
+    beruf:document.getElementById('ntnBeruf')?.value||'',
     ausbjahr:document.getElementById('ntnLj')?.value||'',
     email:email,
     tel:document.getElementById('ntnTel')?.value.trim()||'',
@@ -2939,12 +2996,17 @@ function openEditTNModal(tnId){
   document.getElementById('ntnVN').value=t.vorname||'';
   document.getElementById('ntnNN').value=t.nachname||'';
   document.getElementById('ntnFirma').value=t.firma||'';
-  document.getElementById('ntnBeruf').value=t.beruf||'';
+  // Berufsgruppe + Fachrichtung Dropdowns befüllen
+  const bgId=t.berufGruppeId || getBerufKey(t.beruf);
+  populateBerufGruppeSelect(bgId!=='andere'?bgId:'');
+  updateBerufSelect(t.beruf||'');
   document.getElementById('ntnLj').value=t.ausbjahr||'';
   document.getElementById('ntnEmail').value=t.email||'';
   document.getElementById('ntnTel').value=t.tel||'';
   document.getElementById('ntnVerkuerzer').checked=t.verkuerzer||false;
   document.getElementById('ntnWiederholer').checked=t.wiederholer||false;
+  document.getElementById('ntnCreateAccount').checked=false;
+  document.getElementById('ntnPwRow').style.display='none';
   document.getElementById('newTNModalTitle').textContent='Teilnehmer bearbeiten';
   const btn=document.getElementById('ntnSaveBtn');if(btn){btn.textContent='Aktualisieren';btn.onclick=()=>updateGlobalTN(tnId);}
   document.getElementById('newTNModal').classList.add('open');
@@ -2958,9 +3020,10 @@ function updateGlobalTN(tnId){
   db.collection('globalTN').doc(tnId).update({
     vorname:vn,nachname:nn,
     firma:document.getElementById('ntnFirma')?.value.trim()||'',
-    beruf:document.getElementById('ntnBeruf')?.value.trim()||'',
+    berufGruppeId:document.getElementById('ntnBerufGruppe')?.value||'',
+    beruf:document.getElementById('ntnBeruf')?.value||'',
     ausbjahr:document.getElementById('ntnLj')?.value||'',
-    email:document.getElementById('ntnEmail')?.value.trim()||'',
+    email:(document.getElementById('ntnEmail')?.value||'').trim().toLowerCase(),
     tel:document.getElementById('ntnTel')?.value.trim()||'',
     verkuerzer:document.getElementById('ntnVerkuerzer')?.checked||false,
     wiederholer:document.getElementById('ntnWiederholer')?.checked||false,
