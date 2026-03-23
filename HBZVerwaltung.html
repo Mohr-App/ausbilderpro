@@ -680,6 +680,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div id="kdBeschreibung"></div>
           </div>
           <button class="btn-sm btn-ok" onclick="openEditKursModal()">✏️ Bearbeiten</button>
+          <button class="btn-sm" onclick="generateTNListe()" style="padding:6px 12px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">📋 TN-Liste</button>
           <button class="btn-sm" id="kdArchiveBtn" onclick="toggleArchiveKurs()" style="padding:6px 12px">📦 Archivieren</button>
           <button class="btn-sm btn-bad" onclick="deleteSelectedKurs()">🗑 Löschen</button>
         </div>
@@ -3949,6 +3950,140 @@ function saveEditKurs(){
 }
 
 // ── TN aus Kurs entfernen (Kursdetail) ──
+// ─── TEILNEHMENDENLISTE SA 181 NRW ───
+function generateTNListe(){
+  if(!_selectedKursId){toast('Kein Kurs gewählt','bad');return;}
+  const kurs=_kurse.find(k=>k.id===_selectedKursId);
+  if(!kurs){toast('Kurs nicht gefunden','bad');return;}
+  const kursId=_selectedKursId;
+  // TN laden
+  db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
+    const tns=[];
+    snap.forEach(doc=>tns.push({id:doc.id,...doc.data()}));
+    tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
+    if(!tns.length){toast('Keine TN im Kurs','bad');return;}
+    openTNListeWindow(kurs, tns);
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function openTNListeWindow(kurs, tns){
+  const von=kurs.von; const bis=kurs.bis;
+  if(!von||!bis){toast('Kurs hat kein Start/Enddatum','bad');return;}
+  const kursName=kurs.lehrgangsart||(kurs.name||'');
+  const standort=kurs.standort||'Kreishandwerkerschaft Bonn-Rhein-Sieg - Siegburg';
+  const dauer=fmtDE(von)+' - '+fmtDE(bis);
+  // Alle Wochen im Kurszeitraum berechnen
+  const startDate=new Date(von+'T00:00:00');
+  const endDate=new Date(bis+'T00:00:00');
+  // Montag der ersten Woche finden
+  const firstMon=new Date(startDate);
+  const dayOfWeek=firstMon.getDay(); // 0=So, 1=Mo...
+  if(dayOfWeek===0) firstMon.setDate(firstMon.getDate()+1);
+  else if(dayOfWeek>1) firstMon.setDate(firstMon.getDate()-(dayOfWeek-1));
+  const weeks=[];
+  let curMon=new Date(firstMon);
+  while(curMon<=endDate){
+    const week=[];
+    for(let d=0;d<5;d++){
+      const day=new Date(curMon);
+      day.setDate(day.getDate()+d);
+      const iso=day.toISOString().slice(0,10);
+      const inRange=day>=startDate&&day<=endDate;
+      week.push({date:day, iso, inRange, label:['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'][d]});
+    }
+    if(week.some(d=>d.inRange)) weeks.push(week);
+    curMon.setDate(curMon.getDate()+7);
+  }
+  const w=window.open('','_blank');
+  if(!w){toast('Popup blockiert','bad');return;}
+  let pages='';
+  weeks.forEach((week,wi)=>{
+    const pageBreak=wi>0?'page-break-before:always;':'';
+    pages+=`<div style="margin-bottom:20mm;${pageBreak}">
+<div class="header-row">
+  <div class="logo-block">
+    <div style="font-size:7pt;color:#555;margin-bottom:2mm">Gefördert durch:</div>
+    <div style="font-size:7pt;color:#333;font-weight:bold">Bundesministerium<br>für Wirtschaft<br>und Energie</div>
+    <div style="font-size:6pt;color:#555;margin-top:1mm">aufgrund eines Beschlusses<br>des Deutschen Bundestages</div>
+  </div>
+  <div style="flex:1;font-size:7pt;color:#555;text-align:center">
+    Mit finanzieller Unterstützung des Landes Nordrhein-Westfalen und der Europäischen Union
+    <div style="margin-top:2mm;display:flex;justify-content:center;gap:8mm;font-size:7pt;font-weight:bold">
+      <span>Kofinanziert von der Europäischen Union</span>
+      <span>Ministerium für Arbeit, Gesundheit und Soziales des Landes Nordrhein-Westfalen</span>
+    </div>
+  </div>
+  <div style="text-align:right;font-size:8pt;white-space:nowrap">SA 181, NRW, Seite 3</div>
+</div>
+<div class="meta-row">
+  <div class="meta-cell" style="flex:1"><div class="meta-val">&nbsp;</div><div class="meta-label">Beleg-Nr.</div></div>
+  <div class="meta-cell" style="flex:3"><div class="meta-val">${esc(standort)}</div><div class="meta-label">Lehrgangsort</div></div>
+  <div class="meta-cell" style="flex:1.5"><div class="meta-val">${esc(kursName)}</div><div class="meta-label">Lehrgangsbezeichnung</div></div>
+  <div class="meta-cell" style="flex:1.5"><div class="meta-val">${dauer}</div><div class="meta-label">Lehrgangsdauer</div></div>
+</div>
+<h1>Teilnehmendenliste</h1>
+<div class="info-text">Ich wurde darüber informiert, dass die überbetriebliche Unterweisung mit Mitteln des Landes Nordrhein-Westfalen, des Bundes (bei Fachstufenlehrgängen) und der Europäischen Union gefördert wird.</div>
+<table>
+<thead>
+<tr>
+  <th rowspan="3" style="width:35px">Lfd.<br>Nr.</th>
+  <th rowspan="3" style="width:220px;text-align:left">Name, Vorname des / der Auszubildenden</th>
+  <th colspan="5" style="font-weight:normal;font-size:8pt">jeweils lehrgangstägliche Unterschriften der / des Auszubildenden</th>
+  <th rowspan="3" style="width:110px;font-size:7.5pt">Fehltag wurde am<br>nachgeholt<br><span style="font-size:6.5pt">(Datum + Unterschrift d. TN)</span></th>
+</tr>
+<tr>
+  ${week.map(d=>'<th style="width:85px">'+(d.inRange?d.label:'')+'</th>').join('')}
+</tr>
+<tr>
+  ${week.map(d=>'<th style="font-weight:normal;font-size:8pt">'+(d.inRange?d.date.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'')+'</th>').join('')}
+</tr>
+<tr class="col-num">
+  <td>1</td><td>2</td>${week.map((_,i)=>'<td>'+(i+3)+'</td>').join('')}<td>8</td>
+</tr>
+</thead>
+<tbody>
+${tns.map((t,i)=>{
+  const name=(t.nachname||'')+', '+(t.vorname||'');
+  return '<tr><td class="nr">'+(i+1)+'</td><td class="name">'+esc(name)+'</td>'+week.map(()=>'<td class="sig"></td>').join('')+'<td class="sig"></td></tr>';
+}).join('')}
+${Array(Math.max(0,20-tns.length)).fill(0).map((_,i)=>'<tr><td class="nr">'+(tns.length+i+1)+'</td><td class="name"></td>'+week.map(()=>'<td class="sig"></td>').join('')+'<td class="sig"></td></tr>').join('')}
+</tbody>
+</table>
+</div>`;
+  });
+  w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Teilnehmendenliste – ${esc(kursName)}</title>
+<style>
+@page{size:A4 landscape;margin:10mm 12mm;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;padding:10mm 12mm;}
+@media print{body{padding:0;}.no-print{display:none !important;}}
+.header-row{display:flex;align-items:flex-start;gap:8mm;margin-bottom:4mm;}
+.logo-block{flex-shrink:0;width:30mm;}
+.meta-row{display:flex;border-bottom:1px solid #000;margin-bottom:2mm;padding-bottom:1mm;}
+.meta-cell{padding:0 3mm;}
+.meta-val{font-size:10pt;text-align:center;min-height:5mm;}
+.meta-label{font-size:7pt;color:#555;text-align:center;border-top:1px solid #999;padding-top:1px;}
+h1{text-align:center;font-size:14pt;font-weight:bold;margin:3mm 0 2mm;}
+.info-text{font-size:7.5pt;margin-bottom:3mm;line-height:1.4;}
+table{width:100%;border-collapse:collapse;font-size:8.5pt;}
+th,td{border:1px solid #000;padding:2px 4px;text-align:center;vertical-align:middle;}
+th{background:#fff;font-size:8pt;padding:3px 2px;}
+td.nr{width:35px;text-align:center;}
+td.name{text-align:left;padding-left:6px;font-size:9pt;}
+td.sig{height:22px;}
+tr.col-num td{font-size:7pt;color:#555;height:14px;font-style:italic;}
+.print-btn{display:inline-block;margin:8px 4px;padding:10px 28px;font-size:13px;font-weight:bold;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;}
+.print-btn:hover{background:#1d4ed8;}
+</style></head><body>
+<div style="text-align:center" class="no-print">
+  <button class="print-btn" onclick="window.print()">🖨 Drucken / PDF speichern</button>
+  <span style="font-size:12px;color:#666;margin-left:8px">${weeks.length} Seite(n) · ${tns.length} Teilnehmer · Querformat</span>
+</div>
+${pages}
+</body></html>`);
+  w.document.close();
+}
+
 // ─── TEILNAHMEBESCHEINIGUNG ───
 function generateBescheinigung(tnId, kursId){
   const t=_globalTN.find(x=>x.id===tnId);
