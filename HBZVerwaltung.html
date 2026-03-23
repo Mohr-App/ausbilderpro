@@ -1356,6 +1356,21 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 <div class="hi3">🔔 <b>Benachrichtigungen</b> – Azubis werden automatisch benachrichtigt wenn ein Kurs gelöscht wird.</div>
 </div></div></div>
 
+<!-- SAFE CONFIRM MODAL -->
+<div class="ov" id="safeConfirmModal">
+  <div class="modal" style="max-width:420px">
+    <div class="mhd" style="background:rgba(239,68,68,.08)"><div class="mtit" id="scmTitle" style="color:#ef4444">⚠️ Bestätigung</div><button class="xcls" onclick="document.getElementById('safeConfirmModal').classList.remove('open')">✕</button></div>
+    <div class="mbdy" style="padding:16px">
+      <div id="scmBody" style="font-size:.82rem;line-height:1.6;margin-bottom:14px"></div>
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(239,68,68,.05);border:2px solid rgba(239,68,68,.2);border-radius:10px;cursor:pointer;user-select:none">
+        <input type="checkbox" id="scmCheck" onchange="document.getElementById('scmBtn').disabled=!this.checked;document.getElementById('scmBtn').style.opacity=this.checked?'1':'.4'" style="margin-top:3px;width:18px;height:18px;cursor:pointer;accent-color:#ef4444">
+        <span id="scmCheckLabel" style="font-size:.78rem;font-weight:700;color:#ef4444">Ich bestätige diese Aktion</span>
+      </label>
+      <button class="btn-sm btn-bad" id="scmBtn" disabled onclick="_scmCallback&&_scmCallback()" style="margin-top:12px;width:100%;padding:10px;font-size:.82rem;opacity:.4;transition:opacity .15s">Fortfahren</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
@@ -3856,48 +3871,54 @@ function deleteSelectedKurs(){
   const kursVon=kurs?.von||'';
   const kursBis=kurs?.bis||'';
   const ausbName=kurs?.ausbilderName||'zuständigen Ausbilder';
-
-  // Schritt 1: Absprache mit Ausbilder
-  if(!confirm('⚠️ ACHTUNG: Lehrgang "'+kursName+'" löschen?\n\nWurde die Löschung mit dem Ausbilder\n👷 '+ausbName+'\nabgesprochen?')) return;
-
-  // Schritt 2: Finale Bestätigung
-  if(!confirm('Letzte Sicherheitsfrage:\n\n• TN werden freigegeben\n• Kurs wird als "abgebrochen" markiert\n• Azubis werden benachrichtigt\n\nEndgültig löschen?')) return;
-
-  // TN freigeben + History markieren + Benachrichtigung
-  db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
-    const batch=db.batch();
-    snap.forEach(doc=>{
-      const t=doc.data();
-      const hist=(t.kursHistory||[]).map(h=>{
-        if(h.kursId===kursId) return {...h, abgebrochen:true};
-        return h;
-      });
-      const notif={typ:'kurs_abgebrochen',kursName,von:kursVon,bis:kursBis,ts:Date.now(),gelesen:false};
-      const benach=t.benachrichtigungen||[];
-      benach.push(notif);
-      batch.update(doc.ref, {
-        aktiverKursId: firebase.firestore.FieldValue.delete(),
-        kursHistory: hist,
-        benachrichtigungen: benach
-      });
-    });
-    return batch.commit();
-  }).then(()=>{
-    // Ausbilder benachrichtigen
-    if(kurs?.ausbilderId){
-      const ausbRef=db.collection('shared').doc('kursSettings').collection('ausbilder').doc(kurs.ausbilderId);
-      ausbRef.get().then(doc=>{
-        const d=doc.exists?doc.data():{};
-        const bn=d.benachrichtigungen||[];
-        bn.push({typ:'kurs_abgebrochen',kursName,von:kursVon,bis:kursBis,ts:Date.now(),gelesen:false,von_email:_email||''});
-        ausbRef.update({benachrichtigungen:bn}).catch(()=>{});
-      }).catch(()=>{});
+  safeConfirm(
+    '🗑 Lehrgang endgültig löschen',
+    '<div style="margin-bottom:8px"><b>'+esc(kursName)+'</b></div>'
+    +'<div style="font-size:.75rem;color:#475569;margin-bottom:10px">'+fmtDE(kursVon)+' – '+fmtDE(kursBis)+'</div>'
+    +'<div style="font-size:.78rem;line-height:1.6">Folgende Aktionen werden ausgeführt:</div>'
+    +'<div style="margin:8px 0;padding:10px;background:rgba(239,68,68,.05);border-radius:8px;font-size:.75rem;line-height:1.7">'
+    +'• Alle TN werden freigegeben<br>'
+    +'• Kurs wird als „abgebrochen" markiert<br>'
+    +'• Azubis werden benachrichtigt<br>'
+    +'• Ausbilder 👷 '+esc(ausbName)+' wird benachrichtigt</div>',
+    'Ja, Löschung wurde mit dem Ausbilder abgesprochen',
+    '🗑 Endgültig löschen',
+    ()=>{
+      db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
+        const batch=db.batch();
+        snap.forEach(doc=>{
+          const t=doc.data();
+          const hist=(t.kursHistory||[]).map(h=>{
+            if(h.kursId===kursId) return {...h, abgebrochen:true};
+            return h;
+          });
+          const notif={typ:'kurs_abgebrochen',kursName,von:kursVon,bis:kursBis,ts:Date.now(),gelesen:false};
+          const benach=t.benachrichtigungen||[];
+          benach.push(notif);
+          batch.update(doc.ref, {
+            aktiverKursId: firebase.firestore.FieldValue.delete(),
+            kursHistory: hist,
+            benachrichtigungen: benach
+          });
+        });
+        return batch.commit();
+      }).then(()=>{
+        if(kurs?.ausbilderId){
+          const ausbRef=db.collection('shared').doc('kursSettings').collection('ausbilder').doc(kurs.ausbilderId);
+          ausbRef.get().then(doc=>{
+            const d=doc.exists?doc.data():{};
+            const bn=d.benachrichtigungen||[];
+            bn.push({typ:'kurs_abgebrochen',kursName,von:kursVon,bis:kursBis,ts:Date.now(),gelesen:false,von_email:_email||''});
+            ausbRef.update({benachrichtigungen:bn}).catch(()=>{});
+          }).catch(()=>{});
+        }
+        return db.collection('shared').doc('kurse').collection('list').doc(kursId).delete();
+      }).then(()=>{
+        toast('Kurs gelöscht – TN + Ausbilder + Azubis benachrichtigt ✓');
+        showPage('dashboard');
+      }).catch(err=>toast('Fehler: '+err.message,'bad'));
     }
-    return db.collection('shared').doc('kurse').collection('list').doc(kursId).delete();
-  }).then(()=>{
-    toast('Kurs gelöscht – TN + Ausbilder + Azubis benachrichtigt ✓');
-    showPage('dashboard');
-  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+  );
 }
 
 // ── Kurs bearbeiten ──
@@ -3951,6 +3972,23 @@ function saveEditKurs(){
 }
 
 // ── TN aus Kurs entfernen (Kursdetail) ──
+// ─── SAFE CONFIRM (Häkchen-Pflicht) ───
+let _scmCallback=null;
+function safeConfirm(title, body, checkLabel, btnLabel, callback){
+  document.getElementById('scmTitle').textContent=title;
+  document.getElementById('scmBody').innerHTML=body;
+  document.getElementById('scmCheckLabel').textContent=checkLabel;
+  document.getElementById('scmBtn').textContent=btnLabel;
+  document.getElementById('scmBtn').disabled=true;
+  document.getElementById('scmBtn').style.opacity='.4';
+  document.getElementById('scmCheck').checked=false;
+  _scmCallback=()=>{
+    document.getElementById('safeConfirmModal').classList.remove('open');
+    callback();
+  };
+  document.getElementById('safeConfirmModal').classList.add('open');
+}
+
 // ─── KURS AUSFALL (Verwaltung) ───
 function kursAusfallVerwaltung(){
   if(!_selectedKursId){toast('Kein Kurs gewählt','bad');return;}
@@ -3960,37 +3998,33 @@ function kursAusfallVerwaltung(){
   const today=new Date().toISOString().slice(0,10);
   const todayDE=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
   const kursLabel=kurs.lehrgangsart||(kurs.name||'Lehrgang');
-  if(!confirm('⚠️ KURS FÄLLT HEUTE AUS?\n\nAlle Teilnehmer und deren Betriebe werden sofort benachrichtigt:\n\n\"Heutiger Lehrgang ('+kursLabel+') fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.\"\n\nDatum: '+todayDE+'\n\nFortfahren?')) return;
-  const notification={
-    typ:'kurs_ausfall',
-    kursId:kursId,
-    kursName:kursLabel,
-    datum:today,
-    datumDE:todayDE,
-    nachricht:'Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.',
-    von:'Verwaltung',
-    erstellt:Date.now(),
-    gelesen:false
-  };
-  db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
-    if(snap.empty){toast('Keine TN im Kurs','bad');return;}
-    let ok=0, fail=0;
-    const promises=[];
-    snap.forEach(doc=>{
-      const d=doc.data();
-      const benach=(d.benachrichtigungen||[]);
-      if(benach.some(n=>n.typ==='kurs_ausfall'&&n.datum===today&&n.kursId===kursId)) return;
-      benach.push(notification);
-      promises.push(
-        db.collection('globalTN').doc(doc.id).update({benachrichtigungen:benach})
-          .then(()=>ok++).catch(()=>fail++)
-      );
-    });
-    return Promise.all(promises).then(()=>{
-      if(!fail) toast('⚠️ Ausfall an '+ok+' TN gesendet ✓');
-      else toast(ok+' gesendet, '+fail+' fehlgeschlagen','bad');
-    });
-  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+  safeConfirm(
+    '⚠️ Kurs fällt heute aus',
+    '<div style="margin-bottom:8px"><b>'+esc(kursLabel)+'</b></div>'
+    +'<div style="font-size:.75rem;color:#475569;margin-bottom:8px">Datum: '+todayDE+'</div>'
+    +'<div style="font-size:.78rem;line-height:1.5">Alle Teilnehmer und deren Betriebe werden <b>sofort</b> benachrichtigt:</div>'
+    +'<div style="margin:8px 0;padding:10px;background:rgba(239,68,68,.05);border-radius:8px;font-size:.78rem;font-style:italic">„Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages."</div>',
+    'Ja, ich möchte alle TN und Betriebe benachrichtigen',
+    '⚠️ Ausfall melden',
+    ()=>{
+      const notification={typ:'kurs_ausfall',kursId,kursName:kursLabel,datum:today,datumDE:todayDE,nachricht:'Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.',von:'Verwaltung',erstellt:Date.now(),gelesen:false};
+      db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
+        if(snap.empty){toast('Keine TN im Kurs','bad');return;}
+        let ok=0,fail=0;
+        const promises=[];
+        snap.forEach(doc=>{
+          const benach=(doc.data().benachrichtigungen||[]);
+          if(benach.some(n=>n.typ==='kurs_ausfall'&&n.datum===today&&n.kursId===kursId))return;
+          benach.push(notification);
+          promises.push(db.collection('globalTN').doc(doc.id).update({benachrichtigungen:benach}).then(()=>ok++).catch(()=>fail++));
+        });
+        return Promise.all(promises).then(()=>{
+          if(!fail)toast('⚠️ Ausfall an '+ok+' TN gesendet ✓');
+          else toast(ok+' gesendet, '+fail+' fehlgeschlagen','bad');
+        });
+      }).catch(err=>toast('Fehler: '+err.message,'bad'));
+    }
+  );
 }
 
 // ─── TEILNEHMENDENLISTE SA 181 NRW ───
