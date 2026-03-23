@@ -681,6 +681,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           </div>
           <button class="btn-sm btn-ok" onclick="openEditKursModal()">✏️ Bearbeiten</button>
           <button class="btn-sm" onclick="generateTNListe()" style="padding:6px 12px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">📋 TN-Liste</button>
+          <button class="btn-sm" onclick="kursAusfallVerwaltung()" style="padding:6px 12px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#ef4444">⚠️ Ausfall</button>
           <button class="btn-sm" id="kdArchiveBtn" onclick="toggleArchiveKurs()" style="padding:6px 12px">📦 Archivieren</button>
           <button class="btn-sm btn-bad" onclick="deleteSelectedKurs()">🗑 Löschen</button>
         </div>
@@ -3950,6 +3951,48 @@ function saveEditKurs(){
 }
 
 // ── TN aus Kurs entfernen (Kursdetail) ──
+// ─── KURS AUSFALL (Verwaltung) ───
+function kursAusfallVerwaltung(){
+  if(!_selectedKursId){toast('Kein Kurs gewählt','bad');return;}
+  const kurs=_kurse.find(k=>k.id===_selectedKursId);
+  if(!kurs){toast('Kurs nicht gefunden','bad');return;}
+  const kursId=_selectedKursId;
+  const today=new Date().toISOString().slice(0,10);
+  const todayDE=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  const kursLabel=kurs.lehrgangsart||(kurs.name||'Lehrgang');
+  if(!confirm('⚠️ KURS FÄLLT HEUTE AUS?\n\nAlle Teilnehmer und deren Betriebe werden sofort benachrichtigt:\n\n\"Heutiger Lehrgang ('+kursLabel+') fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.\"\n\nDatum: '+todayDE+'\n\nFortfahren?')) return;
+  const notification={
+    typ:'kurs_ausfall',
+    kursId:kursId,
+    kursName:kursLabel,
+    datum:today,
+    datumDE:todayDE,
+    nachricht:'Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.',
+    von:'Verwaltung',
+    erstellt:Date.now(),
+    gelesen:false
+  };
+  db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
+    if(snap.empty){toast('Keine TN im Kurs','bad');return;}
+    let ok=0, fail=0;
+    const promises=[];
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const benach=(d.benachrichtigungen||[]);
+      if(benach.some(n=>n.typ==='kurs_ausfall'&&n.datum===today&&n.kursId===kursId)) return;
+      benach.push(notification);
+      promises.push(
+        db.collection('globalTN').doc(doc.id).update({benachrichtigungen:benach})
+          .then(()=>ok++).catch(()=>fail++)
+      );
+    });
+    return Promise.all(promises).then(()=>{
+      if(!fail) toast('⚠️ Ausfall an '+ok+' TN gesendet ✓');
+      else toast(ok+' gesendet, '+fail+' fehlgeschlagen','bad');
+    });
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
 // ─── TEILNEHMENDENLISTE SA 181 NRW ───
 function generateTNListe(){
   if(!_selectedKursId){toast('Kein Kurs gewählt','bad');return;}
