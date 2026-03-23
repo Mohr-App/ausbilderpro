@@ -67,6 +67,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .empty{color:var(--mu);font-size:.78rem;text-align:center;padding:30px 12px;font-family:'JetBrains Mono',monospace;}
 .copyright{position:fixed;bottom:8px;right:12px;font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--mu);opacity:.45;}
 @media(max-width:600px){.stat-row{grid-template-columns:1fr;}.hdr{padding:0 12px;gap:8px;}.hdr-logo{font-size:.88rem;}.main{padding:14px 10px;}}
+@keyframes pulseRed{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
 </style>
 </head>
 <body>
@@ -95,6 +96,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Lehrgängen</div></div>
       <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
     </div>
+    <div id="agNotifBanner"></div>
     <div class="card">
       <div class="card-title">👥 Ihre Auszubildenden</div>
       <div id="azubiList"><div class="empty">Lädt…</div></div>
@@ -103,6 +105,490 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <div class="toast" id="toast"></div>
 </div>
 <div class="copyright">© ArbeitgeberPro v1.0.0 ─ by Stefan Mohr</div>
-<script>const _0x4e8a0a=_0x2e65;(function(_0x363e6a,_0x3fb8d3){const _0xcd5161=_0x2e65,_0x4db562=_0x363e6a();while(!![]){try{const _0x28b6ae=parseInt(_0xcd5161(0x154))/0x1+parseInt(_0xcd5161(0x1fd))/0x2+parseInt(_0xcd5161(0x246))/0x3*(parseInt(_0xcd5161(0x215))/0x4)+-parseInt(_0xcd5161(0x177))/0x5*(parseInt(_0xcd5161(0x281))/0x6)+-parseInt(_0xcd5161(0x153))/0x7*(parseInt(_0xcd5161(0x23d))/0x8)+-parseInt(_0xcd5161(0x167))/0x9*(-parseInt(_0xcd5161(0x1d1))/0xa)+-parseInt(_0xcd5161(0x1ca))/0xb;if(_0x28b6ae===_0x3fb8d3)break;else _0x4db562['push'](_0x4db562['shift']());}catch(_0x4fdbe1){_0x4db562['push'](_0x4db562['shift']());}}}(_0x3e4b,0x22fc2));const firebaseConfig={'apiKey':_0x4e8a0a(0x1e6),'authDomain':_0x4e8a0a(0x267),'projectId':_0x4e8a0a(0x1f5),'storageBucket':_0x4e8a0a(0x233),'messagingSenderId':'937082794250','appId':_0x4e8a0a(0x26b)};firebase[_0x4e8a0a(0x221)](firebaseConfig);const auth=firebase['auth'](),db=firebase[_0x4e8a0a(0x27f)]();db[_0x4e8a0a(0x1a5)]({'synchronizeTabs':!![]})[_0x4e8a0a(0x1ad)](()=>{});let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};function esc(_0x597e47){const _0x4943bd=_0x4e8a0a,_0x45d827=document['createElement'](_0x4943bd(0x1f8));return _0x45d827['textContent']=_0x597e47,_0x45d827[_0x4943bd(0x1ce)];}function fmtDE(_0x458a16){const _0x4bac8c=_0x4e8a0a;if(!_0x458a16||_0x458a16[_0x4bac8c(0x1a6)]<0xa)return _0x458a16||'?';const _0x3d9311=_0x458a16[_0x4bac8c(0x1f1)]('-');return _0x3d9311[0x2]+'.'+_0x3d9311[0x1]+'.'+_0x3d9311[0x0];}function toast(_0x5aef36,_0x5967d0){const _0x40f443=_0x4e8a0a,_0x3c940e=document[_0x40f443(0x1e9)]('toast');_0x3c940e[_0x40f443(0x16c)]=_0x5aef36,_0x3c940e[_0x40f443(0x273)]=_0x40f443(0x18c)+(_0x5967d0===_0x40f443(0x157)?_0x40f443(0x1d3):''),setTimeout(()=>_0x3c940e[_0x40f443(0x273)]=_0x40f443(0x237),0xbb8);}function doLogin(){const _0x214fe2=_0x4e8a0a,_0x458cde=document[_0x214fe2(0x1e9)](_0x214fe2(0x235))['value'][_0x214fe2(0x164)](),_0x34c8f7=document[_0x214fe2(0x1e9)](_0x214fe2(0x1fe))[_0x214fe2(0x17c)];if(!_0x458cde||!_0x34c8f7){document[_0x214fe2(0x1e9)](_0x214fe2(0x1d6))[_0x214fe2(0x16c)]=_0x214fe2(0x173);return;}document[_0x214fe2(0x1e9)](_0x214fe2(0x1d6))[_0x214fe2(0x16c)]='',auth[_0x214fe2(0x1c8)](_0x458cde,_0x34c8f7)[_0x214fe2(0x1ad)](_0x53131c=>{const _0x5ce701=_0x214fe2,_0x4710b5={'auth/user-not-found':'E-Mail\x20nicht\x20gefunden','auth/wrong-password':_0x5ce701(0x282),'auth/invalid-email':_0x5ce701(0x209),'auth/too-many-requests':_0x5ce701(0x25d)};document[_0x5ce701(0x1e9)](_0x5ce701(0x1d6))[_0x5ce701(0x16c)]=_0x4710b5[_0x53131c[_0x5ce701(0x1aa)]]||_0x53131c[_0x5ce701(0x188)];});}function doReset(){const _0x51dee7=_0x4e8a0a,_0x22bd42=document[_0x51dee7(0x1e9)](_0x51dee7(0x235))[_0x51dee7(0x17c)][_0x51dee7(0x164)]();if(!_0x22bd42){document[_0x51dee7(0x1e9)]('lErr')['textContent']=_0x51dee7(0x1b8);return;}auth[_0x51dee7(0x249)](_0x22bd42)[_0x51dee7(0x258)](()=>toast(_0x51dee7(0x232)))['catch'](_0x4d9063=>document[_0x51dee7(0x1e9)](_0x51dee7(0x1d6))['textContent']=_0x4d9063[_0x51dee7(0x188)]);}function doLogout(){auth['signOut']();}function _0x3e4b(){const _0x451d21=['Bitte\x20E-Mail\x20eingeben','borderColor','von','<div\x20class=\x22kurs-field\x22><span\x20class=\x22kurs-field-label\x22>Telefon</span><span><a\x20href=\x22tel:','<div\x20class=\x22kurs-field\x22><span\x20class=\x22kurs-field-label\x22>E-Mail</span><span><a\x20href=\x22mailto:','▸\x20Anzeigen','werkzeugFehlt','installBanner','\x20–\x20fehlt:\x20','werkzeug','<div\x20style=\x22color:var(--mu);font-size:.65rem\x22>Fehler\x20beim\x20Laden</div>','<div\x20style=\x22font-size:.55rem;color:var(--mu)\x22>','type','has','azubiList','max','signInWithEmailAndPassword','\x27)\x22\x20style=\x22font-size:.55rem;padding:3px\x208px;border:1px\x20solid\x20var(--brd);border-radius:5px;background:var(--sur2);cursor:pointer;color:var(--tx)\x22>💾</button>','2430934PQiqXp','dataset','azubi-card','doc','innerHTML','teilnehmer','<div\x20class=\x22azubi-av\x22><img\x20src=\x22','1144840ungloL','loginWrap','\x20bad','ausbilderTel','noten_fuehrung','lErr','createElement','\x27)\x22\x20style=\x22font-size:.68rem;padding:6px\x2016px;border:1.5px\x20solid\x20rgba(37,99,235,.3);background:rgba(37,99,235,.06);color:var(--acc);border-radius:7px;cursor:pointer;font-weight:600\x22>📤\x20Wiederherstellen</button></div>','de-DE','💡\x20Archiv\x20wird\x20nur\x20lokal\x20gespeichert.\x20<button\x20onclick=\x22toggleAGPremium()\x22\x20style=\x22font-size:.6rem;padding:2px\x208px;border:1.5px\x20solid\x20rgba(37,99,235,.3);border-radius:5px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600;margin-left:4px\x22>☁\x20Cloud-Sync\x20aktivieren\x20(1,99€/M)</button>','localeCompare','toISOString','\x20MB\x20pro\x20Datei','ausbilderName','forEach','noten_mitarbeit','Übersicht\x20Ihrer\x20Auszubildenden\x20und\x20deren\x20Lehrgänge\x20·\x20Echtzeit-Anwesenheit','<div\x20style=\x22text-align:center;margin-top:6px\x22><button\x20onclick=\x22event.stopPropagation();agUnarchive(\x27','☁\x20Cloud-Sync\x20aktiviert\x20✓','wiederholer','Kein\x20Arbeitgeber-Zugang','AIzaSyCI5hJLj22FTiAJoVIPis7VhoQqJiMLAZQ','<span\x20style=\x22font-family:\x27JetBrains\x20Mono\x27,monospace;font-size:.7rem;padding:4px\x208px;border-radius:5px;font-weight:800;background:#475569;color:#fff\x22>Führung:\x20','arbeitgeber','getElementById','<div\x20style=\x22display:flex;align-items:center;gap:8px;padding:6px\x200;border-bottom:1px\x20solid\x20var(--brd)\x22>','body','where','\x27)\x22\x20style=\x22font-size:.55rem;padding:3px\x208px;border:1px\x20solid\x20rgba(239,68,68,.2);border-radius:5px;background:none;cursor:pointer;color:#ef4444\x22>✕</button>','<div\x20style=\x22font-size:.65rem;color:var(--mu);margin-bottom:8px\x22>Dokumente\x20direkt\x20mit\x20Ihren\x20Azubis\x20austauschen.</div>','</span>','</span></div>','split','nachname','\x27)\x22\x20style=\x22font-size:.68rem;padding:6px\x2016px;border:1.5px\x20solid\x20rgba(37,99,235,.3);background:rgba(37,99,235,.06);color:var(--acc);border-radius:7px;cursor:pointer;font-weight:600\x22>📤\x20Wiederherstellen</button>','ausbjahr','ausbilderpro','Kein\x20Zugang','<div\x20style=\x22margin-top:8px;padding:12px\x2014px;background:rgba(245,158,11,.04);border:2px\x20solid\x20rgba(245,158,11,.2);border-radius:10px\x22><div\x20style=\x22font-size:.7rem;font-weight:800;color:#f59e0b;margin-bottom:6px\x22>🏖\x20URLAUB</div>','div','card','Cloud-Sync\x20deaktivieren?\x20Archiv\x20wird\x20nur\x20noch\x20lokal\x20gespeichert.','click','attLastSync','154444rvIOWH','lPw','uid','<div\x20class=\x22att-bar\x22>','\x27,this)\x22></label></div>','azubi-detail','aktiverKursId','azubi','agPremium','serviceWorker','<button\x20onclick=\x22event.stopPropagation();agUnarchive(\x27','role','Ungültige\x20E-Mail','\x22\x20style=\x22color:var(--acc)\x22>📞','▾\x20Ausblenden','\x27)\x22\x20style=\x22font-size:.68rem;padding:6px\x2016px;border:1.5px\x20solid\x20var(--brd);background:var(--sur2);color:var(--mu);border-radius:7px;cursor:pointer;font-weight:600\x22>📦\x20Archivieren</button></div>','standortGebaeude','hvName','load','(display-mode:standalone)','abgebrochen','setItem','\x27,\x27','Anwesend','233008EpjjOw','ag_install_dismissed','<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(239,68,68,.08);color:#dc2626\x22>🔧\x20Werkzeug\x20fehlt</span>','readAsDataURL','result','now','<div\x20class=\x22att-seg\x22\x20style=\x22width:','werkzeugStatus','agSyncHint','<span\x20style=\x22font-size:1rem\x22>','<div\x20class=\x22empty\x22>Keine\x20Auszubildenden\x20gefunden.<br>Bitte\x20wenden\x20Sie\x20sich\x20an\x20die\x20Hauptverwaltung.</div>','<label\x20style=\x22font-size:.6rem;padding:4px\x2010px;border:1.5px\x20solid\x20rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600\x22>📤\x20Hochladen<input\x20type=\x22file\x22\x20accept=\x22.pdf,.jpg,.jpeg,.png,.doc,.docx\x22\x20style=\x22display:none\x22\x20onchange=\x22agUploadDok(\x27','initializeApp','\x20·\x20<a\x20href=\x22tel:','<div\x20style=\x22margin-top:10px;padding-top:10px;border-top:1px\x20solid\x20var(--brd)\x22><div\x20style=\x22font-size:.65rem;color:var(--mu);font-style:italic\x22>📝\x20Benotung\x20wird\x20nach\x20Kursende\x20sichtbar.</div></div>','update','<button\x20onclick=\x22event.stopPropagation();downloadDok(\x27','url','remove','<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(245,158,11,.08);color:#d97706\x22>🏖\x20Urlaub</span>','\x20<span\x20style=\x22font-size:.55rem;background:rgba(245,158,11,.12);padding:2px\x206px;border-radius:3px\x22>aktuell</span>','\x27)\x22\x20style=\x22font-size:.68rem;padding:6px\x2016px;border:1.5px\x20solid\x20var(--brd);background:var(--sur2);color:var(--mu);border-radius:7px;cursor:pointer;font-weight:600\x22>📦\x20Archivieren</button>','addedAt','ag_archiv_','attPercent','<div\x20style=\x22font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:4px\x22>📄\x20DOKUMENTE</div>','display','noten_extra','vorname','Reset-Link\x20gesendet\x20✓','ausbilderpro.firebasestorage.app','files','lEmail','<div\x20class=\x22kurs-box\x22><div\x20class=\x22kurs-name\x22>📚\x20','toast','archivedTN','tnId','data','list','kursSettings','96LXSHvE','fehlt','<button\x20onclick=\x22event.stopPropagation();deleteDok(\x27','\x22\x20löschen?','attTotal','</div>','<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(148,163,184,.1);color:#94a3b8\x22>○\x20Beendet</span>','</div></div>','<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(220,38,38,.08);color:#dc2626\x22>✗\x20Lehrgang\x20abgebrochen</span>','12lPYuqu','<div\x20style=\x22font-size:.75rem;color:var(--tx);padding:8px\x2010px;background:rgba(37,99,235,.04);border:1px\x20solid\x20rgba(37,99,235,.12);border-radius:7px;margin-bottom:8px;line-height:1.5\x22>','register','sendPasswordResetEmail','SW:','empty','<div\x20style=\x22font-size:.75rem;padding:8px\x2010px;background:rgba(220,38,38,.06);border:1px\x20solid\x20rgba(220,38,38,.2);border-radius:7px;margin-bottom:8px;color:#dc2626;font-weight:700\x22>⚠\x20Lehrgang\x20wurde\x20abgebrochen</div>','\x20–\x20','<div\x20class=\x22kurs-field\x22\x20style=\x22opacity:.6\x22><span\x20class=\x22kurs-field-label\x22>Ausbilder</span><span>','tnData','position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:16px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;font-family:\x22Sora\x22,sans-serif;box-shadow:0\x20-4px\x2024px\x20rgba(0,0,0,.15)','onAuthStateChanged','<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(22,163,74,.08);color:#16a34a\x22>●\x20Laufend</span>','photoUrl','.azubi-detail','includes','<button\x20onclick=\x22toggleAGPremium()\x22\x20style=\x22font-size:.62rem;padding:5px\x2012px;border:1.5px\x20solid\x20rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600\x22>☁\x20Freischalten\x20(1,99€/M)</button>','entries','then','kurse','<div\x20class=\x22azubi-info\x22><div\x20class=\x22azubi-name\x22>','style','#8b5cf6','Zu\x20viele\x20Versuche','</span><span\x20style=\x22font-size:.62rem;color:var(--acc);font-weight:700\x22>','appendChild','<div\x20class=\x22kurs-field\x22><span\x20class=\x22kurs-field-label\x22>Ausbilder</span><span>','#16a34a','classList','shared','<span\x20style=\x22font-family:\x27JetBrains\x20Mono\x27,monospace;font-size:.7rem;padding:4px\x208px;border-radius:5px;font-weight:800;background:#475569;color:#fff\x22>Praxis:\x20','<div\x20style=\x22display:flex;flex-wrap:wrap;gap:4px\x22>','<div\x20style=\x22font-size:.72rem;padding:4px\x200;color:','ausbilderpro.firebaseapp.com','kursName','\x20<span\x20style=\x22font-size:.55rem;color:var(--mu)\x22>📦\x20archiviert</span>','#fbbf24','1:937082794250:web:eb99bc41d8f39908df8af3','\x20·\x20','push','<span><span\x20class=\x22att-dot\x22\x20style=\x22background:','filter','add','users','</a></span></div>','className','<span\x20style=\x22color:#7c3aed;font-weight:700\x22>Azubi</span>','<div\x20id=\x22dokList_','<div\x20style=\x22margin-top:8px;font-size:.62rem;color:#16a34a;font-weight:600\x22>✓\x20Werkzeug\x20vollständig</div>','match','<div\x20class=\x22kurs-box\x22><div\x20style=\x22text-align:center;color:var(--mu);font-size:.78rem;padding:10px\x22>Aktuell\x20keinem\x20Lehrgang\x20zugewiesen.</div>','<div\x20class=\x22kurs-field\x22><span\x20class=\x22kurs-field-label\x22>Standort</span><span>','<div\x20class=\x22kurs-meta\x22\x20style=\x22opacity:.6\x22>','name','dokumente','preventDefault','hvKontaktCard','firestore','Dokument\x20\x22','726GMlKDh','Falsches\x20Passwort','<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(','<div\x20style=\x22font-size:.75rem;padding:8px\x2010px;background:rgba(139,92,246,.06);border:1px\x20solid\x20rgba(139,92,246,.2);border-radius:7px;margin-bottom:8px;color:#7c3aed;font-weight:700\x22>🎓\x20Heute\x20ist\x20Berufsschultag</div>','var(--tx)','cssText','attAbsentU','400','noten_praxis','open','attSick','toLocaleString','48377LzWNdw','271044YgQIwW','<div\x20style=\x22margin-top:10px;padding-top:10px;border-top:1px\x20solid\x20var(--brd);text-align:center\x22>','orderBy','bad','<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(139,92,246,.08);color:#7c3aed\x22>🎓\x20Berufsschultag</span>','beschreibung','attAbsentE','<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(220,38,38,.08);color:#dc2626\x22>✗\x20Nicht\x20erschienen</span>','Fehler:\x20','font-size:.58rem;color:var(--mu);margin-bottom:10px;padding:0\x204px','<span\x20style=\x22color:#16a34a;font-weight:700\x22>☁\x20Cloud-Sync\x20aktiv</span>\x20·\x20Archiv\x20wird\x20geräteübergreifend\x20gespeichert\x20<button\x20onclick=\x22toggleAGPremium()\x22\x20style=\x22font-size:.6rem;padding:2px\x208px;border:1px\x20solid\x20var(--brd);border-radius:5px;background:none;color:var(--mu);cursor:pointer;margin-left:6px\x22>Deaktivieren</button>','<div\x20class=\x22kurs-field\x22><span\x20class=\x22kurs-field-label\x22>Name</span><span>','beforeinstallprompt','attBerufsschule','700','urlaub','trim','none','<div\x20class=\x22kurs-field\x22><span\x20class=\x22kurs-field-label\x22>Kontakt</span><span><a\x20href=\x22mailto:','9AXZIJx','ausbilderEmail','matches','<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(217,119,6,.08);color:#d97706\x22>↻\x20Wiederholer</span>','keys','textContent','<div\x20style=\x22text-align:center;margin-top:6px\x22><button\x20onclick=\x22event.stopPropagation();agArchive(\x27','./sw-ag.js','stringify','</a>','status','collection','Bitte\x20E-Mail\x20und\x20Passwort\x20eingeben','<div\x20style=\x22display:flex;align-items:center;gap:12px;max-width:500px;margin:0\x20auto\x22><div\x20style=\x22font-size:2rem;flex-shrink:0\x22>🏢</div><div\x20style=\x22flex:1\x22><div\x20style=\x22font-size:.88rem;font-weight:800\x22>ArbeitgeberPro\x20installieren</div><div\x20style=\x22font-size:.68rem;opacity:.85;margin-top:2px\x22>App\x20auf\x20dem\x20Startbildschirm\x20–\x20schneller\x20Zugriff!</div></div><button\x20onclick=\x22doInstallAG()\x22\x20style=\x22padding:10px\x2018px;border:2px\x20solid\x20rgba(255,255,255,.5);border-radius:10px;background:rgba(255,255,255,.2);color:#fff;font-family:\x27Sora\x27,sans-serif;font-size:.8rem;font-weight:800;cursor:pointer;flex-shrink:0\x22>Installieren</button><button\x20onclick=\x22dismissInstallAG()\x22\x20style=\x22background:none;border:none;color:rgba(255,255,255,.6);font-size:1.2rem;cursor:pointer;padding:4px;flex-shrink:0\x22>✕</button></div>','display:flex;align-items:center;justify-content:space-between;padding:8px\x2012px;background:var(--sur2);border:1px\x20solid\x20var(--brd);border-radius:8px;margin-bottom:10px;cursor:pointer;user-select:none','assign','10270VmvPUb','<div\x20style=\x22font-size:.6rem;color:var(--mu);margin-top:6px;font-family:\x27JetBrains\x20Mono\x27,monospace\x22>Aktualisiert:\x20','<div\x20style=\x22flex:1;min-width:0\x22><div\x20style=\x22font-size:.72rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\x22>','matchMedia','hdrFirma','value','Dokument','hvEmail',';font-family:\x27JetBrains\x20Mono\x27,monospace\x22>','<div\x20style=\x22margin-top:12px;padding-top:10px;border-top:1px\x20solid\x20var(--brd)\x22><div\x20style=\x22font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px\x22>📊\x20ANWESENHEIT</div>','sort','#d97706','fileName','querySelectorAll','exists',';font-weight:','signOut','message','welcomeTitle','beruf','firma','toast\x20show','globalTN','standalone','.azubi-card','_showArchived','standortName','217,119,6','\x22\x20style=\x22font-size:.7rem;color:var(--mu)\x22>Lädt…</div>','Berufsschule','%;background:','.azubi-card.expanded','onclick','label','Lehrgang','values','#dc2626',',.08);color:','bis','<div\x20style=\x22text-align:center;color:var(--mu);font-size:.72rem;padding:8px\x200;margin-top:6px;border-top:1px\x20solid\x20var(--brd)\x22>Wartet\x20auf\x20neuen\x20Lehrgang</div>','addEventListener','opacity:.45;border-style:dashed;','desc','<div\x20class=\x22kurs-name\x22\x20style=\x22opacity:.6\x22>📚\x20','onload','hvTel','enablePersistence','length','onSnapshot','.\x20Lj','<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(37,99,235,.08);color:#2563eb\x22>◐\x20Geplant</span>','code','\x22\x20style=\x22color:var(--acc)\x22>','<div\x20style=\x22color:var(--mu);font-size:.65rem;font-style:italic\x22>Noch\x20keine\x20Dokumente</div>','catch','<span\x20style=\x22color:var(--acc);font-weight:700\x22>Betrieb</span>','get','dokument','\x22\x20style=\x22color:var(--acc)\x22>📞\x20','appWrap','expanded','querySelector','Unentschuldigt','<button\x20onclick=\x22event.stopPropagation();agArchive(\x27','<div\x20style=\x22text-align:center;margin-top:6px\x22>'];_0x3e4b=function(){return _0x451d21;};return _0x3e4b();}auth[_0x4e8a0a(0x251)](_0x4e6053=>{const _0x2e58a5=_0x4e8a0a;_0x4e6053?(_uid=_0x4e6053[_0x2e58a5(0x1ff)],_email=_0x4e6053['email'],document[_0x2e58a5(0x1e9)](_0x2e58a5(0x1d2))[_0x2e58a5(0x25b)][_0x2e58a5(0x22f)]=_0x2e58a5(0x165),document['getElementById'](_0x2e58a5(0x1b2))[_0x2e58a5(0x25b)][_0x2e58a5(0x22f)]='',loadUserData()):(_uid=null,document['getElementById'](_0x2e58a5(0x1d2))['style'][_0x2e58a5(0x22f)]='',document[_0x2e58a5(0x1e9)](_0x2e58a5(0x1b2))[_0x2e58a5(0x25b)][_0x2e58a5(0x22f)]=_0x2e58a5(0x165),Object[_0x2e58a5(0x19a)](_kursListeners)[_0x2e58a5(0x1df)](_0x546a76=>_0x546a76()),_kursListeners={});});function loadUserData(){const _0x33f180=_0x4e8a0a;db['collection'](_0x33f180(0x271))[_0x33f180(0x1cd)](_uid)[_0x33f180(0x1af)]()[_0x33f180(0x258)](_0x2fc7ba=>{const _0x3d4574=_0x33f180;if(!_0x2fc7ba[_0x3d4574(0x185)]){toast(_0x3d4574(0x1f6),_0x3d4574(0x157));return;}const _0x1a1dbf=_0x2fc7ba[_0x3d4574(0x23a)]();if(_0x1a1dbf[_0x3d4574(0x208)]!=='arbeitgeber'){toast(_0x3d4574(0x1e5),_0x3d4574(0x157)),auth[_0x3d4574(0x187)]();return;}_firma=_0x1a1dbf['firma']||'',document['getElementById'](_0x3d4574(0x17b))[_0x3d4574(0x16c)]=_firma,document[_0x3d4574(0x1e9)](_0x3d4574(0x189))[_0x3d4574(0x16c)]='Willkommen,\x20'+esc(_firma),document['getElementById']('welcomeSub')[_0x3d4574(0x16c)]=_0x3d4574(0x1e1),loadAzubis(),checkAGPremium();});}function loadAzubis(){const _0x4e6268=_0x4e8a0a;if(!_firma)return;db['collection']('globalTN')[_0x4e6268(0x1ec)](_0x4e6268(0x18b),'==',_firma)[_0x4e6268(0x1a7)](_0x3d7402=>{const _0x510e41=_0x4e6268;_azubis=[],_0x3d7402[_0x510e41(0x1df)](_0x1ec166=>_azubis[_0x510e41(0x26d)]({'id':_0x1ec166['id'],..._0x1ec166['data']()})),_azubis['sort']((_0xf122d5,_0x56076b)=>(_0xf122d5[_0x510e41(0x1f2)]||'')[_0x510e41(0x1db)](_0x56076b[_0x510e41(0x1f2)]||'','de')),renderStats(),renderAzubiList(),setupKursListeners();});}function _0x2e65(_0x124e8f,_0x324f36){_0x124e8f=_0x124e8f-0x153;const _0x3e4b0e=_0x3e4b();let _0x2e6599=_0x3e4b0e[_0x124e8f];return _0x2e6599;}function setupKursListeners(){const _0x4ad365=_0x4e8a0a,_0x584953=new Set();_azubis[_0x4ad365(0x1df)](_0x3d6687=>{const _0x55ef68=_0x4ad365;if(_0x3d6687[_0x55ef68(0x203)])_0x584953['add'](_0x3d6687[_0x55ef68(0x203)]);}),Object[_0x4ad365(0x16b)](_kursListeners)[_0x4ad365(0x1df)](_0x1396f5=>{const _0x135f0e=_0x4ad365;!_0x584953[_0x135f0e(0x1c5)](_0x1396f5)&&(_kursListeners[_0x1396f5](),delete _kursListeners[_0x1396f5],delete _kurse[_0x1396f5]);}),_0x584953[_0x4ad365(0x1df)](_0x275713=>{const _0x46f7fe=_0x4ad365;if(_kursListeners[_0x275713])return;db[_0x46f7fe(0x172)](_0x46f7fe(0x263))[_0x46f7fe(0x1cd)](_0x46f7fe(0x259))[_0x46f7fe(0x172)](_0x46f7fe(0x23b))['doc'](_0x275713)[_0x46f7fe(0x1af)]()[_0x46f7fe(0x258)](_0x2b5e79=>{const _0x599030=_0x46f7fe;_0x2b5e79[_0x599030(0x185)]&&(_kurse[_0x275713]=_kurse[_0x275713]||{},Object[_0x599030(0x176)](_kurse[_0x275713],_0x2b5e79[_0x599030(0x23a)]()),renderAzubiList());}),_kursListeners[_0x275713]=db[_0x46f7fe(0x172)](_0x46f7fe(0x263))['doc']('kurse')[_0x46f7fe(0x172)]('list')[_0x46f7fe(0x1cd)](_0x275713)[_0x46f7fe(0x172)](_0x46f7fe(0x1cf))['onSnapshot'](_0x4234af=>{const _0x405517=_0x46f7fe;if(!_kurse[_0x275713])_kurse[_0x275713]={};_kurse[_0x275713]['tnData']={},_0x4234af[_0x405517(0x1df)](_0x3b5aa3=>_kurse[_0x275713][_0x405517(0x24f)][_0x3b5aa3['id']]=_0x3b5aa3[_0x405517(0x23a)]()),renderStats(),renderAzubiList();});});}function renderStats(){const _0x114d9c=_0x4e8a0a;document['getElementById']('statAzubis')[_0x114d9c(0x16c)]=_azubis['length'],document[_0x114d9c(0x1e9)]('statAktiv')[_0x114d9c(0x16c)]=_azubis[_0x114d9c(0x26f)](_0x54e1ca=>_0x54e1ca['aktiverKursId'])['length'];let _0x13475f=0x0,_0x10e983=0x0;_azubis[_0x114d9c(0x1df)](_0x442bf6=>{const _0x24fcc2=_0x114d9c;if(!_0x442bf6[_0x24fcc2(0x203)])return;const _0x352444=_kurse[_0x442bf6[_0x24fcc2(0x203)]];if(!_0x352444||!_0x352444[_0x24fcc2(0x24f)]||!_0x352444['tnData'][_0x442bf6['id']])return;const _0x460171=_0x352444['tnData'][_0x442bf6['id']];_0x460171[_0x24fcc2(0x22d)]!=null&&(_0x13475f+=_0x460171['attPercent'],_0x10e983++);}),document[_0x114d9c(0x1e9)]('statAnw')[_0x114d9c(0x16c)]=_0x10e983?Math['round'](_0x13475f/_0x10e983)+'%':'–';}function renderAzubiList(){const _0x50908f=_0x4e8a0a,_0x5b00f6=document[_0x50908f(0x1e9)](_0x50908f(0x1c6));if(!_azubis['length']){_0x5b00f6['innerHTML']=_0x50908f(0x21f);return;}const _0x12b8de=_getArchived(),_0x24053e=window[_0x50908f(0x190)]||![],_0x1da80b=new Set();document[_0x50908f(0x184)](_0x50908f(0x196))[_0x50908f(0x1df)](_0x5a8f13=>{const _0x10b7ec=_0x50908f;if(_0x5a8f13[_0x10b7ec(0x1cb)][_0x10b7ec(0x239)])_0x1da80b[_0x10b7ec(0x270)](_0x5a8f13['dataset'][_0x10b7ec(0x239)]);}),_0x5b00f6[_0x50908f(0x1ce)]='';const _0x8e2a9c=new Date()[_0x50908f(0x1dc)]()['slice'](0x0,0xa),_0x3cc1f6=[..._azubis];let _0x50cc04=![];_0x3cc1f6[_0x50908f(0x1df)](_0x3efe95=>{const _0x2c7539=_0x50908f;if(_0x12b8de[_0x2c7539(0x255)](_0x3efe95['id'])&&_0x3efe95[_0x2c7539(0x203)]){const _0x4c9695=_kurse[_0x3efe95[_0x2c7539(0x203)]];if(_0x4c9695&&_0x4c9695[_0x2c7539(0x1ba)]&&_0x4c9695[_0x2c7539(0x1ba)]<=_0x8e2a9c&&(!_0x4c9695[_0x2c7539(0x19d)]||_0x4c9695[_0x2c7539(0x19d)]>=_0x8e2a9c)){const _0x3ec3aa=_0x12b8de['indexOf'](_0x3efe95['id']);_0x3ec3aa>=0x0&&(_0x12b8de['splice'](_0x3ec3aa,0x1),_0x50cc04=!![]);}}});if(_0x50cc04)_saveArchived(_0x12b8de);const _0x2f4a7c=_0x3cc1f6[_0x50908f(0x26f)](_0x443ce1=>!_0x12b8de[_0x50908f(0x255)](_0x443ce1['id'])),_0x2a7bf5=_0x3cc1f6[_0x50908f(0x26f)](_0x55bff=>_0x12b8de[_0x50908f(0x255)](_0x55bff['id'])),_0x57a1c5=document[_0x50908f(0x1d7)](_0x50908f(0x1f8));_0x57a1c5['id']=_0x50908f(0x21d),_0x57a1c5[_0x50908f(0x25b)]['cssText']=_0x50908f(0x15d),_0x5b00f6['appendChild'](_0x57a1c5),renderAGSyncStatus();if(_0x2a7bf5[_0x50908f(0x1a6)]){const _0x11fe2a=document['createElement'](_0x50908f(0x1f8));_0x11fe2a[_0x50908f(0x25b)][_0x50908f(0x286)]=_0x50908f(0x175),_0x11fe2a[_0x50908f(0x1ce)]='<span\x20style=\x22font-size:.72rem;color:var(--mu);font-weight:600\x22>📦\x20'+_0x2a7bf5[_0x50908f(0x1a6)]+'\x20archivierte\x20Azubi'+(_0x2a7bf5[_0x50908f(0x1a6)]>0x1?'s':'')+_0x50908f(0x25e)+(_0x24053e?_0x50908f(0x20b):_0x50908f(0x1bd))+'</span>',_0x11fe2a[_0x50908f(0x197)]=()=>{const _0x35bd8d=_0x50908f;window[_0x35bd8d(0x190)]=!window[_0x35bd8d(0x190)],renderAzubiList();},_0x5b00f6[_0x50908f(0x25f)](_0x11fe2a);}const _0x2ce7d7=_0x24053e?[..._0x2f4a7c,..._0x2a7bf5]:_0x2f4a7c;_0x2ce7d7[_0x50908f(0x1df)](_0x1aa584=>{const _0x28a7f7=_0x50908f,_0x355288=_0x12b8de[_0x28a7f7(0x255)](_0x1aa584['id']),_0x22671c=((_0x1aa584[_0x28a7f7(0x231)]||'')+'\x20'+(_0x1aa584[_0x28a7f7(0x1f2)]||''))['trim'](),_0x4fadd7=((_0x1aa584[_0x28a7f7(0x231)]||'?')[0x0]+(_0x1aa584[_0x28a7f7(0x1f2)]||'?')[0x0])['toUpperCase'](),_0x4d3edb=_0x1aa584[_0x28a7f7(0x203)]?_kurse[_0x1aa584[_0x28a7f7(0x203)]]:null,_0x20ae64=_0x4d3edb&&_0x4d3edb['von']&&_0x4d3edb[_0x28a7f7(0x19d)]&&_0x8e2a9c>=_0x4d3edb[_0x28a7f7(0x1ba)]&&_0x8e2a9c<=_0x4d3edb['bis'],_0x720b56=_0x4d3edb&&_0x4d3edb[_0x28a7f7(0x1ba)]&&_0x8e2a9c<_0x4d3edb[_0x28a7f7(0x1ba)],_0x9a84eb=_0x4d3edb&&_0x4d3edb['tnData']?_0x4d3edb[_0x28a7f7(0x24f)][_0x1aa584['id']]:null,_0xcbffee=!_0x1aa584['aktiverKursId']?(_0x1aa584['kursHistory']||[])['filter'](_0x6fb25a=>_0x6fb25a[_0x28a7f7(0x211)]&&_0x6fb25a['bis']&&_0x6fb25a[_0x28a7f7(0x19d)]>=_0x8e2a9c)[_0x28a7f7(0x181)]((_0x24a53f,_0x3d8418)=>(_0x3d8418[_0x28a7f7(0x22b)]||0x0)-(_0x24a53f[_0x28a7f7(0x22b)]||0x0))[0x0]:null;let _0x388015='';if(_0xcbffee)_0x388015=_0x28a7f7(0x245);else{if(_0x1aa584[_0x28a7f7(0x171)]==='absent')_0x388015=_0x28a7f7(0x15b);else{if(_0x1aa584[_0x28a7f7(0x1e4)])_0x388015=_0x28a7f7(0x16a);else{if(_0x20ae64)_0x388015=_0x28a7f7(0x252);else{if(_0x720b56)_0x388015=_0x28a7f7(0x1a9);else{if(_0x1aa584['aktiverKursId'])_0x388015=_0x28a7f7(0x243);else _0x388015='<span\x20class=\x22azubi-badge\x22\x20style=\x22background:rgba(148,163,184,.1);color:#94a3b8\x22>Kein\x20Lehrgang</span>';}}}}}const _0x68d9c6=_0x4d3edb&&(_0x4d3edb['berufsschultage']||[])[_0x28a7f7(0x255)](_0x8e2a9c);if(_0x68d9c6)_0x388015+=_0x28a7f7(0x158);let _0x5b360e='';if(_0x9a84eb&&_0x9a84eb['attTotal']){const _0x4a1aba=_0x9a84eb[_0x28a7f7(0x22d)]||0x0,_0x225295=_0x4a1aba>=0x50?_0x28a7f7(0x261):_0x4a1aba>=0x3c?'#d97706':_0x28a7f7(0x19b);_0x5b360e=_0x28a7f7(0x283)+(_0x4a1aba>=0x50?'22,163,74':_0x4a1aba>=0x3c?_0x28a7f7(0x192):'220,38,38')+_0x28a7f7(0x19c)+_0x225295+'\x22>'+_0x4a1aba+'%</span>';}let _0x26acd5='';if(_0x9a84eb&&_0x9a84eb[_0x28a7f7(0x21c)]===_0x28a7f7(0x23e))_0x26acd5=_0x28a7f7(0x217);let _0x45baea='';const _0x5077d6=(_0x1aa584['urlaub']||[])['find'](_0x23b04c=>_0x23b04c['von']<=_0x8e2a9c&&_0x23b04c['bis']>=_0x8e2a9c);if(_0x5077d6)_0x45baea=_0x28a7f7(0x228);const _0x57769e=document[_0x28a7f7(0x1d7)](_0x28a7f7(0x1f8));_0x57769e[_0x28a7f7(0x273)]=_0x28a7f7(0x1cc),_0x57769e[_0x28a7f7(0x1cb)][_0x28a7f7(0x239)]=_0x1aa584['id'];if(_0x355288)_0x57769e[_0x28a7f7(0x25b)]['cssText']+=_0x28a7f7(0x1a0);_0x57769e[_0x28a7f7(0x1ce)]=(_0x1aa584[_0x28a7f7(0x253)]?_0x28a7f7(0x1d0)+esc(_0x1aa584[_0x28a7f7(0x253)])+'\x22></div>':'<div\x20class=\x22azubi-av\x22>'+esc(_0x4fadd7)+'</div>')+_0x28a7f7(0x25a)+esc(_0x22671c)+(_0x355288?_0x28a7f7(0x269):'')+'</div><div\x20class=\x22azubi-sub\x22>'+(_0x1aa584[_0x28a7f7(0x18a)]||'')+(_0x1aa584[_0x28a7f7(0x1f4)]?_0x28a7f7(0x26c)+_0x1aa584[_0x28a7f7(0x1f4)]+_0x28a7f7(0x1a8):'')+'</div><div\x20style=\x22display:flex;gap:4px;flex-wrap:wrap;margin-top:3px\x22>'+_0x388015+_0x5b360e+_0x26acd5+_0x45baea+'</div></div>';const _0x10c096=document[_0x28a7f7(0x1d7)](_0x28a7f7(0x1f8));_0x10c096[_0x28a7f7(0x273)]=_0x28a7f7(0x202),_0x10c096['style'][_0x28a7f7(0x22f)]=_0x28a7f7(0x165);if(_0x4d3edb){let _0x5ce4a2=_0x28a7f7(0x236)+esc(_0x4d3edb[_0x28a7f7(0x27b)]||_0x28a7f7(0x199))+_0x28a7f7(0x242);_0x5ce4a2+='<div\x20class=\x22kurs-meta\x22>'+fmtDE(_0x4d3edb[_0x28a7f7(0x1ba)])+_0x28a7f7(0x24d)+fmtDE(_0x4d3edb['bis'])+_0x28a7f7(0x242);if(_0x4d3edb[_0x28a7f7(0x159)])_0x5ce4a2+=_0x28a7f7(0x247)+esc(_0x4d3edb[_0x28a7f7(0x159)])+_0x28a7f7(0x242);if(_0x68d9c6)_0x5ce4a2+=_0x28a7f7(0x284);_0x5ce4a2+=_0x28a7f7(0x260)+esc(_0x4d3edb[_0x28a7f7(0x1de)]||'–')+_0x28a7f7(0x1f0);if(_0x4d3edb['ausbilderEmail'])_0x5ce4a2+=_0x28a7f7(0x166)+esc(_0x4d3edb[_0x28a7f7(0x168)])+_0x28a7f7(0x1ab)+esc(_0x4d3edb[_0x28a7f7(0x168)])+_0x28a7f7(0x170)+(_0x4d3edb[_0x28a7f7(0x1d4)]?_0x28a7f7(0x222)+esc(_0x4d3edb[_0x28a7f7(0x1d4)])+_0x28a7f7(0x20a)+esc(_0x4d3edb[_0x28a7f7(0x1d4)])+_0x28a7f7(0x170):'')+'</span></div>';if(_0x4d3edb[_0x28a7f7(0x191)])_0x5ce4a2+=_0x28a7f7(0x279)+esc(_0x4d3edb[_0x28a7f7(0x191)])+(_0x4d3edb[_0x28a7f7(0x20d)]?_0x28a7f7(0x24d)+esc(_0x4d3edb['standortGebaeude']):'')+_0x28a7f7(0x1f0);if(_0x4d3edb[_0x28a7f7(0x1c1)]&&_0x4d3edb['werkzeug'][_0x28a7f7(0x1a6)]){_0x5ce4a2+='<div\x20style=\x22margin-top:10px;padding-top:10px;border-top:1px\x20solid\x20var(--brd)\x22><div\x20style=\x22font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px\x22>🔧\x20MITZUBRINGEN</div>',_0x5ce4a2+=_0x28a7f7(0x265),_0x4d3edb[_0x28a7f7(0x1c1)][_0x28a7f7(0x1df)](_0x13b332=>{const _0x19126d=_0x28a7f7;_0x5ce4a2+='<span\x20style=\x22font-size:.62rem;padding:3px\x208px;background:rgba(37,99,235,.06);border:1px\x20solid\x20rgba(37,99,235,.15);border-radius:5px;color:var(--tx)\x22>'+esc(_0x13b332)+_0x19126d(0x1ef);}),_0x5ce4a2+=_0x28a7f7(0x242);if(_0x9a84eb&&_0x9a84eb[_0x28a7f7(0x21c)]===_0x28a7f7(0x23e))_0x5ce4a2+='<div\x20style=\x22margin-top:8px;padding:8px\x2010px;background:rgba(239,68,68,.06);border:2px\x20solid\x20rgba(239,68,68,.25);border-radius:7px;font-size:.72rem;color:#dc2626;font-weight:700\x22>⚠\x20Werkzeug\x20unvollständig'+(_0x9a84eb[_0x28a7f7(0x1be)]?_0x28a7f7(0x1c0)+esc(_0x9a84eb['werkzeugFehlt']):'')+'</div>';else _0x9a84eb&&_0x9a84eb[_0x28a7f7(0x21c)]==='ok'&&(_0x5ce4a2+=_0x28a7f7(0x276));_0x5ce4a2+=_0x28a7f7(0x242);}if(_0x9a84eb&&_0x9a84eb['attTotal']){const _0x44e47f=_0x9a84eb,_0x239841=_0x44e47f[_0x28a7f7(0x22d)]||0x0,_0x29c2d2=_0x239841>=0x50?_0x28a7f7(0x261):_0x239841>=0x3c?'#d97706':'#dc2626',_0x35b0da=_0x44e47f[_0x28a7f7(0x241)]||0x1,_0x5ef73b=[{'v':_0x44e47f['attPresent']||0x0,'c':_0x28a7f7(0x261),'l':_0x28a7f7(0x214)},{'v':_0x44e47f['attLate']||0x0,'c':_0x28a7f7(0x182),'l':'Zu\x20spät'},{'v':_0x44e47f[_0x28a7f7(0x28b)]||0x0,'c':_0x28a7f7(0x26a),'l':'Krank'},{'v':_0x44e47f[_0x28a7f7(0x15a)]||0x0,'c':'#60a5fa','l':'Entschuldigt'},{'v':_0x44e47f[_0x28a7f7(0x287)]||0x0,'c':_0x28a7f7(0x19b),'l':_0x28a7f7(0x1b5)},{'v':_0x44e47f[_0x28a7f7(0x161)]||0x0,'c':_0x28a7f7(0x25c),'l':_0x28a7f7(0x194)}];_0x5ce4a2+=_0x28a7f7(0x180),_0x5ce4a2+=_0x28a7f7(0x200),_0x5ef73b[_0x28a7f7(0x1df)](_0x37fae1=>{const _0x1d033e=_0x28a7f7;if(_0x37fae1['v']>0x0)_0x5ce4a2+=_0x1d033e(0x21b)+Math[_0x1d033e(0x1c7)](_0x37fae1['v']/_0x35b0da*0x64,0x3)+_0x1d033e(0x195)+_0x37fae1['c']+'\x22\x20title=\x22'+_0x37fae1['l']+':\x20'+_0x37fae1['v']+'\x22></div>';}),_0x5ce4a2+='</div><div\x20style=\x22display:flex;align-items:center;gap:10px;margin-top:4px\x22><span\x20style=\x22font-size:1.3rem;font-weight:800;color:'+_0x29c2d2+_0x28a7f7(0x17f)+_0x239841+'%</span><div\x20class=\x22att-summary\x22>',_0x5ef73b['forEach'](_0x4123c4=>{const _0x73b6b3=_0x28a7f7;if(_0x4123c4['v']>0x0)_0x5ce4a2+=_0x73b6b3(0x26e)+_0x4123c4['c']+'\x22></span>'+_0x4123c4['v']+'×\x20'+_0x4123c4['l']+_0x73b6b3(0x1ef);}),_0x5ce4a2+=_0x28a7f7(0x244),_0x5ce4a2+=_0x28a7f7(0x178)+(_0x44e47f[_0x28a7f7(0x1fc)]?new Date(_0x44e47f[_0x28a7f7(0x1fc)])[_0x28a7f7(0x28c)](_0x28a7f7(0x1d9)):'–')+'</div></div>';}const _0x17f6c4=_0x4d3edb[_0x28a7f7(0x19d)]&&_0x8e2a9c>_0x4d3edb['bis'];_0x17f6c4&&(_0x5ce4a2+=_0x28a7f7(0x155)+(_0x355288?_0x28a7f7(0x207)+_0x1aa584['id']+_0x28a7f7(0x1f3):'<button\x20onclick=\x22event.stopPropagation();agArchive(\x27'+_0x1aa584['id']+_0x28a7f7(0x22a))+_0x28a7f7(0x242));if(_0x17f6c4&&_0x9a84eb&&(_0x9a84eb['noten_mitarbeit']||_0x9a84eb['noten_fuehrung']||_0x9a84eb[_0x28a7f7(0x289)])){_0x5ce4a2+='<div\x20style=\x22margin-top:10px;padding-top:10px;border-top:1px\x20solid\x20var(--brd)\x22><div\x20style=\x22font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px\x22>📝\x20BENOTUNG</div><div\x20style=\x22display:flex;gap:6px;flex-wrap:wrap\x22>';if(_0x9a84eb[_0x28a7f7(0x1e0)])_0x5ce4a2+='<span\x20style=\x22font-family:\x27JetBrains\x20Mono\x27,monospace;font-size:.7rem;padding:4px\x208px;border-radius:5px;font-weight:800;background:#475569;color:#fff\x22>Mitarbeit:\x20'+esc(_0x9a84eb['noten_mitarbeit'])+'</span>';if(_0x9a84eb[_0x28a7f7(0x1d5)])_0x5ce4a2+=_0x28a7f7(0x1e7)+esc(_0x9a84eb['noten_fuehrung'])+'</span>';if(_0x9a84eb[_0x28a7f7(0x289)])_0x5ce4a2+=_0x28a7f7(0x264)+esc(_0x9a84eb[_0x28a7f7(0x289)])+_0x28a7f7(0x1ef);const _0x1a0b06=_0x9a84eb[_0x28a7f7(0x230)]||{};Object[_0x28a7f7(0x257)](_0x1a0b06)['forEach'](([_0x3db008,_0x34653a])=>{const _0x19ac24=_0x28a7f7;if(_0x34653a)_0x5ce4a2+='<span\x20style=\x22font-family:\x27JetBrains\x20Mono\x27,monospace;font-size:.7rem;padding:4px\x208px;border-radius:5px;font-weight:800;background:#475569;color:#fff\x22>'+esc(_0x3db008)+':\x20'+esc(_0x34653a)+_0x19ac24(0x1ef);}),_0x5ce4a2+=_0x28a7f7(0x244);}else!_0x17f6c4&&_0x9a84eb&&(_0x9a84eb[_0x28a7f7(0x1e0)]||_0x9a84eb[_0x28a7f7(0x1d5)]||_0x9a84eb['noten_praxis'])&&(_0x5ce4a2+=_0x28a7f7(0x223));_0x5ce4a2+=_0x28a7f7(0x242),_0x10c096[_0x28a7f7(0x1ce)]=_0x5ce4a2;}else _0xcbffee?_0x10c096[_0x28a7f7(0x1ce)]='<div\x20class=\x22kurs-box\x22\x20style=\x22border-color:rgba(220,38,38,.3)\x22>'+_0x28a7f7(0x24c)+_0x28a7f7(0x1a2)+esc(_0xcbffee[_0x28a7f7(0x268)]||_0x28a7f7(0x199))+_0x28a7f7(0x242)+_0x28a7f7(0x27a)+fmtDE(_0xcbffee['von'])+_0x28a7f7(0x24d)+fmtDE(_0xcbffee[_0x28a7f7(0x19d)])+_0x28a7f7(0x242)+(_0xcbffee[_0x28a7f7(0x1de)]?_0x28a7f7(0x24e)+esc(_0xcbffee['ausbilderName'])+_0x28a7f7(0x1f0):'')+_0x28a7f7(0x19e)+_0x28a7f7(0x1b7)+(_0x355288?_0x28a7f7(0x207)+_0x1aa584['id']+'\x27)\x22\x20style=\x22font-size:.68rem;padding:6px\x2016px;border:1.5px\x20solid\x20rgba(37,99,235,.3);background:rgba(37,99,235,.06);color:var(--acc);border-radius:7px;cursor:pointer;font-weight:600\x22>📤\x20Wiederherstellen</button>':_0x28a7f7(0x1b6)+_0x1aa584['id']+'\x27)\x22\x20style=\x22font-size:.68rem;padding:6px\x2016px;border:1.5px\x20solid\x20var(--brd);background:var(--sur2);color:var(--mu);border-radius:7px;cursor:pointer;font-weight:600\x22>📦\x20Archivieren</button>')+_0x28a7f7(0x242)+_0x28a7f7(0x242):_0x10c096[_0x28a7f7(0x1ce)]=_0x28a7f7(0x278)+(_0x355288?_0x28a7f7(0x1e2)+_0x1aa584['id']+_0x28a7f7(0x1d8):_0x28a7f7(0x16d)+_0x1aa584['id']+_0x28a7f7(0x20c))+_0x28a7f7(0x242);const _0x20e3ce=_0x1aa584[_0x28a7f7(0x163)]||[],_0x3e09a8=_0x20e3ce[_0x28a7f7(0x26f)](_0x1fb3e5=>_0x1fb3e5['bis']>=_0x8e2a9c);if(_0x3e09a8[_0x28a7f7(0x1a6)]){let _0xc216a1=_0x28a7f7(0x1f7);_0x3e09a8[_0x28a7f7(0x181)]((_0x1ece57,_0x2d8d69)=>(_0x1ece57[_0x28a7f7(0x1ba)]||'')[_0x28a7f7(0x1db)](_0x2d8d69[_0x28a7f7(0x1ba)]||''))[_0x28a7f7(0x1df)](_0x520c6a=>{const _0x3e7d0b=_0x28a7f7,_0x46d9b8=_0x520c6a[_0x3e7d0b(0x1ba)]<=_0x8e2a9c&&_0x520c6a['bis']>=_0x8e2a9c;_0xc216a1+=_0x3e7d0b(0x266)+(_0x46d9b8?'#f59e0b':_0x3e7d0b(0x285))+_0x3e7d0b(0x186)+(_0x46d9b8?_0x3e7d0b(0x162):_0x3e7d0b(0x288))+'\x22>'+fmtDE(_0x520c6a[_0x3e7d0b(0x1ba)])+_0x3e7d0b(0x24d)+fmtDE(_0x520c6a[_0x3e7d0b(0x19d)])+(_0x520c6a[_0x3e7d0b(0x198)]?_0x3e7d0b(0x26c)+esc(_0x520c6a[_0x3e7d0b(0x198)]):'')+(_0x46d9b8?_0x3e7d0b(0x229):'')+'</div>';}),_0xc216a1+='</div>',_0x10c096[_0x28a7f7(0x1ce)]+=_0xc216a1;}const _0x423dd0=document[_0x28a7f7(0x1d7)](_0x28a7f7(0x1f8));_0x423dd0[_0x28a7f7(0x25b)][_0x28a7f7(0x286)]='margin-top:8px;padding:12px\x2014px;background:var(--sur);border:2px\x20solid\x20rgba(37,99,235,.15);border-radius:10px',_agPremium?(_0x423dd0[_0x28a7f7(0x1ce)]='<div\x20style=\x22display:flex;align-items:center;justify-content:space-between;margin-bottom:8px\x22><div\x20style=\x22font-size:.7rem;font-weight:800;color:var(--acc)\x22>📄\x20DOKUMENTE</div>'+_0x28a7f7(0x220)+_0x1aa584['id']+_0x28a7f7(0x201)+_0x28a7f7(0x275)+_0x1aa584['id']+_0x28a7f7(0x193),_0x10c096['appendChild'](_0x423dd0),loadDokumente(_0x1aa584['id'])):(_0x423dd0[_0x28a7f7(0x25b)][_0x28a7f7(0x1b9)]='var(--brd)',_0x423dd0[_0x28a7f7(0x1ce)]=_0x28a7f7(0x22e)+_0x28a7f7(0x1ee)+_0x28a7f7(0x256),_0x10c096[_0x28a7f7(0x25f)](_0x423dd0)),_0x57769e[_0x28a7f7(0x19f)](_0x28a7f7(0x1fb),()=>{const _0xf5fda7=_0x28a7f7,_0x1d0e8=_0x10c096[_0xf5fda7(0x25b)][_0xf5fda7(0x22f)]!==_0xf5fda7(0x165);document[_0xf5fda7(0x184)](_0xf5fda7(0x18f))[_0xf5fda7(0x1df)](_0xdd6f68=>_0xdd6f68['classList'][_0xf5fda7(0x227)](_0xf5fda7(0x1b3))),document[_0xf5fda7(0x184)](_0xf5fda7(0x254))[_0xf5fda7(0x1df)](_0x14fec4=>_0x14fec4['style'][_0xf5fda7(0x22f)]='none'),!_0x1d0e8&&(_0x57769e[_0xf5fda7(0x262)][_0xf5fda7(0x270)]('expanded'),_0x10c096['style'][_0xf5fda7(0x22f)]='');}),_0x5b00f6['appendChild'](_0x57769e),_0x5b00f6['appendChild'](_0x10c096),_0x1da80b[_0x28a7f7(0x1c5)](_0x1aa584['id'])&&(_0x57769e[_0x28a7f7(0x262)]['add'](_0x28a7f7(0x1b3)),_0x10c096['style'][_0x28a7f7(0x22f)]='');}),loadHVKontakt();}function agArchive(_0x4141cd){const _0x28dd80=_0x4e8a0a,_0x57f64f=_getArchived();if(!_0x57f64f[_0x28dd80(0x255)](_0x4141cd))_0x57f64f[_0x28dd80(0x26d)](_0x4141cd);_saveArchived(_0x57f64f),renderAzubiList();}function agUnarchive(_0x52a0d4){const _0x204ae8=_0x4e8a0a;let _0x5a309f=_getArchived();_0x5a309f=_0x5a309f[_0x204ae8(0x26f)](_0x4e3dfb=>_0x4e3dfb!==_0x52a0d4),_saveArchived(_0x5a309f),renderAzubiList();}function _getArchived(){const _0x5017c5=_0x4e8a0a;if(_agPremium&&_agArchivedCloud!==null)return[..._agArchivedCloud];return JSON['parse'](localStorage['getItem'](_0x5017c5(0x22c)+(_firma||''))||'[]');}function _saveArchived(_0x34b431){const _0x3b9d41=_0x4e8a0a;localStorage[_0x3b9d41(0x212)](_0x3b9d41(0x22c)+(_firma||''),JSON[_0x3b9d41(0x16f)](_0x34b431)),_agPremium&&(_agArchivedCloud=_0x34b431,db[_0x3b9d41(0x172)](_0x3b9d41(0x271))[_0x3b9d41(0x1cd)](_uid)[_0x3b9d41(0x224)]({'archivedTN':_0x34b431})[_0x3b9d41(0x1ad)](()=>{}));}let _agPremium=![],_agArchivedCloud=null;function checkAGPremium(){const _0x47e40f=_0x4e8a0a;db[_0x47e40f(0x172)](_0x47e40f(0x271))[_0x47e40f(0x1cd)](_uid)['get']()[_0x47e40f(0x258)](_0x111f2a=>{const _0x34c061=_0x47e40f;if(!_0x111f2a[_0x34c061(0x185)])return;const _0x48c62e=_0x111f2a[_0x34c061(0x23a)]();_agPremium=!!_0x48c62e[_0x34c061(0x205)],_agPremium&&_0x48c62e[_0x34c061(0x238)]&&(_agArchivedCloud=_0x48c62e[_0x34c061(0x238)],renderAzubiList());})['catch'](()=>{});}function toggleAGPremium(){const _0x37c852=_0x4e8a0a;if(_agPremium){if(!confirm(_0x37c852(0x1fa)))return;db[_0x37c852(0x172)](_0x37c852(0x271))[_0x37c852(0x1cd)](_uid)['update']({'agPremium':![]})['then'](()=>{_agPremium=![],_agArchivedCloud=null,renderAzubiList(),renderAGSyncStatus();});}else db[_0x37c852(0x172)]('users')[_0x37c852(0x1cd)](_uid)[_0x37c852(0x224)]({'agPremium':!![],'archivedTN':_getArchived()})[_0x37c852(0x258)](()=>{const _0x47f4a5=_0x37c852;_agPremium=!![],_agArchivedCloud=_getArchived(),renderAzubiList(),renderAGSyncStatus(),toast(_0x47f4a5(0x1e3));});}function loadDokumente(_0x38b41f){const _0x5f4109=_0x4e8a0a,_0x23b7ec=document['getElementById']('dokList_'+_0x38b41f);if(!_0x23b7ec)return;db['collection'](_0x5f4109(0x18d))[_0x5f4109(0x1cd)](_0x38b41f)[_0x5f4109(0x172)](_0x5f4109(0x27c))[_0x5f4109(0x156)]('ts',_0x5f4109(0x1a1))['onSnapshot'](_0x43217e=>{const _0x1a33d0=_0x5f4109;if(_0x43217e[_0x1a33d0(0x24b)]){_0x23b7ec[_0x1a33d0(0x1ce)]=_0x1a33d0(0x1ac);return;}let _0x350e21='';_0x43217e['forEach'](_0x2081c4=>{const _0x52f7c1=_0x1a33d0,_0x91ee69=_0x2081c4['data'](),_0x25cf63=_0x91ee69[_0x52f7c1(0x183)]||_0x91ee69[_0x52f7c1(0x27b)]||_0x52f7c1(0x17d),_0x508e38=_0x25cf63['match'](/\.pdf$/i)?'📕':_0x25cf63[_0x52f7c1(0x277)](/\.(jpg|jpeg|png)$/i)?'🖼':'📄',_0x490063=_0x91ee69['vonRolle']===_0x52f7c1(0x204)?_0x52f7c1(0x274):_0x52f7c1(0x1ae);_0x350e21+=_0x52f7c1(0x1ea)+_0x52f7c1(0x21e)+_0x508e38+'</span>'+_0x52f7c1(0x179)+esc(_0x25cf63)+'</div>'+_0x52f7c1(0x1c3)+_0x490063+_0x52f7c1(0x26c)+new Date(_0x91ee69['ts'])['toLocaleDateString']('de-DE')+_0x52f7c1(0x244)+_0x52f7c1(0x225)+_0x38b41f+_0x52f7c1(0x213)+_0x2081c4['id']+_0x52f7c1(0x1c9)+_0x52f7c1(0x23f)+_0x38b41f+_0x52f7c1(0x213)+_0x2081c4['id']+_0x52f7c1(0x213)+esc(_0x25cf63)+_0x52f7c1(0x1ed)+_0x52f7c1(0x242);}),_0x23b7ec['innerHTML']=_0x350e21;},()=>{const _0x584ae7=_0x5f4109;_0x23b7ec[_0x584ae7(0x1ce)]=_0x584ae7(0x1c2);});}function agUploadDok(_0x54ce3b,_0x2e1c88){const _0x237281=_0x4e8a0a;if(!_agPremium){toast('📄\x20Dokumente\x20erfordert\x20Cloud-Sync\x20(1,99€/M)',_0x237281(0x157)),_0x2e1c88[_0x237281(0x17c)]='';return;}const _0x18fbfb=_0x2e1c88[_0x237281(0x234)][0x0];if(!_0x18fbfb)return;const _0x253e5a=0x2;if(_0x18fbfb['size']>_0x253e5a*0x400*0x400){toast('Max.\x20'+_0x253e5a+_0x237281(0x1dd),'bad'),_0x2e1c88['value']='';return;}const _0x102e1f=new FileReader();_0x102e1f[_0x237281(0x1a3)]=function(){const _0x4bf342=_0x237281;db[_0x4bf342(0x172)](_0x4bf342(0x18d))[_0x4bf342(0x1cd)](_0x54ce3b)[_0x4bf342(0x172)](_0x4bf342(0x27c))['add']({'fileName':_0x18fbfb[_0x4bf342(0x27b)],'fileType':_0x18fbfb[_0x4bf342(0x1c4)],'fileSize':_0x18fbfb['size'],'data':_0x102e1f[_0x4bf342(0x219)],'vonRolle':_0x4bf342(0x1e8),'vonEmail':_email||'','vonFirma':_firma||'','ts':Date[_0x4bf342(0x21a)]()})[_0x4bf342(0x258)](()=>{toast('📄\x20Dokument\x20gesendet\x20✓');})['catch'](_0x51448d=>toast(_0x4bf342(0x15c)+_0x51448d['message'],'bad'));},_0x102e1f[_0x237281(0x218)](_0x18fbfb),_0x2e1c88[_0x237281(0x17c)]='';}function downloadDok(_0x6d1984,_0x3c4abd){const _0x53bdc7=_0x4e8a0a;db[_0x53bdc7(0x172)](_0x53bdc7(0x18d))[_0x53bdc7(0x1cd)](_0x6d1984)[_0x53bdc7(0x172)](_0x53bdc7(0x27c))['doc'](_0x3c4abd)[_0x53bdc7(0x1af)]()[_0x53bdc7(0x258)](_0x195f48=>{const _0xb486ee=_0x53bdc7;if(!_0x195f48['exists'])return;const _0x4c1a66=_0x195f48[_0xb486ee(0x23a)]();if(_0x4c1a66[_0xb486ee(0x23a)]){const _0xb65589=document[_0xb486ee(0x1d7)]('a');_0xb65589['href']=_0x4c1a66['data'],_0xb65589['download']=_0x4c1a66['fileName']||_0x4c1a66[_0xb486ee(0x27b)]||_0xb486ee(0x1b0),_0xb65589[_0xb486ee(0x1fb)]();}else _0x4c1a66[_0xb486ee(0x226)]&&window[_0xb486ee(0x28a)](_0x4c1a66['url'],'_blank');})[_0x53bdc7(0x1ad)](_0x2cef32=>toast(_0x53bdc7(0x15c)+_0x2cef32['message'],_0x53bdc7(0x157)));}function deleteDok(_0x52c23b,_0x52d943,_0x184be1){const _0x61a423=_0x4e8a0a;if(!confirm(_0x61a423(0x280)+_0x184be1+_0x61a423(0x240)))return;db[_0x61a423(0x172)](_0x61a423(0x18d))['doc'](_0x52c23b)[_0x61a423(0x172)](_0x61a423(0x27c))[_0x61a423(0x1cd)](_0x52d943)['delete']()['then'](()=>toast('Gelöscht'))['catch'](_0xd038f7=>toast('Fehler:\x20'+_0xd038f7[_0x61a423(0x188)],_0x61a423(0x157)));}function renderAGSyncStatus(){const _0x3e708e=_0x4e8a0a,_0x1e4e20=document['getElementById'](_0x3e708e(0x21d));if(!_0x1e4e20)return;_agPremium?_0x1e4e20[_0x3e708e(0x1ce)]=_0x3e708e(0x15e):_0x1e4e20[_0x3e708e(0x1ce)]=_0x3e708e(0x1da);}function loadHVKontakt(){const _0x320b4c=_0x4e8a0a;db[_0x320b4c(0x172)](_0x320b4c(0x263))['doc'](_0x320b4c(0x23c))['get']()[_0x320b4c(0x258)](_0xd5de29=>{const _0x3e1d67=_0x320b4c;if(!_0xd5de29['exists'])return;const _0x5bc770=_0xd5de29[_0x3e1d67(0x23a)]();let _0x31ae22=document[_0x3e1d67(0x1e9)](_0x3e1d67(0x27e));if(_0x31ae22)_0x31ae22[_0x3e1d67(0x227)]();if(!_0x5bc770['hvName']&&!_0x5bc770[_0x3e1d67(0x1a4)]&&!_0x5bc770[_0x3e1d67(0x17e)])return;const _0x58bdd8=document[_0x3e1d67(0x1d7)](_0x3e1d67(0x1f8));_0x58bdd8['className']=_0x3e1d67(0x1f9),_0x58bdd8['id']=_0x3e1d67(0x27e),_0x58bdd8[_0x3e1d67(0x1ce)]='<div\x20class=\x22card-title\x22>📞\x20Kontakt\x20Hauptverwaltung</div>'+(_0x5bc770['hvName']?_0x3e1d67(0x15f)+esc(_0x5bc770[_0x3e1d67(0x20e)])+_0x3e1d67(0x1f0):'')+(_0x5bc770['hvEmail']?_0x3e1d67(0x1bc)+esc(_0x5bc770['hvEmail'])+_0x3e1d67(0x1ab)+esc(_0x5bc770[_0x3e1d67(0x17e)])+_0x3e1d67(0x272):'')+(_0x5bc770['hvTel']?_0x3e1d67(0x1bb)+esc(_0x5bc770[_0x3e1d67(0x1a4)])+_0x3e1d67(0x1b1)+esc(_0x5bc770[_0x3e1d67(0x1a4)])+_0x3e1d67(0x272):''),document[_0x3e1d67(0x1b4)]('.main')[_0x3e1d67(0x25f)](_0x58bdd8);})[_0x320b4c(0x1ad)](()=>{});}'serviceWorker'in navigator&&window[_0x4e8a0a(0x19f)](_0x4e8a0a(0x20f),()=>{const _0x41bc49=_0x4e8a0a;navigator[_0x41bc49(0x206)][_0x41bc49(0x248)](_0x41bc49(0x16e))[_0x41bc49(0x258)](()=>console['log']('AG\x20SW\x20ok'))['catch'](_0x228c8b=>console['warn'](_0x41bc49(0x24a),_0x228c8b));});let _installPrompt=null;window[_0x4e8a0a(0x19f)](_0x4e8a0a(0x160),_0x271d62=>{const _0x6a3955=_0x4e8a0a;_0x271d62[_0x6a3955(0x27d)](),_installPrompt=_0x271d62,showInstallBanner();});function showInstallBanner(){const _0x78b9=_0x4e8a0a;if(window[_0x78b9(0x17a)](_0x78b9(0x210))[_0x78b9(0x169)]||navigator[_0x78b9(0x18e)])return;if(sessionStorage['getItem']('ag_install_dismissed'))return;const _0x588bee=document['createElement'](_0x78b9(0x1f8));_0x588bee['id']=_0x78b9(0x1bf),_0x588bee[_0x78b9(0x25b)][_0x78b9(0x286)]=_0x78b9(0x250),_0x588bee['innerHTML']=_0x78b9(0x174),document[_0x78b9(0x1eb)]['appendChild'](_0x588bee);}function doInstallAG(){const _0xf75fbe=_0x4e8a0a;_installPrompt&&(_installPrompt['prompt'](),_installPrompt['userChoice'][_0xf75fbe(0x258)](()=>{const _0x34a174=_0xf75fbe;_installPrompt=null;const _0x527032=document[_0x34a174(0x1e9)](_0x34a174(0x1bf));if(_0x527032)_0x527032['remove']();}));}function dismissInstallAG(){const _0x3f4f9e=_0x4e8a0a,_0xce99dc=document['getElementById'](_0x3f4f9e(0x1bf));if(_0xce99dc)_0xce99dc[_0x3f4f9e(0x227)]();sessionStorage[_0x3f4f9e(0x212)](_0x3f4f9e(0x216),'1');}</script>
+<script>
+const firebaseConfig={apiKey:"AIzaSyCI5hJLj22FTiAJoVIPis7VhoQqJiMLAZQ",authDomain:"ausbilderpro.firebaseapp.com",projectId:"ausbilderpro",storageBucket:"ausbilderpro.firebasestorage.app",messagingSenderId:"937082794250",appId:"1:937082794250:web:eb99bc41d8f39908df8af3"};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth();
+const db=firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+
+let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};
+
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function fmtDE(d){if(!d||d.length<10)return d||'?';const p=d.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
+function toast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type==='bad'?' bad':'');setTimeout(()=>t.className='toast',3000);}
+
+function doLogin(){
+  const email=document.getElementById('lEmail').value.trim();
+  const pw=document.getElementById('lPw').value;
+  if(!email||!pw){document.getElementById('lErr').textContent='Bitte E-Mail und Passwort eingeben';return;}
+  document.getElementById('lErr').textContent='';
+  auth.signInWithEmailAndPassword(email,pw).catch(err=>{
+    const m={'auth/user-not-found':'E-Mail nicht gefunden','auth/wrong-password':'Falsches Passwort','auth/invalid-email':'Ungültige E-Mail','auth/too-many-requests':'Zu viele Versuche'};
+    document.getElementById('lErr').textContent=m[err.code]||err.message;
+  });
+}
+function doReset(){
+  const email=document.getElementById('lEmail').value.trim();
+  if(!email){document.getElementById('lErr').textContent='Bitte E-Mail eingeben';return;}
+  auth.sendPasswordResetEmail(email).then(()=>toast('Reset-Link gesendet ✓')).catch(err=>document.getElementById('lErr').textContent=err.message);
+}
+function doLogout(){auth.signOut();}
+
+auth.onAuthStateChanged(user=>{
+  if(user){
+    _uid=user.uid;_email=user.email;
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('appWrap').style.display='';
+    loadUserData();
+  } else {
+    _uid=null;
+    document.getElementById('loginWrap').style.display='';
+    document.getElementById('appWrap').style.display='none';
+    Object.values(_kursListeners).forEach(u=>u());
+    _kursListeners={};
+  }
+});
+
+function loadUserData(){
+  db.collection('users').doc(_uid).get().then(doc=>{
+    if(!doc.exists){toast('Kein Zugang','bad');return;}
+    const d=doc.data();
+    if(d.role!=='arbeitgeber'){toast('Kein Arbeitgeber-Zugang','bad');auth.signOut();return;}
+    _firma=d.firma||'';
+    document.getElementById('hdrFirma').textContent=_firma;
+    document.getElementById('welcomeTitle').textContent='Willkommen, '+esc(_firma);
+    document.getElementById('welcomeSub').textContent='Übersicht Ihrer Auszubildenden und deren Lehrgänge · Echtzeit-Anwesenheit';
+    loadAzubis();
+    checkAGPremium();
+  });
+}
+
+function loadAzubis(){
+  if(!_firma)return;
+  db.collection('globalTN').where('firma','==',_firma).onSnapshot(snap=>{
+    _azubis=[];
+    snap.forEach(doc=>_azubis.push({id:doc.id,...doc.data()}));
+    _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
+    renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
+  });
+}
+
+function setupKursListeners(){
+  // Ausfall-Banner bei TN-Änderungen aktualisieren
+  renderAusfallBanner();
+  const active=new Set();
+  _azubis.forEach(a=>{if(a.aktiverKursId)active.add(a.aktiverKursId);});
+  Object.keys(_kursListeners).forEach(k=>{if(!active.has(k)){_kursListeners[k]();delete _kursListeners[k];delete _kurse[k];}});
+  active.forEach(kursId=>{
+    if(_kursListeners[kursId])return;
+    db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(doc=>{
+      if(doc.exists){_kurse[kursId]=_kurse[kursId]||{};Object.assign(_kurse[kursId],doc.data());renderAzubiList();}
+    });
+    _kursListeners[kursId]=db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').onSnapshot(snap=>{
+        if(!_kurse[kursId])_kurse[kursId]={};
+        _kurse[kursId].tnData={};
+        snap.forEach(doc=>_kurse[kursId].tnData[doc.id]=doc.data());
+        renderStats();renderAzubiList();
+      });
+  });
+}
+
+function renderAusfallBanner(){
+  const el=document.getElementById('agNotifBanner');
+  if(!el) return;
+  const today=new Date().toISOString().slice(0,10);
+  const ausfaelle=[];
+  _azubis.forEach(a=>{
+    const notifs=(a.benachrichtigungen||[]).filter(n=>n.typ==='kurs_ausfall'&&n.datum===today&&!n.gelesen);
+    notifs.forEach(n=>{
+      if(!ausfaelle.some(x=>x.kursId===n.kursId)){
+        ausfaelle.push({...n, tnName:(a.vorname||'')+' '+(a.nachname||'')});
+      }
+    });
+  });
+  if(!ausfaelle.length){el.innerHTML='';return;}
+  el.innerHTML=ausfaelle.map(n=>{
+    const betroffene=_azubis.filter(a=>(a.benachrichtigungen||[]).some(x=>x.typ==='kurs_ausfall'&&x.datum===today&&x.kursId===n.kursId));
+    const namen=betroffene.map(a=>(a.vorname||'')+' '+(a.nachname||'')).join(', ');
+    return '<div style="padding:14px;background:rgba(239,68,68,.1);border:3px solid #ef4444;border-radius:12px;margin-bottom:12px;animation:pulseRed 1.5s infinite">'
+      +'<div style="font-size:1rem;font-weight:800;color:#ef4444;margin-bottom:6px">🚨 LEHRGANG FÄLLT HEUTE AUS</div>'
+      +'<div style="font-size:.85rem;font-weight:700;margin-bottom:4px">'+esc(n.kursName||'Lehrgang')+'</div>'
+      +'<div style="font-size:.78rem;color:#1e293b;line-height:1.5;margin-bottom:6px">'+esc(n.nachricht||'')+'</div>'
+      +'<div style="font-size:.68rem;color:#64748b;margin-top:4px">Betroffen: <b>'+esc(namen)+'</b></div>'
+      +'<div style="font-size:.62rem;color:#94a3b8;margin-top:2px">Von: '+esc(n.von||'Ausbilder')+' · '+esc(n.datumDE||'')+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderStats(){
+  document.getElementById('statAzubis').textContent=_azubis.length;
+  document.getElementById('statAktiv').textContent=_azubis.filter(a=>a.aktiverKursId).length;
+  let tp=0,cp=0;
+  _azubis.forEach(a=>{
+    if(!a.aktiverKursId)return;
+    const kd=_kurse[a.aktiverKursId];
+    if(!kd||!kd.tnData||!kd.tnData[a.id])return;
+    const t=kd.tnData[a.id];
+    if(t.attPercent!=null){tp+=t.attPercent;cp++;}
+  });
+  document.getElementById('statAnw').textContent=cp?Math.round(tp/cp)+'%':'–';
+}
+
+function renderAzubiList(){
+  const el=document.getElementById('azubiList');
+  if(!_azubis.length){el.innerHTML='<div class="empty">Keine Auszubildenden gefunden.<br>Bitte wenden Sie sich an die Hauptverwaltung.</div>';return;}
+  // Archiv-System
+  const archived=_getArchived();
+  const showArchived=window._showArchived||false;
+  // Merke offene Karten
+  const openIds=new Set();
+  document.querySelectorAll('.azubi-card.expanded').forEach(c=>{if(c.dataset.tnId)openIds.add(c.dataset.tnId);});
+  el.innerHTML='';
+  const today=new Date().toISOString().slice(0,10);
+  // Sortieren: aktive zuerst, archivierte hinten
+  const sortedAzubis=[..._azubis];
+  // Auto-Unarchiv: Wenn TN wieder einen laufenden Kurs hat, automatisch aus Archiv nehmen
+  let archChanged=false;
+  sortedAzubis.forEach(a=>{
+    if(archived.includes(a.id)&&a.aktiverKursId){
+      const k=_kurse[a.aktiverKursId];
+      if(k&&k.von&&k.von<=today&&(!k.bis||k.bis>=today)){
+        const idx=archived.indexOf(a.id);
+        if(idx>=0){archived.splice(idx,1);archChanged=true;}
+      }
+    }
+  });
+  if(archChanged) _saveArchived(archived);
+  const activeList=sortedAzubis.filter(a=>!archived.includes(a.id));
+  const archivedList=sortedAzubis.filter(a=>archived.includes(a.id));
+  // Sync-Hinweis (immer anzeigen)
+  const hint=document.createElement('div');
+  hint.id='agSyncHint';
+  hint.style.cssText='font-size:.58rem;color:var(--mu);margin-bottom:10px;padding:0 4px';
+  el.appendChild(hint);
+  renderAGSyncStatus();
+  // Archiv-Toggle
+  if(archivedList.length){
+    const toggle=document.createElement('div');
+    toggle.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;margin-bottom:10px;cursor:pointer;user-select:none';
+    toggle.innerHTML='<span style="font-size:.72rem;color:var(--mu);font-weight:600">📦 '+archivedList.length+' archivierte Azubi'+(archivedList.length>1?'s':'')+'</span><span style="font-size:.62rem;color:var(--acc);font-weight:700">'+(showArchived?'▾ Ausblenden':'▸ Anzeigen')+'</span>';
+    toggle.onclick=()=>{window._showArchived=!window._showArchived;renderAzubiList();};
+    el.appendChild(toggle);
+  }
+  const displayList=showArchived?[...activeList,...archivedList]:activeList;
+  displayList.forEach(a=>{
+    const isArchived=archived.includes(a.id);
+    const name=((a.vorname||'')+' '+(a.nachname||'')).trim();
+    const init=((a.vorname||'?')[0]+(a.nachname||'?')[0]).toUpperCase();
+    const kurs=a.aktiverKursId?_kurse[a.aktiverKursId]:null;
+    const kursLaeuft=kurs&&kurs.von&&kurs.bis&&today>=kurs.von&&today<=kurs.bis;
+    const kursGeplant=kurs&&kurs.von&&today<kurs.von;
+    const td=kurs&&kurs.tnData?kurs.tnData[a.id]:null;
+    // Letzten abgebrochenen Kurs aus History finden (nur wenn Kurs noch laufen würde)
+    const lastAbgebr=!a.aktiverKursId?(a.kursHistory||[]).filter(h=>h.abgebrochen&&h.bis&&h.bis>=today).sort((a,b)=>(b.addedAt||0)-(a.addedAt||0))[0]:null;
+    let badge='';
+    if(lastAbgebr)badge='<span class="azubi-badge" style="background:rgba(220,38,38,.08);color:#dc2626">✗ Lehrgang abgebrochen</span>';
+    else if(a.status==='absent')badge='<span class="azubi-badge" style="background:rgba(220,38,38,.08);color:#dc2626">✗ Nicht erschienen</span>';
+    else if(a.wiederholer)badge='<span class="azubi-badge" style="background:rgba(217,119,6,.08);color:#d97706">↻ Wiederholer</span>';
+    else if(kursLaeuft)badge='<span class="azubi-badge" style="background:rgba(22,163,74,.08);color:#16a34a">● Laufend</span>';
+    else if(kursGeplant)badge='<span class="azubi-badge" style="background:rgba(37,99,235,.08);color:#2563eb">◐ Geplant</span>';
+    else if(a.aktiverKursId)badge='<span class="azubi-badge" style="background:rgba(148,163,184,.1);color:#94a3b8">○ Beendet</span>';
+    else badge='<span class="azubi-badge" style="background:rgba(148,163,184,.1);color:#94a3b8">Kein Lehrgang</span>';
+    // Berufsschultag heute?
+    const bsToday=kurs&&(kurs.berufsschultage||[]).includes(today);
+    if(bsToday)badge+='<span class="azubi-badge" style="background:rgba(139,92,246,.08);color:#7c3aed">🎓 Berufsschultag</span>';
+    let attBadge='';
+    if(td&&td.attTotal){const p=td.attPercent||0;const c=p>=80?'#16a34a':p>=60?'#d97706':'#dc2626';attBadge='<span class="azubi-badge" style="background:rgba('+(p>=80?'22,163,74':p>=60?'217,119,6':'220,38,38')+',.08);color:'+c+'">'+p+'%</span>';}
+    let wzBadge='';
+    if(td&&td.werkzeugStatus==='fehlt') wzBadge='<span class="azubi-badge" style="background:rgba(239,68,68,.08);color:#dc2626">🔧 Werkzeug fehlt</span>';
+    let urlBadge='';
+    const aktUrlaub=(a.urlaub||[]).find(u=>u.von<=today&&u.bis>=today);
+    if(aktUrlaub) urlBadge='<span class="azubi-badge" style="background:rgba(245,158,11,.08);color:#d97706">🏖 Urlaub</span>';
+    const card=document.createElement('div');
+    card.className='azubi-card';card.dataset.tnId=a.id;
+    if(isArchived) card.style.cssText+='opacity:.45;border-style:dashed;';
+    card.innerHTML=(a.photoUrl?'<div class="azubi-av"><img src="'+esc(a.photoUrl)+'"></div>':'<div class="azubi-av">'+esc(init)+'</div>')+'<div class="azubi-info"><div class="azubi-name">'+esc(name)+(isArchived?' <span style="font-size:.55rem;color:var(--mu)">📦 archiviert</span>':'')+'</div><div class="azubi-sub">'+(a.beruf||'')+(a.ausbjahr?' · '+a.ausbjahr+'. Lj':'')+'</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">'+badge+attBadge+wzBadge+urlBadge+'</div></div>';
+    const detail=document.createElement('div');
+    detail.className='azubi-detail';detail.style.display='none';
+    if(kurs){
+      let h='<div class="kurs-box"><div class="kurs-name">📚 '+esc(kurs.name||'Lehrgang')+'</div>';
+      h+='<div class="kurs-meta">'+fmtDE(kurs.von)+' – '+fmtDE(kurs.bis)+'</div>';
+      if(kurs.beschreibung)h+='<div style="font-size:.75rem;color:var(--tx);padding:8px 10px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.12);border-radius:7px;margin-bottom:8px;line-height:1.5">'+esc(kurs.beschreibung)+'</div>';
+      if(bsToday)h+='<div style="font-size:.75rem;padding:8px 10px;background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.2);border-radius:7px;margin-bottom:8px;color:#7c3aed;font-weight:700">🎓 Heute ist Berufsschultag</div>';
+      h+='<div class="kurs-field"><span class="kurs-field-label">Ausbilder</span><span>'+esc(kurs.ausbilderName||'–')+'</span></div>';
+      if(kurs.ausbilderEmail)h+='<div class="kurs-field"><span class="kurs-field-label">Kontakt</span><span><a href="mailto:'+esc(kurs.ausbilderEmail)+'" style="color:var(--acc)">'+esc(kurs.ausbilderEmail)+'</a>'+(kurs.ausbilderTel?' · <a href="tel:'+esc(kurs.ausbilderTel)+'" style="color:var(--acc)">📞'+esc(kurs.ausbilderTel)+'</a>':'')+'</span></div>';
+      if(kurs.standortName)h+='<div class="kurs-field"><span class="kurs-field-label">Standort</span><span>'+esc(kurs.standortName)+(kurs.standortGebaeude?' – '+esc(kurs.standortGebaeude):'')+'</span></div>';
+      // Werkzeug-Warnung
+      if(kurs.werkzeug&&kurs.werkzeug.length){
+        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">🔧 MITZUBRINGEN</div>';
+        h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+        kurs.werkzeug.forEach(w=>{h+='<span style="font-size:.62rem;padding:3px 8px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:5px;color:var(--tx)">'+esc(w)+'</span>';});
+        h+='</div>';
+        if(td&&td.werkzeugStatus==='fehlt'){
+          h+='<div style="margin-top:8px;padding:8px 10px;background:rgba(239,68,68,.06);border:2px solid rgba(239,68,68,.25);border-radius:7px;font-size:.72rem;color:#dc2626;font-weight:700">⚠ Werkzeug unvollständig'+(td.werkzeugFehlt?' – fehlt: '+esc(td.werkzeugFehlt):'')+'</div>';
+        } else if(td&&td.werkzeugStatus==='ok'){
+          h+='<div style="margin-top:8px;font-size:.62rem;color:#16a34a;font-weight:600">✓ Werkzeug vollständig</div>';
+        }
+        h+='</div>';
+      }
+      if(td&&td.attTotal){
+        const t=td,p=t.attPercent||0,col=p>=80?'#16a34a':p>=60?'#d97706':'#dc2626',total=t.attTotal||1;
+        const segs=[{v:t.attPresent||0,c:'#16a34a',l:'Anwesend'},{v:t.attLate||0,c:'#d97706',l:'Zu spät'},{v:t.attSick||0,c:'#fbbf24',l:'Krank'},{v:t.attAbsentE||0,c:'#60a5fa',l:'Entschuldigt'},{v:t.attAbsentU||0,c:'#dc2626',l:'Unentschuldigt'},{v:t.attBerufsschule||0,c:'#8b5cf6',l:'Berufsschule'}];
+        h+='<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">📊 ANWESENHEIT</div>';
+        h+='<div class="att-bar">';
+        segs.forEach(s=>{if(s.v>0)h+='<div class="att-seg" style="width:'+Math.max((s.v/total)*100,3)+'%;background:'+s.c+'" title="'+s.l+': '+s.v+'"></div>';});
+        h+='</div><div style="display:flex;align-items:center;gap:10px;margin-top:4px"><span style="font-size:1.3rem;font-weight:800;color:'+col+';font-family:\'JetBrains Mono\',monospace">'+p+'%</span><div class="att-summary">';
+        segs.forEach(s=>{if(s.v>0)h+='<span><span class="att-dot" style="background:'+s.c+'"></span>'+s.v+'× '+s.l+'</span>';});
+        h+='</div></div>';
+        h+='<div style="font-size:.6rem;color:var(--mu);margin-top:6px;font-family:\'JetBrains Mono\',monospace">Aktualisiert: '+(t.attLastSync?new Date(t.attLastSync).toLocaleString('de-DE'):'–')+'</div></div>';
+      }
+      // Noten nur nach Kursende anzeigen
+      const kursBeendet=kurs.bis&&today>kurs.bis;
+      if(kursBeendet){
+        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd);text-align:center">'
+          +(isArchived
+            ?'<button onclick="event.stopPropagation();agUnarchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid rgba(37,99,235,.3);background:rgba(37,99,235,.06);color:var(--acc);border-radius:7px;cursor:pointer;font-weight:600">📤 Wiederherstellen</button>'
+            :'<button onclick="event.stopPropagation();agArchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid var(--brd);background:var(--sur2);color:var(--mu);border-radius:7px;cursor:pointer;font-weight:600">📦 Archivieren</button>')
+          +'</div>';
+      }
+      if(kursBeendet&&td&&(td.noten_mitarbeit||td.noten_fuehrung||td.noten_praxis)){
+        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">📝 BENOTUNG</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+        if(td.noten_mitarbeit)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Mitarbeit: '+esc(td.noten_mitarbeit)+'</span>';
+        if(td.noten_fuehrung)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Führung: '+esc(td.noten_fuehrung)+'</span>';
+        if(td.noten_praxis)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Praxis: '+esc(td.noten_praxis)+'</span>';
+        const ex=td.noten_extra||{};Object.entries(ex).forEach(([k,v])=>{if(v)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">'+esc(k)+': '+esc(v)+'</span>';});
+        h+='</div></div>';
+      } else if(!kursBeendet&&td&&(td.noten_mitarbeit||td.noten_fuehrung||td.noten_praxis)){
+        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.65rem;color:var(--mu);font-style:italic">📝 Benotung wird nach Kursende sichtbar.</div></div>';
+      }
+      h+='</div>';
+      detail.innerHTML=h;
+    } else if(lastAbgebr){
+      detail.innerHTML='<div class="kurs-box" style="border-color:rgba(220,38,38,.3)">'
+        +'<div style="font-size:.75rem;padding:8px 10px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.2);border-radius:7px;margin-bottom:8px;color:#dc2626;font-weight:700">⚠ Lehrgang wurde abgebrochen</div>'
+        +'<div class="kurs-name" style="opacity:.6">📚 '+esc(lastAbgebr.kursName||'Lehrgang')+'</div>'
+        +'<div class="kurs-meta" style="opacity:.6">'+fmtDE(lastAbgebr.von)+' – '+fmtDE(lastAbgebr.bis)+'</div>'
+        +(lastAbgebr.ausbilderName?'<div class="kurs-field" style="opacity:.6"><span class="kurs-field-label">Ausbilder</span><span>'+esc(lastAbgebr.ausbilderName)+'</span></div>':'')
+        +'<div style="text-align:center;color:var(--mu);font-size:.72rem;padding:8px 0;margin-top:6px;border-top:1px solid var(--brd)">Wartet auf neuen Lehrgang</div>'
+        +'<div style="text-align:center;margin-top:6px">'
+        +(isArchived
+          ?'<button onclick="event.stopPropagation();agUnarchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid rgba(37,99,235,.3);background:rgba(37,99,235,.06);color:var(--acc);border-radius:7px;cursor:pointer;font-weight:600">📤 Wiederherstellen</button>'
+          :'<button onclick="event.stopPropagation();agArchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid var(--brd);background:var(--sur2);color:var(--mu);border-radius:7px;cursor:pointer;font-weight:600">📦 Archivieren</button>')
+        +'</div>'
+        +'</div>';
+    } else {
+      detail.innerHTML='<div class="kurs-box"><div style="text-align:center;color:var(--mu);font-size:.78rem;padding:10px">Aktuell keinem Lehrgang zugewiesen.</div>'
+        +(isArchived
+          ?'<div style="text-align:center;margin-top:6px"><button onclick="event.stopPropagation();agUnarchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid rgba(37,99,235,.3);background:rgba(37,99,235,.06);color:var(--acc);border-radius:7px;cursor:pointer;font-weight:600">📤 Wiederherstellen</button></div>'
+          :'<div style="text-align:center;margin-top:6px"><button onclick="event.stopPropagation();agArchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid var(--brd);background:var(--sur2);color:var(--mu);border-radius:7px;cursor:pointer;font-weight:600">📦 Archivieren</button></div>')
+        +'</div>';
+    }
+    // Urlaub IMMER anzeigen (unabhängig von Kurs)
+    const tnUrlaub=a.urlaub||[];
+    const futureUrlaub=tnUrlaub.filter(u=>u.bis>=today);
+    if(futureUrlaub.length){
+      let uh='<div style="margin-top:8px;padding:12px 14px;background:rgba(245,158,11,.04);border:2px solid rgba(245,158,11,.2);border-radius:10px"><div style="font-size:.7rem;font-weight:800;color:#f59e0b;margin-bottom:6px">🏖 URLAUB</div>';
+      futureUrlaub.sort((x,y)=>(x.von||'').localeCompare(y.von||'')).forEach(u=>{
+        const isNow=u.von<=today&&u.bis>=today;
+        uh+='<div style="font-size:.72rem;padding:4px 0;color:'+(isNow?'#f59e0b':'var(--tx)')+';font-weight:'+(isNow?'700':'400')+'">'+fmtDE(u.von)+' – '+fmtDE(u.bis)+(u.label?' · '+esc(u.label):'')+(isNow?' <span style="font-size:.55rem;background:rgba(245,158,11,.12);padding:2px 6px;border-radius:3px">aktuell</span>':'')+'</div>';
+      });
+      uh+='</div>';
+      detail.innerHTML+=uh;
+    }
+    // Dokumente-Austausch
+    const dokWrap=document.createElement('div');
+    dokWrap.style.cssText='margin-top:8px;padding:12px 14px;background:var(--sur);border:2px solid rgba(37,99,235,.15);border-radius:10px';
+    if(_agPremium){
+      dokWrap.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:.7rem;font-weight:800;color:var(--acc)">📄 DOKUMENTE</div>'
+        +'<label style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600">📤 Hochladen<input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="agUploadDok(\''+a.id+'\',this)"></label></div>'
+        +'<div id="dokList_'+a.id+'" style="font-size:.7rem;color:var(--mu)">Lädt…</div>';
+      detail.appendChild(dokWrap);
+      loadDokumente(a.id);
+    } else {
+      dokWrap.style.borderColor='var(--brd)';
+      dokWrap.innerHTML='<div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:4px">📄 DOKUMENTE</div>'
+        +'<div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Dokumente direkt mit Ihren Azubis austauschen.</div>'
+        +'<button onclick="toggleAGPremium()" style="font-size:.62rem;padding:5px 12px;border:1.5px solid rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600">☁ Freischalten (1,99€/M)</button>';
+      detail.appendChild(dokWrap);
+    }
+    card.addEventListener('click',()=>{
+      const isOpen=detail.style.display!=='none';
+      document.querySelectorAll('.azubi-card').forEach(c=>c.classList.remove('expanded'));
+      document.querySelectorAll('.azubi-detail').forEach(d=>d.style.display='none');
+      if(!isOpen){card.classList.add('expanded');detail.style.display='';}
+    });
+    el.appendChild(card);el.appendChild(detail);
+    if(openIds.has(a.id)){card.classList.add('expanded');detail.style.display='';}
+  });
+  loadHVKontakt();
+}
+
+function agArchive(tnId){
+  const archived=_getArchived();
+  if(!archived.includes(tnId)) archived.push(tnId);
+  _saveArchived(archived);
+  renderAzubiList();
+}
+function agUnarchive(tnId){
+  let archived=_getArchived();
+  archived=archived.filter(id=>id!==tnId);
+  _saveArchived(archived);
+  renderAzubiList();
+}
+function _getArchived(){
+  if(_agPremium&&_agArchivedCloud!==null) return [..._agArchivedCloud];
+  return JSON.parse(localStorage.getItem('ag_archiv_'+(_firma||''))||'[]');
+}
+function _saveArchived(arr){
+  // Immer lokal speichern
+  localStorage.setItem('ag_archiv_'+(_firma||''),JSON.stringify(arr));
+  // Cloud-Sync wenn Premium
+  if(_agPremium){
+    _agArchivedCloud=arr;
+    db.collection('users').doc(_uid).update({archivedTN:arr}).catch(()=>{});
+  }
+}
+let _agPremium=false;
+let _agArchivedCloud=null;
+function checkAGPremium(){
+  db.collection('users').doc(_uid).get().then(doc=>{
+    if(!doc.exists) return;
+    const d=doc.data();
+    _agPremium=!!d.agPremium;
+    if(_agPremium&&d.archivedTN){
+      _agArchivedCloud=d.archivedTN;
+      renderAzubiList();
+    }
+  }).catch(()=>{});
+}
+function toggleAGPremium(){
+  if(_agPremium){
+    // Downgrade
+    if(!confirm('Cloud-Sync deaktivieren? Archiv wird nur noch lokal gespeichert.')) return;
+    db.collection('users').doc(_uid).update({agPremium:false}).then(()=>{
+      _agPremium=false;_agArchivedCloud=null;
+      renderAzubiList();renderAGSyncStatus();
+    });
+  } else {
+    // Upgrade
+    db.collection('users').doc(_uid).update({agPremium:true,archivedTN:_getArchived()}).then(()=>{
+      _agPremium=true;_agArchivedCloud=_getArchived();
+      renderAzubiList();renderAGSyncStatus();
+      toast('☁ Cloud-Sync aktiviert ✓');
+    });
+  }
+}
+
+// ── Dokumente-Austausch ──
+function loadDokumente(tnId){
+  const el=document.getElementById('dokList_'+tnId);
+  if(!el) return;
+  db.collection('globalTN').doc(tnId).collection('dokumente')
+    .orderBy('ts','desc').onSnapshot(snap=>{
+      if(snap.empty){el.innerHTML='<div style="color:var(--mu);font-size:.65rem;font-style:italic">Noch keine Dokumente</div>';return;}
+      let h='';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const fName=d.fileName||d.name||'Dokument';
+        const icon=fName.match(/\.pdf$/i)?'📕':fName.match(/\.(jpg|jpeg|png)$/i)?'🖼':'📄';
+        const vonLabel=d.vonRolle==='azubi'?'<span style="color:#7c3aed;font-weight:700">Azubi</span>':'<span style="color:var(--acc);font-weight:700">Betrieb</span>';
+        h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--brd)">'
+          +'<span style="font-size:1rem">'+icon+'</span>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(fName)+'</div>'
+          +'<div style="font-size:.55rem;color:var(--mu)">'+vonLabel+' · '+new Date(d.ts).toLocaleDateString('de-DE')+'</div></div>'
+          +'<button onclick="event.stopPropagation();downloadDok(\''+tnId+'\',\''+doc.id+'\')" style="font-size:.55rem;padding:3px 8px;border:1px solid var(--brd);border-radius:5px;background:var(--sur2);cursor:pointer;color:var(--tx)">💾</button>'
+          +'<button onclick="event.stopPropagation();deleteDok(\''+tnId+'\',\''+doc.id+'\',\''+esc(fName)+'\')" style="font-size:.55rem;padding:3px 8px;border:1px solid rgba(239,68,68,.2);border-radius:5px;background:none;cursor:pointer;color:#ef4444">✕</button>'
+          +'</div>';
+      });
+      el.innerHTML=h;
+    },()=>{el.innerHTML='<div style="color:var(--mu);font-size:.65rem">Fehler beim Laden</div>';});
+}
+
+function agUploadDok(tnId,input){
+  if(!_agPremium){
+    toast('📄 Dokumente erfordert Cloud-Sync (1,99€/M)','bad');
+    input.value='';return;
+  }
+  const file=input.files[0];
+  if(!file) return;
+  const maxMB=2;
+  if(file.size>maxMB*1024*1024){toast('Max. '+maxMB+' MB pro Datei','bad');input.value='';return;}
+  const reader=new FileReader();
+  reader.onload=function(){
+    db.collection('globalTN').doc(tnId).collection('dokumente').add({
+      fileName:file.name,
+      fileType:file.type,
+      fileSize:file.size,
+      data:reader.result,
+      vonRolle:'arbeitgeber',
+      vonEmail:_email||'',
+      vonFirma:_firma||'',
+      ts:Date.now()
+    }).then(()=>{toast('📄 Dokument gesendet ✓');}).catch(err=>toast('Fehler: '+err.message,'bad'));
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+
+function downloadDok(tnId,docId){
+  db.collection('globalTN').doc(tnId).collection('dokumente').doc(docId).get().then(doc=>{
+    if(!doc.exists) return;
+    const d=doc.data();
+    if(d.data){
+      const a=document.createElement('a');a.href=d.data;a.download=d.fileName||d.name||'dokument';a.click();
+    } else if(d.url){
+      window.open(d.url,'_blank');
+    }
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function deleteDok(tnId,docId,name){
+  if(!confirm('Dokument "'+name+'" löschen?')) return;
+  db.collection('globalTN').doc(tnId).collection('dokumente').doc(docId).delete()
+    .then(()=>toast('Gelöscht'))
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function renderAGSyncStatus(){
+  const el=document.getElementById('agSyncHint');
+  if(!el) return;
+  if(_agPremium){
+    el.innerHTML='<span style="color:#16a34a;font-weight:700">☁ Cloud-Sync aktiv</span> · Archiv wird geräteübergreifend gespeichert <button onclick="toggleAGPremium()" style="font-size:.6rem;padding:2px 8px;border:1px solid var(--brd);border-radius:5px;background:none;color:var(--mu);cursor:pointer;margin-left:6px">Deaktivieren</button>';
+  } else {
+    el.innerHTML='💡 Archiv wird nur lokal gespeichert. <button onclick="toggleAGPremium()" style="font-size:.6rem;padding:2px 8px;border:1.5px solid rgba(37,99,235,.3);border-radius:5px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600;margin-left:4px">☁ Cloud-Sync aktivieren (1,99€/M)</button>';
+  }
+}
+
+function loadHVKontakt(){
+  db.collection('shared').doc('kursSettings').get().then(doc=>{
+    if(!doc.exists)return;const d=doc.data();
+    let ex=document.getElementById('hvKontaktCard');if(ex)ex.remove();
+    if(!d.hvName&&!d.hvTel&&!d.hvEmail)return;
+    const c=document.createElement('div');c.className='card';c.id='hvKontaktCard';
+    c.innerHTML='<div class="card-title">📞 Kontakt Hauptverwaltung</div>'
+      +(d.hvName?'<div class="kurs-field"><span class="kurs-field-label">Name</span><span>'+esc(d.hvName)+'</span></div>':'')
+      +(d.hvEmail?'<div class="kurs-field"><span class="kurs-field-label">E-Mail</span><span><a href="mailto:'+esc(d.hvEmail)+'" style="color:var(--acc)">'+esc(d.hvEmail)+'</a></span></div>':'')
+      +(d.hvTel?'<div class="kurs-field"><span class="kurs-field-label">Telefon</span><span><a href="tel:'+esc(d.hvTel)+'" style="color:var(--acc)">📞 '+esc(d.hvTel)+'</a></span></div>':'');
+    document.querySelector('.main').appendChild(c);
+  }).catch(()=>{});
+}
+
+// SW + Install
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw-ag.js').then(()=>console.log('AG SW ok')).catch(e=>console.warn('SW:',e));});}
+let _installPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_installPrompt=e;showInstallBanner();});
+function showInstallBanner(){
+  if(window.matchMedia('(display-mode:standalone)').matches||navigator.standalone)return;
+  if(sessionStorage.getItem('ag_install_dismissed'))return;
+  const b=document.createElement('div');b.id='installBanner';
+  b.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:16px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;font-family:"Sora",sans-serif;box-shadow:0 -4px 24px rgba(0,0,0,.15)';
+  b.innerHTML='<div style="display:flex;align-items:center;gap:12px;max-width:500px;margin:0 auto"><div style="font-size:2rem;flex-shrink:0">🏢</div><div style="flex:1"><div style="font-size:.88rem;font-weight:800">ArbeitgeberPro installieren</div><div style="font-size:.68rem;opacity:.85;margin-top:2px">App auf dem Startbildschirm – schneller Zugriff!</div></div><button onclick="doInstallAG()" style="padding:10px 18px;border:2px solid rgba(255,255,255,.5);border-radius:10px;background:rgba(255,255,255,.2);color:#fff;font-family:\'Sora\',sans-serif;font-size:.8rem;font-weight:800;cursor:pointer;flex-shrink:0">Installieren</button><button onclick="dismissInstallAG()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:1.2rem;cursor:pointer;padding:4px;flex-shrink:0">✕</button></div>';
+  document.body.appendChild(b);
+}
+function doInstallAG(){if(_installPrompt){_installPrompt.prompt();_installPrompt.userChoice.then(()=>{_installPrompt=null;const b=document.getElementById('installBanner');if(b)b.remove();});}}
+function dismissInstallAG(){const b=document.getElementById('installBanner');if(b)b.remove();sessionStorage.setItem('ag_install_dismissed','1');}
+</script>
 </body>
 </html>

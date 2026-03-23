@@ -1966,7 +1966,7 @@ function renderMain(){
     return;
   }
   el.innerHTML=
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+'</div><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn mob-view-toggle" id="viewToggle" onclick="toggleMobileView()">☰ Liste</button></div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+'</div><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button><button class="tbtn mob-view-toggle" id="viewToggle" onclick="toggleMobileView()">☰ Liste</button></div></div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
     +'<div id="seatingWrap" class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
@@ -3312,6 +3312,57 @@ function loadKursHistorie(){
   }).catch(err=>{
     console.error('Historie error:',err);
     body.innerHTML='<div class="hist-empty">Fehler: '+esc(err.message)+'</div>';
+  });
+}
+
+// ─── KURS AUSFALL – Benachrichtigung an Azubi + Arbeitgeber ───
+function kursAusfall(){
+  const inst=curInst();if(!inst)return;
+  const kursId=inst.sharedKursId;
+  if(!kursId||!_db){toast('Kein verknüpfter Kurs','bad');return;}
+  const today=new Date().toISOString().slice(0,10);
+  const todayDE=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  if(!confirm('⚠️ KURS FÄLLT HEUTE AUS?\n\nAlle Teilnehmer und deren Betriebe werden sofort benachrichtigt:\n\n\"Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.\"\n\nDatum: '+todayDE+'\n\nFortfahren?')) return;
+  // Alle verknüpften TN-IDs sammeln
+  const tnIds=new Set();
+  Object.values(inst.seats||{}).forEach(s=>{
+    if(s&&s.poolTnId) tnIds.add(s.poolTnId);
+  });
+  if(!tnIds.size){toast('Keine verknüpften TN gefunden','bad');return;}
+  const kursLabel=S.kats[S.curKat]?.label||'Lehrgang';
+  const ausbilderName=_auth?.currentUser?.displayName||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
+  const notification={
+    typ:'kurs_ausfall',
+    kursId:kursId,
+    kursName:kursLabel,
+    datum:today,
+    datumDE:todayDE,
+    nachricht:'Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.',
+    von:ausbilderName,
+    erstellt:Date.now(),
+    gelesen:false
+  };
+  let successCount=0, errorCount=0;
+  const total=tnIds.size;
+  const promises=[];
+  tnIds.forEach(tnId=>{
+    const p=_db.collection('globalTN').doc(tnId).get().then(doc=>{
+      if(!doc.exists) return;
+      const d=doc.data();
+      const benach=(d.benachrichtigungen||[]);
+      // Duplikat-Check: gleicher Tag + gleicher Kurs
+      if(benach.some(n=>n.typ==='kurs_ausfall'&&n.datum===today&&n.kursId===kursId)) return;
+      benach.push(notification);
+      return _db.collection('globalTN').doc(tnId).update({benachrichtigungen:benach});
+    }).then(()=>successCount++).catch(()=>errorCount++);
+    promises.push(p);
+  });
+  Promise.all(promises).then(()=>{
+    if(errorCount===0){
+      toast('⚠️ Ausfall-Benachrichtigung an '+successCount+' TN gesendet ✓');
+    } else {
+      toast(successCount+' gesendet, '+errorCount+' fehlgeschlagen','bad');
+    }
   });
 }
 
