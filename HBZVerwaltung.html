@@ -3630,7 +3630,12 @@ function showKursDetail(kursId){
   const kdBeschrEl=document.getElementById('kdBeschreibung');
   if(kdBeschrEl) kdBeschrEl.innerHTML=k.beschreibung?'<div style="font-size:.75rem;padding:8px 12px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.12);border-radius:8px;margin-top:8px;line-height:1.5;color:var(--tx)">'+esc(k.beschreibung)+'</div>':'';
   const archBtn=document.getElementById('kdArchiveBtn');
-  if(archBtn) archBtn.textContent=k.archiviert?'📤 Wiederherstellen':'📦 Archivieren';
+  if(archBtn){
+    archBtn.textContent=k.archiviert?'📤 Wiederherstellen':'📦 Archivieren';
+    const kursLaeuft=!k.archiviert&&k.bis&&k.bis>=today;
+    archBtn.style.opacity=kursLaeuft?'.4':'1';
+    archBtn.title=kursLaeuft?'Erst nach Kursende ('+fmtDE(k.bis)+') verfügbar':'';
+  }
 
   const wrap=document.getElementById('kdTNList');
   wrap.innerHTML='<div class="empty">Lädt…</div>';
@@ -3824,6 +3829,13 @@ function toggleArchiveKurs(){
   if(!k) return;
   const isArchived=!!k.archiviert;
   const kursId=_selectedKursId;
+  const today=new Date().toISOString().slice(0,10);
+
+  // Sperre: Archivieren nur wenn Kurs beendet
+  if(!isArchived && k.bis && k.bis >= today){
+    toast('⚠️ Kurs läuft noch bis '+fmtDE(k.bis)+' – Archivieren erst nach Kursende möglich. Bei Ausfall oder Abbruch bitte ⚠️ Ausfall oder 🗑 Löschen nutzen.','bad');
+    return;
+  }
 
   if(isArchived){
     // Wiederherstellen – einfach Flag entfernen
