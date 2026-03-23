@@ -3976,6 +3976,9 @@ function generateBescheinigung(tnId, kursId){
     const fehltage=(d.attAbsentE||0)+(d.attAbsentU||0)+(d.attSick||0);
     const verspaetungen=d.attLate||0;
     const bemerkung=d.bemerkung||'';
+    const sigData=d.bescheinigungSignatur||'';
+    const sigVon=d.bescheinigungVon||'';
+    const sigDatum=d.bescheinigungDatum?new Date(d.bescheinigungDatum).toLocaleDateString('de-DE'):'';
     const w=window.open('','_blank');
     if(!w){toast('Popup blockiert – bitte Popups erlauben','bad');return;}
     w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Teilnahmebescheinigung – ${esc(name)}</title>
@@ -3983,7 +3986,7 @@ function generateBescheinigung(tnId, kursId){
 @page{size:A4;margin:20mm 20mm 15mm 20mm;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Times New Roman',Times,serif;font-size:12pt;color:#000;line-height:1.5;padding:20mm;max-width:210mm;margin:0 auto;}
-@media print{body{padding:0;}}
+@media print{body{padding:0;}.no-print{display:none !important;}}
 .header{text-align:center;margin-bottom:8mm;border-bottom:1px solid #000;padding-bottom:4mm;}
 .header .org{font-size:13pt;font-weight:bold;letter-spacing:.5px;}
 .header .sub{font-size:10pt;margin-top:1mm;}
@@ -3997,18 +4000,24 @@ h1{text-align:center;font-size:16pt;font-weight:bold;margin:8mm 0;text-decoratio
 .noten-table td{padding:2mm 3mm;font-size:11pt;}
 .noten-table td:first-child{font-weight:bold;width:45%;}
 .noten-table td:last-child{border-bottom:1px dotted #888;}
-.sig-row{display:flex;justify-content:space-between;margin-top:15mm;}
+.sig-row{display:flex;justify-content:space-between;margin-top:12mm;align-items:flex-end;}
 .sig-block{text-align:center;width:45%;}
-.sig-line{border-top:1px solid #000;margin-top:20mm;padding-top:2mm;font-size:9pt;}
+.sig-line{border-top:1px solid #000;padding-top:2mm;font-size:9pt;}
+.sig-img{width:100%;max-width:200px;height:80px;object-fit:contain;}
 .footer{margin-top:10mm;padding-top:4mm;border-top:1px solid #ccc;font-size:8pt;text-align:center;color:#444;}
 .hinweis{margin-top:8mm;font-size:9pt;font-style:italic;text-align:center;}
-.print-btn{display:block;margin:10px auto;padding:12px 32px;font-size:14px;font-weight:bold;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;}
+.print-btn{display:inline-block;margin:10px 4px;padding:12px 32px;font-size:14px;font-weight:bold;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;}
 .print-btn:hover{background:#1d4ed8;}
-@media print{.print-btn{display:none !important;}}
 .checkbox-row{margin:3mm 0;font-size:11pt;}
 .cb{display:inline-block;width:12pt;height:12pt;border:1.5pt solid #000;border-radius:2pt;margin:0 3pt;vertical-align:middle;}
+.status-badge{display:inline-block;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;margin:6px 0;}
 </style></head><body>
-<button class="print-btn" onclick="window.print()">🖨 Drucken / PDF speichern</button>
+<div style="text-align:center" class="no-print">
+  ${sigData
+    ?'<span class="status-badge" style="background:#f0fdf4;color:#16a34a">✅ Unterschrieben von '+esc(sigVon)+(sigDatum?' am '+sigDatum:'')+'</span><br>'
+    :'<span class="status-badge" style="background:#fef3c7;color:#d97706">⚠ Noch nicht vom Ausbilder unterschrieben</span><br>'}
+  <button class="print-btn" onclick="window.print()">🖨 Drucken / PDF speichern</button>
+</div>
 <div class="header">
   <div class="org">KREISHANDWERKERSCHAFT BONN · RHEIN-SIEG</div>
   <div class="sub">– Handwerkliches Bildungszentrum –</div>
@@ -4028,13 +4037,16 @@ h1{text-align:center;font-size:16pt;font-weight:bold;margin:8mm 0;text-decoratio
 <div class="field"><b>Fehltage:</b> <span class="dots">${fehltage||'...'}</span> &nbsp;&nbsp; <b>Verspätungen:</b> <span class="dots">${verspaetungen||'...'}</span></div>
 <div class="field" style="margin-top:3mm"><b>Besondere Bemerkungen:</b><br><span class="dots-long">${bemerkung?' '+esc(bemerkung)+' ':'...'}</span></div>
 <div class="checkbox-row" style="margin-top:5mm">
-  <b>Ausbildungsnachweis wurde für den Zeitraum der überbetrieblichen Unterweisung geführt:</b>
+  <b>Ausbildungsnachweis wurde für den Zeitraum der ÜLU geführt:</b>
   &nbsp;<span class="cb"></span> ja &nbsp;&nbsp;<span class="cb"></span> nein
 </div>
 <div class="field" style="margin-top:8mm"><b>${esc(ort)}, den ${bis}</b></div>
 <div class="sig-row">
-  <div class="sig-block"><div class="sig-line">Lehrgangsleiter</div></div>
-  <div class="sig-block"><div class="sig-line">Ausbilder (Meister)</div></div>
+  <div class="sig-block"><div style="height:80px"></div><div class="sig-line">Lehrgangsleiter</div></div>
+  <div class="sig-block">
+    ${sigData?'<img src="'+sigData+'" class="sig-img">':'<div style="height:80px"></div>'}
+    <div class="sig-line">Ausbilder (Meister)${ausbName?' – '+esc(ausbName):''}</div>
+  </div>
 </div>
 <div class="hinweis">Diese Bescheinigung ist nach Beendigung des Lehrgangs dem Meister zur Unterschrift vorzulegen<br>und später mit den Anmeldeunterlagen zur Gesellenprüfung einzureichen.</div>
 <div class="footer">
