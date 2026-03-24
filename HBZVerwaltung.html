@@ -455,6 +455,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   body{overflow-x:hidden;}
 }
 @keyframes pulseWarn{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
+.bst-day{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:2px solid #e2e8f0;font-size:.75rem;font-weight:600;cursor:pointer;user-select:none;transition:all .12s;}
+.bst-day:has(input:checked){background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.4);color:#7c3aed;}
+.bst-day input{accent-color:#7c3aed;cursor:pointer;}
 /* GANTT CHART */
 .gantt{display:flex;min-width:max-content;}
 .gantt-names{position:sticky;left:0;z-index:3;background:var(--sur);border-right:2px solid var(--brd);flex-shrink:0;width:180px;}
@@ -665,6 +668,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           </div>
           <div id="bldOverlapWarn" style="display:none"></div>
           <div class="fg" style="margin-top:8px">
+            <label class="fl">🎓 Berufsschultage <span style="font-weight:400;color:var(--mu)">– Wochentage an denen TN in der Berufsschule sind</span></label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px" id="bldBSTage">
+              <label class="bst-day"><input type="checkbox" value="Mo"> Mo</label>
+              <label class="bst-day"><input type="checkbox" value="Di"> Di</label>
+              <label class="bst-day"><input type="checkbox" value="Mi"> Mi</label>
+              <label class="bst-day"><input type="checkbox" value="Do"> Do</label>
+              <label class="bst-day"><input type="checkbox" value="Fr"> Fr</label>
+            </div>
+          </div>
+          <div class="fg" style="margin-top:8px">
             <label class="fl">Kursbeschreibung <span style="font-weight:400;color:var(--mu)">– Inhalte, z.B. Netzwerktechnik, SPS-Programmierung</span></label>
             <textarea class="fi" id="bldBeschreibung" rows="2" placeholder="Lehrgangsinhalt für Azubis und Arbeitgeber sichtbar…" style="resize:vertical"></textarea>
           </div>
@@ -742,6 +755,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div class="form-row" style="margin-top:8px">
               <div class="fg"><label class="fl">Von</label><input type="date" class="fi" id="ekVon"></div>
               <div class="fg"><label class="fl">Bis</label><input type="date" class="fi" id="ekBis"></div>
+            </div>
+            <div class="fg" style="margin-top:8px">
+              <label class="fl">🎓 Berufsschultage</label>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px" id="ekBSTage">
+                <label class="bst-day"><input type="checkbox" value="Mo"> Mo</label>
+                <label class="bst-day"><input type="checkbox" value="Di"> Di</label>
+                <label class="bst-day"><input type="checkbox" value="Mi"> Mi</label>
+                <label class="bst-day"><input type="checkbox" value="Do"> Do</label>
+                <label class="bst-day"><input type="checkbox" value="Fr"> Fr</label>
+              </div>
             </div>
             <button class="btn-sm btn-ok" onclick="saveEditKurs()" style="width:100%;margin-top:12px">✓ Speichern</button>
           </div>
@@ -3678,7 +3701,13 @@ function showKursDetail(kursId){
     (k.ausbilderName?' &middot; '+esc(k.ausbilderName):'')+
     (k.ausbilderEmail?' ('+esc(k.ausbilderEmail)+')':'');
   const kdBeschrEl=document.getElementById('kdBeschreibung');
-  if(kdBeschrEl) kdBeschrEl.innerHTML=k.beschreibung?'<div style="font-size:.75rem;padding:8px 12px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.12);border-radius:8px;margin-top:8px;line-height:1.5;color:var(--tx)">'+esc(k.beschreibung)+'</div>':'';
+  if(kdBeschrEl){
+    let descHtml=k.beschreibung?'<div style="font-size:.75rem;padding:8px 12px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.12);border-radius:8px;margin-top:8px;line-height:1.5;color:var(--tx)">'+esc(k.beschreibung)+'</div>':'';
+    if(k.berufsschultage&&k.berufsschultage.length){
+      descHtml+='<div style="margin-top:6px;display:flex;gap:4px;align-items:center;flex-wrap:wrap"><span style="font-size:.68rem;color:#7c3aed;font-weight:700">🎓 Berufsschultage:</span>'+k.berufsschultage.map(t=>'<span style="font-size:.65rem;padding:2px 8px;background:rgba(139,92,246,.1);color:#7c3aed;border-radius:6px;font-weight:700">'+esc(t)+'</span>').join('')+'</div>';
+    }
+    kdBeschrEl.innerHTML=descHtml;
+  }
   const archBtn=document.getElementById('kdArchiveBtn');
   if(archBtn){
     archBtn.textContent=k.archiviert?'📤 Wiederherstellen':'📦 Archivieren';
@@ -4003,6 +4032,8 @@ function openEditKursModal(){
   });
   document.getElementById('ekVon').value = k.von || '';
   document.getElementById('ekBis').value = k.bis || '';
+  // Berufsschultage laden
+  document.querySelectorAll('#ekBSTage input').forEach(c=>c.checked=(k.berufsschultage||[]).includes(c.value));
   document.getElementById('editKursModal').classList.add('open');
 }
 function closeEditKursModal(){ document.getElementById('editKursModal').classList.remove('open'); }
@@ -4025,6 +4056,7 @@ function saveEditKurs(){
   }
   const update = {
     von, bis,
+    berufsschultage: Array.from(document.querySelectorAll('#ekBSTage input:checked')).map(c=>c.value),
     ausbilderId: ausbId || '',
     ausbilderName: ausbObj ? ausbObj.name : '',
     ausbilderEmail: ausbObj ? (ausbObj.email||'') : '', ausbilderLoginEmail: ausbObj ? (ausbObj.loginEmail||ausbObj.email||'') : '', ausbilderTel: ausbObj ? (ausbObj.tel||'') : '',
@@ -5428,7 +5460,8 @@ function renderGantt(){
       else if(k.bis&&k.bis<todayISO) cls='gb-beendet';
       const label=k.lehrgangsart||k.name||'';
       const tnCnt=k.entwurf?(k.entwurfTNIds||[]).length:(_kursTNCounts[k.id]||0);
-      barsHTML+='<div class="gantt-bar '+cls+'" style="left:'+x+'px;width:'+w+'px" onclick="showKursDetail(\''+k.id+'\')" title="'+esc(label)+' ('+fmtDE(k.von)+' – '+fmtDE(k.bis)+') · '+tnCnt+' TN">'+esc(label)+'</div>';
+      const bsTage=(k.berufsschultage||[]).length?(' · 🎓 '+k.berufsschultage.join(',')):'';
+      barsHTML+='<div class="gantt-bar '+cls+'" style="left:'+x+'px;width:'+w+'px" onclick="showKursDetail(\''+k.id+'\')" title="'+esc(label)+' ('+fmtDE(k.von)+' – '+fmtDE(k.bis)+') · '+tnCnt+' TN'+bsTage+'">'+esc(label)+'</div>';
     });
 
     // Urlaub bars
@@ -6151,6 +6184,7 @@ function openKursBuilder(){
   document.getElementById('bldVon').value = today;
   document.getElementById('bldBis').value = today;
   const bldBeschr=document.getElementById('bldBeschreibung'); if(bldBeschr) bldBeschr.value='';
+  setBldBSTage([]);
   // Aktuelles Datum anzeigen
   const heuteEl = document.getElementById('bldHeute');
   if(heuteEl) heuteEl.textContent = 'Heute: ' + new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -6673,6 +6707,13 @@ function renderBldTNList(){
 
 let _bldEditKursId=null; // Wenn Planung bearbeitet wird
 
+function getBldBSTage(){
+  return Array.from(document.querySelectorAll('#bldBSTage input:checked')).map(c=>c.value);
+}
+function setBldBSTage(tage){
+  document.querySelectorAll('#bldBSTage input').forEach(c=>c.checked=(tage||[]).includes(c.value));
+}
+
 // ─── AUSBILDER ZEITRAUM-KOLLISIONSPRÜFUNG ───
 function checkAusbilderOverlap(ausbId, von, bis, excludeKursId){
   if(!ausbId||!von||!bis) return null;
@@ -6717,6 +6758,7 @@ function bldSaveEntwurf(){
     ausbilderEmail:ausbObj?.email||'', ausbilderLoginEmail:ausbObj?.loginEmail||ausbObj?.email||'', ausbilderTel:ausbObj?.tel||'',
     ausbilderId:ausbObj?.id||'',
     von, bis, beschreibung,
+    berufsschultage:getBldBSTage(),
     standortName:standort?.name||'',
     standortAdresse:standort?((standort.strasse||'')+(standort.plz?' · '+standort.plz:'')+(standort.ort?' '+standort.ort:'')).trim():'',
     standortGebaeude:standort?.gebaeude||'',
@@ -6790,6 +6832,7 @@ function openEntwurf(kursId){
   document.getElementById('bldVon').value=k.von||'';
   document.getElementById('bldBis').value=k.bis||'';
   const bldBeschr2=document.getElementById('bldBeschreibung'); if(bldBeschr2) bldBeschr2.value=k.beschreibung||'';
+  setBldBSTage(k.berufsschultage||[]);
   const heuteEl=document.getElementById('bldHeute');
   if(heuteEl) heuteEl.textContent='Heute: '+new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -6933,6 +6976,7 @@ function bldUebertragen(){
     ausbilderEmail: ausbObj.email || '', ausbilderLoginEmail: ausbObj.loginEmail || ausbObj.email || '', ausbilderTel: ausbObj.tel || '',
     ausbilderId: ausbObj.id,
     von, bis,
+    berufsschultage: getBldBSTage(),
     // Standort
     standortName: standort?.name||'',
     standortAdresse: standort?((standort.strasse||'')+(standort.plz?' · '+standort.plz:'')+(standort.ort?' '+standort.ort:'')).trim():'',
