@@ -718,6 +718,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           </div>
           <button class="btn-sm btn-ok" onclick="openEditKursModal()">✏️ Bearbeiten</button>
           <button class="btn-sm" onclick="generateTNListe()" style="padding:6px 12px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">📋 TN-Liste</button>
+          <button class="btn-sm" onclick="generateBetriebsliste()" style="padding:6px 12px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">🏢 Betriebsliste</button>
+          <button class="btn-sm" onclick="generateAlleBescheinigungen()" style="padding:6px 12px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">📄 Alle Bescheinigungen</button>
           <button class="btn-sm" onclick="generateAlleBescheinigungen()" style="padding:6px 12px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">📄 Alle Bescheinigungen</button>
           <button class="btn-sm" onclick="kursAusfallVerwaltung()" style="padding:6px 12px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#ef4444">⚠️ Ausfall</button>
           <button class="btn-sm" id="kdArchiveBtn" onclick="toggleArchiveKurs()" style="padding:6px 12px">📦 Archivieren</button>
@@ -4131,6 +4133,168 @@ function kursAusfallVerwaltung(){
       }).catch(err=>toast('Fehler: '+err.message,'bad'));
     }
   );
+}
+
+// ─── BETRIEBSLISTE ───
+function generateBetriebsliste(){
+  if(!_selectedKursId){toast('Kein Kurs gewählt','bad');return;}
+  const kurs=_kurse.find(k=>k.id===_selectedKursId);
+  if(!kurs){toast('Kurs nicht gefunden','bad');return;}
+  db.collection('globalTN').where('aktiverKursId','==',_selectedKursId).get().then(snap=>{
+    const tns=[];
+    snap.forEach(doc=>tns.push({id:doc.id,...doc.data()}));
+    tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
+    if(!tns.length){toast('Keine TN im Kurs','bad');return;}
+    const kursName=kurs.lehrgangsart||(kurs.name||'');
+    const dauer=fmtDE(kurs.von)+' – '+fmtDE(kurs.bis);
+    const ausbName=kurs.ausbilderName||'';
+    const w=window.open('','_blank');
+    if(!w){toast('Popup blockiert','bad');return;}
+    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Betriebsliste – ${esc(kursName)}</title>
+<style>
+@page{size:A4 landscape;margin:12mm;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;font-size:9pt;color:#000;padding:12mm;}
+@media print{body{padding:0;}.no-print{display:none !important;}}
+h1{font-size:14pt;margin-bottom:2mm;}
+.meta{font-size:9pt;color:#444;margin-bottom:4mm;}
+table{width:100%;border-collapse:collapse;margin-top:4mm;}
+th,td{border:1px solid #000;padding:4px 6px;text-align:left;vertical-align:top;font-size:8.5pt;}
+th{background:#f0f2f8;font-weight:bold;font-size:8pt;}
+td.nr{text-align:center;width:30px;}
+.print-btn{display:inline-block;margin:8px 4px;padding:10px 28px;font-size:13px;font-weight:bold;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;}
+</style></head><body>
+<div class="no-print" style="text-align:center;margin-bottom:8px">
+  <button class="print-btn" onclick="window.print()">🖨 Drucken / PDF</button>
+</div>
+<h1>🏢 Betriebsliste – ${esc(kursName)}</h1>
+<div class="meta">${dauer} · Ausbilder: ${esc(ausbName)} · ${tns.length} Teilnehmer</div>
+<table>
+<thead>
+<tr>
+  <th style="width:30px">Nr.</th>
+  <th style="width:160px">Nachname, Vorname</th>
+  <th>Ausbildungsbetrieb</th>
+  <th>Beruf / Fachrichtung</th>
+  <th style="width:40px">Lj.</th>
+  <th>E-Mail TN</th>
+  <th>Telefon TN</th>
+</tr>
+</thead>
+<tbody>
+${tns.map((t,i)=>{
+  return '<tr>'
+    +'<td class="nr">'+(i+1)+'</td>'
+    +'<td>'+esc((t.nachname||'')+', '+(t.vorname||''))+'</td>'
+    +'<td>'+esc(t.firma||'–')+'</td>'
+    +'<td>'+esc(t.beruf||'–')+'</td>'
+    +'<td style="text-align:center">'+(t.ausbjahr||'–')+'</td>'
+    +'<td>'+esc(t.email||'–')+'</td>'
+    +'<td>'+esc(t.tel||'–')+'</td>'
+    +'</tr>';
+}).join('')}
+</tbody>
+</table>
+</body></html>`);
+    w.document.close();
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// ─── MASSENBESCHEINIGUNG (alle TN eines Kurses) ───
+function generateAlleBescheinigungen(){
+  if(!_selectedKursId){toast('Kein Kurs gewählt','bad');return;}
+  const kurs=_kurse.find(k=>k.id===_selectedKursId);
+  if(!kurs){toast('Kurs nicht gefunden','bad');return;}
+  const kursId=_selectedKursId;
+  const kursName=kurs.lehrgangsart||(kurs.name||'');
+  const kursBeschreibung=kurs.inhalt||kurs.beschreibung||'';
+  const kursLabel=kursName+(kursBeschreibung?' '+kursBeschreibung:'');
+  const ausbName=kurs.ausbilderName||kurs.ausbilder||'';
+  const ort=kurs.standort||'Siegburg';
+  const von=fmtDE(kurs.von)||'___';
+  const bis=fmtDE(kurs.bis)||'___';
+  // 1. Alle TN laden
+  // 2. Alle Sync-Daten laden
+  Promise.all([
+    db.collection('globalTN').where('aktiverKursId','==',kursId).get(),
+    db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').get()
+  ]).then(([tnSnap, syncSnap])=>{
+    const tnMap={};
+    tnSnap.forEach(doc=>tnMap[doc.id]={id:doc.id,...doc.data()});
+    const syncMap={};
+    syncSnap.forEach(doc=>syncMap[doc.id]=doc.data());
+    const tns=Object.values(tnMap).sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
+    if(!tns.length){toast('Keine TN im Kurs','bad');return;}
+    const w=window.open('','_blank');
+    if(!w){toast('Popup blockiert','bad');return;}
+    let pages=tns.map((t,idx)=>{
+      const name=((t.vorname||'')+' '+(t.nachname||'')).trim();
+      const geb=t.geburtsdatum?fmtDE(t.geburtsdatum):'___________';
+      const d=syncMap[t.id]||{};
+      const fuehrung=d.noten_fuehrung||'';
+      const mitarbeit=d.noten_mitarbeit||'';
+      const praxis=d.noten_praxis||'';
+      const fehltage=(d.attAbsentE||0)+(d.attAbsentU||0)+(d.attSick||0);
+      const verspaetungen=d.attLate||0;
+      const bemerkung=d.bemerkung||'';
+      const sigData=d.bescheinigungSignatur||'';
+      const pb=idx>0?'page-break-before:always;':'';
+      return `<div style="${pb}">
+<div class="header"><div class="org">KREISHANDWERKERSCHAFT BONN · RHEIN-SIEG</div><div class="sub">– Handwerkliches Bildungszentrum –</div><div class="standorte">HBZ Bonn &nbsp;|&nbsp; HBZ Siegburg</div></div>
+<h1>Teilnahmebescheinigung</h1>
+<div class="field">Der/die Auszubildende <b>${esc(name)}</b></div>
+<div class="field">geboren am <b>${geb}</b></div>
+<div class="field" style="margin-top:5mm">hat in der Zeit vom <b>${von}</b> bis <b>${bis}</b></div>
+<div class="field">an folgender überbetrieblichen Unterweisung teilgenommen.</div>
+<div class="field" style="margin-top:4mm"><b>${esc(kursLabel)}</b></div>
+<table class="noten-table"><tr><td>Führung:</td><td>${fuehrung||'...'}</td></tr><tr><td>Mitarbeit:</td><td>${mitarbeit||'...'}</td></tr><tr><td>Fachkenntnisse (praktisch):</td><td>${praxis||'...'}</td></tr></table>
+<div class="field"><b>Fehltage:</b> <span class="dots">${fehltage||'...'}</span> &nbsp;&nbsp; <b>Verspätungen:</b> <span class="dots">${verspaetungen||'...'}</span></div>
+<div class="field" style="margin-top:3mm"><b>Besondere Bemerkungen:</b><br><span class="dots-long">${bemerkung?' '+esc(bemerkung)+' ':'...'}</span></div>
+<div class="checkbox-row" style="margin-top:5mm"><b>Ausbildungsnachweis wurde für den Zeitraum der ÜLU geführt:</b> &nbsp;<span class="cb"></span> ja &nbsp;&nbsp;<span class="cb"></span> nein</div>
+<div class="field" style="margin-top:8mm"><b>${esc(ort)}, den ${bis}</b></div>
+<div class="sig-row">
+  <div class="sig-block"><div style="height:80px"></div><div class="sig-line">Lehrgangsleiter</div></div>
+  <div class="sig-block">${sigData?'<img src="'+sigData+'" class="sig-img">':'<div style="height:80px"></div>'}<div class="sig-line">Ausbilder (Meister)${ausbName?' – '+esc(ausbName):''}</div></div>
+</div>
+<div class="hinweis">Diese Bescheinigung ist nach Beendigung des Lehrgangs dem Meister zur Unterschrift vorzulegen<br>und später mit den Anmeldeunterlagen zur Gesellenprüfung einzureichen.</div>
+<div class="footer"><b>HBZ Siegburg</b> · Gerhart-Hauptmann-Weg 2 · 53721 Siegburg &nbsp;|&nbsp; <b>HBZ Bonn</b> · Ennemoseste. 10 · 53119 Bonn<br>Tel.: 02241/990-0 · Fax 02241/990-100 · www.khs-handwerk.de · postfach@khs-handwerk.de</div>
+</div>`;
+    }).join('');
+    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Bescheinigungen – ${esc(kursName)} (${tns.length} TN)</title>
+<style>
+@page{size:A4;margin:20mm 20mm 15mm 20mm;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Times New Roman',Times,serif;font-size:12pt;color:#000;line-height:1.5;padding:20mm;max-width:210mm;margin:0 auto;}
+@media print{body{padding:0;}.no-print{display:none !important;}}
+.header{text-align:center;margin-bottom:8mm;border-bottom:1px solid #000;padding-bottom:4mm;}
+.header .org{font-size:13pt;font-weight:bold;letter-spacing:.5px;}
+.header .sub{font-size:10pt;margin-top:1mm;}
+.header .standorte{font-size:9pt;color:#444;margin-top:2mm;}
+h1{text-align:center;font-size:16pt;font-weight:bold;margin:8mm 0;text-decoration:underline;}
+.field{margin:3mm 0;}.field b{font-weight:bold;}
+.dots{display:inline-block;min-width:60mm;border-bottom:1px dotted #888;padding-bottom:1px;}
+.dots-long{display:inline-block;min-width:120mm;border-bottom:1px dotted #888;padding-bottom:1px;}
+.noten-table{width:100%;margin:5mm 0;border-collapse:collapse;}
+.noten-table td{padding:2mm 3mm;font-size:11pt;}
+.noten-table td:first-child{font-weight:bold;width:45%;}
+.noten-table td:last-child{border-bottom:1px dotted #888;}
+.sig-row{display:flex;justify-content:space-between;margin-top:12mm;align-items:flex-end;}
+.sig-block{text-align:center;width:45%;}
+.sig-line{border-top:1px solid #000;padding-top:2mm;font-size:9pt;}
+.sig-img{width:100%;max-width:200px;height:80px;object-fit:contain;}
+.footer{margin-top:10mm;padding-top:4mm;border-top:1px solid #ccc;font-size:8pt;text-align:center;color:#444;}
+.hinweis{margin-top:8mm;font-size:9pt;font-style:italic;text-align:center;}
+.checkbox-row{margin:3mm 0;font-size:11pt;}
+.cb{display:inline-block;width:12pt;height:12pt;border:1.5pt solid #000;border-radius:2pt;margin:0 3pt;vertical-align:middle;}
+.print-btn{display:inline-block;margin:8px 4px;padding:10px 28px;font-size:13px;font-weight:bold;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;}
+</style></head><body>
+<div class="no-print" style="text-align:center;margin-bottom:8px">
+  <button class="print-btn" onclick="window.print()">🖨 Alle drucken (${tns.length} Bescheinigungen)</button>
+</div>
+${pages}
+</body></html>`);
+    w.document.close();
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 // ─── TEILNEHMENDENLISTE SA 181 NRW ───
