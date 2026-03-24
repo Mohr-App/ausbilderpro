@@ -1985,7 +1985,7 @@ function renderMain(){
     return;
   }
   el.innerHTML=
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+'</div><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button><button class="tbtn mob-view-toggle" id="viewToggle" onclick="toggleMobileView()">☰ Liste</button></div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+'</div><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📄 Bescheinigungen</button><button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button><button class="tbtn mob-view-toggle" id="viewToggle" onclick="toggleMobileView()">☰ Liste</button></div></div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
     +'<div id="seatingWrap" class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
@@ -3053,7 +3053,9 @@ function renderAtt(){
   if(bsRow) bsRow.style.display=bsCnt?'block':'none';
   const c=document.getElementById('ahist');
   if(!att.length){c.innerHTML='<p style="color:var(--mu);font-size:.73rem;text-align:center;padding:9px">Noch keine Einträge</p>';return;}
-  c.innerHTML=att.map((a,i)=>{
+  // Sortiert nach Datum absteigend (neueste oben), Original-Index beibehalten für Löschen
+  const sorted=att.map((a,i)=>({a,i})).sort((x,y)=>(y.a.date||'').localeCompare(x.a.date||''));
+  c.innerHTML=sorted.map(({a,i})=>{
     const cf=attCfg(a);
     let extra='';
     if(a.lateMins>0) extra+=' <span class="ab ab-l">'+a.lateMins+' min</span>';
@@ -3348,6 +3350,115 @@ function safeConfirm(title, body, checkLabel, btnLabel, callback){
     callback();
   };
   document.getElementById('safeConfirmModal').classList.add('open');
+}
+
+// ─── ALLE BESCHEINIGUNGEN (Massendruck – Ausbilder) ───
+function generateAlleBescheinigungenAusbilder(){
+  const inst=curInst();if(!inst)return;
+  const kursId=inst.sharedKursId;
+  if(!kursId||!_db){toast('Kein verknüpfter Kurs','bad');return;}
+  const seats=Object.values(inst.seats||{}).filter(s=>s&&s.name&&s.poolTnId);
+  if(!seats.length){toast('Keine verknüpften TN','bad');return;}
+  seats.sort((a,b)=>{
+    const pa=a.name.split(/\s+/), pb=b.name.split(/\s+/);
+    return (pa[pa.length-1]||'').localeCompare(pb[pb.length-1]||'','de');
+  });
+  // Kurs + globalTN + Sync-Daten laden
+  Promise.all([
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId).get(),
+    ...seats.map(s=>_db.collection('globalTN').doc(s.poolTnId).get().catch(()=>null)),
+    ...seats.map(s=>_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(s.poolTnId).get().catch(()=>null))
+  ]).then(results=>{
+    const kursDoc=results[0];
+    const kurs=kursDoc.exists?kursDoc.data():{};
+    const kursName=kurs.lehrgangsart||(kurs.name||'');
+    const kursBeschreibung=kurs.inhalt||kurs.beschreibung||'';
+    const kursLabel=kursName+(kursBeschreibung?' '+kursBeschreibung:'');
+    const von=fmtDE(kurs.von)||'___________';
+    const bis=fmtDE(kurs.bis)||'___________';
+    const ort=kurs.standort||'Siegburg';
+    const ausbName=_auth?.currentUser?.displayName||_auth?.currentUser?.email?.split('@')[0]||'';
+    const tnDocs=results.slice(1, 1+seats.length);
+    const syncDocs=results.slice(1+seats.length);
+    let sigCount=0;
+    const pages=seats.map((s,idx)=>{
+      const tnData=tnDocs[idx]&&tnDocs[idx].exists?tnDocs[idx].data():{};
+      const sync=syncDocs[idx]&&syncDocs[idx].exists?syncDocs[idx].data():{};
+      const name=s.name;
+      const geb=tnData.geburtsdatum?fmtDE(tnData.geburtsdatum):'___________';
+      const fuehrung=sync.noten_fuehrung||s.fuehrung||'';
+      const mitarbeit=sync.noten_mitarbeit||s.mitarbeit||'';
+      const praxis=sync.noten_praxis||s.praxis||'';
+      const fehltage=(sync.attAbsentE||0)+(sync.attAbsentU||0)+(sync.attSick||0);
+      const verspaetungen=sync.attLate||0;
+      const bemerkung=sync.bemerkung||s.bemerkung||'';
+      const sigData=sync.bescheinigungSignatur||'';
+      if(sigData) sigCount++;
+      const pb=idx>0?'page-break-before:always;':'';
+      return `<div style="${pb}">
+<div class="header"><div class="org">KREISHANDWERKERSCHAFT BONN · RHEIN-SIEG</div><div class="sub">– Handwerkliches Bildungszentrum –</div><div class="standorte">HBZ Bonn &nbsp;|&nbsp; HBZ Siegburg</div></div>
+<h1>Teilnahmebescheinigung</h1>
+<div class="field">Der/die Auszubildende <b>${esc(name)}</b></div>
+<div class="field">geboren am <b>${geb}</b></div>
+<div class="field" style="margin-top:5mm">hat in der Zeit vom <b>${von}</b> bis <b>${bis}</b></div>
+<div class="field">an folgender überbetrieblichen Unterweisung teilgenommen.</div>
+<div class="field" style="margin-top:4mm"><b>${esc(kursLabel)}</b></div>
+<table class="noten-table">
+<tr><td>Führung:</td><td>${fuehrung||'...'}</td></tr>
+<tr><td>Mitarbeit:</td><td>${mitarbeit||'...'}</td></tr>
+<tr><td>Fachkenntnisse (praktisch):</td><td>${praxis||'...'}</td></tr>
+</table>
+<div class="field"><b>Fehltage:</b> <span class="dots">${fehltage||'...'}</span> &nbsp;&nbsp; <b>Verspätungen:</b> <span class="dots">${verspaetungen||'...'}</span></div>
+<div class="field" style="margin-top:3mm"><b>Besondere Bemerkungen:</b><br><span class="dots-long">${bemerkung?' '+esc(bemerkung)+' ':'...'}</span></div>
+<div class="checkbox-row" style="margin-top:5mm"><b>Ausbildungsnachweis wurde für den Zeitraum der ÜLU geführt:</b> &nbsp;<span class="cb"></span> ja &nbsp;&nbsp;<span class="cb"></span> nein</div>
+<div class="field" style="margin-top:8mm"><b>${esc(ort)}, den ${bis}</b></div>
+<div class="sig-row">
+  <div class="sig-block"><div style="height:80px"></div><div class="sig-line">Lehrgangsleiter</div></div>
+  <div class="sig-block">${sigData?'<img src="'+sigData+'" class="sig-img">':'<div style="height:80px"></div>'}<div class="sig-line">Ausbilder (Meister)${ausbName?' – '+esc(ausbName):''}</div></div>
+</div>
+<div class="hinweis">Diese Bescheinigung ist nach Beendigung des Lehrgangs dem Meister zur Unterschrift vorzulegen<br>und später mit den Anmeldeunterlagen zur Gesellenprüfung einzureichen.</div>
+<div class="footer"><b>HBZ Siegburg</b> · Gerhart-Hauptmann-Weg 2 · 53721 Siegburg &nbsp;|&nbsp; <b>HBZ Bonn</b> · Ennemoseste. 10 · 53119 Bonn<br>Tel.: 02241/990-0 · Fax 02241/990-100 · www.khs-handwerk.de · postfach@khs-handwerk.de</div>
+</div>`;
+    }).join('');
+    const w=window.open('','_blank');
+    if(!w){toast('Popup blockiert','bad');return;}
+    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Bescheinigungen – ${esc(kursName)}</title>
+<style>
+@page{size:A4;margin:20mm 20mm 15mm 20mm;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Times New Roman',Times,serif;font-size:12pt;color:#000;line-height:1.5;padding:20mm;max-width:210mm;margin:0 auto;}
+@media print{body{padding:0;}.no-print{display:none !important;}}
+.header{text-align:center;margin-bottom:8mm;border-bottom:1px solid #000;padding-bottom:4mm;}
+.header .org{font-size:13pt;font-weight:bold;letter-spacing:.5px;}
+.header .sub{font-size:10pt;margin-top:1mm;}
+.header .standorte{font-size:9pt;color:#444;margin-top:2mm;}
+h1{text-align:center;font-size:16pt;font-weight:bold;margin:8mm 0;text-decoration:underline;}
+.field{margin:3mm 0;}.field b{font-weight:bold;}
+.dots{display:inline-block;min-width:60mm;border-bottom:1px dotted #888;padding-bottom:1px;}
+.dots-long{display:inline-block;min-width:120mm;border-bottom:1px dotted #888;padding-bottom:1px;}
+.noten-table{width:100%;margin:5mm 0;border-collapse:collapse;}
+.noten-table td{padding:2mm 3mm;font-size:11pt;}
+.noten-table td:first-child{font-weight:bold;width:45%;}
+.noten-table td:last-child{border-bottom:1px dotted #888;}
+.sig-row{display:flex;justify-content:space-between;margin-top:12mm;align-items:flex-end;}
+.sig-block{text-align:center;width:45%;}
+.sig-line{border-top:1px solid #000;padding-top:2mm;font-size:9pt;}
+.sig-img{width:100%;max-width:200px;height:80px;object-fit:contain;}
+.footer{margin-top:10mm;padding-top:4mm;border-top:1px solid #ccc;font-size:8pt;text-align:center;color:#444;}
+.hinweis{margin-top:8mm;font-size:9pt;font-style:italic;text-align:center;}
+.checkbox-row{margin:3mm 0;font-size:11pt;}
+.cb{display:inline-block;width:12pt;height:12pt;border:1.5pt solid #000;border-radius:2pt;margin:0 3pt;vertical-align:middle;}
+.print-btn{display:inline-block;margin:8px 4px;padding:12px 28px;font-size:14px;font-weight:bold;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;}
+.print-btn:hover{background:#1d4ed8;}
+</style></head><body>
+<div style="text-align:center" class="no-print">
+  <button class="print-btn" onclick="window.print()">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
+  <div style="font-size:12px;color:#475569;margin:6px 0">${seats.length} Teilnehmer · ${sigCount} unterschrieben · ${seats.length-sigCount} offen</div>
+</div>
+${pages}
+</body></html>`);
+    w.document.close();
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 // ─── KURS AUSFALL – Benachrichtigung an Azubi + Arbeitgeber ───
