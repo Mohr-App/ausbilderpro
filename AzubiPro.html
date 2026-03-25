@@ -476,9 +476,14 @@ function loadKurse(){
       html+='</div>';
     }
 
-    // Alle Kurse als Liste
-    html+='<div class="card"><div class="card-title">📅 Alle Lehrgänge ('+_kurse.length+')</div>';
-    _kurse.forEach(k=>{
+    // Alle Kurse als Liste (ohne den hervorgehobenen oben)
+    const listeKurse=_kurse.filter(k=>{
+      if(highlight && k.id===highlight.id && !unconfirmed.find(u=>u.id===k.id)) return false;
+      return true;
+    });
+    if(listeKurse.length){
+    html+='<div class="card"><div class="card-title">📅 Weitere Lehrgänge ('+listeKurse.length+')</div>';
+    listeKurse.forEach(k=>{
       let st='beendet', stLabel='Beendet';
       if(k.von&&k.bis&&today>=k.von&&today<=k.bis){ st='laufend'; stLabel='● Laufend'; }
       else if(k.von&&k.von>today){ st='geplant'; stLabel='◐ Geplant'; }
@@ -492,6 +497,7 @@ function loadKurse(){
       html+='</div>';
     });
     html+='</div>';
+    }
 
     el.innerHTML=html;
     });
