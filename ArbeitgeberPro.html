@@ -248,47 +248,18 @@ function renderStats(){
 function renderAzubiList(){
   const el=document.getElementById('azubiList');
   if(!_azubis.length){el.innerHTML='<div class="empty">Keine Auszubildenden gefunden.<br>Bitte wenden Sie sich an die Hauptverwaltung.</div>';return;}
-  // Archiv-System
-  const archived=_getArchived();
-  const showArchived=window._showArchived||false;
-  // Merke offene Karten
   const openIds=new Set();
   document.querySelectorAll('.azubi-card.expanded').forEach(c=>{if(c.dataset.tnId)openIds.add(c.dataset.tnId);});
   el.innerHTML='';
   const today=new Date().toISOString().slice(0,10);
-  // Sortieren: aktive zuerst, archivierte hinten
-  const sortedAzubis=[..._azubis];
-  // Auto-Unarchiv: Wenn TN wieder einen laufenden Kurs hat, automatisch aus Archiv nehmen
-  let archChanged=false;
-  sortedAzubis.forEach(a=>{
-    if(archived.includes(a.id)&&a.aktiverKursId){
-      const k=_kurse[a.aktiverKursId];
-      if(k&&k.von&&k.von<=today&&(!k.bis||k.bis>=today)){
-        const idx=archived.indexOf(a.id);
-        if(idx>=0){archived.splice(idx,1);archChanged=true;}
-      }
-    }
-  });
-  if(archChanged) _saveArchived(archived);
-  const activeList=sortedAzubis.filter(a=>!archived.includes(a.id));
-  const archivedList=sortedAzubis.filter(a=>archived.includes(a.id));
-  // Sync-Hinweis (immer anzeigen)
+  // Sync-Hinweis
   const hint=document.createElement('div');
   hint.id='agSyncHint';
   hint.style.cssText='font-size:.58rem;color:var(--mu);margin-bottom:10px;padding:0 4px';
   el.appendChild(hint);
   renderAGSyncStatus();
-  // Archiv-Toggle
-  if(archivedList.length){
-    const toggle=document.createElement('div');
-    toggle.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;margin-bottom:10px;cursor:pointer;user-select:none';
-    toggle.innerHTML='<span style="font-size:.72rem;color:var(--mu);font-weight:600">📦 '+archivedList.length+' archivierte Azubi'+(archivedList.length>1?'s':'')+'</span><span style="font-size:.62rem;color:var(--acc);font-weight:700">'+(showArchived?'▾ Ausblenden':'▸ Anzeigen')+'</span>';
-    toggle.onclick=()=>{window._showArchived=!window._showArchived;renderAzubiList();};
-    el.appendChild(toggle);
-  }
-  const displayList=showArchived?[...activeList,...archivedList]:activeList;
-  displayList.forEach(a=>{
-    const isArchived=archived.includes(a.id);
+  _azubis.forEach(a=>{
+    const isArchived=false;
     const name=((a.vorname||'')+' '+(a.nachname||'')).trim();
     const init=((a.vorname||'?')[0]+(a.nachname||'?')[0]).toUpperCase();
     const kurs=a.aktiverKursId&&_kurse[a.aktiverKursId]&&_kurse[a.aktiverKursId].von?_kurse[a.aktiverKursId]:null;
@@ -357,13 +328,6 @@ function renderAzubiList(){
       }
       // Noten nur nach Kursende anzeigen
       const kursBeendet=kurs.bis&&today>kurs.bis;
-      if(kursBeendet){
-        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd);text-align:center">'
-          +(isArchived
-            ?'<button onclick="event.stopPropagation();agUnarchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid rgba(37,99,235,.3);background:rgba(37,99,235,.06);color:var(--acc);border-radius:7px;cursor:pointer;font-weight:600">📤 Wiederherstellen</button>'
-            :'<button onclick="event.stopPropagation();agArchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid var(--brd);background:var(--sur2);color:var(--mu);border-radius:7px;cursor:pointer;font-weight:600">📦 Archivieren</button>')
-          +'</div>';
-      }
       if(kursBeendet&&td&&(td.noten_mitarbeit||td.noten_fuehrung||td.noten_praxis)){
         h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">📝 BENOTUNG</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
         if(td.noten_mitarbeit)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Mitarbeit: '+esc(td.noten_mitarbeit)+'</span>';
@@ -375,26 +339,59 @@ function renderAzubiList(){
         h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.65rem;color:var(--mu);font-style:italic">📝 Benotung wird nach Kursende sichtbar.</div></div>';
       }
       h+='</div>';
+      // Kurshistorie (wie bei AzubiPro)
+      const hist=(a.kursHistory||[]).filter(hh=>hh.kursId!==a.aktiverKursId&&!hh.abgebrochen&&!hh.entfernt&&!hh.nichtErschienen).sort((x,y)=>(y.von||'').localeCompare(x.von||''));
+      if(hist.length){
+        h+='<div style="margin-top:10px"><div style="font-size:.68rem;font-weight:800;color:var(--mu);letter-spacing:.04em;margin-bottom:6px">📅 WEITERE LEHRGÄNGE ('+hist.length+')</div>';
+        hist.forEach(hh=>{
+          h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:7px;margin-bottom:4px">'
+            +'<div style="width:6px;height:6px;border-radius:50%;background:#9ca3af;flex-shrink:0"></div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:700">'+esc(hh.kursName||'Lehrgang')+'</div>'
+            +'<div style="font-size:.6rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(hh.von)+' – '+fmtDE(hh.bis)+'</div></div>'
+            +'<span style="font-size:.55rem;padding:2px 6px;border-radius:4px;background:rgba(148,163,184,.1);color:#94a3b8;font-weight:700">Beendet</span>'
+            +'</div>';
+        });
+        h+='</div>';
+      }
       detail.innerHTML=h;
     } else if(lastAbgebr){
-      detail.innerHTML='<div class="kurs-box" style="border-color:rgba(220,38,38,.3)">'
+      let h2='<div class="kurs-box" style="border-color:rgba(220,38,38,.3)">'
         +'<div style="font-size:.75rem;padding:8px 10px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.2);border-radius:7px;margin-bottom:8px;color:#dc2626;font-weight:700">⚠ Lehrgang wurde abgebrochen</div>'
         +'<div class="kurs-name" style="opacity:.6">📚 '+esc(lastAbgebr.kursName||'Lehrgang')+'</div>'
         +'<div class="kurs-meta" style="opacity:.6">'+fmtDE(lastAbgebr.von)+' – '+fmtDE(lastAbgebr.bis)+'</div>'
         +(lastAbgebr.ausbilderName?'<div class="kurs-field" style="opacity:.6"><span class="kurs-field-label">Ausbilder</span><span>'+esc(lastAbgebr.ausbilderName)+'</span></div>':'')
         +'<div style="text-align:center;color:var(--mu);font-size:.72rem;padding:8px 0;margin-top:6px;border-top:1px solid var(--brd)">Wartet auf neuen Lehrgang</div>'
-        +'<div style="text-align:center;margin-top:6px">'
-        +(isArchived
-          ?'<button onclick="event.stopPropagation();agUnarchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid rgba(37,99,235,.3);background:rgba(37,99,235,.06);color:var(--acc);border-radius:7px;cursor:pointer;font-weight:600">📤 Wiederherstellen</button>'
-          :'<button onclick="event.stopPropagation();agArchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid var(--brd);background:var(--sur2);color:var(--mu);border-radius:7px;cursor:pointer;font-weight:600">📦 Archivieren</button>')
-        +'</div>'
         +'</div>';
+      const hist2=(a.kursHistory||[]).filter(hh=>!hh.abgebrochen&&!hh.entfernt&&!hh.nichtErschienen).sort((x,y)=>(y.von||'').localeCompare(x.von||''));
+      if(hist2.length){
+        h2+='<div style="margin-top:10px"><div style="font-size:.68rem;font-weight:800;color:var(--mu);letter-spacing:.04em;margin-bottom:6px">📅 WEITERE LEHRGÄNGE ('+hist2.length+')</div>';
+        hist2.forEach(hh=>{
+          h2+='<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:7px;margin-bottom:4px">'
+            +'<div style="width:6px;height:6px;border-radius:50%;background:#9ca3af;flex-shrink:0"></div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:700">'+esc(hh.kursName||'Lehrgang')+'</div>'
+            +'<div style="font-size:.6rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(hh.von)+' – '+fmtDE(hh.bis)+'</div></div>'
+            +'<span style="font-size:.55rem;padding:2px 6px;border-radius:4px;background:rgba(148,163,184,.1);color:#94a3b8;font-weight:700">Beendet</span>'
+            +'</div>';
+        });
+        h2+='</div>';
+      }
+      detail.innerHTML=h2;
     } else {
-      detail.innerHTML='<div class="kurs-box"><div style="text-align:center;color:var(--mu);font-size:.78rem;padding:10px">Aktuell keinem Lehrgang zugewiesen.</div>'
-        +(isArchived
-          ?'<div style="text-align:center;margin-top:6px"><button onclick="event.stopPropagation();agUnarchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid rgba(37,99,235,.3);background:rgba(37,99,235,.06);color:var(--acc);border-radius:7px;cursor:pointer;font-weight:600">📤 Wiederherstellen</button></div>'
-          :'<div style="text-align:center;margin-top:6px"><button onclick="event.stopPropagation();agArchive(\''+a.id+'\')" style="font-size:.68rem;padding:6px 16px;border:1.5px solid var(--brd);background:var(--sur2);color:var(--mu);border-radius:7px;cursor:pointer;font-weight:600">📦 Archivieren</button></div>')
-        +'</div>';
+      let h3='<div class="kurs-box"><div style="text-align:center;color:var(--mu);font-size:.78rem;padding:10px">Aktuell keinem Lehrgang zugewiesen.</div></div>';
+      const hist3=(a.kursHistory||[]).filter(hh=>!hh.abgebrochen&&!hh.entfernt&&!hh.nichtErschienen).sort((x,y)=>(y.von||'').localeCompare(x.von||''));
+      if(hist3.length){
+        h3+='<div style="margin-top:10px"><div style="font-size:.68rem;font-weight:800;color:var(--mu);letter-spacing:.04em;margin-bottom:6px">📅 BISHERIGE LEHRGÄNGE ('+hist3.length+')</div>';
+        hist3.forEach(hh=>{
+          h3+='<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:7px;margin-bottom:4px">'
+            +'<div style="width:6px;height:6px;border-radius:50%;background:#9ca3af;flex-shrink:0"></div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:700">'+esc(hh.kursName||'Lehrgang')+'</div>'
+            +'<div style="font-size:.6rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(hh.von)+' – '+fmtDE(hh.bis)+'</div></div>'
+            +'<span style="font-size:.55rem;padding:2px 6px;border-radius:4px;background:rgba(148,163,184,.1);color:#94a3b8;font-weight:700">Beendet</span>'
+            +'</div>';
+        });
+        h3+='</div>';
+      }
+      detail.innerHTML=h3;
     }
     // Urlaub IMMER anzeigen (unabhängig von Kurs)
     const tnUrlaub=a.urlaub||[];
