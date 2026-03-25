@@ -1103,13 +1103,23 @@ service cloud.firestore {
 
       <!-- ADD/EDIT VERWALTUNG MODAL -->
       <div class="ov" id="addVerwModal">
-        <div class="modal" style="max-width:380px">
+        <div class="modal" style="max-width:400px">
           <div class="mhd"><div class="mtit" id="addVerwModalTit">Verwaltung-Mitarbeiter hinzufügen</div><button class="xcls" onclick="safeClose('addVerwModal',closeAddVerwModal)">&#10005;</button></div>
           <div class="mbdy">
             <input type="hidden" id="addVerwId">
             <div class="fg"><label class="fl">Name <span style="color:var(--bad)">*</span></label><input class="fi" id="addVerwNameInp" placeholder="Vor- und Nachname"></div>
             <div class="fg"><label class="fl">E-Mail <span style="color:var(--bad)">*</span></label><input class="fi" id="addVerwEmailInp" type="email" placeholder="name@hbz.de"></div>
-            <div style="display:flex;gap:8px;margin-top:10px">
+            <div id="addVerwPwRow" style="margin-top:8px">
+              <div class="fg"><label class="fl">Startpasswort <span style="color:var(--bad)">*</span></label><input class="fi" id="addVerwPw" value="Verwaltung2026!" placeholder="Min. 6 Zeichen"></div>
+              <div style="font-size:.6rem;color:var(--mu);margin-top:2px">Mitarbeiter kann das Passwort nach dem ersten Login ändern.</div>
+            </div>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;cursor:pointer;padding:8px 10px;border-radius:8px;border:2px solid #e2e8f0;transition:all .12s" id="addVerwSettingsLabel">
+                <input type="checkbox" id="addVerwSettings" style="width:16px;height:16px;cursor:pointer;accent-color:#3b82f6">
+                <span>⚙️ Zugang zu Einstellungen (Ausbilder, Lehrgangsarten, Berufsgruppen)</span>
+              </label>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px">
               <button class="btn-sm" id="addVerwDelBtn" style="flex:1;display:none;background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)" onclick="confirmDeleteVerw()">&#128465; Löschen</button>
               <button class="btn-sm btn-ok" style="flex:2" onclick="saveVerw()">&#10003; Speichern</button>
             </div>
@@ -1557,10 +1567,19 @@ function grantAccess(u, role){
   // Badge zeigt Rolle
   const badge = document.getElementById('hdrBadge');
   if(badge) badge.textContent = role==='admin' ? 'ADMIN' : 'VERWALTUNG';
-  // Einstellungen + Ausbilder-Button nur für Admin
+  // Einstellungen: Admin immer, Verwaltung nur mit canSettings
   if(role !== 'admin'){
     const settingsBtn = document.getElementById('nav-einstellungen');
-    if(settingsBtn) settingsBtn.style.display='none';
+    // Prüfe ob canSettings in der Verwaltung-Collection oder users-Doc gesetzt ist
+    db.collection('shared').doc('kursSettings').collection('verwaltung')
+      .where('email','==',_email.toLowerCase()).limit(1).get().then(snap=>{
+        if(!snap.empty){
+          const vData=snap.docs[0].data();
+          if(!vData.canSettings && settingsBtn) settingsBtn.style.display='none';
+        } else {
+          if(settingsBtn) settingsBtn.style.display='none';
+        }
+      }).catch(()=>{if(settingsBtn) settingsBtn.style.display='none';});
   }
   loadAll();
   loadAusbilderEmails();
@@ -3621,18 +3640,22 @@ function renderVerwListSettings(){
   const el=document.getElementById('verwListSettings');
   if(!el) return;
   if(!_verwaltung.length){ el.innerHTML='<div style="font-size:.72rem;color:var(--mu);font-style:italic">Noch keine Verwaltung-Mitarbeiter angelegt</div>'; return; }
-  el.innerHTML=_verwaltung.map(v=>
-    '<div class="settings-row" onclick="openEditVerw(\''+v.id+'\')">'
-    +'<div><div class="settings-row-name">🏢 '+esc(v.name)+'</div>'
+  el.innerHTML=_verwaltung.map(v=>{
+    const settingsBadge=v.canSettings?'<span style="font-size:.55rem;padding:2px 6px;background:rgba(59,130,246,.12);color:#3b82f6;border-radius:5px;font-weight:700;margin-left:6px">⚙️ Settings</span>':'';
+    return '<div class="settings-row" onclick="openEditVerw(\''+v.id+'\')">'
+    +'<div><div class="settings-row-name">🏢 '+esc(v.name)+settingsBadge+'</div>'
     +'<div class="settings-row-sub">'+esc(v.email||'')+'</div></div>'
-    +'</div>'
-  ).join('');
+    +'</div>';
+  }).join('');
 }
 
 function openAddVerwModal(){
   document.getElementById('addVerwId').value='';
   document.getElementById('addVerwNameInp').value='';
   document.getElementById('addVerwEmailInp').value='';
+  document.getElementById('addVerwPw').value='Verwaltung2026!';
+  document.getElementById('addVerwPwRow').style.display='';
+  document.getElementById('addVerwSettings').checked=false;
   document.getElementById('addVerwModalTit').textContent='Verwaltung-Mitarbeiter hinzufügen';
   document.getElementById('addVerwDelBtn').style.display='none';
   document.getElementById('addVerwModal').classList.add('open');
@@ -3642,6 +3665,8 @@ function openEditVerw(id){
   document.getElementById('addVerwId').value=id;
   document.getElementById('addVerwNameInp').value=v.name||'';
   document.getElementById('addVerwEmailInp').value=v.email||'';
+  document.getElementById('addVerwPwRow').style.display='none'; // Passwort nur beim Erstellen
+  document.getElementById('addVerwSettings').checked=!!v.canSettings;
   document.getElementById('addVerwModalTit').textContent='Verwaltung-Mitarbeiter bearbeiten';
   document.getElementById('addVerwDelBtn').style.display='';
   document.getElementById('addVerwModal').classList.add('open');
@@ -3652,13 +3677,43 @@ function saveVerw(){
   const id=document.getElementById('addVerwId').value;
   const name=(document.getElementById('addVerwNameInp').value||'').trim();
   const email=(document.getElementById('addVerwEmailInp').value||'').trim().toLowerCase();
+  const canSettings=document.getElementById('addVerwSettings')?.checked||false;
   if(!name){toast('Bitte Name eingeben','bad');return;}
   if(!email){toast('Bitte E-Mail eingeben','bad');return;}
   const col=db.collection('shared').doc('kursSettings').collection('verwaltung');
-  const data={name,email};
-  const p=id?col.doc(id).update(data):col.add(data);
-  p.then(()=>{closeAddVerwModal();toast('Gespeichert ✓');})
-   .catch(err=>toast('Fehler: '+err.message,'bad'));
+  const data={name,email,canSettings};
+  if(id){
+    // Bearbeiten – Daten updaten + canSettings in users synchen
+    col.doc(id).update(data)
+      .then(()=>{
+        // canSettings auch im users-Dokument aktualisieren (falls bereits registriert)
+        db.collection('users').where('email','==',email).limit(1).get().then(snap=>{
+          if(!snap.empty) snap.docs[0].ref.update({canSettings}).catch(()=>{});
+        }).catch(()=>{});
+        closeAddVerwModal();toast('Aktualisiert ✓');
+      })
+      .catch(err=>toast('Fehler: '+err.message,'bad'));
+  } else {
+    // Neu – Konto erstellen
+    const pw=(document.getElementById('addVerwPw').value||'').trim();
+    if(pw.length<6){toast('Startpasswort muss mindestens 6 Zeichen haben','bad');return;}
+    col.add(data).then(ref=>{
+      // Firebase Auth Konto erstellen
+      return _secondaryAuth.createUserWithEmailAndPassword(email, pw).then(cred=>{
+        db.collection('users').doc(cred.user.uid).set({email:email, role:'verwaltung', canSettings:canSettings},{merge:true}).catch(()=>{});
+        _secondaryAuth.signOut();
+        closeAddVerwModal();
+        toast('Mitarbeiter + Konto erstellt ✓');
+      }).catch(err=>{
+        closeAddVerwModal();
+        if(err.code==='auth/email-already-in-use'){
+          toast('Gespeichert ✓ – E-Mail hat bereits ein Konto. Login funktioniert mit dem bestehenden Passwort.');
+        } else {
+          toast('Gespeichert, aber Konto-Fehler: '+err.message,'bad');
+        }
+      });
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
+  }
 }
 function confirmDeleteVerw(){
   const id=document.getElementById('addVerwId').value;
