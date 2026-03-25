@@ -3704,10 +3704,13 @@ function saveVerw(){
         _secondaryAuth.signOut();
         closeAddVerwModal();
         toast('Mitarbeiter + Konto erstellt ✓');
+        // E-Mail mit Zugangsdaten öffnen
+        sendVerwZugangEmail(name, email, pw);
       }).catch(err=>{
         closeAddVerwModal();
         if(err.code==='auth/email-already-in-use'){
           toast('Gespeichert ✓ – E-Mail hat bereits ein Konto. Login funktioniert mit dem bestehenden Passwort.');
+          sendVerwZugangEmail(name, email, '(bestehendes Passwort)');
         } else {
           toast('Gespeichert, aber Konto-Fehler: '+err.message,'bad');
         }
@@ -3721,6 +3724,16 @@ function confirmDeleteVerw(){
   db.collection('shared').doc('kursSettings').collection('verwaltung').doc(id).delete()
     .then(()=>{closeAddVerwModal();toast('Gelöscht');})
     .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function sendVerwZugangEmail(name, email, pw){
+  const link='https://mohr-app.github.io/ausbilderpro/HBZVerwaltung.html';
+  const subject='Ihre Zugangsdaten – VerwaltungPro';
+  const body=`Hallo ${name},\n\nSie wurden als Verwaltung-Mitarbeiter in VerwaltungPro eingerichtet.\n\nIhre Zugangsdaten:\n─────────────────\nLink: ${link}\nE-Mail: ${email}\nPasswort: ${pw}\n─────────────────\n\nBitte ändern Sie Ihr Passwort nach dem ersten Login.\n\nBei Fragen wenden Sie sich an den Administrator.\n\nMit freundlichen Grüßen\nVerwaltungPro`;
+  const mailto='mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  if(confirm('📧 Zugangsdaten per E-Mail an '+email+' senden?')){
+    window.open(mailto,'_blank');
+  }
 }
 
 function renderSbKurseTree(){
