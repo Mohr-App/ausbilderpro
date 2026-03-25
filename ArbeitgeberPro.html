@@ -183,11 +183,20 @@ function setupKursListeners(){
   active.forEach(kursId=>{
     if(_kursListeners[kursId])return;
     db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(doc=>{
-      if(doc.exists){_kurse[kursId]=_kurse[kursId]||{};Object.assign(_kurse[kursId],doc.data());renderAzubiList();}
+      if(doc.exists){
+        _kurse[kursId]=_kurse[kursId]||{};Object.assign(_kurse[kursId],doc.data());renderAzubiList();
+      } else {
+        // Kurs wurde gelöscht – stale aktiverKursId aufräumen
+        _azubis.forEach(a=>{
+          if(a.aktiverKursId===kursId) a.aktiverKursId=null;
+        });
+        delete _kurse[kursId];
+        renderAzubiList();
+      }
     });
     _kursListeners[kursId]=db.collection('shared').doc('kurse').collection('list').doc(kursId)
       .collection('teilnehmer').onSnapshot(snap=>{
-        if(!_kurse[kursId])_kurse[kursId]={};
+        if(!_kurse[kursId]||!_kurse[kursId].von) return; // Kurs existiert nicht (mehr)
         _kurse[kursId].tnData={};
         snap.forEach(doc=>_kurse[kursId].tnData[doc.id]=doc.data());
         renderStats();renderAzubiList();
@@ -282,7 +291,7 @@ function renderAzubiList(){
     const isArchived=archived.includes(a.id);
     const name=((a.vorname||'')+' '+(a.nachname||'')).trim();
     const init=((a.vorname||'?')[0]+(a.nachname||'?')[0]).toUpperCase();
-    const kurs=a.aktiverKursId?_kurse[a.aktiverKursId]:null;
+    const kurs=a.aktiverKursId&&_kurse[a.aktiverKursId]&&_kurse[a.aktiverKursId].von?_kurse[a.aktiverKursId]:null;
     const kursLaeuft=kurs&&kurs.von&&kurs.bis&&today>=kurs.von&&today<=kurs.bis;
     const kursGeplant=kurs&&kurs.von&&today<kurs.von;
     const td=kurs&&kurs.tnData?kurs.tnData[a.id]:null;
