@@ -1616,7 +1616,7 @@ function renderSidebar(){
       const ir=document.createElement('div');
       ir.className='inst-row'+(active?' active':'');
       if(isVergangen) ir.style.opacity='.6';
-      ir.innerHTML='<div class="inst-dot"'+(isAktiv?' style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4)"':'')+'></div><div class="inst-info"><div class="inst-dates">'+esc(instLabel(inst))+'</div>'+(cnt?'<div class="inst-cnt">'+cnt+' Schüler</div>':'')+(isAktiv?'<div style="font-size:.5rem;color:#22c55e;font-weight:700">● AKTUELL</div>':'')+'</div><button class="inst-del" onclick="delInst(\''+id+'\',\''+iid+'\',event)">✕</button>';
+      ir.innerHTML='<div class="inst-dot"'+(isAktiv?' style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4)"':'')+'></div><div class="inst-info"><div class="inst-dates">'+esc(instLabel(inst))+'</div>'+(cnt?'<div class="inst-cnt">'+cnt+' Schüler</div>':'')+(isAktiv?'<div style="font-size:.5rem;color:#22c55e;font-weight:700">● AKTUELL</div>':'')+'</div><button class="inst-del" onclick="moveInst(\''+id+'\',\''+iid+'\',event)" title="Verschieben" style="color:var(--acc)!important;opacity:.5">↔</button><button class="inst-del" onclick="delInst(\''+id+'\',\''+iid+'\',event)">✕</button>';
       ir.querySelector('.inst-info').addEventListener('click',()=>selInst(id,iid));
       ir.querySelector('.inst-dot').addEventListener('click',()=>selInst(id,iid));
       ch.appendChild(ir);
@@ -1658,6 +1658,36 @@ function delKat(id,e){
   persist();renderAll();
   toast('🗑 "'+kat.label+'" gelöscht – 30 Tage im Papierkorb');
 }
+
+function moveInst(fromKatId,instId,e){
+  e.stopPropagation();
+  const inst=S.kats[fromKatId]?.instances[instId];
+  if(!inst) return;
+  // Andere Lehrgangsarten sammeln
+  const targets=S.katOrder.filter(k=>k!==fromKatId&&S.kats[k]).map(k=>S.kats[k].label);
+  if(!targets.length){toast('Keine andere Lehrgangsart vorhanden','bad');return;}
+  const label=instLabel(inst);
+  const choice=prompt('Lehrgang '+label+' verschieben nach:\n\n'+targets.map((t,i)=>(i+1)+'. '+t).join('\n')+'\n\nNummer eingeben:');
+  if(!choice) return;
+  const idx=parseInt(choice)-1;
+  const targetIds=S.katOrder.filter(k=>k!==fromKatId&&S.kats[k]);
+  if(idx<0||idx>=targetIds.length){toast('Ungültige Auswahl','bad');return;}
+  const toKatId=targetIds[idx];
+  // Verschieben
+  S.kats[toKatId].instances[instId]=inst;
+  delete S.kats[fromKatId].instances[instId];
+  S.curKat=toKatId;
+  S.curInst=instId;
+  S.kats[toKatId].open=true;
+  // Firestore-Kurs umbenennen wenn vorhanden
+  if(inst.sharedKursId&&_db){
+    _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
+      .update({name:S.kats[toKatId].label,lehrgangsart:S.kats[toKatId].label}).catch(()=>{});
+  }
+  persist();renderAll();
+  toast('↔ Verschoben nach "'+S.kats[toKatId].label+'" ✓');
+}
+
 function delInst(katId,instId,e){
   e.stopPropagation();
   const inst=S.kats[katId]?.instances[instId];
