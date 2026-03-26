@@ -818,7 +818,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="pool-sb-hdr" id="poolSbHdr">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div class="pool-sb-title">👥 Teilnehmerpool</div>
-        <button class="pool-hide-btn active" id="poolHideBtn" onclick="toggleHidePlaced()" title="Platzierte ein-/ausblenden">👁 Offen</button>
+        <div style="display:flex;gap:4px">
+          <button class="pool-hide-btn" onclick="loadPool()" title="Pool neu laden" style="font-size:.7rem">🔄</button>
+          <button class="pool-hide-btn active" id="poolHideBtn" onclick="toggleHidePlaced()" title="Platzierte ein-/ausblenden">👁 Offen</button>
+        </div>
       </div>
       <button class="pool-link-btn" onclick="openPoolLink()">🔗 Kurs verknüpfen</button>
     </div>
@@ -4624,17 +4627,21 @@ function loadPool(){
       // ── Auto-Platzierung: TN mit Wunsch-Sitzplatz automatisch setzen ──
       const inst3=curInst();
       if(inst3){
+        // Label→SeatId Map bauen: Wenn Tisch "6" als "32" beschriftet ist, findet "32" den Sitz "6"
+        const labelToSeatId={};
+        const rows3=getRows(inst3);
+        rows3.forEach(r=>r.seats.forEach(sid=>{
+          const lbl=(inst3.seatLabels&&inst3.seatLabels[sid]!=null&&inst3.seatLabels[sid]!=='')?String(inst3.seatLabels[sid]):String(sid);
+          labelToSeatId[lbl]=sid;
+        }));
         let autoPlaced=0;
         allTN.forEach(t=>{
           if(!t.wunschSitzplatz) return;
-          // Schon platziert?
           if(placedTnIds.has(t.id)||placedNames.has(normName(t.name))) return;
-          const seatId=String(t.wunschSitzplatz);
-          // Sitz existiert und ist frei?
-          const rows=getRows(inst3);
-          let seatExists=false;
-          rows.forEach(r=>r.seats.forEach(sid=>{if(sid===seatId)seatExists=true;}));
-          if(!seatExists) return;
+          const wunsch=String(t.wunschSitzplatz);
+          // Erst Label prüfen, dann interne ID
+          const seatId=labelToSeatId[wunsch]||null;
+          if(!seatId) return;
           const existing=inst3.seats[seatId];
           if(existing&&existing.name) return; // belegt
           inst3.seats[seatId]={...(inst3.seats[seatId]||{}), name:t.name, company:t.company, profession:t.profession, ausbjahr:t.ausbjahr, poolTnId:t.id, poolKursId:kursId};
