@@ -612,6 +612,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn gdrive-btn" id="gdriveBtn" onclick="gdriveAction();closeHdrMenu()" style="width:100%;text-align:left"><span id="gdriveBtnTxt">☁ Google Drive</span></button>
         <div style="border-top:1px solid var(--brd);margin:2px 0"></div>
         <button class="tbtn" onclick="openMeinUrlaub();closeHdrMenu()" style="width:100%;text-align:left">🏖 Mein Urlaub</button>
+        <button class="tbtn" onclick="openAusbilderProfil();closeHdrMenu()" style="width:100%;text-align:left">👤 Mein Profil</button>
         <button class="tbtn" onclick="openTrash();closeHdrMenu()" style="width:100%;text-align:left">🗑 Papierkorb</button>
         <button class="tbtn" onclick="showHilfeModal();closeHdrMenu()" style="width:100%;text-align:left">❓ Brauchst du Hilfe?</button>
       </div>
@@ -866,6 +867,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <button class="tbtn" onclick="cancelWdhGrund()" style="flex:1">Abbrechen</button>
 <button class="tbtn" onclick="if(document.getElementById('wdhGrundFreitext').value.trim())selectWdhGrund(document.getElementById('wdhGrundFreitext').value.trim())" style="flex:1;background:rgba(245,158,11,.15);color:#d97706">✓ Senden</button>
 </div>
+</div></div></div>
+
+<!-- AUSBILDER PROFIL MODAL -->
+<div class="ov" id="ausbilderProfilModal" onclick="if(event.target===this)this.classList.remove('open')">
+<div class="modal" style="max-width:380px">
+<div class="mhd"><div class="mtit">👤 Mein Profil</div><button class="xcls" onclick="document.getElementById('ausbilderProfilModal').classList.remove('open')">&#10005;</button></div>
+<div class="mbdy">
+<div style="font-size:.62rem;color:var(--mu);margin-bottom:10px;padding:8px 10px;background:rgba(59,130,246,.04);border:1px solid rgba(59,130,246,.15);border-radius:8px">Diese Daten werden an Azubis und Arbeitgeber weitergegeben, damit sie dich kontaktieren können.</div>
+<div class="fg"><label class="fl">Name <span style="color:#ef4444">*</span></label><input class="fi" id="apName" placeholder="Vor- und Nachname"></div>
+<div class="fg" style="margin-top:6px"><label class="fl">Telefon</label><input class="fi" id="apTelefon" type="tel" placeholder="0170 1234567"></div>
+<div class="fg" style="margin-top:6px"><label class="fl">E-Mail</label><input class="fi" id="apEmail" type="email" placeholder="wird automatisch ausgefüllt" readonly style="opacity:.6"></div>
+<button class="bsave" onclick="saveAusbilderProfil()" style="margin-top:12px">💾 Speichern</button>
 </div></div></div>
 
 <!-- QR CODE MODAL -->
@@ -1976,19 +1989,30 @@ function saveNewInst(){
 
   // Automatisch Firestore-Kurs erstellen wenn angemeldet
   if(_db&&_auth&&_auth.currentUser){
+    // Profil prüfen – beim ersten Mal auffordern
+    const profil=getAusbilderProfil();
+    if(!profil.name){
+      if(confirm('Um QR-Code und Azubi-Kontakt zu aktivieren, bitte zuerst dein Profil ausfüllen (Name + Telefon).\n\nJetzt ausfüllen?')){
+        // Kurs trotzdem lokal erstellen, Profil-Modal öffnen
+        S.kats[dpKatId].instances[id]=instData;
+        S.curKat=dpKatId;S.curInst=id;S.kats[dpKatId].open=true;
+        persist();closeDp();renderAll();
+        openAusbilderProfil();
+        return;
+      }
+    }
     const email=_auth.currentUser.email.toLowerCase();
     const von=sY+'-'+sM+'-'+sD;
     const bis=eY+'-'+eM+'-'+eD;
     const kursName=S.kats[dpKatId].label;
+    const ausbData=getAusbilderKursData();
     const kursData={
       name: kursName,
       lehrgangsart: kursName,
       von: von,
       bis: bis,
       berufsschultage: [],
-      ausbilderLoginEmail: email,
-      ausbilderEmail: email,
-      ausbilderName: _auth.currentUser.displayName||email,
+      ...ausbData,
       standalone: true,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: email
@@ -3524,6 +3548,36 @@ ${pages}
 }
 
 // ─── KURS AUSFALL – Benachrichtigung an Azubi + Arbeitgeber ───
+// ─── AUSBILDER PROFIL ───
+function getAusbilderProfil(){
+  try{return JSON.parse(localStorage.getItem('ausbilderProfil')||'{}');}catch(e){return{};}
+}
+function openAusbilderProfil(){
+  const p=getAusbilderProfil();
+  document.getElementById('apName').value=p.name||_auth?.currentUser?.displayName||'';
+  document.getElementById('apTelefon').value=p.telefon||'';
+  document.getElementById('apEmail').value=_auth?.currentUser?.email||'';
+  document.getElementById('ausbilderProfilModal').classList.add('open');
+}
+function saveAusbilderProfil(){
+  const name=(document.getElementById('apName').value||'').trim();
+  const telefon=(document.getElementById('apTelefon').value||'').trim();
+  if(!name){toast('Bitte Name eingeben','bad');return;}
+  localStorage.setItem('ausbilderProfil',JSON.stringify({name,telefon}));
+  document.getElementById('ausbilderProfilModal').classList.remove('open');
+  toast('Profil gespeichert ✓');
+}
+function getAusbilderKursData(){
+  const p=getAusbilderProfil();
+  const email=_auth?.currentUser?.email?.toLowerCase()||'';
+  return {
+    ausbilderLoginEmail: email,
+    ausbilderEmail: email,
+    ausbilderName: p.name||_auth?.currentUser?.displayName||email,
+    ausbilderTel: p.telefon||''
+  };
+}
+
 // ─── STANDALONE MODUS ───
 function activateFirestore(){
   const inst=curInst();
@@ -3534,12 +3588,12 @@ function activateFirestore(){
   const von=inst.sY+'-'+inst.sM+'-'+inst.sD;
   const bis=inst.eY+'-'+inst.eM+'-'+inst.eD;
   const kursName=S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs';
+  const ausbData=getAusbilderKursData();
   const kursData={
     name: kursName, lehrgangsart: kursName,
     von, bis,
     berufsschultage: inst.berufsschultage||[],
-    ausbilderLoginEmail: email, ausbilderEmail: email,
-    ausbilderName: _auth.currentUser.displayName||email,
+    ...ausbData,
     standalone: true,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     createdBy: email
