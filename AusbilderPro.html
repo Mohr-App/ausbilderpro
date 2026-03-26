@@ -652,7 +652,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
   <div id="hbzKurseSectionMob" style="flex-shrink:0"></div>
   <button class="sb-abruf-btn" onclick="drawerClose();openLehrgangAbrufen()" style="margin:6px 12px">📥 Lehrgänge abrufen</button>
-  <button class="sb-abruf-btn" onclick="drawerClose();openStandaloneKursModal()" style="margin:0 12px 6px;background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.3);color:#10b981">➕ Eigenen Kurs erstellen</button>
   <div class="sb-sec" style="flex-shrink:0;">Lehrgangsarten <button class="sb-add-kat" onclick="drawerClose();openKatModal()">+</button></div>
   <div class="mob-drawer-scroll" id="mobKatList"></div>
 </div>
@@ -809,7 +808,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <div class="sb" id="sb">
     <div id="hbzKurseSection"></div>
     <button class="sb-abruf-btn" onclick="openLehrgangAbrufen()">📥 Lehrgänge abrufen</button>
-    <button class="sb-abruf-btn" onclick="openStandaloneKursModal()" style="background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.3);color:#10b981">➕ Eigenen Kurs erstellen</button>
     <div class="sb-sec">Lehrgangsarten <button class="sb-add-kat" onclick="openKatModal()" title="Hinzufügen / Wiederherstellen">+</button></div>
     <div id="katList"></div>
   </div>
@@ -868,31 +866,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <button class="tbtn" onclick="cancelWdhGrund()" style="flex:1">Abbrechen</button>
 <button class="tbtn" onclick="if(document.getElementById('wdhGrundFreitext').value.trim())selectWdhGrund(document.getElementById('wdhGrundFreitext').value.trim())" style="flex:1;background:rgba(245,158,11,.15);color:#d97706">✓ Senden</button>
 </div>
-</div></div></div>
-
-<!-- STANDALONE KURS ERSTELLEN MODAL -->
-<div class="ov" id="standaloneKursModal" onclick="if(event.target===this)this.classList.remove('open')">
-<div class="modal" style="max-width:400px">
-<div class="mhd" style="background:rgba(16,185,129,.08)"><div class="mtit" style="color:#10b981">➕ Eigenen Kurs erstellen</div><button class="xcls" onclick="document.getElementById('standaloneKursModal').classList.remove('open')">&#10005;</button></div>
-<div class="mbdy">
-<div style="font-size:.65rem;color:var(--mu);margin-bottom:10px;padding:8px 10px;background:rgba(16,185,129,.04);border:1px solid rgba(16,185,129,.15);border-radius:8px">Standalone-Modus: Du erstellst den Kurs eigenständig ohne Verwaltung. Azubis können sich per QR-Code selbst registrieren.</div>
-<div class="fg"><label class="fl">Kursname / Lehrgangsart <span style="color:#ef4444">*</span></label><input class="fi" id="saKursName" placeholder="z.B. ET3 Grundstufe"></div>
-<div style="display:flex;gap:8px;margin-top:8px">
-<div class="fg" style="flex:1"><label class="fl">Von <span style="color:#ef4444">*</span></label><input type="date" class="fi" id="saKursVon"></div>
-<div class="fg" style="flex:1"><label class="fl">Bis <span style="color:#ef4444">*</span></label><input type="date" class="fi" id="saKursBis"></div>
-</div>
-<div class="fg" style="margin-top:8px">
-<label class="fl">Berufsschultage</label>
-<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px" id="saBSTage">
-<label style="display:flex;align-items:center;gap:4px;font-size:.75rem;padding:5px 10px;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" value="Mo"> Mo</label>
-<label style="display:flex;align-items:center;gap:4px;font-size:.75rem;padding:5px 10px;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" value="Di"> Di</label>
-<label style="display:flex;align-items:center;gap:4px;font-size:.75rem;padding:5px 10px;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" value="Mi"> Mi</label>
-<label style="display:flex;align-items:center;gap:4px;font-size:.75rem;padding:5px 10px;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" value="Do"> Do</label>
-<label style="display:flex;align-items:center;gap:4px;font-size:.75rem;padding:5px 10px;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer"><input type="checkbox" value="Fr"> Fr</label>
-</div>
-</div>
-<div class="fg" style="margin-top:8px"><label class="fl">Beschreibung (optional)</label><input class="fi" id="saKursBeschr" placeholder="Hinweise, Raum, etc."></div>
-<button class="bsave" onclick="saveStandaloneKurs()" style="margin-top:12px">✓ Kurs erstellen</button>
 </div></div></div>
 
 <!-- QR CODE MODAL -->
@@ -1999,9 +1972,46 @@ function saveNewInst(){
     {id:'r1',label:'',seats:[...DEFAULT_LEFT]},
     {id:'r2',label:'',seats:[...DEFAULT_RIGHT]}
   ];
-  S.kats[dpKatId].instances[id]={sD,sM,sY,eD,eM,eY,rows,seatCnt:13,seats:{},nextSeatNum:13,seatLabels:defaultLabels};
-  S.curKat=dpKatId;S.curInst=id;S.kats[dpKatId].open=true;
-  persist();closeDp();renderAll();
+  const instData={sD,sM,sY,eD,eM,eY,rows,seatCnt:13,seats:{},nextSeatNum:13,seatLabels:defaultLabels};
+
+  // Automatisch Firestore-Kurs erstellen wenn angemeldet
+  if(_db&&_auth&&_auth.currentUser){
+    const email=_auth.currentUser.email.toLowerCase();
+    const von=sY+'-'+sM+'-'+sD;
+    const bis=eY+'-'+eM+'-'+eD;
+    const kursName=S.kats[dpKatId].label;
+    const kursData={
+      name: kursName,
+      lehrgangsart: kursName,
+      von: von,
+      bis: bis,
+      berufsschultage: [],
+      ausbilderLoginEmail: email,
+      ausbilderEmail: email,
+      ausbilderName: _auth.currentUser.displayName||email,
+      standalone: true,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: email
+    };
+    _db.collection('shared').doc('kurse').collection('list').add(kursData).then(ref=>{
+      instData.sharedKursId=ref.id;
+      S.kats[dpKatId].instances[id]=instData;
+      S.curKat=dpKatId;S.curInst=id;S.kats[dpKatId].open=true;
+      persist();closeDp();renderAll();
+      toast('Lehrgang erstellt ✓ – QR-Code und Pool verfügbar');
+    }).catch(err=>{
+      // Fallback: lokal erstellen ohne Firestore
+      S.kats[dpKatId].instances[id]=instData;
+      S.curKat=dpKatId;S.curInst=id;S.kats[dpKatId].open=true;
+      persist();closeDp();renderAll();
+      toast('Lehrgang erstellt (offline) – Firestore: '+err.message,'bad');
+    });
+  } else {
+    // Nicht angemeldet → nur lokal
+    S.kats[dpKatId].instances[id]=instData;
+    S.curKat=dpKatId;S.curInst=id;S.kats[dpKatId].open=true;
+    persist();closeDp();renderAll();
+  }
 }
 
 // ─── MAIN ───
@@ -2023,11 +2033,11 @@ function renderMain(){
         '<div class="es" style="max-width:420px;margin:0 auto">'
         +'<div style="font-size:2.5rem;margin-bottom:12px">📋</div>'
         +'<h2 style="color:var(--tx);margin-bottom:8px">Willkommen bei AusbilderPro</h2>'
-        +'<p style="line-height:1.7;margin-bottom:20px">Lehrgänge werden von der Verwaltung für dich angelegt.<br>Klicke unten um deine zugewiesenen Lehrgänge abzurufen.</p>'
+        +'<p style="line-height:1.7;margin-bottom:20px">Starte indem du deine Lehrgänge abrufst oder eine Lehrgangsart anlegst und selbst loslegst.</p>'
         +'<button class="es-btn" onclick="openLehrgangAbrufen()" id="esAbrufBtn" style="font-size:.95rem;padding:14px 28px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)">📥 Lehrgänge abrufen</button>'
         +'<div id="esAbrufStatus" style="margin-top:12px;font-size:.72rem;color:var(--mu)"></div>'
         +'<div style="margin-top:28px;border-top:1px solid var(--brd);padding-top:16px">'
-        +'<div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Oder manuell anlegen:</div>'
+        +'<div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Oder Lehrgangsart anlegen und eigenständig starten:</div>'
         +'<button class="es-btn" onclick="openKatModal()" style="font-size:.75rem;padding:9px 18px;background:var(--sur2);color:var(--mu);box-shadow:none">+ Eigene Lehrgangsart anlegen</button>'
         +'</div></div>';
       // Automatisch prüfen ob Lehrgänge verfügbar
@@ -2040,7 +2050,7 @@ function renderMain(){
     return;
   }
   el.innerHTML=
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'</div><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📄 Bescheinigungen</button><button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button>'+(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">👤+ TN</button>':'')+'<button class="tbtn mob-view-toggle" id="viewToggle" onclick="toggleMobileView()">☰ Liste</button></div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'</div><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📄 Bescheinigungen</button><button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button>'+(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">👤+ TN</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed">🔗 QR + Pool aktivieren</button>')+'<button class="tbtn mob-view-toggle" id="viewToggle" onclick="toggleMobileView()">☰ Liste</button></div></div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
     +'<div id="seatingWrap" class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
@@ -3515,49 +3525,35 @@ ${pages}
 
 // ─── KURS AUSFALL – Benachrichtigung an Azubi + Arbeitgeber ───
 // ─── STANDALONE MODUS ───
-function openStandaloneKursModal(){
-  const today=new Date().toISOString().slice(0,10);
-  document.getElementById('saKursName').value='';
-  document.getElementById('saKursVon').value=today;
-  document.getElementById('saKursBis').value='';
-  document.getElementById('saKursBeschr').value='';
-  document.querySelectorAll('#saBSTage input').forEach(c=>c.checked=false);
-  document.getElementById('standaloneKursModal').classList.add('open');
-}
-
-function saveStandaloneKurs(){
-  const name=(document.getElementById('saKursName').value||'').trim();
-  const von=document.getElementById('saKursVon').value;
-  const bis=document.getElementById('saKursBis').value;
-  const beschreibung=(document.getElementById('saKursBeschr').value||'').trim();
-  const bsTage=Array.from(document.querySelectorAll('#saBSTage input:checked')).map(c=>c.value);
-  if(!name){toast('Bitte Kursname eingeben','bad');return;}
-  if(!von||!bis){toast('Bitte Von und Bis Datum eingeben','bad');return;}
-  if(bis<von){toast('Enddatum liegt vor dem Startdatum','bad');return;}
-  if(!_db||!_auth||!_auth.currentUser){toast('Nicht angemeldet','bad');return;}
-
+function activateFirestore(){
+  const inst=curInst();
+  if(!inst){toast('Kein Lehrgang gewählt','bad');return;}
+  if(inst.sharedKursId){toast('Bereits verbunden','bad');return;}
+  if(!_db||!_auth||!_auth.currentUser){toast('Nicht angemeldet – bitte zuerst einloggen','bad');return;}
   const email=_auth.currentUser.email.toLowerCase();
+  const von=inst.sY+'-'+inst.sM+'-'+inst.sD;
+  const bis=inst.eY+'-'+inst.eM+'-'+inst.eD;
+  const kursName=S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs';
   const kursData={
-    name: name,
-    lehrgangsart: name,
-    von: von,
-    bis: bis,
-    beschreibung: beschreibung,
-    berufsschultage: bsTage,
-    ausbilderLoginEmail: email,
-    ausbilderEmail: email,
+    name: kursName, lehrgangsart: kursName,
+    von, bis,
+    berufsschultage: inst.berufsschultage||[],
+    ausbilderLoginEmail: email, ausbilderEmail: email,
     ausbilderName: _auth.currentUser.displayName||email,
     standalone: true,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     createdBy: email
   };
-
   _db.collection('shared').doc('kurse').collection('list').add(kursData).then(ref=>{
-    document.getElementById('standaloneKursModal').classList.remove('open');
-    toast('Kurs erstellt ✓');
-    // Lokalen Lehrgang anlegen + verknüpfen
-    linkHBZKurs(ref.id, {...kursData, id:ref.id}, null);
+    inst.sharedKursId=ref.id;
+    persist();renderMain();
+    toast('QR-Code + Pool aktiviert ✓');
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function openStandaloneKursModal(){
+  // Legacy – leitet jetzt auf Lehrgangsart-Erstellung um
+  openKatModal();
 }
 
 function openQRModal(){
