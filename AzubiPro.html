@@ -123,6 +123,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="flex:1"><label class="fl">Lehrjahr</label><select class="fi" id="jLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
       <div style="flex:1"><label class="fl">Geburtsdatum</label><input type="date" class="fi" id="jGeburt"></div>
     </div>
+    <div class="fg" style="margin-top:6px"><label class="fl">Sitzplatznummer</label><input class="fi" id="jSitzplatz" type="number" min="1" placeholder="z.B. 5" style="max-width:120px"></div>
     <div style="display:flex;gap:8px;margin-top:6px">
       <div style="flex:1"><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jEmail" placeholder="deine@email.de"></div>
       <div style="flex:1"><label class="fl">Telefon</label><input class="fi" type="tel" id="jTelefon" placeholder="0170..."></div>
@@ -526,6 +527,7 @@ function submitJoinRegistration(){
   const geburtsdatum=document.getElementById('jGeburt').value||'';
   const email=(document.getElementById('jEmail').value||'').trim().toLowerCase();
   const telefon=(document.getElementById('jTelefon').value||'').trim();
+  const sitzplatz=(document.getElementById('jSitzplatz').value||'').trim();
   const passwort=document.getElementById('jPasswort').value||'';
   const errEl=document.getElementById('jErr');
   errEl.textContent='';
@@ -550,6 +552,7 @@ function submitJoinRegistration(){
       email: email,
       kontaktEmail: email,
       kontaktTelefon: telefon,
+      wunschSitzplatz: sitzplatz,
       aktiverKursId: _joinKursId,
       selfRegistered: true,
       registeredAt: Date.now()
@@ -572,6 +575,7 @@ function submitJoinRegistration(){
           vorname, nachname, firma, beruf, ausbjahr,
           kontaktEmail: email,
           kontaktTelefon: telefon,
+          wunschSitzplatz: sitzplatz,
           status: 'active',
           selfRegistered: true,
           addedAt: Date.now()
@@ -1169,7 +1173,8 @@ function loadProfil(){
     +'<div style="font-size:.55rem;color:var(--mu);margin-bottom:8px">Deine Kontaktdaten sind für Ausbilder und Verwaltung sichtbar.</div>'
     +'<div class="fg" style="margin-bottom:6px"><label class="fl" style="font-size:.65rem">📧 E-Mail</label><input class="fi" id="azubiEmail" value="'+esc(t.kontaktEmail||'')+'" placeholder="deine@email.de" style="font-size:.8rem"></div>'
     +'<div class="fg" style="margin-bottom:8px"><label class="fl" style="font-size:.65rem">📱 Telefon</label><input class="fi" id="azubiTelefon" value="'+esc(t.kontaktTelefon||'')+'" placeholder="0170 1234567" type="tel" style="font-size:.8rem"></div>'
-    +'<button onclick="saveAzubiKontakt()" style="width:100%;padding:10px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">💾 Kontaktdaten speichern</button>'
+    +'<div class="fg" style="margin-bottom:8px"><label class="fl" style="font-size:.65rem">🪑 Sitzplatznummer</label><input class="fi" id="azubiSitzplatz" value="'+esc(t.wunschSitzplatz||'')+'" placeholder="z.B. 5" type="number" min="1" style="font-size:.8rem;max-width:120px"></div>'
+    +'<button onclick="saveAzubiKontakt()" style="width:100%;padding:10px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">💾 Speichern</button>'
     +'</div>'
     +'<div id="profilPhotoStatus"></div>';
 
@@ -1192,11 +1197,18 @@ function saveAzubiKontakt(){
   if(!_tnId){toast('Nicht angemeldet','bad');return;}
   const email=(document.getElementById('azubiEmail')?.value||'').trim();
   const telefon=(document.getElementById('azubiTelefon')?.value||'').trim();
-  db.collection('globalTN').doc(_tnId).update({kontaktEmail:email, kontaktTelefon:telefon})
+  const sitzplatz=(document.getElementById('azubiSitzplatz')?.value||'').trim();
+  db.collection('globalTN').doc(_tnId).update({kontaktEmail:email, kontaktTelefon:telefon, wunschSitzplatz:sitzplatz})
     .then(()=>{
       _tnData.kontaktEmail=email;
       _tnData.kontaktTelefon=telefon;
-      toast('✓ Kontaktdaten gespeichert');
+      _tnData.wunschSitzplatz=sitzplatz;
+      // Auch im aktiven Kurs aktualisieren
+      if(_tnData.aktiverKursId){
+        db.collection('shared').doc('kurse').collection('list').doc(_tnData.aktiverKursId)
+          .collection('teilnehmer').doc(_tnId).update({wunschSitzplatz:sitzplatz}).catch(()=>{});
+      }
+      toast('✓ Gespeichert');
     })
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
