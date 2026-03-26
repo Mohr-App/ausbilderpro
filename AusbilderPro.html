@@ -4518,9 +4518,13 @@ let _poolDragTnId = null;
 let _poolDragKursId = null;
 let _seatDragId = null;
 let _poolLoadGen = 0; // Generation counter – stale async responses get discarded
+let _poolUnsub = null; // onSnapshot listener cleanup
+let _autoPlacedIds = new Set(); // Verhindert doppelte Toast-Meldungen
 
 function loadPool(){
   if(_demoMode) return;
+  // Alten Listener abmelden
+  if(_poolUnsub){_poolUnsub();_poolUnsub=null;}
   const inst = curInst();
   const body = document.getElementById('poolSbBody');
   const hdr  = document.getElementById('poolSbHdr');
@@ -4547,11 +4551,13 @@ function loadPool(){
 
   if(!inst){
     body.innerHTML='<div class="pool-empty">Kein Lehrgang ausgewählt</div>';
+    _autoPlacedIds=new Set();
     return;
   }
   const kursId = inst.sharedKursId;
   if(!kursId){
     body.innerHTML='<div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>';
+    _autoPlacedIds=new Set();
     // Auch ohne Firestore lokale Container rendern
     renderFehlt(null);
     renderWiederholer(null);
@@ -4576,10 +4582,9 @@ function loadPool(){
     let dtEl = document.createElement('div'); dtEl.className='pool-sb-dates';
     dtEl.textContent = (kd.von&&kd.bis) ? fmtDE(kd.von)+' – '+fmtDE(kd.bis) : fmtDE(kd.von);
     hdr.insertBefore(dtEl, hdr.querySelector('.pool-link-btn'));
-    kursRef.collection('teilnehmer').orderBy('nachname').get()
-    .then(snap=>{
+    _poolUnsub = kursRef.collection('teilnehmer').orderBy('nachname').onSnapshot(snap=>{
       // ── Snapshot-Guard ──
-      if(isStale()) return;
+      if(isStale()){if(_poolUnsub){_poolUnsub();_poolUnsub=null;}return;}
       if(snap.empty){ body.innerHTML='<div class="pool-empty">Keine Teilnehmer im Kurs</div>'; renderFehlt(kursId); renderWiederholer(kursId); return; }
       const seats = curSeats();
       // Robust normalization: collapse spaces, trim, lowercase
@@ -4635,25 +4640,31 @@ function loadPool(){
           labelToSeatId[lbl]=sid;
         }));
         let autoPlaced=0;
+        const autoPlaceBatch=_db?_db.batch():null;
         allTN.forEach(t=>{
           if(!t.wunschSitzplatz) return;
           if(placedTnIds.has(t.id)||placedNames.has(normName(t.name))) return;
+          if(_autoPlacedIds.has(t.id)) return; // Schon in dieser Session platziert
           const wunsch=String(t.wunschSitzplatz);
-          // Erst Label prüfen, dann interne ID
           const seatId=labelToSeatId[wunsch]||null;
           if(!seatId) return;
           const existing=inst3.seats[seatId];
-          if(existing&&existing.name) return; // belegt
+          if(existing&&existing.name) return;
           inst3.seats[seatId]={...(inst3.seats[seatId]||{}), name:t.name, company:t.company, profession:t.profession, ausbjahr:t.ausbjahr, poolTnId:t.id, poolKursId:kursId};
           placedTnIds.add(t.id);
           placedNames.add(normName(t.name));
-          if(_db&&kursId&&t.id){
-            _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(t.id).update({status:'attending'}).catch(()=>{});
+          _autoPlacedIds.add(t.id);
+          autoPlaced++;
+          if(autoPlaceBatch&&kursId&&t.id){
+            autoPlaceBatch.update(
+              _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(t.id),
+              {status:'attending'}
+            );
             syncGlobalTNStatus(t.id,'clear');
           }
-          autoPlaced++;
         });
         if(autoPlaced>0){
+          if(autoPlaceBatch) autoPlaceBatch.commit().catch(()=>{});
           persist();renderSeats();
           toast(autoPlaced+' TN automatisch platziert (Wunsch-Sitzplatz) ✓');
           // Pool-Karten aktualisieren
@@ -4674,7 +4685,7 @@ function loadPool(){
       setupSeatDropTargets();
       renderFehlt(kursId);
       renderWiederholer(kursId);
-    }).catch(()=>{ if(!isStale()) body.innerHTML='<div class="pool-empty">Fehler beim Laden</div>'; });
+    }, err=>{ if(!isStale()) body.innerHTML='<div class="pool-empty">Fehler beim Laden</div>'; });
   });
 }
 
