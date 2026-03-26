@@ -316,14 +316,18 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 
 // ── Auth ──
 auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
+let _registering=false; // Guard: verhindert signOut während Selbstregistrierung
 auth.onAuthStateChanged(u=>{
+  if(_registering) return; // Registrierung läuft – nicht eingreifen
   if(u){
     _uid=u.uid;
     _email=u.email.toLowerCase();
     // Prüfe ob TN existiert
     findTN(_email).then(found=>{
+      if(_registering) return;
       if(found){
         document.getElementById('loginWrap').style.display='none';
+        document.getElementById('joinWrap').style.display='none';
         document.getElementById('app').classList.add('show');
         document.getElementById('hdrUser').textContent=_email.split('@')[0];
         loadData();
@@ -334,7 +338,9 @@ auth.onAuthStateChanged(u=>{
     });
   } else {
     _uid=null; _tnId=null; _tnData=null;
-    document.getElementById('loginWrap').style.display='flex';
+    if(!_registering&&!_joinKursId){
+      document.getElementById('loginWrap').style.display='flex';
+    }
     document.getElementById('app').classList.remove('show');
   }
 });
@@ -377,19 +383,20 @@ let _joinKursId=null;
   const joinId=params.get('join');
   if(!joinId) return;
   _joinKursId=joinId;
-  // Kursinfo laden
+  const infoEl=document.getElementById('joinKursInfo');
+  // Kursinfo laden (braucht Auth – versuchen, bei Fehler trotzdem Registrierung erlauben)
   db.collection('shared').doc('kurse').collection('list').doc(joinId).get().then(doc=>{
     if(!doc.exists){
-      document.getElementById('joinKursInfo').innerHTML='<span style="color:#ef4444">Kurs nicht gefunden</span>';
+      infoEl.innerHTML='<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Kurs-ID: '+esc(joinId.substring(0,8))+'…</div>';
       return;
     }
     const k=doc.data();
-    document.getElementById('joinKursInfo').innerHTML=
+    infoEl.innerHTML=
       '<div style="font-weight:800;font-size:.88rem">'+esc(k.name||k.lehrgangsart||'Lehrgang')+'</div>'
       +'<div style="font-size:.68rem;color:var(--mu);margin-top:4px;font-family:\'JetBrains Mono\',monospace">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div>'
       +(k.ausbilderName?'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">Ausbilder: '+esc(k.ausbilderName)+'</div>':'');
   }).catch(()=>{
-    document.getElementById('joinKursInfo').innerHTML='<span style="color:#ef4444">Kursdaten konnten nicht geladen werden</span>';
+    infoEl.innerHTML='<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Registriere dich um dem Lehrgang beizutreten.</div>';
   });
   // Join-Screen anzeigen statt Login
   document.getElementById('loginWrap').style.display='none';
@@ -422,6 +429,8 @@ function submitJoinRegistration(){
 
   errEl.style.color='var(--acc)';
   errEl.textContent='Wird registriert…';
+
+  _registering=true; // Auth-Listener blockieren
 
   // 1. Firebase Auth Konto erstellen
   auth.createUserWithEmailAndPassword(email, passwort).then(cred=>{
@@ -465,12 +474,27 @@ function submitJoinRegistration(){
   }).then(()=>{
     errEl.style.color='var(--acc)';
     errEl.textContent='✓ Registrierung erfolgreich!';
-    // URL bereinigen und App laden
+    // URL bereinigen
     window.history.replaceState({},'',window.location.pathname);
     _joinKursId=null;
-    document.getElementById('joinWrap').style.display='none';
-    // Auth-Listener übernimmt ab hier
+    _registering=false;
+    // Auth-Listener manuell triggern
+    const u=auth.currentUser;
+    if(u){
+      _uid=u.uid;
+      _email=u.email.toLowerCase();
+      findTN(_email).then(found=>{
+        if(found){
+          document.getElementById('joinWrap').style.display='none';
+          document.getElementById('loginWrap').style.display='none';
+          document.getElementById('app').classList.add('show');
+          document.getElementById('hdrUser').textContent=_email.split('@')[0];
+          loadData();
+        }
+      });
+    }
   }).catch(err=>{
+    _registering=false;
     errEl.style.color='var(--bad)';
     const map={
       'auth/email-already-in-use':'Diese E-Mail ist bereits registriert. Bitte über "Anmelden" einloggen.',
