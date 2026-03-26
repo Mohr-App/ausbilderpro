@@ -106,6 +106,34 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 </head>
 <body>
 
+<!-- SELF-REGISTRATION (via QR join link) -->
+<div class="login-wrap" id="joinWrap" style="display:none">
+  <div class="login-box" style="max-width:400px">
+    <div class="login-logo">Azubi<span>Pro</span></div>
+    <div class="login-sub">Selbstregistrierung</div>
+    <div id="joinKursInfo" style="margin-bottom:12px;padding:10px 14px;background:rgba(16,185,129,.08);border:1.5px solid rgba(16,185,129,.25);border-radius:10px;font-size:.78rem;text-align:center"></div>
+    <div style="font-size:.62rem;color:var(--mu);margin-bottom:10px;text-align:center">Gib deine Daten ein um dich für den Lehrgang zu registrieren.</div>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="jVorname" placeholder="Max"></div>
+      <div style="flex:1"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="jNachname" placeholder="Mustermann"></div>
+    </div>
+    <div style="margin-top:6px"><label class="fl">Betrieb / Ausbildungsfirma <span style="color:#ef4444">*</span></label><input class="fi" id="jFirma" placeholder="Firma GmbH"></div>
+    <div style="margin-top:6px"><label class="fl">Beruf</label><input class="fi" id="jBeruf" placeholder="Elektroniker"></div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <div style="flex:1"><label class="fl">Lehrjahr</label><select class="fi" id="jLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+      <div style="flex:1"><label class="fl">Geburtsdatum</label><input type="date" class="fi" id="jGeburt"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <div style="flex:1"><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jEmail" placeholder="deine@email.de"></div>
+      <div style="flex:1"><label class="fl">Telefon</label><input class="fi" type="tel" id="jTelefon" placeholder="0170..."></div>
+    </div>
+    <div style="margin-top:8px"><label class="fl">Passwort für die App <span style="color:#ef4444">*</span></label><input class="fi" type="password" id="jPasswort" placeholder="Min. 6 Zeichen" autocomplete="new-password"></div>
+    <div class="err" id="jErr"></div>
+    <button class="btn" onclick="submitJoinRegistration()" style="margin-top:10px;background:linear-gradient(135deg,#059669,#10b981)">✓ Registrieren & Lehrgang beitreten</button>
+    <div style="margin-top:10px;text-align:center"><button onclick="showNormalLogin()" style="background:none;border:none;color:var(--acc);font-size:.68rem;cursor:pointer;font-family:'Sora',sans-serif;text-decoration:underline">Bereits registriert? Hier anmelden</button></div>
+  </div>
+</div>
+
 <!-- LOGIN -->
 <div class="login-wrap" id="loginWrap">
   <div class="login-box">
@@ -341,6 +369,117 @@ function doReset(){
 }
 function doLogout(){ if(confirm('Wirklich abmelden?')) auth.signOut(); }
 function showErr(m){ const el=document.getElementById('lErr'); el.style.color='var(--bad)'; el.textContent=m; }
+
+// ── SELF-REGISTRATION (QR Join) ──
+let _joinKursId=null;
+(function checkJoinParam(){
+  const params=new URLSearchParams(window.location.search);
+  const joinId=params.get('join');
+  if(!joinId) return;
+  _joinKursId=joinId;
+  // Kursinfo laden
+  db.collection('shared').doc('kurse').collection('list').doc(joinId).get().then(doc=>{
+    if(!doc.exists){
+      document.getElementById('joinKursInfo').innerHTML='<span style="color:#ef4444">Kurs nicht gefunden</span>';
+      return;
+    }
+    const k=doc.data();
+    document.getElementById('joinKursInfo').innerHTML=
+      '<div style="font-weight:800;font-size:.88rem">'+esc(k.name||k.lehrgangsart||'Lehrgang')+'</div>'
+      +'<div style="font-size:.68rem;color:var(--mu);margin-top:4px;font-family:\'JetBrains Mono\',monospace">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div>'
+      +(k.ausbilderName?'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">Ausbilder: '+esc(k.ausbilderName)+'</div>':'');
+  }).catch(()=>{
+    document.getElementById('joinKursInfo').innerHTML='<span style="color:#ef4444">Kursdaten konnten nicht geladen werden</span>';
+  });
+  // Join-Screen anzeigen statt Login
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('joinWrap').style.display='flex';
+})();
+
+function showNormalLogin(){
+  document.getElementById('joinWrap').style.display='none';
+  document.getElementById('loginWrap').style.display='flex';
+}
+
+function submitJoinRegistration(){
+  const vorname=(document.getElementById('jVorname').value||'').trim();
+  const nachname=(document.getElementById('jNachname').value||'').trim();
+  const firma=(document.getElementById('jFirma').value||'').trim();
+  const beruf=(document.getElementById('jBeruf').value||'').trim();
+  const ausbjahr=document.getElementById('jLehrjahr').value||'';
+  const geburtsdatum=document.getElementById('jGeburt').value||'';
+  const email=(document.getElementById('jEmail').value||'').trim().toLowerCase();
+  const telefon=(document.getElementById('jTelefon').value||'').trim();
+  const passwort=document.getElementById('jPasswort').value||'';
+  const errEl=document.getElementById('jErr');
+  errEl.textContent='';
+
+  if(!vorname||!nachname){errEl.textContent='Bitte Vor- und Nachname eingeben';return;}
+  if(!firma){errEl.textContent='Bitte Betrieb angeben';return;}
+  if(!email){errEl.textContent='Bitte E-Mail eingeben';return;}
+  if(passwort.length<6){errEl.textContent='Passwort muss mindestens 6 Zeichen haben';return;}
+  if(!_joinKursId){errEl.textContent='Kein Kurs-Link erkannt';return;}
+
+  errEl.style.color='var(--acc)';
+  errEl.textContent='Wird registriert…';
+
+  // 1. Firebase Auth Konto erstellen
+  auth.createUserWithEmailAndPassword(email, passwort).then(cred=>{
+    const uid=cred.user.uid;
+    // 2. globalTN Dokument erstellen
+    const tnData={
+      vorname, nachname, firma, beruf, ausbjahr, geburtsdatum,
+      email: email,
+      kontaktEmail: email,
+      kontaktTelefon: telefon,
+      aktiverKursId: _joinKursId,
+      selfRegistered: true,
+      registeredAt: Date.now()
+    };
+    // Kursinfo für History laden
+    return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get().then(kDoc=>{
+      const kd=kDoc.exists?kDoc.data():{};
+      tnData.kursHistory=[{
+        kursId: _joinKursId,
+        kursName: kd.name||kd.lehrgangsart||'Lehrgang',
+        von: kd.von||'',
+        bis: kd.bis||'',
+        addedAt: Date.now()
+      }];
+      return db.collection('globalTN').add(tnData);
+    }).then(ref=>{
+      // 3. In Kurs-TN-Subcollection eintragen
+      return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId)
+        .collection('teilnehmer').doc(ref.id).set({
+          vorname, nachname, firma, beruf, ausbjahr,
+          kontaktEmail: email,
+          kontaktTelefon: telefon,
+          status: 'active',
+          selfRegistered: true,
+          addedAt: Date.now()
+        }).then(()=>{
+          // 4. users-Dokument mit azubi-Rolle
+          return db.collection('users').doc(uid).set({email: email, role:'azubi'},{merge:true});
+        });
+    });
+  }).then(()=>{
+    errEl.style.color='var(--acc)';
+    errEl.textContent='✓ Registrierung erfolgreich!';
+    // URL bereinigen und App laden
+    window.history.replaceState({},'',window.location.pathname);
+    _joinKursId=null;
+    document.getElementById('joinWrap').style.display='none';
+    // Auth-Listener übernimmt ab hier
+  }).catch(err=>{
+    errEl.style.color='var(--bad)';
+    const map={
+      'auth/email-already-in-use':'Diese E-Mail ist bereits registriert. Bitte über "Anmelden" einloggen.',
+      'auth/invalid-email':'Ungültige E-Mail-Adresse',
+      'auth/weak-password':'Passwort zu schwach (min. 6 Zeichen)'
+    };
+    errEl.textContent=map[err.code]||'Fehler: '+err.message;
+  });
+}
 
 // ── Navigation ──
 function showPage(id){
