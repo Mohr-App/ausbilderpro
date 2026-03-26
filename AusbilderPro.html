@@ -1664,9 +1664,33 @@ function delInst(katId,instId,e){
   if(!confirm('⚠️ Lehrgang '+label+' löschen?\n\n'+seatCount+' Schüler mit Anwesenheit und Noten.'))return;
   if(seatCount>0&&!confirm('LETZTE WARNUNG:\n\nAlle Sitzpläne, Anwesenheitsdaten und Noten für '+label+' gehen verloren.\n\nDaten werden 30 Tage im Papierkorb aufbewahrt.\n\nEndgültig löschen?'))return;
   trashPush('inst','Lehrgang: '+S.kats[katId].label+' '+label,{katId,instId,inst,katLabel:S.kats[katId].label});
-  // Firestore-Kurs mitlöschen wenn standalone
+  // Firestore-Kurs mitlöschen wenn vorhanden
   if(inst.sharedKursId&&_db){
-    _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).delete().catch(()=>{});
+    const kursId=inst.sharedKursId;
+    // TN freigeben: aktiverKursId entfernen + benachrichtigen
+    _db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
+      const batch=_db.batch();
+      snap.forEach(doc=>{
+        const t=doc.data();
+        const hist=(t.kursHistory||[]).map(h=>{
+          if(h.kursId===kursId) return {...h, abgebrochen:true};
+          return h;
+        });
+        const notif={typ:'kurs_abgebrochen',kursName:S.kats[katId]?.label||'Kurs',von:inst.sY+'-'+inst.sM+'-'+inst.sD,bis:inst.eY+'-'+inst.eM+'-'+inst.eD,ts:Date.now(),gelesen:false};
+        const benach=t.benachrichtigungen||[];
+        benach.push(notif);
+        batch.update(doc.ref,{
+          aktiverKursId:firebase.firestore.FieldValue.delete(),
+          kursHistory:hist,
+          benachrichtigungen:benach
+        });
+      });
+      return batch.commit();
+    }).then(()=>{
+      _db.collection('shared').doc('kurse').collection('list').doc(kursId).delete().catch(()=>{});
+    }).catch(()=>{
+      _db.collection('shared').doc('kurse').collection('list').doc(kursId).delete().catch(()=>{});
+    });
   }
   delete S.kats[katId].instances[instId];
   if(S.curKat===katId&&S.curInst===instId) S.curInst=Object.keys(S.kats[katId].instances)[0]||null;
