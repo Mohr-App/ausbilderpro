@@ -1664,6 +1664,10 @@ function delInst(katId,instId,e){
   if(!confirm('⚠️ Lehrgang '+label+' löschen?\n\n'+seatCount+' Schüler mit Anwesenheit und Noten.'))return;
   if(seatCount>0&&!confirm('LETZTE WARNUNG:\n\nAlle Sitzpläne, Anwesenheitsdaten und Noten für '+label+' gehen verloren.\n\nDaten werden 30 Tage im Papierkorb aufbewahrt.\n\nEndgültig löschen?'))return;
   trashPush('inst','Lehrgang: '+S.kats[katId].label+' '+label,{katId,instId,inst,katLabel:S.kats[katId].label});
+  // Firestore-Kurs mitlöschen wenn standalone
+  if(inst.sharedKursId&&_db){
+    _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).delete().catch(()=>{});
+  }
   delete S.kats[katId].instances[instId];
   if(S.curKat===katId&&S.curInst===instId) S.curInst=Object.keys(S.kats[katId].instances)[0]||null;
   persist();renderAll();loadHBZKurse();
