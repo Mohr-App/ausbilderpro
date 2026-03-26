@@ -892,6 +892,13 @@ function loadProfil(){
     +'<div class="profile-field"><span class="pf-label">Betrieb</span><span class="pf-value">'+esc(t.firma||'–')+'</span></div>'
     +'<div class="profile-field"><span class="pf-label">Lehrjahr</span><span class="pf-value">'+(t.ausbjahr?t.ausbjahr+'. Jahr':'–')+'</span></div>'
     +'<div class="profile-field"><span class="pf-label">Aktiver Kurs</span><span class="pf-value" style="color:var(--acc)">'+esc(_kurse.find(k=>k.id===t.aktiverKursId)?.name||'Keiner')+'</span></div>'
+    +'<div style="margin-top:14px;padding:14px;background:rgba(59,130,246,.04);border:2px solid rgba(59,130,246,.15);border-radius:10px">'
+    +'<div style="font-size:.7rem;font-weight:800;color:var(--acc);margin-bottom:8px">📞 Kontaktdaten</div>'
+    +'<div style="font-size:.55rem;color:var(--mu);margin-bottom:8px">Deine Kontaktdaten sind für Ausbilder und Verwaltung sichtbar.</div>'
+    +'<div class="fg" style="margin-bottom:6px"><label class="fl" style="font-size:.65rem">📧 E-Mail</label><input class="fi" id="azubiEmail" value="'+esc(t.kontaktEmail||'')+'" placeholder="deine@email.de" style="font-size:.8rem"></div>'
+    +'<div class="fg" style="margin-bottom:8px"><label class="fl" style="font-size:.65rem">📱 Telefon</label><input class="fi" id="azubiTelefon" value="'+esc(t.kontaktTelefon||'')+'" placeholder="0170 1234567" type="tel" style="font-size:.8rem"></div>'
+    +'<button onclick="saveAzubiKontakt()" style="width:100%;padding:10px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">💾 Kontaktdaten speichern</button>'
+    +'</div>'
     +'<div id="profilPhotoStatus"></div>';
 
   // Historie
@@ -907,6 +914,19 @@ function loadProfil(){
       +(isAkt?'<span style="font-size:.6rem;color:var(--acc);font-weight:700">Aktuell</span>':'')
       +'</div>';
   }).join('');
+}
+
+function saveAzubiKontakt(){
+  if(!_tnId){toast('Nicht angemeldet','bad');return;}
+  const email=(document.getElementById('azubiEmail')?.value||'').trim();
+  const telefon=(document.getElementById('azubiTelefon')?.value||'').trim();
+  db.collection('globalTN').doc(_tnId).update({kontaktEmail:email, kontaktTelefon:telefon})
+    .then(()=>{
+      _tnData.kontaktEmail=email;
+      _tnData.kontaktTelefon=telefon;
+      toast('✓ Kontaktdaten gespeichert');
+    })
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 function uploadProfilPhoto(e){
