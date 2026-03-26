@@ -130,7 +130,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div style="margin-top:8px"><label class="fl">Passwort für die App <span style="color:#ef4444">*</span></label><input class="fi" type="password" id="jPasswort" placeholder="Min. 6 Zeichen" autocomplete="new-password"></div>
     <div class="err" id="jErr"></div>
     <button class="btn" onclick="submitJoinRegistration()" style="margin-top:10px;background:linear-gradient(135deg,#059669,#10b981)">✓ Registrieren & Lehrgang beitreten</button>
-    <div style="margin-top:10px;text-align:center"><button onclick="showNormalLogin()" style="background:none;border:none;color:var(--acc);font-size:.68rem;cursor:pointer;font-family:'Sora',sans-serif;text-decoration:underline">Bereits registriert? Hier anmelden</button></div>
+    <div style="margin-top:14px;border-top:1px solid var(--brd);padding-top:12px">
+      <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px;text-align:center">Bereits registriert?</div>
+      <div><label class="fl">E-Mail</label><input class="fi" type="email" id="jLoginEmail" placeholder="deine@email.de" autocomplete="email"></div>
+      <div style="margin-top:6px"><label class="fl">Passwort</label><input class="fi" type="password" id="jLoginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitJoinLogin()"></div>
+      <div class="err" id="jLoginErr"></div>
+      <button class="btn" onclick="submitJoinLogin()" style="margin-top:8px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)">Anmelden & Lehrgang beitreten</button>
+    </div>
   </div>
 </div>
 
@@ -406,6 +412,109 @@ let _joinKursId=null;
 function showNormalLogin(){
   document.getElementById('joinWrap').style.display='none';
   document.getElementById('loginWrap').style.display='flex';
+}
+
+function submitJoinLogin(){
+  const email=(document.getElementById('jLoginEmail').value||'').trim();
+  const pass=document.getElementById('jLoginPass').value||'';
+  const errEl=document.getElementById('jLoginErr');
+  errEl.textContent='';
+  if(!email||!pass){errEl.textContent='Bitte E-Mail und Passwort eingeben';return;}
+  if(!_joinKursId){errEl.textContent='Kein Kurs-Link erkannt';return;}
+
+  errEl.style.color='var(--acc)';
+  errEl.textContent='Wird angemeldet…';
+  _registering=true;
+
+  auth.signInWithEmailAndPassword(email, pass).then(cred=>{
+    // TN finden
+    return db.collection('globalTN').where('email','==',email.toLowerCase()).limit(1).get().then(snap=>{
+      if(snap.empty){
+        errEl.style.color='var(--bad)';
+        errEl.textContent='Kein Teilnehmer-Konto für diese E-Mail gefunden.';
+        _registering=false;
+        return;
+      }
+      const tnDoc=snap.docs[0];
+      const tnId=tnDoc.id;
+      const tnData=tnDoc.data();
+
+      // Prüfe ob bereits in diesem Kurs
+      if(tnData.aktiverKursId===_joinKursId){
+        errEl.style.color='var(--acc)';
+        errEl.textContent='✓ Du bist bereits in diesem Kurs!';
+        _registering=false;
+        _joinKursId=null;
+        window.history.replaceState({},'',window.location.pathname);
+        _uid=cred.user.uid;
+        _email=email.toLowerCase();
+        _tnId=tnId;
+        _tnData=tnData;
+        document.getElementById('joinWrap').style.display='none';
+        document.getElementById('app').classList.add('show');
+        document.getElementById('hdrUser').textContent=_email.split('@')[0];
+        loadData();
+        return;
+      }
+
+      // Kursinfo laden für History
+      return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get().then(kDoc=>{
+        const kd=kDoc.exists?kDoc.data():{};
+        const histEntry={
+          kursId: _joinKursId,
+          kursName: kd.name||kd.lehrgangsart||'Lehrgang',
+          von: kd.von||'',
+          bis: kd.bis||'',
+          addedAt: Date.now()
+        };
+        const hist=tnData.kursHistory||[];
+        if(!hist.some(h=>h.kursId===_joinKursId)) hist.push(histEntry);
+
+        // globalTN updaten
+        return db.collection('globalTN').doc(tnId).update({
+          aktiverKursId: _joinKursId,
+          kursHistory: hist
+        });
+      }).then(()=>{
+        // In Kurs-TN eintragen
+        return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId)
+          .collection('teilnehmer').doc(tnId).set({
+            vorname: tnData.vorname||'',
+            nachname: tnData.nachname||'',
+            firma: tnData.firma||'',
+            beruf: tnData.beruf||'',
+            ausbjahr: tnData.ausbjahr||'',
+            kontaktEmail: tnData.kontaktEmail||tnData.email||'',
+            kontaktTelefon: tnData.kontaktTelefon||'',
+            status: 'active',
+            addedAt: Date.now()
+          },{merge:true});
+      }).then(()=>{
+        errEl.style.color='var(--acc)';
+        errEl.textContent='✓ Lehrgang beigetreten!';
+        _registering=false;
+        window.history.replaceState({},'',window.location.pathname);
+        const savedKursId=_joinKursId;
+        _joinKursId=null;
+        _uid=cred.user.uid;
+        _email=email.toLowerCase();
+        _tnId=tnId;
+        // Reload TN data
+        return db.collection('globalTN').doc(tnId).get().then(doc=>{
+          _tnData=doc.exists?doc.data():tnData;
+          document.getElementById('joinWrap').style.display='none';
+          document.getElementById('app').classList.add('show');
+          document.getElementById('hdrUser').textContent=_email.split('@')[0];
+          loadData();
+        });
+      });
+    });
+  }).catch(err=>{
+    _registering=false;
+    errEl.style.color='var(--bad)';
+    const map={'auth/user-not-found':'E-Mail oder Passwort falsch','auth/wrong-password':'E-Mail oder Passwort falsch','auth/invalid-credential':'E-Mail oder Passwort falsch','auth/invalid-email':'Ungültige E-Mail','auth/too-many-requests':'Zu viele Versuche – kurz warten'};
+    errEl.textContent=map[err.code]||'Fehler: '+err.message;
+  });
 }
 
 function submitJoinRegistration(){
