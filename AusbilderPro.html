@@ -877,7 +877,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div style="font-size:.62rem;color:var(--mu);margin-bottom:10px;padding:8px 10px;background:rgba(59,130,246,.04);border:1px solid rgba(59,130,246,.15);border-radius:8px">Diese Daten werden an Azubis und Arbeitgeber weitergegeben, damit sie dich kontaktieren können.</div>
 <div class="fg"><label class="fl">Name <span style="color:#ef4444">*</span></label><input class="fi" id="apName" placeholder="Vor- und Nachname"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Telefon</label><input class="fi" id="apTelefon" type="tel" placeholder="0170 1234567"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">E-Mail</label><input class="fi" id="apEmail" type="email" placeholder="wird automatisch ausgefüllt" readonly style="opacity:.6"></div>
+<div class="fg" style="margin-top:6px"><label class="fl">E-Mail (für Azubis sichtbar)</label><input class="fi" id="apEmail" type="email" placeholder="deine@arbeits-email.de"></div>
 <button class="bsave" onclick="saveAusbilderProfil()" style="margin-top:12px">💾 Speichern</button>
 </div></div></div>
 
@@ -3556,24 +3556,25 @@ function openAusbilderProfil(){
   const p=getAusbilderProfil();
   document.getElementById('apName').value=p.name||_auth?.currentUser?.displayName||'';
   document.getElementById('apTelefon').value=p.telefon||'';
-  document.getElementById('apEmail').value=_auth?.currentUser?.email||'';
+  document.getElementById('apEmail').value=p.email||'';
   document.getElementById('ausbilderProfilModal').classList.add('open');
 }
 function saveAusbilderProfil(){
   const name=(document.getElementById('apName').value||'').trim();
   const telefon=(document.getElementById('apTelefon').value||'').trim();
+  const email=(document.getElementById('apEmail').value||'').trim();
   if(!name){toast('Bitte Name eingeben','bad');return;}
-  localStorage.setItem('ausbilderProfil',JSON.stringify({name,telefon}));
+  localStorage.setItem('ausbilderProfil',JSON.stringify({name,telefon,email}));
   document.getElementById('ausbilderProfilModal').classList.remove('open');
   toast('Profil gespeichert ✓');
 }
 function getAusbilderKursData(){
   const p=getAusbilderProfil();
-  const email=_auth?.currentUser?.email?.toLowerCase()||'';
+  const loginEmail=_auth?.currentUser?.email?.toLowerCase()||'';
   return {
-    ausbilderLoginEmail: email,
-    ausbilderEmail: email,
-    ausbilderName: p.name||_auth?.currentUser?.displayName||email,
+    ausbilderLoginEmail: loginEmail,
+    ausbilderEmail: p.email||loginEmail,
+    ausbilderName: p.name||_auth?.currentUser?.displayName||loginEmail,
     ausbilderTel: p.telefon||''
   };
 }
