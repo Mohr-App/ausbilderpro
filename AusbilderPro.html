@@ -2942,6 +2942,8 @@ function openModal(id){
           } else {
             h+='<div style="margin-top:4px;padding:5px 8px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.2);border-radius:7px;font-size:.68rem;color:#dc2626;font-weight:600">⚠ Keine DSGVO-Zustimmung</div>';
           }
+          // Komplett-Löschen Button
+          h+='<button onclick="deleteTnKomplett(\''+d.poolTnId+'\')" style="margin-top:10px;width:100%;padding:8px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:8px;color:#dc2626;font-size:.7rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Aus Kurs entfernen</button>';
           fsInfo.innerHTML=h;
         }).catch(()=>{fsInfo.innerHTML='';fsInfo.style.display='none';});
       } else {
@@ -3764,6 +3766,7 @@ function openTnDetail(tnId){
           +esc(h.kursName||'?')+' <span style="color:var(--mu)">'+fmtDE(h.von||'')+' – '+fmtDE(h.bis||'')+'</span>'+abgebr+'</div>';
       });
     }
+    html+='<button onclick="deleteTnKomplett(\''+tnId+'\');document.getElementById(\'tnDetailModal\').classList.remove(\'open\')" style="margin-top:12px;width:100%;padding:8px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:8px;color:#dc2626;font-size:.7rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Aus Kurs entfernen</button>';
     document.getElementById('tnDetailBody').innerHTML=html;
   }).catch(err=>{
     document.getElementById('tnDetailBody').innerHTML='<div class="pool-empty">Fehler: '+esc(err.message)+'</div>';
@@ -3773,6 +3776,39 @@ function openTnDetail(tnId){
 function openTnDetailFromSeat(){
   const d=curSeats()[curSeat]||{};
   if(d.poolTnId) openTnDetail(d.poolTnId);
+}
+
+function deleteTnKomplett(tnId){
+  if(!tnId||!_db) return;
+  const inst=curInst();
+  const kursId=inst?.sharedKursId;
+  if(!kursId){toast('Kein Kurs verknüpft','bad');return;}
+  if(!confirm('Teilnehmer aus diesem Kurs entfernen?')) return;
+
+  // 1. Aus Kurs-Teilnehmer-Subcollection löschen
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(tnId).delete().then(()=>{
+      // 2. aktiverKursId im globalTN zurücksetzen falls es dieser Kurs war
+      return _db.collection('globalTN').doc(tnId).get();
+    }).then(doc=>{
+      if(doc.exists&&doc.data().aktiverKursId===kursId){
+        return _db.collection('globalTN').doc(tnId).update({
+          aktiverKursId: firebase.firestore.FieldValue.delete()
+        });
+      }
+    }).then(()=>{
+      // 3. Vom Sitzplatz entfernen (lokal)
+      if(inst){
+        Object.keys(inst.seats||{}).forEach(sid=>{
+          if(inst.seats[sid]&&inst.seats[sid].poolTnId===tnId){
+            inst.seats[sid]={};
+          }
+        });
+      }
+      document.getElementById('ov').classList.remove('open');
+      persist();renderSeats();loadPool();
+      toast('✓ Teilnehmer aus Kurs entfernt');
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 // ─── STANDALONE MODUS ───
