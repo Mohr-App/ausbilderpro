@@ -2052,12 +2052,30 @@ function saveNewInst(){
   const eD=document.getElementById('dpED').value,eM=document.getElementById('dpEM').value,eY=document.getElementById('dpEY').value;
   if(!sD||!sM||!sY||!eD||!eM||!eY){alert('Bitte beide Daten vollständig ausfüllen.');return;}
   const id=gid();
-  const defaultLabels={};
-  const rows=[
+  // Tischbeschriftungen vom letzten Lehrgang derselben Art übernehmen
+  const prevInstances=Object.values(S.kats[dpKatId]?.instances||{});
+  let lastLabels={};
+  let lastRows=null;
+  let lastSeatCnt=13;
+  let lastNextSeatNum=13;
+  if(prevInstances.length){
+    // Neuesten Lehrgang finden (nach Startdatum)
+    const sorted=[...prevInstances].sort((a,b)=>{
+      const da=a.sY+'-'+String(a.sM).padStart(2,'0')+'-'+String(a.sD).padStart(2,'0');
+      const db2=b.sY+'-'+String(b.sM).padStart(2,'0')+'-'+String(b.sD).padStart(2,'0');
+      return db2>da?1:db2<da?-1:0;
+    });
+    const last=sorted[0];
+    if(last.seatLabels) lastLabels=JSON.parse(JSON.stringify(last.seatLabels));
+    if(last.rows) lastRows=JSON.parse(JSON.stringify(last.rows));
+    if(last.seatCnt) lastSeatCnt=last.seatCnt;
+    if(last.nextSeatNum) lastNextSeatNum=last.nextSeatNum;
+  }
+  const rows=lastRows||[
     {id:'r1',label:'',seats:[...DEFAULT_LEFT]},
     {id:'r2',label:'',seats:[...DEFAULT_RIGHT]}
   ];
-  const instData={sD,sM,sY,eD,eM,eY,rows,seatCnt:13,seats:{},nextSeatNum:13,seatLabels:defaultLabels};
+  const instData={sD,sM,sY,eD,eM,eY,rows,seatCnt:lastSeatCnt,seats:{},nextSeatNum:lastNextSeatNum,seatLabels:lastLabels};
 
   // Automatisch Firestore-Kurs erstellen wenn angemeldet
   if(_db&&_auth&&_auth.currentUser){
