@@ -2659,7 +2659,7 @@ function renameSeat(e,id){
   e.stopPropagation();
   const inst=curInst();if(!inst)return;
   if(!inst.seatLabels) inst.seatLabels={};
-  const cur=inst.seatLabels[id]!=null?inst.seatLabels[id]:id;
+  const cur=(inst.seatLabels[id]!=null&&inst.seatLabels[id]!=='')?inst.seatLabels[id]:'';
   const nw=prompt('Tischnummer / Bezeichnung:',cur);
   if(nw===null)return;
   inst.seatLabels[id]=nw.trim()||cur;
@@ -4837,8 +4837,8 @@ function loadPool(){
         const labelToSeatId={};
         const rows3=getRows(inst3);
         rows3.forEach(r=>r.seats.forEach(sid=>{
-          const lbl=(inst3.seatLabels&&inst3.seatLabels[sid]!=null&&inst3.seatLabels[sid]!=='')?String(inst3.seatLabels[sid]):String(sid);
-          labelToSeatId[lbl]=sid;
+          const lbl=(inst3.seatLabels&&inst3.seatLabels[sid]!=null&&inst3.seatLabels[sid]!=='')?String(inst3.seatLabels[sid]):null;
+          if(lbl) labelToSeatId[lbl]=sid;
         }));
         let autoPlaced=0;
         const autoPlaceBatch=_db?_db.batch():null;
