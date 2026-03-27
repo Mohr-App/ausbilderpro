@@ -2614,9 +2614,9 @@ function removeSeat(rowId){
   const row=rows.find(r=>r.id===rowId); if(!row)return;
   if(row.seats.length<=1){alert('Mindestens 1 Tisch pro Reihe.');return;}
   const sid=row.seats[0]; // bottom seat
-  const lbl=(inst.seatLabels&&inst.seatLabels[sid]!=null&&inst.seatLabels[sid]!=='')?inst.seatLabels[sid]:sid;
+  const lbl=(inst.seatLabels&&inst.seatLabels[sid]!=null&&inst.seatLabels[sid]!=='')?inst.seatLabels[sid]:'';
   if(inst.seats[sid]&&inst.seats[sid].name){
-    if(!confirm('Tisch '+lbl+' ist belegt – trotzdem entfernen?'))return;
+    if(!confirm('Tisch '+(lbl||'(unbeschriftet)')+' ist belegt – trotzdem entfernen?'))return;
     delete inst.seats[sid];
   }
   row.seats.shift();
@@ -2908,7 +2908,9 @@ function openModal(id){
   tmpAtt=JSON.parse(JSON.stringify(d.attendance||[]));
   // Snapshot für Dirty-Check
   _modalSnapshot={name:d.name||'',company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',attLen:(d.attendance||[]).length};
-  document.getElementById('mtit').textContent='Sitzplatz '+id;
+  const inst_=curInst();
+  const seatLabel=(inst_&&inst_.seatLabels&&inst_.seatLabels[id]!=null&&inst_.seatLabels[id]!=='')?inst_.seatLabels[id]:null;
+  document.getElementById('mtit').textContent=seatLabel?'Sitzplatz '+seatLabel:'Sitzplatz';
   // Firestore TN-Daten laden (async, darf openModal nicht blockieren)
   try{
     const fsInfo=document.getElementById('tnFirestoreInfo');
