@@ -885,6 +885,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <button class="bsave" onclick="saveAusbilderProfil()" style="margin-top:12px">💾 Speichern</button>
 </div></div></div>
 
+<!-- TN DETAIL MODAL -->
+<div class="ov" id="tnDetailModal" onclick="if(event.target===this)this.classList.remove('open')">
+<div class="modal" style="max-width:420px">
+<div class="mhd"><div class="mtit" id="tnDetailTitle">👤 Teilnehmer</div><button class="xcls" onclick="document.getElementById('tnDetailModal').classList.remove('open')">&#10005;</button></div>
+<div class="mbdy" id="tnDetailBody" style="max-height:70vh;overflow-y:auto"><div class="pool-empty">Lädt…</div></div>
+</div></div>
+
 <!-- QR CODE MODAL -->
 <div class="ov" id="qrModal" onclick="if(event.target===this)this.classList.remove('open')">
 <div class="modal" style="max-width:400px">
@@ -997,7 +1004,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <!-- SEAT MODAL -->
 <div class="ov" id="ov" onclick="if(event.target===this)safeCloseModal()">
   <div class="modal">
-    <div class="mhd"><div class="mtit" id="mtit">Sitzplatz</div><button class="xcls" onclick="safeCloseModal()">✕</button></div>
+    <div class="mhd"><div class="mtit" id="mtit">Sitzplatz</div><button class="tbtn" id="seatProfilBtn" onclick="openTnDetailFromSeat()" style="display:none;font-size:.6rem;padding:3px 8px;margin-right:8px">👤 Profil</button><button class="xcls" onclick="safeCloseModal()">✕</button></div>
     <div class="mbdy">
       <div class="tabs">
         <button class="tab active" onclick="stab('info')">📋 Person</button>
@@ -2883,6 +2890,8 @@ function openModal(id){
   // Snapshot für Dirty-Check
   _modalSnapshot={name:d.name||'',company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',attLen:(d.attendance||[]).length};
   document.getElementById('mtit').textContent='Sitzplatz '+id;
+  const profilBtn=document.getElementById('seatProfilBtn');
+  if(profilBtn) profilBtn.style.display=d.poolTnId?'':'none';
   document.getElementById('iName').value=d.name||'';
   document.getElementById('iCo').value=d.company||'';
   populateProfOber(); setProfFromValue(d.profession||'');
@@ -3640,6 +3649,72 @@ function getAusbilderKursData(){
     ausbilderName: p.name||_auth?.currentUser?.displayName||loginEmail,
     ausbilderTel: p.telefon||''
   };
+}
+
+// ─── TN DETAIL ───
+function openTnDetail(tnId){
+  if(!_db||!tnId) return;
+  document.getElementById('tnDetailTitle').textContent='👤 Teilnehmer';
+  document.getElementById('tnDetailBody').innerHTML='<div class="pool-empty">Lädt…</div>';
+  document.getElementById('tnDetailModal').classList.add('open');
+  _db.collection('globalTN').doc(tnId).get().then(doc=>{
+    if(!doc.exists){document.getElementById('tnDetailBody').innerHTML='<div class="pool-empty">Nicht gefunden</div>';return;}
+    const t=doc.data();
+    const name=((t.vorname||'')+' '+(t.nachname||'')).trim();
+    const init=((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
+    document.getElementById('tnDetailTitle').textContent='👤 '+name;
+    let html='<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">'
+      +'<div style="width:48px;height:48px;border-radius:50%;background:rgba(59,130,246,.15);display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;color:var(--acc);flex-shrink:0;border:2px solid rgba(59,130,246,.3)">'+esc(init)+'</div>'
+      +'<div><div style="font-size:1rem;font-weight:800;color:var(--tx)">'+esc(name)+'</div>'
+      +'<div style="font-size:.7rem;color:var(--mu)">'+(t.beruf||'')+(t.ausbjahr?' · '+t.ausbjahr+'. Lehrjahr':'')+'</div></div></div>';
+    function field(label,val,icon){
+      if(!val) return '';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(59,130,246,.03);border:1px solid rgba(59,130,246,.08);border-radius:8px;margin-bottom:5px">'
+        +'<span style="font-size:.9rem;width:20px;text-align:center">'+icon+'</span>'
+        +'<div style="flex:1;min-width:0"><div style="font-size:.55rem;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+esc(label)+'</div>'
+        +'<div style="font-size:.82rem;color:var(--tx);font-weight:600;word-break:break-word">'+esc(val)+'</div></div></div>';
+    }
+    html+=field('Betrieb',t.firma,'🏢');
+    html+=field('Beruf',t.beruf,'🔧');
+    html+=field('Lehrjahr',t.ausbjahr?t.ausbjahr+'. Jahr':'','📅');
+    html+=field('Geburtsdatum',t.geburtsdatum?fmtDE(t.geburtsdatum):'','🎂');
+    html+=field('E-Mail',t.kontaktEmail||t.email,'📧');
+    html+=field('Telefon',t.kontaktTelefon||t.tel,'📱');
+    html+=field('Sitzplatz-Wunsch',t.wunschSitzplatz?'Platz '+t.wunschSitzplatz:'','🪑');
+    // Registrierungsinfo
+    if(t.selfRegistered){
+      const regDate=t.registeredAt?new Date(t.registeredAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
+      html+=field('Registriert am',regDate,'✅');
+    }
+    if(t.manuellAngelegt){
+      html+=field('Angelegt von',t.angelegtVon||'Ausbilder','✏️');
+    }
+    // DSGVO
+    if(t.dsgvoZustimmung){
+      const ts=t.dsgvoZustimmung.zeitpunkt?new Date(t.dsgvoZustimmung.zeitpunkt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
+      html+='<div style="margin-top:8px;padding:8px 10px;background:rgba(16,185,129,.06);border:1.5px solid rgba(16,185,129,.2);border-radius:8px;font-size:.72rem;color:#059669;font-weight:600">✅ DSGVO-Zustimmung am '+ts+' (v'+esc(t.dsgvoZustimmung.version||'1.0')+')</div>';
+    } else {
+      html+='<div style="margin-top:8px;padding:8px 10px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.2);border-radius:8px;font-size:.72rem;color:#dc2626;font-weight:600">⚠ Keine DSGVO-Zustimmung</div>';
+    }
+    // Kurshistorie
+    const hist=(t.kursHistory||[]).slice().sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
+    if(hist.length){
+      html+='<div style="margin-top:12px;font-size:.6rem;font-weight:700;color:var(--mu);letter-spacing:.06em;margin-bottom:6px">KURSHISTORIE ('+hist.length+')</div>';
+      hist.forEach(h=>{
+        const abgebr=h.abgebrochen?'<span style="color:#ef4444"> · abgebrochen</span>':'';
+        html+='<div style="padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:6px;margin-bottom:3px;font-size:.7rem">'
+          +esc(h.kursName||'?')+' <span style="color:var(--mu)">'+fmtDE(h.von||'')+' – '+fmtDE(h.bis||'')+'</span>'+abgebr+'</div>';
+      });
+    }
+    document.getElementById('tnDetailBody').innerHTML=html;
+  }).catch(err=>{
+    document.getElementById('tnDetailBody').innerHTML='<div class="pool-empty">Fehler: '+esc(err.message)+'</div>';
+  });
+}
+
+function openTnDetailFromSeat(){
+  const d=curSeats()[curSeat]||{};
+  if(d.poolTnId) openTnDetail(d.poolTnId);
 }
 
 // ─── STANDALONE MODUS ───
@@ -4658,6 +4733,7 @@ function loadPool(){
           card.classList.add('dragging'); e.dataTransfer.effectAllowed='copy';
         });
         card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+        card.addEventListener('click',()=>{ if(!card.classList.contains('dragging')) openTnDetail(doc.id); });
         body.appendChild(card);
       });
       // ── Auto-Platzierung: TN mit Wunsch-Sitzplatz automatisch setzen ──
