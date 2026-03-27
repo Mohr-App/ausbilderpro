@@ -2892,46 +2892,47 @@ function openModal(id){
   // Snapshot für Dirty-Check
   _modalSnapshot={name:d.name||'',company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',attLen:(d.attendance||[]).length};
   document.getElementById('mtit').textContent='Sitzplatz '+id;
-  if(profilBtn) profilBtn.style.display=d.poolTnId?'':'none';
-  // Firestore TN-Daten laden
-  const fsInfo=document.getElementById('tnFirestoreInfo');
-  if(fsInfo){
-    if(d.poolTnId&&_db){
-      fsInfo.style.display='';
-      fsInfo.innerHTML='<div style="font-size:.55rem;color:var(--mu)">Lädt Registrierungsdaten…</div>';
-      _db.collection('globalTN').doc(d.poolTnId).get().then(tdoc=>{
-        if(!tdoc.exists){fsInfo.innerHTML='';fsInfo.style.display='none';return;}
-        const t=tdoc.data();
-        function fld(icon,label,val){
-          if(!val)return '';
-          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:rgba(59,130,246,.03);border:1px solid rgba(59,130,246,.08);border-radius:7px;margin-bottom:4px">'
-            +'<span style="font-size:.8rem;width:18px;text-align:center">'+icon+'</span>'
-            +'<div style="flex:1;min-width:0"><div style="font-size:.5rem;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+esc(label)+'</div>'
-            +'<div style="font-size:.76rem;color:var(--tx);font-weight:600;word-break:break-word">'+esc(val)+'</div></div></div>';
-        }
-        let h='<div style="font-size:.58rem;font-weight:700;color:var(--mu);letter-spacing:.06em;margin-bottom:6px">REGISTRIERUNGSDATEN</div>';
-        h+=fld('🎂','Geburtsdatum',t.geburtsdatum?fmtDE(t.geburtsdatum):'');
-        h+=fld('📧','E-Mail',t.kontaktEmail||t.email||'');
-        h+=fld('📱','Telefon',t.kontaktTelefon||t.tel||'');
-        h+=fld('🪑','Wunsch-Sitzplatz',t.wunschSitzplatz?'Platz '+t.wunschSitzplatz:'');
-        if(t.selfRegistered){
-          const rd=t.registeredAt?new Date(t.registeredAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
-          h+=fld('📝','Selbst registriert am',rd);
-        }
-        if(t.manuellAngelegt) h+=fld('✏️','Angelegt von',t.angelegtVon||'Ausbilder');
-        if(t.dsgvoZustimmung){
-          const ts=t.dsgvoZustimmung.zeitpunkt?new Date(t.dsgvoZustimmung.zeitpunkt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
-          h+='<div style="margin-top:4px;padding:5px 8px;background:rgba(16,185,129,.06);border:1.5px solid rgba(16,185,129,.2);border-radius:7px;font-size:.68rem;color:#059669;font-weight:600">✅ DSGVO v'+esc(t.dsgvoZustimmung.version||'1.0')+' am '+ts+'</div>';
-        } else {
-          h+='<div style="margin-top:4px;padding:5px 8px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.2);border-radius:7px;font-size:.68rem;color:#dc2626;font-weight:600">⚠ Keine DSGVO-Zustimmung</div>';
-        }
-        fsInfo.innerHTML=h;
-      }).catch(()=>{fsInfo.innerHTML='';fsInfo.style.display='none';});
-    } else {
-      fsInfo.style.display='none';
-      fsInfo.innerHTML='';
+  // Firestore TN-Daten laden (async, darf openModal nicht blockieren)
+  try{
+    const fsInfo=document.getElementById('tnFirestoreInfo');
+    if(fsInfo){
+      if(d.poolTnId&&_db){
+        fsInfo.style.display='';
+        fsInfo.innerHTML='<div style="font-size:.55rem;color:var(--mu)">Lädt Registrierungsdaten…</div>';
+        _db.collection('globalTN').doc(d.poolTnId).get().then(tdoc=>{
+          if(!tdoc.exists){fsInfo.innerHTML='';fsInfo.style.display='none';return;}
+          const t=tdoc.data();
+          function fld(icon,label,val){
+            if(!val)return '';
+            return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:rgba(59,130,246,.03);border:1px solid rgba(59,130,246,.08);border-radius:7px;margin-bottom:4px">'
+              +'<span style="font-size:.8rem;width:18px;text-align:center">'+icon+'</span>'
+              +'<div style="flex:1;min-width:0"><div style="font-size:.5rem;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+esc(label)+'</div>'
+              +'<div style="font-size:.76rem;color:var(--tx);font-weight:600;word-break:break-word">'+esc(String(val))+'</div></div></div>';
+          }
+          let h='<div style="font-size:.58rem;font-weight:700;color:var(--mu);letter-spacing:.06em;margin-bottom:6px">REGISTRIERUNGSDATEN</div>';
+          h+=fld('🎂','Geburtsdatum',t.geburtsdatum?fmtDE(t.geburtsdatum):'');
+          h+=fld('📧','E-Mail',t.kontaktEmail||t.email||'');
+          h+=fld('📱','Telefon',t.kontaktTelefon||t.tel||'');
+          h+=fld('🪑','Wunsch-Sitzplatz',t.wunschSitzplatz?'Platz '+t.wunschSitzplatz:'');
+          if(t.selfRegistered){
+            const rd=t.registeredAt?new Date(t.registeredAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
+            h+=fld('📝','Selbst registriert am',rd);
+          }
+          if(t.manuellAngelegt) h+=fld('✏️','Angelegt von',t.angelegtVon||'Ausbilder');
+          if(t.dsgvoZustimmung){
+            const ts=t.dsgvoZustimmung.zeitpunkt?new Date(t.dsgvoZustimmung.zeitpunkt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
+            h+='<div style="margin-top:4px;padding:5px 8px;background:rgba(16,185,129,.06);border:1.5px solid rgba(16,185,129,.2);border-radius:7px;font-size:.68rem;color:#059669;font-weight:600">✅ DSGVO v'+esc(String(t.dsgvoZustimmung.version||'1.0'))+' am '+ts+'</div>';
+          } else {
+            h+='<div style="margin-top:4px;padding:5px 8px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.2);border-radius:7px;font-size:.68rem;color:#dc2626;font-weight:600">⚠ Keine DSGVO-Zustimmung</div>';
+          }
+          fsInfo.innerHTML=h;
+        }).catch(()=>{fsInfo.innerHTML='';fsInfo.style.display='none';});
+      } else {
+        fsInfo.style.display='none';
+        fsInfo.innerHTML='';
+      }
     }
-  }
+  }catch(e){console.warn('fsInfo error',e);}
   document.getElementById('iName').value=d.name||'';
   document.getElementById('iCo').value=d.company||'';
   populateProfOber(); setProfFromValue(d.profession||'');
