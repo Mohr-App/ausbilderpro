@@ -2915,12 +2915,28 @@ function openModal(id){
   try{
     const fsInfo=document.getElementById('tnFirestoreInfo');
     if(fsInfo){
-      if(d.poolTnId&&_db){
+      if((d.poolTnId||d.name)&&_db){
         fsInfo.style.display='';
         fsInfo.innerHTML='<div style="font-size:.55rem;color:var(--mu)">Lädt Registrierungsdaten…</div>';
-        _db.collection('globalTN').doc(d.poolTnId).get().then(tdoc=>{
-          if(!tdoc.exists){fsInfo.innerHTML='';fsInfo.style.display='none';return;}
+        // Entweder direkt per ID oder per Name suchen
+        const tnPromise = d.poolTnId 
+          ? _db.collection('globalTN').doc(d.poolTnId).get()
+          : _db.collection('globalTN').where('vorname','==',((d.name||'').split(' ')[0]||'')).where('nachname','==',((d.name||'').split(' ').slice(1).join(' ')||'')).limit(1).get().then(snap=>{
+              if(snap.empty) return null;
+              // poolTnId nachtragen auf dem Sitz
+              const foundId=snap.docs[0].id;
+              const inst__=curInst();
+              if(inst__&&inst__.seats&&inst__.seats[curSeat]){
+                inst__.seats[curSeat].poolTnId=foundId;
+                persist();
+              }
+              return snap.docs[0];
+            });
+        tnPromise.then(result=>{
+          const tdoc = result?.exists!==undefined ? result : (result||null);
+          if(!tdoc||!tdoc.exists){fsInfo.innerHTML='';fsInfo.style.display='none';return;}
           const t=tdoc.data();
+          const resolvedTnId=d.poolTnId||tdoc.id;
           function fld(icon,label,val){
             if(!val)return '';
             return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:rgba(59,130,246,.03);border:1px solid rgba(59,130,246,.08);border-radius:7px;margin-bottom:4px">'
@@ -2967,7 +2983,7 @@ function openModal(id){
             });
           }
           // Aus Kurs entfernen Button
-          h+='<button onclick="deleteTnKomplett(\''+d.poolTnId+'\')" style="margin-top:10px;width:100%;padding:8px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:8px;color:#dc2626;font-size:.7rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Aus Kurs entfernen</button>';
+          h+='<button onclick="deleteTnKomplett(\''+resolvedTnId+'\')" style="margin-top:10px;width:100%;padding:8px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:8px;color:#dc2626;font-size:.7rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Aus Kurs entfernen</button>';
           fsInfo.innerHTML=h;
         }).catch(()=>{fsInfo.innerHTML='';fsInfo.style.display='none';});
       } else {
