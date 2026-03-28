@@ -983,6 +983,20 @@ service cloud.firestore {
             </div>
           </div>
 
+          <!-- KURSEINSTELLUNGEN -->
+          <div class="card scard" onclick="toggleSCard(this)">
+            <div class="scard-hdr">
+              <div style="font-size:.85rem;font-weight:700">📅 Kurseinstellungen</div>
+              <div class="scard-arrow">▸</div>
+            </div>
+            <div class="scard-body">
+              <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Standard-Einstellungen für neue Kurse. Kann pro Kurs überschrieben werden.</div>
+              <div class="fg"><label class="fl">Standard-Kurstage pro Lehrgang</label><input class="fi" id="defaultKurstageInp" type="number" min="1" max="30" value="5" placeholder="5" style="max-width:100px" onclick="event.stopPropagation()"></div>
+              <div style="font-size:.58rem;color:var(--mu);margin-top:4px">Berufsschultage werden automatisch abgezogen.</div>
+              <button class="btn-sm btn-ok" onclick="event.stopPropagation();saveKursSettings()" style="width:100%;margin-top:6px;font-size:.72rem">💾 Kurseinstellungen speichern</button>
+            </div>
+          </div>
+
           <!-- AUSBILDER KARTE -->
           <div class="card scard" onclick="toggleSCard(this)">
             <div class="scard-hdr">
@@ -1484,9 +1498,12 @@ function loadHVKontakt(){
     const n=document.getElementById('hvNameInp');
     const t=document.getElementById('hvTelInp');
     const e=document.getElementById('hvEmailInp');
+    const kt=document.getElementById('defaultKurstageInp');
     if(n) n.value=d.hvName||'';
     if(t) t.value=d.hvTel||'';
     if(e) e.value=d.hvEmail||'';
+    if(kt) kt.value=d.defaultKurstage||5;
+    _defaultKurstage=d.defaultKurstage||5;
   }).catch(()=>{});
 }
 function saveHVKontakt(){
@@ -1495,6 +1512,12 @@ function saveHVKontakt(){
   const hvEmail=(document.getElementById('hvEmailInp')?.value||'').trim();
   db.collection('shared').doc('kursSettings').set({hvName,hvTel,hvEmail},{merge:true})
     .then(()=>toast('Kontaktdaten gespeichert ✓'))
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+function saveKursSettings(){
+  const defaultKurstage=parseInt(document.getElementById('defaultKurstageInp')?.value)||5;
+  db.collection('shared').doc('kursSettings').set({defaultKurstage},{merge:true})
+    .then(()=>toast('Kurseinstellungen gespeichert ✓'))
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 function showChangelog(){
@@ -1524,6 +1547,7 @@ const _secondaryAuth = _secondaryApp.auth();
 let _uid = null;
 let _email = null;
 let _kurse = [];
+let _defaultKurstage = 5;
 let _csvData = [];
 let _selectedKursId = null;
 
@@ -5391,19 +5415,25 @@ function openTNProfile(tnId){
 function loadTNProfileAttendance(tnId, kursId){
   const el=document.getElementById('tnProfileAtt');
   if(!el||!kursId) return;
-  db.collection('shared').doc('kurse').collection('list').doc(kursId)
-    .collection('teilnehmer').doc(tnId).get().then(doc=>{
-      if(!doc.exists) return;
-      const d=doc.data();
-      if(!d.attTotal) return;
-      const pct=d.attPercent||0;
+  // Kurs + TN-Daten parallel laden
+  Promise.all([
+    db.collection('shared').doc('kurse').collection('list').doc(kursId).get(),
+    db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId).get()
+  ]).then(([kursDoc, tnDoc])=>{
+      if(!tnDoc.exists) return;
+      const d=tnDoc.data();
+      const kd=kursDoc.exists?kursDoc.data():{};
+      if(!d.attTotal&&!kd.kurstage) return;
+      // Kurstage = Soll-Tage, BS wird nicht abgezogen
+      const kurstage=kd.kurstage||d.attTotal||5;
+      const pct=kurstage>0?Math.round((d.attPresent||0)/kurstage*100):0;
       const col=pct>=80?'#22c55e':pct>=60?'#f59e0b':'#ef4444';
       el.innerHTML=
         '<div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu);margin-bottom:8px">ANWESENHEIT</div>'+
         '<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:9px;padding:12px 14px">'+
           '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
             '<div style="font-size:1.4rem;font-weight:900;color:'+col+'">'+pct+'%</div>'+
-            '<div style="font-size:.68rem;color:var(--mu)">Anwesenheitsquote<br>'+d.attPresent+' von '+d.attTotal+' Tagen</div>'+
+            '<div style="font-size:.68rem;color:var(--mu)">Anwesenheitsquote<br>'+(d.attPresent||0)+' von '+kurstage+' Kurstagen</div>'+
           '</div>'+
           '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.65rem;font-family:\'JetBrains Mono\',monospace">'+
             (d.attPresent?'<span style="color:#22c55e">✅ '+d.attPresent+'× anwesend</span>':'')+
@@ -7090,6 +7120,7 @@ function bldSaveEntwurf(){
     standortMapsUrl:standort?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((standort.strasse||'')+' '+(standort.plz||'')+' '+(standort.ort||'')):'',
     werkzeug:lgartObj.werkzeug||[],
     kleidung:lgartObj.kleidung||[],
+    kurstage:_defaultKurstage,
     entwurf:true,
     entwurfTNIds:_bldTNIds,
     createdAt:firebase.firestore.FieldValue.serverTimestamp(),
@@ -7310,6 +7341,7 @@ function bldUebertragen(){
     // Werkzeug + Kleidung von Lehrgangsart
     werkzeug: lgartObj.werkzeug||[],
     kleidung: lgartObj.kleidung||[],
+    kurstage: _defaultKurstage,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     createdBy: _uid,
     beschreibung,

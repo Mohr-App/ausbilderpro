@@ -2074,7 +2074,7 @@ function saveNewInst(){
     {id:'r1',label:'',seats:[...DEFAULT_LEFT]},
     {id:'r2',label:'',seats:[...DEFAULT_RIGHT]}
   ];
-  const instData={sD,sM,sY,eD,eM,eY,rows,seatCnt:lastSeatCnt,seats:{},nextSeatNum:lastNextSeatNum,seatLabels:lastLabels};
+  const instData={sD,sM,sY,eD,eM,eY,rows,seatCnt:lastSeatCnt,seats:{},nextSeatNum:lastNextSeatNum,seatLabels:lastLabels,kurstage:5};
 
   // Automatisch Firestore-Kurs erstellen wenn angemeldet
   if(_db&&_auth&&_auth.currentUser){
@@ -2102,6 +2102,7 @@ function saveNewInst(){
       bis: bis,
       berufsschultage: [],
       ...ausbData,
+      kurstage: instData.kurstage||5,
       standalone: true,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: email
@@ -2163,7 +2164,7 @@ function renderMain(){
     return;
   }
   el.innerHTML=
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'</div><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📄 Bescheinigungen</button><button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button>'+(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">👤+ TN</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed">🔗 QR + Pool aktivieren</button>')+'<button class="tbtn mob-view-toggle" id="viewToggle" onclick="toggleMobileView()">☰ Liste</button><button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Verschieben">↔ Verschieben</button><button class="tbtn main-docs-btn" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Löschen">🗑 Löschen</button></div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #c4cce0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📄 Bescheinigungen</button><button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button>'+(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">👤+ TN</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed">🔗 QR + Pool aktivieren</button>')+'<button class="tbtn mob-view-toggle" id="viewToggle" onclick="toggleMobileView()">☰ Liste</button><button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Verschieben">↔ Verschieben</button><button class="tbtn main-docs-btn" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Löschen">🗑 Löschen</button></div></div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
     +'<div id="seatingWrap" class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
@@ -2378,6 +2379,19 @@ function seatQuickAtt(sid){
   syncAttendanceToFirestore(sid);
 }
 
+function updateKurstage(val){
+  const inst=curInst(); if(!inst) return;
+  const days=parseInt(val)||5;
+  inst.kurstage=days;
+  persist();
+  // Auch in Firestore aktualisieren
+  if(inst.sharedKursId&&_db){
+    _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
+      .update({kurstage:days}).catch(()=>{});
+  }
+  toast('Kurstage: '+days+' ✓');
+}
+
 function markBerufsschultag(){
   const inst=curInst(); if(!inst) return;
   const today=new Date().toISOString().slice(0,10);
@@ -2457,7 +2471,9 @@ function syncMobileAttToFirestore(sid){
   });
   const total=present+absentE+absentU+sick+berufsschule;
   if(!total) return;
-  const attPercent=Math.round((present/total)*100);
+  const kurstage=inst.kurstage||5;
+  const effektiveTage=kurstage;
+  const attPercent=Math.round((present/effektiveTage)*100);
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(tnId).update({
       attTotal:total,attPresent:present,
@@ -3470,7 +3486,9 @@ function syncAttendanceToFirestore(seatId){
   const hasGrades=d.mitarbeit||d.fuehrung||d.praxis||Object.values(d.extraGrades||{}).some(v=>v);
   const hasWz=!!d.werkzeugStatus;
   if(!total&&!hasGrades&&!hasWz) return;
-  const attPercent=total>0?Math.round((present/total)*100):0;
+  // Kurstage aus Instanz (default 5)
+  const kurstage=inst.kurstage||5;
+  const attPercent=kurstage>0?Math.round((present/kurstage)*100):0;
   const syncData={
     attLastSync:Date.now(),
     noten_mitarbeit:d.mitarbeit||'',
@@ -3919,6 +3937,7 @@ function activateFirestore(){
     von, bis,
     berufsschultage: inst.berufsschultage||[],
     ...ausbData,
+    kurstage: inst.kurstage||5,
     standalone: true,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     createdBy: email
@@ -4868,6 +4887,8 @@ function loadPool(){
     // ── Snapshot-Guard: User hat inzwischen gewechselt → ignorieren ──
     if(isStale()) return;
     const kd = kursDoc.exists ? kursDoc.data() : {};
+    // Kurstage aus Firestore übernehmen
+    if(kd.kurstage&&inst){inst.kurstage=kd.kurstage;persist();}
     let knEl = document.createElement('div'); knEl.className='pool-sb-kursname';
     knEl.textContent = kd.name||'';
     hdr.insertBefore(knEl, hdr.querySelector('.pool-link-btn'));
