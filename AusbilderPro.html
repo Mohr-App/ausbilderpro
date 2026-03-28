@@ -3551,14 +3551,27 @@ function loadKursHistorie(){
     kursSnap.forEach(kursDoc=>{
       kursList.push({id:kursDoc.id, ...kursDoc.data()});
     });
-    // Für jeden Kurs: TN-Dokument laden
+    // Für jeden Kurs: TN-Dokument laden (per ID oder Name)
+    const seatData=curSeats()[curSeat]||{};
+    const tnName=(seatData.name||'').trim();
+    const tnVorname=tnName.split(' ')[0]||'';
+    const tnNachname=tnName.split(' ').slice(1).join(' ')||'';
     kursList.forEach(kurs=>{
       promises.push(
         _db.collection('shared').doc('kurse').collection('list').doc(kurs.id)
           .collection('teilnehmer').doc(tnId).get()
           .then(tnDoc=>{
-            if(!tnDoc.exists) return null;
-            return {kurs, tn:tnDoc.data()};
+            if(tnDoc.exists) return {kurs, tn:tnDoc.data()};
+            // Fallback: per Name suchen
+            if(!tnVorname) return null;
+            return _db.collection('shared').doc('kurse').collection('list').doc(kurs.id)
+              .collection('teilnehmer')
+              .where('vorname','==',tnVorname)
+              .where('nachname','==',tnNachname)
+              .limit(1).get().then(snap=>{
+                if(snap.empty) return null;
+                return {kurs, tn:snap.docs[0].data()};
+              });
           }).catch(()=>null)
       );
     });
