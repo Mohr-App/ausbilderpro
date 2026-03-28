@@ -2944,7 +2944,22 @@ function openModal(id){
           } else {
             h+='<div style="margin-top:4px;padding:5px 8px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.2);border-radius:7px;font-size:.68rem;color:#dc2626;font-weight:600">⚠ Keine DSGVO-Zustimmung</div>';
           }
-          // Komplett-Löschen Button
+          // Kurshistorie
+          let hist2=(t.kursHistory||[]).slice().sort((a2,b2)=>(b2.addedAt||0)-(a2.addedAt||0));
+          if(!hist2.length&&t.aktiverKursId){
+            const inst__=curInst();
+            const kName_=inst__?.sharedKursId===t.aktiverKursId?(S.kats[S.curKat]?.label||'Kurs'):'Aktiver Kurs';
+            hist2=[{kursName:kName_,kursId:t.aktiverKursId,von:'',bis:'',addedAt:Date.now()}];
+          }
+          if(hist2.length){
+            h+='<div style="margin-top:8px;font-size:.55rem;font-weight:700;color:#8896b0;letter-spacing:.06em;margin-bottom:4px">KURSHISTORIE ('+hist2.length+')</div>';
+            hist2.forEach(h2=>{
+              const abgebr2=h2.abgebrochen?'<span style="color:#ef4444"> · abgebr.</span>':'';
+              h+='<div style="padding:4px 8px;background:rgba(59,130,246,.03);border:1px solid rgba(59,130,246,.08);border-radius:6px;margin-bottom:3px;font-size:.68rem">'
+                +esc(h2.kursName||'?')+(h2.von?' <span style="color:#8896b0">'+fmtDE(h2.von)+' – '+fmtDE(h2.bis||'')+'</span>':'')+abgebr2+'</div>';
+            });
+          }
+          // Aus Kurs entfernen Button
           h+='<button onclick="deleteTnKomplett(\''+d.poolTnId+'\')" style="margin-top:10px;width:100%;padding:8px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:8px;color:#dc2626;font-size:.7rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Aus Kurs entfernen</button>';
           fsInfo.innerHTML=h;
         }).catch(()=>{fsInfo.innerHTML='';fsInfo.style.display='none';});
