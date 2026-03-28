@@ -2389,7 +2389,12 @@ function updateKurstage(val){
     _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
       .update({kurstage:days}).catch(()=>{});
   }
-  toast('Kurstage: '+days+' ✓');
+  // Alle TN auf Sitzplätzen neu syncen
+  Object.keys(inst.seats||{}).forEach(sid=>{
+    const d=inst.seats[sid];
+    if(d&&d.name&&d.poolTnId) syncAttendanceToFirestore(sid);
+  });
+  toast('Kurstage: '+days+' – Anwesenheit neu berechnet ✓');
 }
 
 function markBerufsschultag(){
