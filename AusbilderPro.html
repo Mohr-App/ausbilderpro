@@ -3566,14 +3566,14 @@ function loadKursHistorie(){
   }).then(results=>{
     if(!results){body.innerHTML='<div class="hist-empty">Fehler beim Laden</div>';return;}
     const entries=results.filter(r=>r!==null)
-      .filter(r=>r.kurs.id!==currentKursId) // aktuellen Kurs ausblenden
       .sort((a,b)=>(b.kurs.von||'').localeCompare(a.kurs.von||''));
     if(!entries.length){
-      body.innerHTML='<div class="hist-empty">Erster Kurs für diesen Teilnehmer – keine vorherige Historie.</div>';
+      body.innerHTML='<div class="hist-empty">Keine Kursdaten gefunden.</div>';
       return;
     }
     body.innerHTML=entries.map(e=>{
       const k=e.kurs, t=e.tn;
+      const isCurrent=k.id===currentKursId;
       const kursName=k.lehrgangsart||k.name||'Kurs';
       const von=fmtDE(k.von), bis=fmtDE(k.bis);
       // Ausbilder-Name
@@ -3607,8 +3607,8 @@ function loadKursHistorie(){
       // Werkzeug
       let wzHtml='';
       if(t.werkzeugStatus==='fehlt')wzHtml='<div style="font-size:.65rem;color:#ef4444;margin-top:2px">🔧 Werkzeug unvollständig'+(t.werkzeugFehlt?' – '+esc(t.werkzeugFehlt):'')+'</div>';
-      return '<div class="hist-card">'
-        +'<div class="hist-kurs">'+esc(kursName)+statusBadge+'</div>'
+      return '<div class="hist-card"'+(isCurrent?' style="border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.03)"':'')+'>'
+        +'<div class="hist-kurs">'+esc(kursName)+(isCurrent?'<span style="font-size:.6rem;color:#22c55e;font-weight:700;margin-left:6px">● AKTUELL</span>':'')+statusBadge+'</div>'
         +'<div class="hist-dates">'+von+' – '+bis+'</div>'
         +(ausb?'<div class="hist-ausbilder">👷 '+esc(ausb)+'</div>':'')
         +(gradeHtml?'<div class="hist-grades">'+gradeHtml+'</div>':'')
