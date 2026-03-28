@@ -2951,6 +2951,13 @@ function openModal(id){
             const kName_=inst__?.sharedKursId===t.aktiverKursId?(S.kats[S.curKat]?.label||'Kurs'):'Aktiver Kurs';
             hist2=[{kursName:kName_,kursId:t.aktiverKursId,von:'',bis:'',addedAt:Date.now()}];
           }
+          if(!hist2.length){
+            // Fallback: TN ist im aktuellen Kurs (über Pool/Sitz bekannt)
+            const inst__=curInst();
+            if(inst__&&inst__.sharedKursId){
+              hist2=[{kursName:S.kats[S.curKat]?.label||'Aktueller Kurs',kursId:inst__.sharedKursId,von:inst__.sY+'-'+String(inst__.sM).padStart(2,'0')+'-'+String(inst__.sD).padStart(2,'0'),bis:inst__.eY+'-'+String(inst__.eM).padStart(2,'0')+'-'+String(inst__.eD).padStart(2,'0'),addedAt:Date.now()}];
+            }
+          }
           if(hist2.length){
             h+='<div style="margin-top:8px;font-size:.55rem;font-weight:700;color:#8896b0;letter-spacing:.06em;margin-bottom:4px">KURSHISTORIE ('+hist2.length+')</div>';
             hist2.forEach(h2=>{
@@ -3780,6 +3787,12 @@ function openTnDetail(tnId){
       const inst_=curInst();
       const kName=inst_?.sharedKursId===t.aktiverKursId?(S.kats[S.curKat]?.label||'Kurs'):'Aktiver Kurs';
       hist=[{kursName:kName,kursId:t.aktiverKursId,von:'',bis:'',addedAt:Date.now()}];
+    }
+    if(!hist.length){
+      const inst_=curInst();
+      if(inst_&&inst_.sharedKursId){
+        hist=[{kursName:S.kats[S.curKat]?.label||'Aktueller Kurs',kursId:inst_.sharedKursId,von:inst_.sY+'-'+String(inst_.sM).padStart(2,'0')+'-'+String(inst_.sD).padStart(2,'0'),bis:inst_.eY+'-'+String(inst_.eM).padStart(2,'0')+'-'+String(inst_.eD).padStart(2,'0'),addedAt:Date.now()}];
+      }
     }
     if(hist.length){
       html+='<div style="margin-top:12px;font-size:.6rem;font-weight:700;color:var(--mu);letter-spacing:.06em;margin-bottom:6px">KURSHISTORIE ('+hist.length+')</div>';
