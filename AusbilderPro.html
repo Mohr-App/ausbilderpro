@@ -3759,7 +3759,13 @@ function openTnDetail(tnId){
       html+='<div style="margin-top:8px;padding:8px 10px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.2);border-radius:8px;font-size:.72rem;color:#dc2626;font-weight:600">⚠ Keine DSGVO-Zustimmung</div>';
     }
     // Kurshistorie
-    const hist=(t.kursHistory||[]).slice().sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
+    let hist=(t.kursHistory||[]).slice().sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
+    // Fallback: wenn Historie leer aber aktiver Kurs vorhanden
+    if(!hist.length&&t.aktiverKursId){
+      const inst_=curInst();
+      const kName=inst_?.sharedKursId===t.aktiverKursId?(S.kats[S.curKat]?.label||'Kurs'):'Aktiver Kurs';
+      hist=[{kursName:kName,kursId:t.aktiverKursId,von:'',bis:'',addedAt:Date.now()}];
+    }
     if(hist.length){
       html+='<div style="margin-top:12px;font-size:.6rem;font-weight:700;color:var(--mu);letter-spacing:.06em;margin-bottom:6px">KURSHISTORIE ('+hist.length+')</div>';
       hist.forEach(h=>{
