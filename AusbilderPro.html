@@ -3512,11 +3512,37 @@ function loadKursHistorie(){
   body.innerHTML='<div class="hist-empty">Lädt…</div>';
   if(!curSeat)return;
   const d=curSeats()[curSeat];
-  if(!d||!d.poolTnId||!_db){
-    body.innerHTML='<div class="hist-empty">Keine Historie verfügbar (nur für verknüpfte TN)</div>';
+  if(!d||!_db){
+    body.innerHTML='<div class="hist-empty">Keine Historie verfügbar</div>';
     return;
   }
-  const tnId=d.poolTnId;
+  // poolTnId oder per Name suchen
+  let tnIdPromise;
+  if(d.poolTnId){
+    tnIdPromise=Promise.resolve(d.poolTnId);
+  } else if(d.name){
+    const parts=(d.name||'').split(' ');
+    const vn=parts[0]||'';
+    const nn=parts.slice(1).join(' ')||'';
+    tnIdPromise=_db.collection('globalTN').where('vorname','==',vn).where('nachname','==',nn).limit(1).get().then(snap=>{
+      if(snap.empty) return null;
+      const foundId=snap.docs[0].id;
+      const inst__=curInst();
+      if(inst__&&inst__.seats&&inst__.seats[curSeat]){
+        inst__.seats[curSeat].poolTnId=foundId;
+        persist();
+      }
+      return foundId;
+    });
+  } else {
+    body.innerHTML='<div class="hist-empty">Kein Teilnehmer auf diesem Platz</div>';
+    return;
+  }
+  tnIdPromise.then(tnId=>{
+  if(!tnId){
+    body.innerHTML='<div class="hist-empty">Teilnehmer nicht in Datenbank gefunden</div>';
+    return;
+  }
   const currentKursId=curInst()?.sharedKursId||null;
   // Alle Kurse laden in denen dieser TN vorkommt
   _db.collection('shared').doc('kurse').collection('list').get().then(kursSnap=>{
@@ -3595,6 +3621,7 @@ function loadKursHistorie(){
     console.error('Historie error:',err);
     body.innerHTML='<div class="hist-empty">Fehler: '+esc(err.message)+'</div>';
   });
+  }); // tnIdPromise
 }
 
 // ─── SAFE CONFIRM (Häkchen-Pflicht) ───
