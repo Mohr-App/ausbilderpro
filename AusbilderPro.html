@@ -2645,7 +2645,17 @@ function mkSeat(id,seats){
     const instStart=inst.sY&&inst.sM&&inst.sD?(inst.sY+'-'+inst.sM+'-'+inst.sD):'0000-01-01';
     const qaBtn=(qaSt||hasDetail||qaD>instEnd||qaD<instStart)?'':'<div class="sqa-btn" onclick="event.stopPropagation();seatQuickAtt(\''+id+'\')" title="Anwesend markieren">✓</div>';
     const wzBadge=d.werkzeugStatus==='fehlt'?'<div style="font-size:.5rem;color:#ef4444;font-weight:800;margin-top:1px">🔧 unvollständig</div>':'';
-    el.innerHTML+=(pendingIcon||urlInfo)+'<div class="sname-row"><span class="sname">'+esc(d.name)+'</span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
+    // Meldungs-Overlay
+    let meldHtml='';
+    if(d.poolTnId&&_tnMeldungen[d.poolTnId]&&_tnMeldungen[d.poolTnId].length){
+      const meld=_tnMeldungen[d.poolTnId][0];
+      const meldIcons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
+      const meldBorders={'spaeter':'rgba(245,158,11,.5)','frueher':'rgba(99,102,241,.5)','krank':'rgba(239,68,68,.5)','text':'rgba(124,58,237,.5)'};
+      el.style.boxShadow='0 0 0 3px '+(meldBorders[meld.type]||'rgba(239,68,68,.5)')+', 0 0 14px '+(meldBorders[meld.type]||'rgba(239,68,68,.3)');
+      el.style.animation='pulseInfo 1.5s infinite';
+      meldHtml='<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2.2rem;z-index:6;pointer-events:none;filter:drop-shadow(0 2px 8px rgba(0,0,0,.35))">'+(meldIcons[meld.type]||'💬')+'</div>';
+    }
+    el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+'<div class="sname-row"><span class="sname">'+esc(d.name)+'</span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
   }
   return el;
 }
@@ -3966,14 +3976,27 @@ let _pendingMeldung=null;
 function confirmMeldungGelesen(){
   if(!_pendingMeldung) return;
   const {seatId, tnId, kursId, docIds}=_pendingMeldung;
+  const melds=_tnMeldungen[tnId]||[];
   _pendingMeldung=null;
   document.getElementById('tnDetailModal').classList.remove('open');
   if(kursId&&_db){
     const batch=_db.batch();
+    const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
     docIds.forEach(did=>{
-      batch.update(_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('meldungen').doc(did),{gelesen:true});
+      batch.update(_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('meldungen').doc(did),{gelesen:true,gelesenVon:ausName,gelesenAm:new Date().toISOString()});
     });
     batch.commit().catch(()=>{});
+    // Azubi benachrichtigen
+    const meldTyp=melds.length?melds[0].type:'text';
+    const meldLabels={'spaeter':'Verspätung','frueher':'Früheres Gehen','krank':'Krankmeldung','text':'Nachricht'};
+    _db.collection('globalTN').doc(tnId).update({
+      benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
+        typ:'meldung_gelesen',
+        text:'Deine Meldung ('+( meldLabels[meldTyp]||'Nachricht')+') wurde von '+ausName+' zur Kenntnis genommen.',
+        datum: new Date().toISOString(),
+        gelesen: false
+      })
+    }).catch(()=>{});
   }
   // Aus lokalem Cache entfernen
   delete _tnMeldungen[tnId];
@@ -5021,59 +5044,8 @@ function loadPool(){
         if(!_tnMeldungen[m.tnId]) _tnMeldungen[m.tnId]=[];
         _tnMeldungen[m.tnId].push({docId:doc.id, ...m});
       });
-      // Sitzplätze aktualisieren: roter Rahmen + Icon
-      const inst_m=curInst();
-      if(inst_m){
-        const meldIcons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
-        const meldColors={'spaeter':'rgba(245,158,11,.3)','frueher':'rgba(99,102,241,.3)','krank':'rgba(239,68,68,.4)','text':'rgba(124,58,237,.3)'};
-        Object.keys(inst_m.seats||{}).forEach(sid=>{
-          const sd=inst_m.seats[sid];
-          const seatEl=document.getElementById('seat-'+sid);
-          if(!seatEl) return;
-          // Alte Meldungs-Elemente entfernen
-          seatEl.querySelectorAll('.meld-badge,.meld-overlay').forEach(e=>e.remove());
-          seatEl.style.boxShadow='';
-          seatEl.style.animation='';
-          if(sd&&sd.poolTnId&&_tnMeldungen[sd.poolTnId]&&_tnMeldungen[sd.poolTnId].length){
-            const meld=_tnMeldungen[sd.poolTnId][0]; // neueste
-            const icon=meldIcons[meld.type]||'💬';
-            const borderCol=meldColors[meld.type]||'rgba(239,68,68,.3)';
-            seatEl.style.boxShadow='0 0 0 3px '+borderCol+', 0 0 12px '+borderCol;
-            seatEl.style.animation='pulseInfo 1.5s infinite';
-            // Icon-Overlay mittig
-            const ov=document.createElement('div');
-            ov.className='meld-overlay';
-            ov.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2rem;z-index:6;pointer-events:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))';
-            ov.textContent=icon;
-            seatEl.style.position='relative';
-            seatEl.appendChild(ov);
-          }
-        });
-      }
-      // Sidebar-Anzeige aktualisieren
-      const mel=document.getElementById('poolMeldungen');
-      if(mel){
-        if(snap.empty){mel.style.display='none';mel.innerHTML='';}
-        else {
-          mel.style.display='';
-          let mh='<div style="padding:6px 10px;font-size:.55rem;font-weight:700;color:#7c3aed;letter-spacing:.06em;background:rgba(139,92,246,.06)">💬 MELDUNGEN ('+snap.size+')</div>';
-          snap.forEach(doc=>{
-            const m=doc.data();
-            const zeit=m.zeit?new Date(m.zeit).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
-            const icons={'spaeter':'\uD83D\uDD50','frueher':'\uD83D\uDEB6','krank':'\uD83E\uDD12','text':'\uD83D\uDCAC'};
-            const colors={'spaeter':'#d97706','frueher':'#6366f1','krank':'#ef4444','text':'#7c3aed'};
-            mh+='<div style="padding:6px 10px;border-bottom:1px solid rgba(139,92,246,.1);display:flex;align-items:flex-start;gap:6px">'
-              +'<span style="font-size:.75rem">'+(icons[m.type]||'\uD83D\uDCAC')+'</span>'
-              +'<div style="flex:1;min-width:0"><div style="font-size:.65rem;font-weight:700;color:'+(colors[m.type]||'#7c3aed')+'">'+esc(m.name||'Azubi')+'</div>'
-              +'<div style="font-size:.6rem;color:#6B7280">'+esc(m.text)+'</div></div>'
-              +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">'
-              +'<span style="font-size:.48rem;color:#94a3b8">'+zeit+'</span>'
-              +'<button onclick="dismissMeldung(\''+kursId+'\',\''+doc.id+'\')" style="font-size:.48rem;color:#94a3b8;background:none;border:none;cursor:pointer;padding:0" title="Gelesen">✕</button>'
-              +'</div></div>';
-          });
-          mel.innerHTML=mh;
-        }
-      }
+      // Seats neu rendern damit Rahmen/Icons erscheinen
+      renderSeats();
       // Toast für neue Meldungen
       snap.docChanges().forEach(ch=>{
         if(ch.type==='added'&&!_meldSeen.has(ch.doc.id)){
