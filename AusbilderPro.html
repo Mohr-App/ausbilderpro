@@ -2956,6 +2956,13 @@ function acKey(e, dropId){
 }
 
 function openModal(id){
+  const d_check=curSeats()[id]||{};
+  // Meldungs-Intercept: wenn ungelesene Meldungen → erst anzeigen
+  if(d_check.poolTnId&&_tnMeldungen[d_check.poolTnId]&&_tnMeldungen[d_check.poolTnId].length&&!_meldSkipSeat){
+    showMeldungIntercept(id, d_check);
+    return;
+  }
+  _meldSkipSeat=false;
   curSeat=id;curAttMain=null;
   const d=curSeats()[id]||{};
   tmpAtt=JSON.parse(JSON.stringify(d.attendance||[]));
@@ -3920,6 +3927,66 @@ function openTnDetail(tnId){
   }).catch(err=>{
     document.getElementById('tnDetailBody').innerHTML='<div class="pool-empty">Fehler: '+esc(err.message)+'</div>';
   });
+}
+
+let _meldSkipSeat=false;
+function showMeldungIntercept(seatId, d){
+  const tnId=d.poolTnId;
+  const melds=_tnMeldungen[tnId]||[];
+  if(!melds.length) return;
+  const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
+  const labels={'spaeter':'Kommt heute später','frueher':'Geht heute früher','krank':'Ist heute krank','text':'Nachricht'};
+  const colors={'spaeter':'#d97706','frueher':'#6366f1','krank':'#ef4444','text':'#7c3aed'};
+  const borderColors={'spaeter':'rgba(245,158,11,.3)','frueher':'rgba(99,102,241,.3)','krank':'rgba(239,68,68,.3)','text':'rgba(124,58,237,.3)'};
+  let html='<div style="text-align:center;margin-bottom:14px">';
+  melds.forEach(m=>{
+    const icon=icons[m.type]||'💬';
+    const label=labels[m.type]||m.text;
+    const col=colors[m.type]||'#7c3aed';
+    const bcol=borderColors[m.type]||'rgba(124,58,237,.3)';
+    const zeit=m.zeit?new Date(m.zeit).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    html+='<div style="padding:14px;background:rgba(0,0,0,.02);border:2.5px solid '+bcol+';border-radius:12px;margin-bottom:8px">'
+      +'<div style="font-size:2.5rem;margin-bottom:8px">'+icon+'</div>'
+      +'<div style="font-size:1rem;font-weight:800;color:'+col+'">'+esc(m.name||'Azubi')+'</div>'
+      +'<div style="font-size:.88rem;font-weight:700;color:#1e293b;margin-top:4px">'+esc(label)+'</div>'
+      +(m.text&&m.type==='text'?'<div style="font-size:.78rem;color:#374151;margin-top:6px;font-style:italic">"'+esc(m.text)+'"</div>':'')
+      +'<div style="font-size:.6rem;color:#94a3b8;margin-top:6px">'+zeit+'</div>'
+      +'</div>';
+  });
+  html+='</div>';
+  // Alle Meldungs-DocIDs sammeln für Gelesen-Markierung
+  _pendingMeldung={seatId, tnId, kursId: inst?.sharedKursId, docIds: melds.map(m=>m.docId)};
+  document.getElementById('tnDetailTitle').textContent='📬 Meldung';
+  document.getElementById('tnDetailBody').innerHTML=html
+    +'<button onclick="confirmMeldungGelesen()" style="width:100%;padding:12px;background:#059669;color:#fff;border:none;border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Gelesen – Sitzplatz öffnen</button>';
+  document.getElementById('tnDetailModal').classList.add('open');
+}
+
+let _pendingMeldung=null;
+function confirmMeldungGelesen(){
+  if(!_pendingMeldung) return;
+  const {seatId, tnId, kursId, docIds}=_pendingMeldung;
+  _pendingMeldung=null;
+  document.getElementById('tnDetailModal').classList.remove('open');
+  if(kursId&&_db){
+    const batch=_db.batch();
+    docIds.forEach(did=>{
+      batch.update(_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('meldungen').doc(did),{gelesen:true});
+    });
+    batch.commit().catch(()=>{});
+  }
+  // Aus lokalem Cache entfernen
+  delete _tnMeldungen[tnId];
+  // Sitz-Styling zurücksetzen
+  const seatEl=document.getElementById('seat-'+seatId);
+  if(seatEl){
+    seatEl.style.boxShadow='';
+    seatEl.style.animation='';
+    seatEl.querySelectorAll('.meld-overlay').forEach(e=>e.remove());
+  }
+  // Jetzt normales Modal öffnen
+  _meldSkipSeat=true;
+  openModal(seatId);
 }
 
 function openTnDetailFromSeat(){
@@ -4946,6 +5013,43 @@ function loadPool(){
     // ── Meldungen Live-Listener ──
     _meldUnsub = kursRef.collection('meldungen').where('gelesen','==',false).orderBy('zeit','desc').onSnapshot(snap=>{
       if(isStale()){if(_meldUnsub){_meldUnsub();_meldUnsub=null;}return;}
+      // Meldungen per TN-ID speichern
+      _tnMeldungen={};
+      snap.forEach(doc=>{
+        const m=doc.data();
+        if(!m.tnId) return;
+        if(!_tnMeldungen[m.tnId]) _tnMeldungen[m.tnId]=[];
+        _tnMeldungen[m.tnId].push({docId:doc.id, ...m});
+      });
+      // Sitzplätze aktualisieren: roter Rahmen + Icon
+      const inst_m=curInst();
+      if(inst_m){
+        const meldIcons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
+        const meldColors={'spaeter':'rgba(245,158,11,.3)','frueher':'rgba(99,102,241,.3)','krank':'rgba(239,68,68,.4)','text':'rgba(124,58,237,.3)'};
+        Object.keys(inst_m.seats||{}).forEach(sid=>{
+          const sd=inst_m.seats[sid];
+          const seatEl=document.getElementById('seat-'+sid);
+          if(!seatEl) return;
+          // Alte Meldungs-Elemente entfernen
+          seatEl.querySelectorAll('.meld-badge,.meld-overlay').forEach(e=>e.remove());
+          seatEl.style.boxShadow='';
+          seatEl.style.animation='';
+          if(sd&&sd.poolTnId&&_tnMeldungen[sd.poolTnId]&&_tnMeldungen[sd.poolTnId].length){
+            const meld=_tnMeldungen[sd.poolTnId][0]; // neueste
+            const icon=meldIcons[meld.type]||'💬';
+            const borderCol=meldColors[meld.type]||'rgba(239,68,68,.3)';
+            seatEl.style.boxShadow='0 0 0 3px '+borderCol+', 0 0 12px '+borderCol;
+            seatEl.style.animation='pulseInfo 1.5s infinite';
+            // Icon-Overlay mittig
+            const ov=document.createElement('div');
+            ov.className='meld-overlay';
+            ov.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2rem;z-index:6;pointer-events:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))';
+            ov.textContent=icon;
+            seatEl.style.position='relative';
+            seatEl.appendChild(ov);
+          }
+        });
+      }
       // Sidebar-Anzeige aktualisieren
       const mel=document.getElementById('poolMeldungen');
       if(mel){
@@ -4970,33 +5074,13 @@ function loadPool(){
           mel.innerHTML=mh;
         }
       }
-      // Toast + Badge für neue Meldungen
+      // Toast für neue Meldungen
       snap.docChanges().forEach(ch=>{
         if(ch.type==='added'&&!_meldSeen.has(ch.doc.id)){
           _meldSeen.add(ch.doc.id);
           const m=ch.doc.data();
-          const docId=ch.doc.id;
-          // Toast anzeigen
-          toast('💬 '+esc(m.name)+': '+esc(m.text));
-          // Badge auf Sitzplatz
-          const inst=curInst();
-          if(inst){
-            Object.keys(inst.seats||{}).forEach(sid=>{
-              if(inst.seats[sid]&&inst.seats[sid].poolTnId===m.tnId){
-                const seatEl=document.getElementById('seat-'+sid);
-                if(seatEl&&!seatEl.querySelector('.meld-badge')){
-                  const badge=document.createElement('div');
-                  badge.className='meld-badge';
-                  badge.style.cssText='position:absolute;top:4px;right:4px;width:18px;height:18px;background:#7c3aed;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.55rem;color:#fff;font-weight:800;cursor:pointer;z-index:5;box-shadow:0 1px 4px rgba(124,58,237,.4);animation:pulse 1.5s infinite';
-                  badge.textContent='💬';
-                  badge.title=m.name+': '+m.text;
-                  badge.onclick=(e)=>{e.stopPropagation();showMeldungen(kursId);};
-                  seatEl.style.position='relative';
-                  seatEl.appendChild(badge);
-                }
-              }
-            });
-          }
+          const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
+          toast((icons[m.type]||'💬')+' '+esc(m.name)+': '+esc(m.text));
         }
       });
     },err=>console.warn('Meldungen error:',err));
@@ -5789,6 +5873,7 @@ let _demoMode=false;
 let _tnPhotos={}; // {tnId: photoUrl}
 let _tnUrlaub={}; // {tnId: [{von,bis,label}]}
 let _tnPending={}; // {tnId: true} – TN mit pendingRemoval
+let _tnMeldungen={}; // {tnId: [{id,type,text,name,zeit,gelesen}]}
 try{
   firebase.initializeApp(_fbCfg);
   _auth=firebase.auth();
