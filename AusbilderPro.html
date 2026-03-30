@@ -3946,11 +3946,8 @@ function deleteTnKomplett(tnId){
       if(data.aktiverKursId===kursId){
         updates.aktiverKursId=firebase.firestore.FieldValue.delete();
       }
-      // kursHistory: Eintrag als entfernt markieren
-      const hist=(data.kursHistory||[]).map(h=>{
-        if(h.kursId===kursId) return {...h, entfernt:true};
-        return h;
-      });
+      // kursHistory: Eintrag komplett entfernen
+      const hist=(data.kursHistory||[]).filter(h=>h.kursId!==kursId);
       updates.kursHistory=hist;
       return _db.collection('globalTN').doc(tnId).update(updates);
     }).then(()=>{
