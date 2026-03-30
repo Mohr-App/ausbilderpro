@@ -3937,14 +3937,22 @@ function deleteTnKomplett(tnId){
   // 1. Aus Kurs-Teilnehmer-Subcollection löschen
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(tnId).delete().then(()=>{
-      // 2. aktiverKursId im globalTN zurücksetzen falls es dieser Kurs war
+      // 2. aktiverKursId im globalTN zurücksetzen + aus kursHistory entfernen
       return _db.collection('globalTN').doc(tnId).get();
     }).then(doc=>{
-      if(doc.exists&&doc.data().aktiverKursId===kursId){
-        return _db.collection('globalTN').doc(tnId).update({
-          aktiverKursId: firebase.firestore.FieldValue.delete()
-        });
+      if(!doc.exists) return;
+      const data=doc.data();
+      const updates={};
+      if(data.aktiverKursId===kursId){
+        updates.aktiverKursId=firebase.firestore.FieldValue.delete();
       }
+      // kursHistory: Eintrag als entfernt markieren
+      const hist=(data.kursHistory||[]).map(h=>{
+        if(h.kursId===kursId) return {...h, entfernt:true};
+        return h;
+      });
+      updates.kursHistory=hist;
+      return _db.collection('globalTN').doc(tnId).update(updates);
     }).then(()=>{
       // 3. Vom Sitzplatz entfernen (lokal)
       if(inst){
