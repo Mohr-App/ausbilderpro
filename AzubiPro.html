@@ -15,6 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 :root{--bg:#0f1219;--sur:#181d2a;--sur2:#1e2536;--brd:#2a3148;--acc:#10b981;--acc2:#34d399;--bad:#ef4444;--tx:#e8ecf4;--mu:#6b7a99;--warn:#f59e0b;}
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -163,6 +164,34 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- QR KURS BEITRETEN MODAL -->
+<div id="qrJoinOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9997;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:400px;width:100%;background:var(--sur);border:2px solid var(--brd);border-radius:16px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.4);max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:1.1rem;font-weight:800;color:var(--tx)">📱 Kurs beitreten</div>
+      <button onclick="closeQrJoin()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--mu)">✕</button>
+    </div>
+    <div style="font-size:.75rem;color:var(--mu);line-height:1.6;margin-bottom:14px">Scanne den QR-Code im Klassenraum oder gib den Beitritts-Link ein.</div>
+    <!-- QR Scanner -->
+    <div id="qrScannerWrap" style="margin-bottom:14px">
+      <div id="qrReader" style="width:100%;border-radius:10px;overflow:hidden"></div>
+      <div id="qrScanStatus" style="font-size:.7rem;color:var(--mu);text-align:center;margin-top:6px"></div>
+    </div>
+    <button onclick="startQrScanner()" id="qrStartBtn" style="width:100%;padding:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border:none;border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:14px">📷 Kamera starten</button>
+    <!-- Oder-Trenner -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div style="flex:1;height:1px;background:var(--brd)"></div>
+      <div style="font-size:.65rem;color:var(--mu);font-weight:600">ODER</div>
+      <div style="flex:1;height:1px;background:var(--brd)"></div>
+    </div>
+    <!-- Link eingeben -->
+    <div style="font-size:.7rem;font-weight:700;color:var(--tx);margin-bottom:6px">Link eingeben</div>
+    <input class="fi" id="qrJoinLink" placeholder="Link einfügen (z.B. ...?join=abc123)" style="margin-bottom:8px">
+    <button onclick="joinFromLink()" style="width:100%;padding:10px;background:rgba(16,185,129,.15);color:#059669;border:1.5px solid rgba(16,185,129,.3);border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✓ Kurs beitreten</button>
+    <div class="err" id="qrJoinErr" style="margin-top:6px"></div>
+  </div>
+</div>
+
 <!-- KRANKMELDUNG BESTÄTIGUNG -->
 <div id="krankOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9998;align-items:center;justify-content:center;padding:20px">
   <div style="max-width:400px;width:100%;background:var(--sur);border:2px solid rgba(239,68,68,.3);border-radius:16px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.4)">
@@ -213,6 +242,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div id="sitzplatzPopup"></div>
       <div id="notifBanner"></div>
       <div id="homeKurse"><div class="empty">Lädt Lehrgänge…</div></div>
+      <!-- Kurs beitreten Button -->
+      <button onclick="openQrJoin()" style="width:100%;margin-top:10px;padding:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border:none;border-radius:12px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 12px rgba(29,78,216,.3)">📱 Kurs beitreten (QR-Code scannen)</button>
       <!-- Kontakt -->
       <div class="card" style="margin-top:8px">
         <div class="card-title">📞 Kontakt Verwaltung</div>
@@ -774,6 +805,110 @@ function _doSendMeldung(type, kursId){
       setTimeout(()=>{if(st)st.style.display='none';},3000);
       toast('Meldung gesendet ✓');
     }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// ── QR KURS BEITRETEN ──
+let _qrScanner=null;
+function openQrJoin(){
+  document.getElementById('qrJoinOverlay').style.display='flex';
+  document.getElementById('qrJoinErr').textContent='';
+  document.getElementById('qrJoinLink').value='';
+  document.getElementById('qrScanStatus').textContent='';
+  document.getElementById('qrStartBtn').style.display='';
+}
+function closeQrJoin(){
+  if(_qrScanner){try{_qrScanner.stop();}catch(e){}; _qrScanner=null;}
+  document.getElementById('qrJoinOverlay').style.display='none';
+}
+function startQrScanner(){
+  const errEl=document.getElementById('qrJoinErr');
+  const statusEl=document.getElementById('qrScanStatus');
+  errEl.textContent='';
+  if(typeof Html5Qrcode==='undefined'){
+    errEl.textContent='QR-Scanner konnte nicht geladen werden. Bitte Link unten eingeben.';
+    return;
+  }
+  document.getElementById('qrStartBtn').style.display='none';
+  statusEl.textContent='Kamera wird gestartet…';
+  _qrScanner=new Html5Qrcode('qrReader');
+  _qrScanner.start(
+    {facingMode:'environment'},
+    {fps:10, qrbox:{width:250,height:250}},
+    (text)=>{
+      // QR erkannt
+      _qrScanner.stop().then(()=>{_qrScanner=null;}).catch(()=>{});
+      statusEl.textContent='✓ QR-Code erkannt!';
+      processJoinUrl(text);
+    },
+    ()=>{}
+  ).catch(err=>{
+    statusEl.textContent='';
+    document.getElementById('qrStartBtn').style.display='';
+    errEl.textContent='Kamera nicht verfügbar: '+(err.message||err)+'. Bitte Link unten eingeben.';
+  });
+}
+function joinFromLink(){
+  const link=(document.getElementById('qrJoinLink').value||'').trim();
+  if(!link){document.getElementById('qrJoinErr').textContent='Bitte Link eingeben';return;}
+  processJoinUrl(link);
+}
+function processJoinUrl(url){
+  const errEl=document.getElementById('qrJoinErr');
+  // join-Parameter extrahieren
+  let kursId=null;
+  try{
+    const u=new URL(url);
+    kursId=u.searchParams.get('join');
+  }catch(e){
+    // Vielleicht ist es direkt eine ID
+    if(url.length>10&&!url.includes(' ')) kursId=url;
+  }
+  if(!kursId){errEl.textContent='Kein gültiger Kurs-Link erkannt';return;}
+  errEl.style.color='var(--acc)';
+  errEl.textContent='Trete Kurs bei…';
+  // Prüfen ob Kurs existiert
+  db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(kDoc=>{
+    if(!kDoc.exists){errEl.style.color='var(--bad)';errEl.textContent='Kurs nicht gefunden';return;}
+    const kd=kDoc.data();
+    // Prüfen ob bereits im Kurs
+    if(_tnData.aktiverKursId===kursId || (_tnData.kursHistory||[]).some(h=>h.kursId===kursId)){
+      errEl.style.color='var(--bad)';errEl.textContent='Du bist bereits in diesem Kurs eingetragen';
+      return;
+    }
+    // Kurshistorie updaten
+    const histEntry={kursId, kursName:kd.name||kd.lehrgangsart||'Lehrgang', von:kd.von||'', bis:kd.bis||'', addedAt:Date.now()};
+    const hist=(_tnData.kursHistory||[]).slice();
+    hist.push(histEntry);
+    return db.collection('globalTN').doc(_tnId).update({
+      aktiverKursId: kursId,
+      kursHistory: hist,
+      wunschSitzplatz: ''
+    }).then(()=>{
+      // In Kurs-TN eintragen
+      return db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('teilnehmer').doc(_tnId).set({
+          vorname:_tnData.vorname||'',
+          nachname:_tnData.nachname||'',
+          firma:_tnData.firma||'',
+          beruf:_tnData.beruf||'',
+          ausbjahr:_tnData.ausbjahr||'',
+          kontaktEmail:_tnData.kontaktEmail||_tnData.email||'',
+          kontaktTelefon:_tnData.kontaktTelefon||'',
+          status:'active',
+          addedAt:Date.now()
+        },{merge:true});
+    }).then(()=>{
+      _tnData.aktiverKursId=kursId;
+      _tnData.kursHistory=hist;
+      _tnData.wunschSitzplatz='';
+      closeQrJoin();
+      toast('✓ Lehrgang beigetreten: '+(kd.name||kd.lehrgangsart||'Kurs'));
+      loadKurse();
+    });
+  }).catch(err=>{
+    errEl.style.color='var(--bad)';
+    errEl.textContent='Fehler: '+err.message;
+  });
 }
 
 function checkDsgvoConsent(){
