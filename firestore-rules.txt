@@ -59,6 +59,11 @@ service cloud.firestore {
           allow update: if request.auth != null
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['wunschSitzplatz']);
           allow create, delete: if request.auth != null && deep == 'dokumente';
+          // Meldungen: Azubi darf erstellen, Ausbilder darf lesen/löschen
+          allow create: if request.auth != null && deep == 'meldungen';
+          allow delete: if request.auth != null && deep == 'meldungen';
+          allow update: if request.auth != null && deep == 'meldungen'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gelesen']);
         }
       }
     }
@@ -79,7 +84,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['urlaub']);
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-          ['benachrichtigungen','aktiverKursId','pendingRemoval','pendingRemovalKurs','kursHistory']
+          ['benachrichtigungen','aktiverKursId','pendingRemoval','pendingRemovalKurs','kursHistory','wunschSitzplatz']
         );
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['beruf']);
