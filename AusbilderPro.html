@@ -4927,10 +4927,43 @@ function syncGlobalTNStatus(tnId, statusType){
   // statusType: 'absent' | 'wiederholer' | 'clear'
   if(!_db || !tnId) return;
   const ref = _db.collection('globalTN').doc(tnId);
+  const kursName=S.kats[S.curKat]?.label||'Lehrgang';
+  const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
+  const kursId=curInst()?.sharedKursId;
   if(statusType === 'absent'){
     ref.update({status:'absent', wiederholer: firebase.firestore.FieldValue.delete()}).catch(()=>{});
+    // kursHistory markieren + Benachrichtigung
+    if(kursId) ref.get().then(doc=>{
+      if(!doc.exists) return;
+      const hist=(doc.data().kursHistory||[]).map(h=>h.kursId===kursId?{...h, nichtErschienen:true}:h);
+      ref.update({
+        kursHistory: hist,
+        benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
+          typ:'kurs_nicht_angetreten',
+          text:'Für den Lehrgang "'+kursName+'" wurdest du leider als "Nicht angetreten" eingestuft. Du brauchst zu diesem Lehrgang nicht mehr zu erscheinen. Bitte informiere zeitnah deinen Ausbildungsbetrieb.',
+          ausbilder: ausName,
+          datum: new Date().toISOString(),
+          gelesen: false
+        })
+      }).catch(()=>{});
+    }).catch(()=>{});
   } else if(statusType === 'wiederholer'){
     ref.update({wiederholer:true, status: firebase.firestore.FieldValue.delete()}).catch(()=>{});
+    // kursHistory markieren + Benachrichtigung
+    if(kursId) ref.get().then(doc=>{
+      if(!doc.exists) return;
+      const hist=(doc.data().kursHistory||[]).map(h=>h.kursId===kursId?{...h, abgebrochen:true}:h);
+      ref.update({
+        kursHistory: hist,
+        benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
+          typ:'kurs_wiederholer',
+          text:'Für den Lehrgang "'+kursName+'" wurdest du als Wiederholer eingestuft. Du brauchst zu diesem Lehrgang nicht mehr zu erscheinen – der Kurs wird zu einem späteren Zeitpunkt wiederholt. Bitte informiere deinen Ausbildungsbetrieb.',
+          ausbilder: ausName,
+          datum: new Date().toISOString(),
+          gelesen: false
+        })
+      }).catch(()=>{});
+    }).catch(()=>{});
   } else {
     // clear – back to normal
     ref.update({status: firebase.firestore.FieldValue.delete(), wiederholer: firebase.firestore.FieldValue.delete()}).catch(()=>{});
