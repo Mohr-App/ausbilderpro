@@ -700,6 +700,36 @@ function saveSitzplatzPopup(){
   saveHomeSitzplatz();
 }
 
+function sendMeldung(type, kursId){
+  if(!_tnId||!kursId) return;
+  const msgs = {
+    'spaeter': '🕐 Ich komme heute später',
+    'frueher': '🚶 Ich gehe heute früher',
+    'krank': '🤒 Ich bin heute krank'
+  };
+  let text = msgs[type]||'';
+  if(type==='text'){
+    const inp=document.getElementById('meldungText');
+    text=(inp?.value||'').trim();
+    if(!text){toast('Bitte Nachricht eingeben','bad');return;}
+  }
+  const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Azubi';
+  const meldung = {
+    type, text, name,
+    tnId: _tnId,
+    zeit: new Date().toISOString(),
+    gelesen: false
+  };
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('meldungen').add(meldung).then(()=>{
+      const st=document.getElementById('meldungStatus');
+      if(st){st.textContent='✓ Meldung gesendet';st.style.display='';}
+      if(type==='text'){const inp=document.getElementById('meldungText');if(inp)inp.value='';}
+      setTimeout(()=>{if(st)st.style.display='none';},3000);
+      toast('Meldung gesendet ✓');
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
 function checkDsgvoConsent(){
   if(!_tnData||!_tnId) return;
   if(_tnData.dsgvoZustimmung) return; // Bereits zugestimmt
@@ -843,6 +873,20 @@ function loadKurse(){
         +'<button onclick="saveHomeSitzplatz()" style="padding:6px 14px;background:var(--acc);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">'+(spVal?'Ändern':'Speichern')+'</button>'
         +(spVal?'<span style="font-size:.6rem;color:#10b981;font-weight:600">✓</span>':'')
         +'</div>';
+      // Meldung an Ausbilder
+      html+='<div onclick="event.stopPropagation()" style="margin-top:8px;padding:10px 12px;background:rgba(139,92,246,.04);border:2px solid rgba(139,92,246,.15);border-radius:10px">'
+        +'<div style="font-size:.7rem;font-weight:700;color:#7c3aed;margin-bottom:8px">💬 Meldung an Ausbilder</div>'
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
+        +'<button onclick="sendMeldung(\'spaeter\',\''+highlight.id+'\')" style="padding:5px 10px;background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.3);border-radius:7px;font-size:.68rem;font-weight:600;color:#d97706;cursor:pointer;font-family:\'Sora\',sans-serif">🕐 Komme später</button>'
+        +'<button onclick="sendMeldung(\'frueher\',\''+highlight.id+'\')" style="padding:5px 10px;background:rgba(99,102,241,.1);border:1.5px solid rgba(99,102,241,.3);border-radius:7px;font-size:.68rem;font-weight:600;color:#6366f1;cursor:pointer;font-family:\'Sora\',sans-serif">🚶 Gehe früher</button>'
+        +'<button onclick="sendMeldung(\'krank\',\''+highlight.id+'\')" style="padding:5px 10px;background:rgba(239,68,68,.1);border:1.5px solid rgba(239,68,68,.3);border-radius:7px;font-size:.68rem;font-weight:600;color:#ef4444;cursor:pointer;font-family:\'Sora\',sans-serif">🤒 Bin krank</button>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px">'
+        +'<input id="meldungText" type="text" placeholder="Nachricht an Ausbilder…" style="flex:1;padding:6px 10px;border:1.5px solid rgba(139,92,246,.25);border-radius:7px;font-size:.72rem;font-family:\'Sora\',sans-serif;background:var(--sur);color:var(--tx)">'
+        +'<button onclick="sendMeldung(\'text\',\''+highlight.id+'\')" style="padding:6px 12px;background:#7c3aed;color:#fff;border:none;border-radius:7px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">Senden</button>'
+        +'</div>'
+        +'<div id="meldungStatus" style="font-size:.6rem;color:#10b981;margin-top:4px;display:none"></div>'
+        +'</div>';
       html+='</div>';
     }
 
@@ -909,6 +953,14 @@ function checkBenachrichtigungen(){
         +'<div style="font-size:.7rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(n.von)+' – '+fmtDE(n.bis)+'</div>'
         +'<div style="font-size:.68rem;color:var(--mu);margin-top:4px">Du wurdest von der Verwaltung aus diesem Lehrgang entfernt. Bei Fragen nutze die Kontakt-Buttons unten.</div>'
         +'<button onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:9px;border:none;border-radius:8px;background:rgba(245,158,11,.15);color:#f59e0b;font-family:\'Sora\',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer">✓ Verstanden</button>'
+        +'</div>';
+    }
+    if(n.typ==='krankmeldung'){
+      return '<div style="padding:14px;background:rgba(239,68,68,.08);border:2.5px solid rgba(239,68,68,.35);border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:.95rem;font-weight:800;color:#ef4444;margin-bottom:8px">🤒 Krankmeldung</div>'
+        +'<div style="font-size:.8rem;color:#1e293b;line-height:1.6;margin-bottom:8px">'+esc(n.text||'')+'</div>'
+        +'<div style="padding:10px;background:rgba(239,68,68,.06);border-radius:8px;font-size:.75rem;color:#b91c1c;font-weight:700;line-height:1.5">📞 Bitte melde dich umgehend persönlich bei deinem Ausbildungsbetrieb!</div>'
+        +'<button onclick="markNotifRead('+i+')" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;background:#ef4444;color:#fff;font-family:\'Sora\',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">✓ Zur Kenntnis genommen</button>'
         +'</div>';
     }
     return '';

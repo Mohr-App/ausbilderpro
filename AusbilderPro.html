@@ -409,6 +409,7 @@ body{font-family:'Sora',sans-serif;background:#f0f2f8;color:var(--tx);min-height
 .copyright{position:fixed;bottom:8px;right:12px;z-index:97;font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--mu);opacity:.45;pointer-events:none;user-select:none;letter-spacing:.04em;border-top:1px solid rgba(100,116,139,.2);padding-top:5px;}
 .hi2{font-size:.74rem;line-height:1.6;padding:3px 0;border-bottom:1px solid rgba(46,52,80,.4);color:var(--tx);}
 @keyframes pulseInfo{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.4)}50%{box-shadow:0 0 0 5px rgba(245,158,11,0)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
 /* PASSWORD SCREEN */
 .pw-screen{position:fixed;inset:0;background:#f0f2f8;z-index:9999;display:flex;align-items:center;justify-content:center;}
 .pw-box{background:#fff;border:2px solid #c4cce0;border-radius:16px;padding:36px 32px;width:100%;max-width:340px;box-shadow:0 24px 80px rgba(0,0,0,.12);display:flex;flex-direction:column;align-items:center;gap:18px;}
@@ -826,6 +827,7 @@ body{font-family:'Sora',sans-serif;background:#f0f2f8;color:var(--tx);min-height
       </div>
       <button class="pool-link-btn" onclick="openPoolLink()">🔗 Kurs verknüpfen</button>
     </div>
+    <div id="poolMeldungen" style="display:none;max-height:180px;overflow-y:auto;border-bottom:2px solid rgba(139,92,246,.3)"></div>
     <div class="pool-sb-body hide-placed" id="poolSbBody" ondragover="event.preventDefault();this.classList.add('pool-sb-dropover')" ondragleave="this.classList.remove('pool-sb-dropover')" ondrop="poolDropBack(event)">
       <div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>
     </div>
@@ -2164,7 +2166,7 @@ function renderMain(){
     return;
   }
   el.innerHTML=
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #c4cce0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📄 Bescheinigungen</button><button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button>'+(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">👤+ TN</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed">🔗 QR + Pool aktivieren</button>')+'<button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Verschieben">↔ Verschieben</button><button class="tbtn main-docs-btn" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Löschen">🗑 Löschen</button></div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #c4cce0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="tbtn main-docs-btn" id="meldBtn" onclick="showMeldungen(\''+inst.sharedKursId+'\'||'')" style="background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.3);color:#7c3aed">💬 Meldungen</button><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📄 Bescheinigungen</button><button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button>'+(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">👤+ TN</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed">🔗 QR + Pool aktivieren</button>')+'<button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Verschieben">↔ Verschieben</button><button class="tbtn main-docs-btn" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Löschen">🗑 Löschen</button></div></div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
     +'<div id="seatingWrap" class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
@@ -2377,6 +2379,36 @@ function seatQuickAtt(sid){
   persist(); renderSeats(); renderQuickAttCount();
   if(_mobileListMode) renderMobileList();
   syncAttendanceToFirestore(sid);
+}
+
+function showMeldungen(kursId){
+  if(!_db||!kursId) return;
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('meldungen').orderBy('zeit','desc').limit(20).get().then(snap=>{
+      if(snap.empty){toast('Keine Meldungen');return;}
+      let html='<div style="font-size:.9rem;font-weight:800;margin-bottom:12px">💬 Meldungen</div>';
+      const batch=_db.batch();
+      snap.forEach(doc=>{
+        const m=doc.data();
+        const zeit=m.zeit?new Date(m.zeit).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+        const typeCol=m.type==='krank'?'#ef4444':m.type==='spaeter'?'#d97706':m.type==='frueher'?'#6366f1':'#7c3aed';
+        html+='<div style="padding:8px 10px;background:'+(m.gelesen?'#f8fafc':'rgba(124,58,237,.05)')+';border:1px solid '+(m.gelesen?'#e2e8f0':'rgba(124,58,237,.2)')+';border-radius:8px;margin-bottom:5px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+          +'<span style="font-size:.78rem;font-weight:700;color:'+typeCol+'">'+esc(m.name)+'</span>'
+          +'<span style="font-size:.55rem;color:#94a3b8">'+zeit+'</span></div>'
+          +'<div style="font-size:.72rem;color:#374151;margin-top:2px">'+esc(m.text)+'</div></div>';
+        if(!m.gelesen) batch.update(doc.ref,{gelesen:true});
+      });
+      html+='<button onclick="document.getElementById(\'tnDetailModal\').classList.remove(\'open\')" style="margin-top:10px;width:100%;padding:8px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">Schließen</button>';
+      document.getElementById('tnDetailTitle').textContent='💬 Meldungen';
+      document.getElementById('tnDetailBody').innerHTML=html;
+      document.getElementById('tnDetailModal').classList.add('open');
+      // Alle als gelesen markieren
+      batch.commit().then(()=>{
+        // Badges entfernen
+        document.querySelectorAll('.meld-badge').forEach(b=>b.remove());
+      }).catch(()=>{});
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 function updateKurstage(val){
@@ -3303,6 +3335,22 @@ function addAtt(){
   }
   tmpAtt.sort((a,b)=>a.date>b.date?-1:1);
   document.getElementById('aNote').value='';
+  if(curAttMain==='sick'){
+    // Azubi benachrichtigen: Bitte beim AG melden
+    const seatData=curSeats()[curSeat];
+    if(seatData&&seatData.poolTnId&&_db){
+      const tnId=seatData.poolTnId;
+      const heute=new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+      _db.collection('globalTN').doc(tnId).update({
+        benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
+          typ:'krankmeldung',
+          text:'Du wurdest am '+heute+' als krank gemeldet. Der Arbeitgeber wird automatisch informiert \u2013 bitte melde dich zus\u00E4tzlich pers\u00F6nlich bei deinem Ausbildungsbetrieb!',
+          datum: new Date().toISOString(),
+          gelesen: false
+        })
+      }).catch(()=>{});
+    }
+  }
   const saveBtn=document.getElementById('btnSaveAtt');
   if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';}
   renderAtt();
@@ -4837,12 +4885,16 @@ let _poolDragKursId = null;
 let _seatDragId = null;
 let _poolLoadGen = 0; // Generation counter – stale async responses get discarded
 let _poolUnsub = null; // onSnapshot listener cleanup
+let _meldungenUnsub = null;
+let _meldUnsub = null; // Meldungen listener
+let _meldSeen = new Set(); // bereits angezeigte Meldungen
 let _autoPlacedIds = new Set(); // Verhindert doppelte Toast-Meldungen
 
 function loadPool(){
   if(_demoMode) return;
   // Alten Listener abmelden
   if(_poolUnsub){_poolUnsub();_poolUnsub=null;}
+  if(_meldUnsub){_meldUnsub();_meldUnsub=null;}
   const inst = curInst();
   const body = document.getElementById('poolSbBody');
   const hdr  = document.getElementById('poolSbHdr');
@@ -4902,6 +4954,63 @@ function loadPool(){
     let dtEl = document.createElement('div'); dtEl.className='pool-sb-dates';
     dtEl.textContent = (kd.von&&kd.bis) ? fmtDE(kd.von)+' – '+fmtDE(kd.bis) : fmtDE(kd.von);
     hdr.insertBefore(dtEl, hdr.querySelector('.pool-link-btn'));
+    // ── Meldungen Live-Listener ──
+    _meldUnsub = kursRef.collection('meldungen').where('gelesen','==',false).orderBy('zeit','desc').onSnapshot(snap=>{
+      if(isStale()){if(_meldUnsub){_meldUnsub();_meldUnsub=null;}return;}
+      // Sidebar-Anzeige aktualisieren
+      const mel=document.getElementById('poolMeldungen');
+      if(mel){
+        if(snap.empty){mel.style.display='none';mel.innerHTML='';}
+        else {
+          mel.style.display='';
+          let mh='<div style="padding:6px 10px;font-size:.55rem;font-weight:700;color:#7c3aed;letter-spacing:.06em;background:rgba(139,92,246,.06)">💬 MELDUNGEN ('+snap.size+')</div>';
+          snap.forEach(doc=>{
+            const m=doc.data();
+            const zeit=m.zeit?new Date(m.zeit).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
+            const icons={'spaeter':'\uD83D\uDD50','frueher':'\uD83D\uDEB6','krank':'\uD83E\uDD12','text':'\uD83D\uDCAC'};
+            const colors={'spaeter':'#d97706','frueher':'#6366f1','krank':'#ef4444','text':'#7c3aed'};
+            mh+='<div style="padding:6px 10px;border-bottom:1px solid rgba(139,92,246,.1);display:flex;align-items:flex-start;gap:6px">'
+              +'<span style="font-size:.75rem">'+(icons[m.type]||'\uD83D\uDCAC')+'</span>'
+              +'<div style="flex:1;min-width:0"><div style="font-size:.65rem;font-weight:700;color:'+(colors[m.type]||'#7c3aed')+'">'+esc(m.name||'Azubi')+'</div>'
+              +'<div style="font-size:.6rem;color:#6B7280">'+esc(m.text)+'</div></div>'
+              +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">'
+              +'<span style="font-size:.48rem;color:#94a3b8">'+zeit+'</span>'
+              +'<button onclick="dismissMeldung(\''+kursId+'\',\''+doc.id+'\')" style="font-size:.48rem;color:#94a3b8;background:none;border:none;cursor:pointer;padding:0" title="Gelesen">✕</button>'
+              +'</div></div>';
+          });
+          mel.innerHTML=mh;
+        }
+      }
+      // Toast + Badge für neue Meldungen
+      snap.docChanges().forEach(ch=>{
+        if(ch.type==='added'&&!_meldSeen.has(ch.doc.id)){
+          _meldSeen.add(ch.doc.id);
+          const m=ch.doc.data();
+          const docId=ch.doc.id;
+          // Toast anzeigen
+          toast('💬 '+esc(m.name)+': '+esc(m.text));
+          // Badge auf Sitzplatz
+          const inst=curInst();
+          if(inst){
+            Object.keys(inst.seats||{}).forEach(sid=>{
+              if(inst.seats[sid]&&inst.seats[sid].poolTnId===m.tnId){
+                const seatEl=document.getElementById('seat-'+sid);
+                if(seatEl&&!seatEl.querySelector('.meld-badge')){
+                  const badge=document.createElement('div');
+                  badge.className='meld-badge';
+                  badge.style.cssText='position:absolute;top:4px;right:4px;width:18px;height:18px;background:#7c3aed;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.55rem;color:#fff;font-weight:800;cursor:pointer;z-index:5;box-shadow:0 1px 4px rgba(124,58,237,.4);animation:pulse 1.5s infinite';
+                  badge.textContent='💬';
+                  badge.title=m.name+': '+m.text;
+                  badge.onclick=(e)=>{e.stopPropagation();showMeldungen(kursId);};
+                  seatEl.style.position='relative';
+                  seatEl.appendChild(badge);
+                }
+              }
+            });
+          }
+        }
+      });
+    },err=>console.warn('Meldungen error:',err));
     _poolUnsub = kursRef.collection('teilnehmer').orderBy('nachname').onSnapshot(snap=>{
       // ── Snapshot-Guard ──
       if(isStale()){if(_poolUnsub){_poolUnsub();_poolUnsub=null;}return;}
