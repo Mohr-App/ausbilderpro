@@ -3335,22 +3335,6 @@ function addAtt(){
   }
   tmpAtt.sort((a,b)=>a.date>b.date?-1:1);
   document.getElementById('aNote').value='';
-  if(curAttMain==='sick'){
-    // Azubi benachrichtigen: Bitte beim AG melden
-    const seatData=curSeats()[curSeat];
-    if(seatData&&seatData.poolTnId&&_db){
-      const tnId=seatData.poolTnId;
-      const heute=new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-      _db.collection('globalTN').doc(tnId).update({
-        benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
-          typ:'krankmeldung',
-          text:'Du wurdest am '+heute+' als krank gemeldet. Der Arbeitgeber wird automatisch informiert \u2013 bitte melde dich zus\u00E4tzlich pers\u00F6nlich bei deinem Ausbildungsbetrieb!',
-          datum: new Date().toISOString(),
-          gelesen: false
-        })
-      }).catch(()=>{});
-    }
-  }
   const saveBtn=document.getElementById('btnSaveAtt');
   if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';}
   renderAtt();

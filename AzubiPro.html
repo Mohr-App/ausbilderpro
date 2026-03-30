@@ -163,6 +163,27 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- KRANKMELDUNG BESTÄTIGUNG -->
+<div id="krankOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9998;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:400px;width:100%;background:var(--sur);border:2px solid rgba(239,68,68,.3);border-radius:16px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.4)">
+    <div style="font-size:1.1rem;font-weight:800;color:#ef4444;margin-bottom:10px">🤒 Krankmeldung</div>
+    <div style="font-size:.78rem;color:var(--tx);line-height:1.7;margin-bottom:12px">Dein <b>Ausbilder</b> und dein <b>Arbeitgeber</b> werden über deine Krankmeldung automatisch informiert.</div>
+    <div style="padding:12px;background:rgba(239,68,68,.06);border:2px solid rgba(239,68,68,.2);border-radius:10px;margin-bottom:14px">
+      <div style="font-size:.82rem;font-weight:700;color:#b91c1c;line-height:1.6">⚠️ Wichtig: Du bist verpflichtet, dich zusätzlich persönlich bei deinem Ausbildungsbetrieb krank zu melden!</div>
+      <div style="font-size:.7rem;color:#6B7280;margin-top:6px;line-height:1.5">Die Meldung über diese App ersetzt <b>nicht</b> deine persönliche Krankmeldung beim Betrieb (telefonisch oder per E-Mail).</div>
+    </div>
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(239,68,68,.04);border:1.5px solid rgba(239,68,68,.15);border-radius:10px;cursor:pointer;user-select:none;margin-bottom:14px">
+      <input type="checkbox" id="krankCheck" style="margin-top:2px;width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:#ef4444">
+      <span style="font-size:.72rem;color:var(--tx);line-height:1.6">Ich habe verstanden und werde mich <b>persönlich bei meinem Ausbildungsbetrieb</b> krank melden.</span>
+    </label>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('krankOverlay').style.display='none'" style="flex:1;padding:12px;background:var(--sur2);color:var(--tx);border:1.5px solid var(--brd);border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">Abbrechen</button>
+      <button onclick="confirmKrankmeldung()" style="flex:1;padding:12px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">🤒 Krank melden</button>
+    </div>
+    <div class="err" id="krankErr" style="margin-top:6px"></div>
+  </div>
+</div>
+
 <!-- DSGVO CONSENT OVERLAY -->
 <div id="dsgvoOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px">
   <div style="max-width:400px;width:100%;background:var(--sur);border:2px solid var(--brd);border-radius:16px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.4)">
@@ -701,6 +722,26 @@ function saveSitzplatzPopup(){
 }
 
 function sendMeldung(type, kursId){
+  if(!_tnId||!kursId) return;
+  // Krankmeldung: erst AG-Hinweis anzeigen
+  if(type==='krank'){
+    _pendingKrankKursId=kursId;
+    document.getElementById('krankOverlay').style.display='flex';
+    document.getElementById('krankCheck').checked=false;
+    return;
+  }
+  _doSendMeldung(type, kursId);
+}
+let _pendingKrankKursId=null;
+function confirmKrankmeldung(){
+  if(!document.getElementById('krankCheck').checked){
+    document.getElementById('krankErr').textContent='Bitte Checkbox bestätigen';
+    return;
+  }
+  document.getElementById('krankOverlay').style.display='none';
+  _doSendMeldung('krank', _pendingKrankKursId);
+}
+function _doSendMeldung(type, kursId){
   if(!_tnId||!kursId) return;
   const msgs = {
     'spaeter': '🕐 Ich komme heute später',
