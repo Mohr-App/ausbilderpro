@@ -3057,6 +3057,10 @@ function openModal(id){
           }
           // Aus Kurs entfernen Button
           h+='<button onclick="deleteTnKomplett(\''+resolvedTnId+'\')" style="margin-top:10px;width:100%;padding:8px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:8px;color:#dc2626;font-size:.7rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Aus Kurs entfernen</button>';
+          // Admin Reset Button
+          if(_isAdmin){
+            h+='<button onclick="adminResetTN(\''+resolvedTnId+'\')" style="margin-top:6px;width:100%;padding:8px;background:rgba(124,58,237,.08);border:1.5px solid rgba(124,58,237,.3);border-radius:8px;color:#7c3aed;font-size:.7rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">🔧 Admin: Status zurücksetzen</button>';
+          }
           fsInfo.innerHTML=h;
         }).catch(()=>{fsInfo.innerHTML='';fsInfo.style.display='none';});
       } else {
@@ -4008,6 +4012,61 @@ function confirmMeldungGelesen(){
   // Jetzt normales Modal öffnen
   _meldSkipSeat=true;
   openModal(seatId);
+}
+
+function adminResetTN(tnId){
+  if(!_isAdmin||!_db||!tnId) return;
+  if(!confirm('🔧 Admin-Reset: Status des TN komplett zurücksetzen?\n\nDas entfernt Wiederholer/Fehlt-Status und stellt den TN im Kurs wieder her.')) return;
+  const inst=curInst();
+  const kursId=inst?.sharedKursId;
+  // 1. Teilnehmer-Status in Kurs zurücksetzen
+  if(kursId){
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').doc(tnId).update({
+        status: firebase.firestore.FieldValue.delete(),
+        wdhGrund: firebase.firestore.FieldValue.delete(),
+        wdhTs: firebase.firestore.FieldValue.delete(),
+        wdhVon: firebase.firestore.FieldValue.delete()
+      }).catch(()=>{});
+  }
+  // 2. globalTN zurücksetzen + kursHistory reparieren
+  _db.collection('globalTN').doc(tnId).get().then(doc=>{
+    if(!doc.exists) return;
+    const data=doc.data();
+    const hist=(data.kursHistory||[]).map(h=>{
+      if(h.kursId===kursId){
+        const clean={...h};
+        delete clean.abgebrochen;
+        delete clean.nichtErschienen;
+        delete clean.entfernt;
+        return clean;
+      }
+      return h;
+    });
+    const upd={
+      kursHistory: hist,
+      status: firebase.firestore.FieldValue.delete(),
+      wiederholer: firebase.firestore.FieldValue.delete(),
+      wdhGrund: firebase.firestore.FieldValue.delete(),
+      wdhTs: firebase.firestore.FieldValue.delete()
+    };
+    if(!data.aktiverKursId&&kursId) upd.aktiverKursId=kursId;
+    return _db.collection('globalTN').doc(tnId).update(upd);
+  }).then(()=>{
+    // 3. Lokal: aus fehltStudents entfernen
+    if(inst&&inst.fehltStudents){
+      inst.fehltStudents=inst.fehltStudents.filter(f=>f.poolTnId!==tnId);
+    }
+    // Wiederholer-Flag auf Sitz entfernen
+    if(inst){
+      Object.values(inst.seats||{}).forEach(d=>{
+        if(d&&d.poolTnId===tnId) delete d.wiederholer;
+      });
+    }
+    document.getElementById('ov').classList.remove('open');
+    persist();renderSeats();loadPool();
+    toast('🔧 Admin-Reset: TN-Status zurückgesetzt ✓');
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 function openTnDetailFromSeat(){
@@ -5859,7 +5918,7 @@ const _fbCfg={
   messagingSenderId:"937082794250",
   appId:"1:937082794250:web:eb99bc41d8f39908df8af3"
 };
-let _auth=null,_db=null,_st=null,_fbUid=null,_syncTimer=null;
+let _auth=null,_db=null,_st=null,_fbUid=null,_syncTimer=null,_isAdmin=false;
 let _demoMode=false;
 let _tnPhotos={}; // {tnId: photoUrl}
 let _tnUrlaub={}; // {tnId: [{von,bis,label}]}
@@ -5883,6 +5942,7 @@ try{
     _db.collection('users').doc(_fbUid).get().then(doc=>{
       const role = doc.exists ? doc.data().role : null;
       if(role === 'admin'){
+        _isAdmin=true;
         showRoleChoice(user.email);
         return;
       }
@@ -5912,7 +5972,7 @@ try{
       fbLoadData();
     });
   } else {
-    _fbUid=null;
+    _fbUid=null;_isAdmin=false;
     document.getElementById('pwScreen').style.display='flex';
     document.getElementById('fbLogoutBtn').style.display='none';
     document.getElementById('cloudInd').textContent='☁ —';
