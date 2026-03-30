@@ -872,13 +872,13 @@ function loadKurse(){
     const confirmPromises=_kurse.map(k=>
       db.collection('shared').doc('kurse').collection('list').doc(k.id)
         .collection('teilnehmer').doc(_tnId).get()
-        .then(doc=>{ k._tnDoc=doc.exists?doc.data():{}; })
-        .catch(()=>{ k._tnDoc={}; })
+        .then(doc=>{ k._tnExists=doc.exists; k._tnDoc=doc.exists?doc.data():{}; })
+        .catch(()=>{ k._tnExists=false; k._tnDoc={}; })
     );
 
     return Promise.all(confirmPromises).then(()=>{
-    // Auto-Bereinigung: Kurse aus kursHistory entfernen wenn TN nicht mehr in Teilnehmer-Subcollection
-    const orphaned=_kurse.filter(k=>!k._tnDoc?.vorname && !k._tnDoc?.nachname && !k._tnDoc?.addedAt && !k._tnDoc?.bestaetigtAm);
+    // Auto-Bereinigung: Kurse entfernen wenn TN nicht mehr in Teilnehmer-Subcollection
+    const orphaned=_kurse.filter(k=>k._tnExists===false);
     if(orphaned.length){
       const cleanHist=(_tnData.kursHistory||[]).filter(h=>!orphaned.find(o=>o.id===h.kursId));
       const cleanUpdates={kursHistory:cleanHist};
