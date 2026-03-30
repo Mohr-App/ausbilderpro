@@ -409,6 +409,11 @@ body{font-family:'Sora',sans-serif;background:#f0f2f8;color:var(--tx);min-height
 .copyright{position:fixed;bottom:8px;right:12px;z-index:97;font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--mu);opacity:.45;pointer-events:none;user-select:none;letter-spacing:.04em;border-top:1px solid rgba(100,116,139,.2);padding-top:5px;}
 .hi2{font-size:.74rem;line-height:1.6;padding:3px 0;border-bottom:1px solid rgba(46,52,80,.4);color:var(--tx);}
 @keyframes pulseInfo{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.4)}50%{box-shadow:0 0 0 5px rgba(245,158,11,0)}}
+@keyframes pulseMeld{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.03)}}
+.seat.meld-spaeter{outline:3px solid #d97706!important;outline-offset:-3px;animation:pulseMeld 1.5s infinite!important;}
+.seat.meld-frueher{outline:3px solid #6366f1!important;outline-offset:-3px;animation:pulseMeld 1.5s infinite!important;}
+.seat.meld-krank{outline:3px solid #ef4444!important;outline-offset:-3px;animation:pulseMeld 1.5s infinite!important;}
+.seat.meld-text{outline:3px solid #7c3aed!important;outline-offset:-3px;animation:pulseMeld 1.5s infinite!important;}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
 /* PASSWORD SCREEN */
 .pw-screen{position:fixed;inset:0;background:#f0f2f8;z-index:9999;display:flex;align-items:center;justify-content:center;}
@@ -2650,9 +2655,7 @@ function mkSeat(id,seats){
     if(d.poolTnId&&_tnMeldungen[d.poolTnId]&&_tnMeldungen[d.poolTnId].length){
       const meld=_tnMeldungen[d.poolTnId][0];
       const meldIcons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
-      const meldBorders={'spaeter':'rgba(245,158,11,.5)','frueher':'rgba(99,102,241,.5)','krank':'rgba(239,68,68,.5)','text':'rgba(124,58,237,.5)'};
-      el.style.boxShadow='0 0 0 3px '+(meldBorders[meld.type]||'rgba(239,68,68,.5)')+', 0 0 14px '+(meldBorders[meld.type]||'rgba(239,68,68,.3)');
-      el.style.animation='pulseInfo 1.5s infinite';
+      el.classList.add('meld-'+(meld.type||'text'));
       meldHtml='<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2.2rem;z-index:6;pointer-events:none;filter:drop-shadow(0 2px 8px rgba(0,0,0,.35))">'+(meldIcons[meld.type]||'💬')+'</div>';
     }
     el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+'<div class="sname-row"><span class="sname">'+esc(d.name)+'</span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
@@ -3965,7 +3968,7 @@ function showMeldungIntercept(seatId, d){
   });
   html+='</div>';
   // Alle Meldungs-DocIDs sammeln für Gelesen-Markierung
-  _pendingMeldung={seatId, tnId, kursId: inst?.sharedKursId, docIds: melds.map(m=>m.docId)};
+  _pendingMeldung={seatId, tnId, kursId: curInst()?.sharedKursId, docIds: melds.map(m=>m.docId)};
   document.getElementById('tnDetailTitle').textContent='📬 Meldung';
   document.getElementById('tnDetailBody').innerHTML=html
     +'<button onclick="confirmMeldungGelesen()" style="width:100%;padding:12px;background:#059669;color:#fff;border:none;border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Gelesen – Sitzplatz öffnen</button>';
@@ -4000,13 +4003,8 @@ function confirmMeldungGelesen(){
   }
   // Aus lokalem Cache entfernen
   delete _tnMeldungen[tnId];
-  // Sitz-Styling zurücksetzen
-  const seatEl=document.getElementById('seat-'+seatId);
-  if(seatEl){
-    seatEl.style.boxShadow='';
-    seatEl.style.animation='';
-    seatEl.querySelectorAll('.meld-overlay').forEach(e=>e.remove());
-  }
+  // Seats neu rendern (entfernt Rahmen/Icon)
+  renderSeats();
   // Jetzt normales Modal öffnen
   _meldSkipSeat=true;
   openModal(seatId);
