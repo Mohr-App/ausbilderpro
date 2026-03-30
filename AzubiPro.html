@@ -877,6 +877,20 @@ function loadKurse(){
     );
 
     return Promise.all(confirmPromises).then(()=>{
+    // Auto-Bereinigung: Kurse aus kursHistory entfernen wenn TN nicht mehr in Teilnehmer-Subcollection
+    const orphaned=_kurse.filter(k=>!k._tnDoc?.vorname && !k._tnDoc?.nachname && !k._tnDoc?.addedAt && !k._tnDoc?.bestaetigtAm);
+    if(orphaned.length){
+      const cleanHist=(_tnData.kursHistory||[]).filter(h=>!orphaned.find(o=>o.id===h.kursId));
+      const cleanUpdates={kursHistory:cleanHist};
+      if(_tnData.aktiverKursId && orphaned.find(o=>o.id===_tnData.aktiverKursId)){
+        cleanUpdates.aktiverKursId=firebase.firestore.FieldValue.delete();
+        _tnData.aktiverKursId=null;
+      }
+      _tnData.kursHistory=cleanHist;
+      _kurse=_kurse.filter(k=>!orphaned.find(o=>o.id===k.id));
+      db.collection('globalTN').doc(_tnId).update(cleanUpdates).catch(()=>{});
+    }
+
     const aktiv=_kurse.find(k=>k.von&&k.bis&&today>=k.von&&today<=k.bis);
     const naechster=_kurse.find(k=>k.von&&k.von>today);
     const highlight=aktiv||naechster;
