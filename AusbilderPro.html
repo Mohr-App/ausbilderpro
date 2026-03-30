@@ -177,10 +177,10 @@ body{font-family:'Sora',sans-serif;background:#f0f2f8;color:var(--tx);min-height
 .fehlt-hdr{padding:8px 14px;border-top:2px solid rgba(239,68,68,.3);border-bottom:1px solid var(--brd);font-size:.6rem;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;background:rgba(239,68,68,.05);flex-shrink:0;}
 .fehlt-body{min-height:100px;max-height:280px;overflow-y:auto;padding:6px 8px;background:#f0f2f8;flex-shrink:0;}
 .fehlt-body.fehlt-dropover{background:rgba(239,68,68,.1);outline:2px dashed #ef4444;outline-offset:-4px;}
-.fehlt-card{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:7px 10px;margin-bottom:4px;cursor:grab;display:flex;align-items:center;gap:8px;transition:all .12s;}
+.fehlt-card{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:7px 10px;margin-bottom:4px;cursor:default;display:flex;align-items:center;gap:8px;transition:all .12s;}
 .fehlt-card:hover{border-color:#ef4444;}
 .wiederholer-dropover{background:rgba(245,158,11,.1)!important;outline:2px dashed #d97706;outline-offset:-4px;}
-.wiederholer-card{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:7px 10px;margin-bottom:4px;cursor:grab;display:flex;align-items:center;gap:8px;transition:all .12s;}
+.wiederholer-card{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:7px 10px;margin-bottom:4px;cursor:default;display:flex;align-items:center;gap:8px;transition:all .12s;}
 .wiederholer-card:hover{border-color:#d97706;}
 .seat.wiederholer{opacity:.4;border-style:dashed!important;border-color:#d97706!important;}
 .fehlt-card .pool-avatar{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444;}
@@ -4935,8 +4935,9 @@ function syncGlobalTNStatus(tnId, statusType){
     // kursHistory markieren + Benachrichtigung
     if(kursId) ref.get().then(doc=>{
       if(!doc.exists) return;
-      const hist=(doc.data().kursHistory||[]).map(h=>h.kursId===kursId?{...h, nichtErschienen:true}:h);
-      ref.update({
+      const data=doc.data();
+      const hist=(data.kursHistory||[]).map(h=>h.kursId===kursId?{...h, nichtErschienen:true}:h);
+      const upd={
         kursHistory: hist,
         benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
           typ:'kurs_nicht_angetreten',
@@ -4945,15 +4946,18 @@ function syncGlobalTNStatus(tnId, statusType){
           datum: new Date().toISOString(),
           gelesen: false
         })
-      }).catch(()=>{});
+      };
+      if(data.aktiverKursId===kursId) upd.aktiverKursId=firebase.firestore.FieldValue.delete();
+      ref.update(upd).catch(()=>{});
     }).catch(()=>{});
   } else if(statusType === 'wiederholer'){
     ref.update({wiederholer:true, status: firebase.firestore.FieldValue.delete()}).catch(()=>{});
     // kursHistory markieren + Benachrichtigung
     if(kursId) ref.get().then(doc=>{
       if(!doc.exists) return;
-      const hist=(doc.data().kursHistory||[]).map(h=>h.kursId===kursId?{...h, abgebrochen:true}:h);
-      ref.update({
+      const data=doc.data();
+      const hist=(data.kursHistory||[]).map(h=>h.kursId===kursId?{...h, abgebrochen:true}:h);
+      const upd={
         kursHistory: hist,
         benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
           typ:'kurs_wiederholer',
@@ -4962,7 +4966,9 @@ function syncGlobalTNStatus(tnId, statusType){
           datum: new Date().toISOString(),
           gelesen: false
         })
-      }).catch(()=>{});
+      };
+      if(data.aktiverKursId===kursId) upd.aktiverKursId=firebase.firestore.FieldValue.delete();
+      ref.update(upd).catch(()=>{});
     }).catch(()=>{});
   } else {
     // clear – back to normal
@@ -5289,96 +5295,69 @@ function poolDropBack(e){
 function dropToFehlt(e){
   e.preventDefault();
   document.getElementById('fehltBody').classList.remove('fehlt-dropover');
-
-  // Fall 1: Vom Sitzplatz in Fehlt
-  if(_seatDragId){
+  // Drag-Daten sichern bevor sie verloren gehen
+  const saved={seatDragId:_seatDragId, poolDragId:_poolDragId, poolDragTnId:_poolDragTnId, poolDragKursId:_poolDragKursId, wiederholerSeatId:_wiederholerSeatId, fehltLocal:_fehltLocal};
+  const tnName=_seatDragId?(curSeats()[_seatDragId]?.name||''):(_poolDragId||'');
+  if(!tnName) return;
+  _seatDragId=null;_poolDragId=null;_poolDragTnId=null;_poolDragKursId=null;_wiederholerSeatId=null;
+  safeConfirm(
+    '🚫 Nicht angetreten',
+    '<b>'+esc(tnName)+'</b> als "Nicht angetreten" einstufen?<br><br><span style="font-size:.75rem;color:#6B7280">Der Azubi wird benachrichtigt und der Kurs wird für ihn beendet. <b>Diese Aktion kann nicht rückgängig gemacht werden.</b></span>',
+    'Ich bestätige, dass dieser TN nicht angetreten ist',
+    '🚫 Nicht angetreten',
+    ()=>{ _execDropToFehlt(saved); }
+  );
+}
+function _execDropToFehlt(s){
+  // Fall 1: Vom Sitzplatz
+  if(s.seatDragId){
     const inst=curInst(); if(!inst) return;
-    const d=inst.seats[_seatDragId]; if(!d||!d.name) return;
-    const tnId   = d.poolTnId;
-    const kursId = d.poolKursId || inst.sharedKursId;
+    const d=inst.seats[s.seatDragId]; if(!d||!d.name) return;
+    const tnId=d.poolTnId;
+    const kursId=d.poolKursId||inst.sharedKursId;
     if(!inst.fehltStudents) inst.fehltStudents=[];
-    if(!inst.fehltStudents.find(f=>f.name===d.name)){
-      inst.fehltStudents.push({name:d.name, company:d.company||'', profession:d.profession||'', ausbjahr:d.ausbjahr||'', poolTnId:tnId||null, poolKursId:kursId||null});
-    }
-    ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst.seats[_seatDragId][k]);
-    persist(); renderSeats();
-    if(_db && kursId && tnId){
+    if(!inst.fehltStudents.find(f=>f.name===d.name))
+      inst.fehltStudents.push({name:d.name,company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',poolTnId:tnId||null,poolKursId:kursId||null});
+    ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst.seats[s.seatDragId][k]);
+    persist();renderSeats();
+    if(_db&&kursId&&tnId){
       _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-        .collection('teilnehmer').doc(tnId).update({status:'absent'})
-        .then(()=>loadPool()).catch(()=>loadPool());
-      syncGlobalTNStatus(tnId, 'absent');
-    } else { loadPool(); }
-    _seatDragId=null;
+        .collection('teilnehmer').doc(tnId).update({status:'absent'}).then(()=>loadPool()).catch(()=>loadPool());
+      syncGlobalTNStatus(tnId,'absent');
+    } else loadPool();
     return;
   }
-
-  if(!_poolDragId) return;
-
-  // Fall 2: Aus Wiederholer-Container in Fehlt
-  if(_wiederholerSeatId){
-    const inst=curInst();
-    if(inst && inst.seats[_wiederholerSeatId]){
-      const d=inst.seats[_wiederholerSeatId];
-      // Wiederholer-Flag entfernen, als Fehlt sichern
-      delete inst.seats[_wiederholerSeatId].wiederholer;
-      if(!inst.fehltStudents) inst.fehltStudents=[];
-      if(!inst.fehltStudents.find(f=>f.name===_poolDragId))
-        inst.fehltStudents.push({name:_poolDragId, company:d.company||'', profession:d.profession||'', ausbjahr:d.ausbjahr||'', poolTnId:_poolDragTnId||null, poolKursId:_poolDragKursId||null});
-      ['name','company','profession','ausbjahr','poolTnId','poolKursId'].forEach(k=>delete inst.seats[_wiederholerSeatId][k]);
-      persist(); renderSeats();
-    }
-    if(_db && _poolDragKursId && _poolDragTnId){
-      _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
-        .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'})
-        .then(()=>loadPool()).catch(()=>loadPool());
-      syncGlobalTNStatus(_poolDragTnId, 'absent');
-    }
-    else loadPool();
-    _poolDragId=null; _wiederholerSeatId=null;
-    return;
-  }
-
-  // Fall 3: Aus Pool (mit Firestore-ID) in Fehlt
-  if(_poolDragTnId && _poolDragKursId){
+  if(!s.poolDragId) return;
+  // Fall 2: Aus Pool mit Firestore-ID
+  if(s.poolDragTnId&&s.poolDragKursId){
     const inst3=curInst();
-    if(inst3 && _poolDragId){
+    if(inst3&&s.poolDragId){
       Object.entries(inst3.seats).forEach(([sid,d])=>{
-        if(d && d.name===_poolDragId){
-          ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst3.seats[sid][k]);
-        }
+        if(d&&d.name===s.poolDragId) ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst3.seats[sid][k]);
       });
       if(!inst3.fehltStudents) inst3.fehltStudents=[];
-      if(!inst3.fehltStudents.find(f=>f.name===_poolDragId))
-        inst3.fehltStudents.push({name:_poolDragId, company:'', profession:'', ausbjahr:'', poolTnId:_poolDragTnId, poolKursId:_poolDragKursId});
-      persist(); renderSeats();
+      if(!inst3.fehltStudents.find(f=>f.name===s.poolDragId))
+        inst3.fehltStudents.push({name:s.poolDragId,company:'',profession:'',ausbjahr:'',poolTnId:s.poolDragTnId,poolKursId:s.poolDragKursId});
+      persist();renderSeats();
     }
-    _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
-      .collection('teilnehmer').doc(_poolDragTnId).update({status:'absent'})
-      .then(()=>loadPool()).catch(()=>loadPool());
-    syncGlobalTNStatus(_poolDragTnId, 'absent');
-    _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
+    _db.collection('shared').doc('kurse').collection('list').doc(s.poolDragKursId)
+      .collection('teilnehmer').doc(s.poolDragTnId).update({status:'absent'}).then(()=>loadPool()).catch(()=>loadPool());
+    syncGlobalTNStatus(s.poolDragTnId,'absent');
     return;
   }
-
-  // Fall 4: Lokaler Schüler ohne Firestore-ID (Offline-Modus oder manuell eingetragen)
-  if(_poolDragId){
+  // Fall 3: Lokal
+  if(s.poolDragId){
     const inst4=curInst();
     if(inst4){
-      // Sitz leeren falls Schüler sitzt (z.B. Wiederholer)
       Object.entries(inst4.seats).forEach(([sid,d])=>{
-        if(d && d.name===_poolDragId)
-          ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst4.seats[sid][k]);
+        if(d&&d.name===s.poolDragId) ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst4.seats[sid][k]);
       });
       if(!inst4.fehltStudents) inst4.fehltStudents=[];
-      // Daten aus fehlt-card holen falls vorhanden
-      const fc=document.querySelector('.fehlt-card[data-name="'+CSS.escape(_poolDragId)+'"]')
-            || document.querySelector('.wiederholer-card[data-name="'+CSS.escape(_poolDragId)+'"]');
-      if(!inst4.fehltStudents.find(f=>f.name===_poolDragId))
-        inst4.fehltStudents.push({name:_poolDragId, company:fc?.dataset.company||'', profession:fc?.dataset.profession||'', ausbjahr:fc?.dataset.ausbjahr||'', poolTnId:null, poolKursId:null});
-      persist(); renderSeats();
+      if(!inst4.fehltStudents.find(f=>f.name===s.poolDragId))
+        inst4.fehltStudents.push({name:s.poolDragId,company:'',profession:'',ausbjahr:'',poolTnId:null,poolKursId:null});
+      persist();renderSeats();
     }
     loadPool();
-    _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
   }
 }
 
@@ -5426,6 +5405,15 @@ function selectWdhGrund(grund){
   const p=_wdhPendingData;
   _wdhPendingData=null;
 
+  safeConfirm(
+    '↩ Wiederholer',
+    '<b>'+esc(p.tnName)+'</b> als Wiederholer einstufen?<br><br><span style="font-size:.72rem;color:#6B7280">Grund: '+esc(grund)+'<br><br>Der Azubi wird benachrichtigt und der Kurs wird für ihn beendet. <b>Diese Aktion kann nicht rückgängig gemacht werden.</b></span>',
+    'Ich bestätige die Einstufung als Wiederholer',
+    '↩ Wiederholer einstufen',
+    ()=>{ _execWdhGrund(p, grund); }
+  );
+}
+function _execWdhGrund(p, grund){
   if(p.fromSeat){
     const inst=curInst(); if(!inst) return;
     inst.seats[p.seatId].wiederholer=true;
@@ -5483,7 +5471,7 @@ function renderWiederholer(kursId){
       const initials=d.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
       const card=document.createElement('div');
       card.className='wiederholer-card';
-      card.draggable=true;
+      card.draggable=false;
       card.dataset.name=d.name; card.dataset.company=d.company||''; card.dataset.profession=d.profession||''; card.dataset.ausbjahr=d.ausbjahr||'';
       card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
         +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(d.name)+'</div>'
@@ -5518,7 +5506,7 @@ function renderWiederholer(kursId){
         const initials=fullName.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
         const card=document.createElement('div');
         card.className='wiederholer-card';
-        card.draggable=true;
+        card.draggable=false;
         card.dataset.name=fullName; card.dataset.tnid=doc.id; card.dataset.kursid=kursId;
         card.dataset.company=d.firma||''; card.dataset.profession=d.beruf||''; card.dataset.ausbjahr=d.ausbjahr||'';
         card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
@@ -5539,7 +5527,7 @@ function renderWiederholer(kursId){
         const initials=d.name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
         const card=document.createElement('div');
         card.className='wiederholer-card';
-        card.draggable=true;
+        card.draggable=false;
         card.dataset.name=d.name; card.dataset.company=d.company||''; card.dataset.profession=d.profession||''; card.dataset.ausbjahr=d.ausbjahr||'';
         card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#1e2433">'+esc(d.name)+'</div>'
@@ -5572,7 +5560,7 @@ function renderFehlt(kursId){
     const initials=name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
     const card=document.createElement('div');
     card.className='fehlt-card';
-    card.draggable=true;
+    card.draggable=false;
     card.dataset.name=name; card.dataset.tnid=tnId||''; card.dataset.kursid=fsKursId||'';
     card.dataset.company=company||''; card.dataset.profession=profession||''; card.dataset.ausbjahr=ausbjahr||'';
     card.innerHTML='<div class="pool-avatar" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444">'+initials+'</div>'
