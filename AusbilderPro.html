@@ -187,6 +187,11 @@ body{font-family:'Sora',sans-serif;background:#f0f2f8;color:var(--tx);min-height
 .seat.pool-target{outline:2px dashed var(--acc);outline-offset:2px;}
 @media(max-width:900px){.pool-sidebar{display:none;}}
 .main-docs-btn{font-size:.65rem!important;padding:3px 9px!important;}
+.hdr-actions{display:none;flex-wrap:wrap;gap:4px;padding:8px 0;animation:slideDown .2s ease;}
+.hdr-actions.show{display:flex;}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.hdr-menu-btn{padding:6px 14px;background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);border-radius:8px;color:#3b82f6;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;transition:all .12s;}
+.hdr-menu-btn.open{background:rgba(37,99,235,.15);border-color:rgba(37,99,235,.4);}
 .kat-newinst{display:none;align-items:center;gap:5px;padding:5px 10px 5px 24px;cursor:pointer;color:var(--acc);font-size:.73rem;font-weight:600;opacity:.7;transition:opacity .12s;flex-shrink:0;}
 .kat-newinst.show{display:flex;}
 .kat-newinst:hover{opacity:1;}
@@ -2171,7 +2176,18 @@ function renderMain(){
     return;
   }
   el.innerHTML=
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #c4cce0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button><button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button><button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button><button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📄 Bescheinigungen</button><button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button><button class=\"tbtn main-docs-btn\" onclick=\"ausbilderKommtSpaeter()\" style=\"background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706\">🕐 Komme später</button>'+(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">👤+ TN</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed">🔗 QR + Pool aktivieren</button>')+'<button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Verschieben">↔ Verschieben</button><button class="tbtn main-docs-btn" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Löschen">🗑 Löschen</button></div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #c4cce0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="hdr-menu-btn" onclick="toggleHdrMenu()" id="hdrMenuBtn">☰ Aktionen</button></div></div>'
+    +'<div class="hdr-actions" id="hdrActions">'
+    +'<button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button>'
+    +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button>'
+    +'<button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button>'
+    +'<button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📄 Bescheinigungen</button>'
+    +'<button class="tbtn main-docs-btn" onclick="ausbilderKommtSpaeter()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706">🕐 Komme später</button>'
+    +'<button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button>'
+    +(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">👤+ TN</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed">🔗 QR + Pool aktivieren</button>')
+    +'<button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Verschieben">↔ Verschieben</button>'
+    +'<button class="tbtn main-docs-btn" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Löschen">🗑 Löschen</button>'
+    +'</div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
     +'<div id="seatingWrap" class="seating-wrap"><div class="seating" id="seatingEl"></div></div>'
@@ -2414,6 +2430,15 @@ function showMeldungen(kursId){
         document.querySelectorAll('.meld-badge').forEach(b=>b.remove());
       }).catch(()=>{});
     }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function toggleHdrMenu(){
+  const el=document.getElementById('hdrActions');
+  const btn=document.getElementById('hdrMenuBtn');
+  if(!el) return;
+  el.classList.toggle('show');
+  if(btn) btn.classList.toggle('open');
+  if(btn) btn.textContent=el.classList.contains('show')?'✕ Schließen':'☰ Aktionen';
 }
 
 function updateKurstage(val){
