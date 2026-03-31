@@ -1657,21 +1657,27 @@ function baustelleErfassen(){
   err.textContent='';
   if(!name){err.textContent='Bitte Baustelle/Projekt eingeben';return;}
   if(!von||!bis){err.textContent='Bitte Zeiten eingeben';return;}
+  if(!_tnId){err.textContent='Fehler: Nicht angemeldet (_tnId fehlt)';return;}
   const today=new Date().toISOString().slice(0,10);
+  err.textContent='Speichert…';
   db.collection('globalTN').doc(_tnId).collection('baustellen').add({
     datum:today, baustelle:name, adresse, taetigkeit, von, bis,
     erstellt:Date.now(),
     tnName:((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim(),
     firma:_tnData?.firma||''
-  }).then(()=>{
+  }).then(doc=>{
+    err.textContent='';
     document.getElementById('bsName').value='';
     document.getElementById('bsAdresse').value='';
     document.getElementById('bsTaetigkeit').value='';
     document.getElementById('bsVon').value='';
     document.getElementById('bsBis').value='';
-    toast('🏗 Baustelleneinsatz gespeichert ✓');
+    toast('🏗 Baustelleneinsatz gespeichert ✓ (ID: '+doc.id+')');
     loadBaustellen();
-  }).catch(err2=>{err.textContent='Fehler: '+err2.message;console.error('Baustelle save error:',err2);});
+  }).catch(err2=>{
+    err.textContent='❌ FEHLER: '+err2.code+' – '+err2.message;
+    console.error('Baustelle save error:',err2);
+  });
 }
 
 function loadBaustellen(){
@@ -1679,11 +1685,11 @@ function loadBaustellen(){
   if(!el||!_tnId||!db) return;
   const sel=document.getElementById('bsMonat');
   const ym=sel?sel.value:new Date().toISOString().slice(0,7);
-  el.innerHTML='<div class="empty">Lädt…</div>';
+  el.innerHTML='<div class="empty">Lädt… ('+ym+')</div>';
   db.collection('globalTN').doc(_tnId).collection('baustellen')
     .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
     .orderBy('datum','desc').get().then(snap=>{
-      if(snap.empty){el.innerHTML='<div class="empty">Keine Einsätze in diesem Monat</div>';return;}
+      if(snap.empty){el.innerHTML='<div class="empty">Keine Einsätze in '+ym+'</div>';return;}
       let html='';
       snap.forEach(doc=>{
         const d=doc.data();
