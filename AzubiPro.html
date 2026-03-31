@@ -50,6 +50,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .stab{padding:8px 14px;border:1.5px solid var(--brd);border-radius:8px;background:var(--sur2);color:var(--mu);font-size:.68rem;font-weight:700;font-family:'Sora',sans-serif;cursor:pointer;white-space:nowrap;transition:all .12s;}
 .stab.active{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.4);color:var(--acc);}
 .btab{display:none;}.btab.active{display:block;}
+.az-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 2px 6px rgba(239,68,68,.4);animation:pulseBadge 1.5s infinite;}
+@keyframes pulseBadge{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 8px rgba(239,68,68,0)}}
 /* Cards */
 .card{background:var(--sur);border:2px solid var(--brd);border-radius:14px;padding:16px;margin-bottom:12px;}
 .card-title{font-size:.68rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;margin-bottom:10px;}
@@ -891,6 +893,7 @@ function loadData(){
   loadHVKontakt();
   checkSitzplatzPopup();
   checkDsgvoConsent();
+  checkAzubiBadges();
   // Home Kurs-Info aktualisieren
   const ki=document.getElementById('homeKursInfo');
   if(ki&&_tnData?.aktiverKursId){
@@ -1098,6 +1101,7 @@ function initBetrieb(){
     _betriebInit=true;
     loadBetriebMeldungen();
   }
+  checkAzubiBadges();
   // Aktuellen Sub-Tab initialisieren
   const active=document.querySelector('.btab.active');
   if(active&&active.id==='btab-zeiten') initZeiten();
@@ -1106,6 +1110,49 @@ function initBetrieb(){
   if(active&&active.id==='btab-meldung') loadBetriebMeldungen();
   // Default: Zeiten initialisieren
   if(!active||active.id==='btab-zeiten') initZeiten();
+}
+
+function checkAzubiBadges(){
+  if(!_tnId||!db) return;
+  let zeitCount=0, urlaubCount=0, meldCount=0;
+  const p1=db.collection('globalTN').doc(_tnId).collection('zeiterfassung')
+    .where('manuell','==',true).where('agBestaetigt','==',false).get()
+    .then(s=>{zeitCount=s.size;}).catch(()=>{});
+  const p2=db.collection('globalTN').doc(_tnId).collection('urlaubsantraege')
+    .where('status','==','beantragt').get()
+    .then(s=>{urlaubCount=s.size;}).catch(()=>{});
+  const p3=db.collection('globalTN').doc(_tnId).collection('betriebMeldungen')
+    .where('gelesen','==',false).get()
+    .then(s=>{meldCount=s.size;}).catch(()=>{});
+  Promise.all([p1,p2,p3]).then(()=>{
+    const total=zeitCount+urlaubCount+meldCount;
+    // Betrieb bottom-tab badge
+    setAzBadge('nav-betrieb', total);
+    // Sub-tab badges
+    const tabs=document.querySelectorAll('#betriebTabs .stab');
+    tabs.forEach(t=>{
+      const old=t.querySelector('.az-badge');if(old)old.remove();
+      let count=0;
+      if(t.textContent.includes('Zeiten')) count=zeitCount;
+      else if(t.textContent.includes('Urlaub')) count=urlaubCount;
+      else if(t.textContent.includes('Meldungen')) count=meldCount;
+      if(count>0){
+        t.style.position='relative';
+        const b=document.createElement('span');b.className='az-badge';
+        b.textContent=count;
+        t.appendChild(b);
+      }
+    });
+  });
+}
+function setAzBadge(elId, count){
+  const el=document.getElementById(elId);
+  if(!el) return;
+  let badge=el.querySelector('.az-badge');
+  if(count>0){
+    if(!badge){badge=document.createElement('span');badge.className='az-badge';el.style.position='relative';el.appendChild(badge);}
+    badge.textContent=count;
+  } else if(badge) badge.remove();
 }
 
 function showBetriebTab(tab){
