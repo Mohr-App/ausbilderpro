@@ -15,6 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -432,6 +433,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .hdr-burger:hover{background:rgba(255,255,255,.1);}
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:149;}
 @media(max-width:768px){
+  #dashCharts{grid-template-columns:1fr!important;}
+  #dashStatusGrid{grid-template-columns:1fr!important;}
   .hdr-burger{display:block;}
   .hdr-search-wrap{max-width:none;margin:0 6px;}
   .hdr-badge{display:none;}
@@ -603,6 +606,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
         <div id="kurseBreakdownPanel" style="display:none;margin-bottom:20px"></div>
         <div id="tnBreakdownPanel" style="display:none;margin-bottom:20px"></div>
+
+        <!-- CHARTS -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px" id="dashCharts">
+          <div class="card" style="margin:0;padding:14px">
+            <div class="card-title">📊 Kurs-Status</div>
+            <div style="max-height:200px;display:flex;justify-content:center"><canvas id="chartKursStatus"></canvas></div>
+          </div>
+          <div class="card" style="margin:0;padding:14px">
+            <div class="card-title">👥 Teilnehmer nach Beruf</div>
+            <div style="max-height:200px"><canvas id="chartBeruf"></canvas></div>
+          </div>
+        </div>
 
         <!-- Kursfortschritt Warnung -->
         <div id="dashCurrWarning" style="display:none;margin-bottom:20px"></div>
@@ -2565,6 +2580,44 @@ function loadDashboard(){
     html += '</details>';
   }
   dl.innerHTML=html||'<div class="empty">Noch keine Kurse</div>';
+  renderDashCharts();
+}
+
+let _chartKursStatus=null, _chartBeruf=null;
+function renderDashCharts(){
+  const today=localDate?localDate():new Date().toISOString().slice(0,10);
+  // Kurs-Status Donut
+  let laufend=0,geplant=0,abgeschlossen=0;
+  _kurse.forEach(k=>{
+    if(k.archiviert||k.entwurf) return;
+    if(!k.von||today<k.von) geplant++;
+    else if(!k.bis||today<=k.bis) laufend++;
+    else abgeschlossen++;
+  });
+  const ctx1=document.getElementById('chartKursStatus');
+  if(ctx1){
+    if(_chartKursStatus) _chartKursStatus.destroy();
+    _chartKursStatus=new Chart(ctx1,{
+      type:'doughnut',
+      data:{labels:['Laufend','Geplant','Abgeschlossen'],datasets:[{data:[laufend,geplant,abgeschlossen],backgroundColor:['#10b981','#3b82f6','#94a3b8'],borderWidth:0,hoverOffset:6}]},
+      options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom',labels:{font:{size:11,family:"'Sora',sans-serif",weight:600},padding:12,usePointStyle:true,pointStyle:'circle'}}},cutout:'65%'}
+    });
+  }
+  // TN nach Beruf
+  const berufMap={};
+  _globalTN.forEach(t=>{const b=t.beruf||'Ohne Beruf';berufMap[b]=(berufMap[b]||0)+1;});
+  const berufLabels=Object.keys(berufMap).sort((a,b)=>berufMap[b]-berufMap[a]);
+  const berufData=berufLabels.map(b=>berufMap[b]);
+  const berufColors=['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+  const ctx2=document.getElementById('chartBeruf');
+  if(ctx2){
+    if(_chartBeruf) _chartBeruf.destroy();
+    _chartBeruf=new Chart(ctx2,{
+      type:'bar',
+      data:{labels:berufLabels,datasets:[{data:berufData,backgroundColor:berufColors.slice(0,berufLabels.length),borderRadius:6,barThickness:22}]},
+      options:{responsive:true,maintainAspectRatio:true,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10,family:"'JetBrains Mono',monospace"}}},y:{grid:{display:false},ticks:{font:{size:10,family:"'Sora',sans-serif",weight:600}}}}}
+    });
+  }
 }
 
 // ── Kurse ──
@@ -7774,6 +7827,7 @@ function safeClose(modalId, closeFn){
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 // ISO "2026-03-04" → deutsch "04.03.2026"
 function fmtDE(d){ if(!d||d.length<10) return d||'?'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
+function localDate(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 let _toastTimer;
 function toast(msg,type){
   const el=document.getElementById('toast');
