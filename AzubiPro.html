@@ -342,13 +342,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <!-- Sub-Tabs -->
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="betriebTabs">
-        <button class="stab active" onclick="showBetriebTab('meldung')">🤒 Meldung</button>
-        <button class="stab" onclick="showBetriebTab('zeiten')">⏱ Zeiten</button>
+        <button class="stab active" onclick="showBetriebTab('zeiten')">⏱ Zeiten</button>
+        <button class="stab" onclick="showBetriebTab('baustellen')">🏗 Baustelle</button>
         <button class="stab" onclick="showBetriebTab('urlaub')">🏖 Urlaub</button>
-        <button class="stab" onclick="showBetriebTab('baustellen')">🏗 Baustellen</button>
+        <button class="stab" onclick="showBetriebTab('meldung')">💬 Meldungen</button>
       </div>
-      <!-- Meldung an AG -->
-      <div class="btab active" id="btab-meldung">
+      <!-- Zeiten -->
+      <div class="btab active" id="btab-zeiten">
         <div class="card">
           <div class="card-title">Meldung an den Betrieb</div>
           <div style="display:flex;flex-direction:column;gap:8px">
@@ -1091,6 +1091,9 @@ function initBetrieb(){
   if(active&&active.id==='btab-zeiten') initZeiten();
   if(active&&active.id==='btab-urlaub') initUrlaub();
   if(active&&active.id==='btab-baustellen') initBaustellen();
+  if(active&&active.id==='btab-meldung') loadBetriebMeldungen();
+  // Default: Zeiten initialisieren
+  if(!active||active.id==='btab-zeiten') initZeiten();
 }
 
 function showBetriebTab(tab){
@@ -1784,6 +1787,20 @@ function checkBenachrichtigungen(){
         +'<div style="font-size:.85rem;font-weight:700;color:#fff;margin-bottom:6px">'+esc(n.kursName||'Lehrgang')+'</div>'
         +'<div style="font-size:.82rem;color:#fff;line-height:1.6;margin-bottom:8px">'+esc(n.text||'')+'</div>'
         +'<button onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:10px;border:none;border-radius:8px;background:#fff;color:#d97706;font-family:\'Sora\',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">✓ Zur Kenntnis genommen</button>'
+        +'</div>';
+    }
+    if(n.typ==='urlaub_genehmigt'){
+      return '<div style="padding:12px;background:rgba(16,185,129,.08);border:2px solid rgba(16,185,129,.3);border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:.85rem;font-weight:800;color:#059669;margin-bottom:6px">✅ Urlaub genehmigt</div>'
+        +'<div style="font-size:.78rem;color:#1e293b;line-height:1.6">'+esc(n.text||'Dein Urlaubsantrag wurde genehmigt.')+'</div>'
+        +'<button onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:9px;border:none;border-radius:8px;background:rgba(16,185,129,.15);color:#059669;font-family:\'Sora\',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer">✓ OK</button>'
+        +'</div>';
+    }
+    if(n.typ==='urlaub_abgelehnt'){
+      return '<div style="padding:12px;background:rgba(239,68,68,.08);border:2px solid rgba(239,68,68,.3);border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:.85rem;font-weight:800;color:#ef4444;margin-bottom:6px">❌ Urlaub abgelehnt</div>'
+        +'<div style="font-size:.78rem;color:#1e293b;line-height:1.6">'+esc(n.text||'Dein Urlaubsantrag wurde leider abgelehnt.')+'</div>'
+        +'<button onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:9px;border:none;border-radius:8px;background:rgba(239,68,68,.15);color:#ef4444;font-family:\'Sora\',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer">✓ OK</button>'
         +'</div>';
     }
     return '';

@@ -68,6 +68,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .copyright{position:fixed;bottom:8px;right:12px;font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--mu);opacity:.45;}
 @media(max-width:600px){.stat-row{grid-template-columns:1fr;}.hdr{padding:0 12px;gap:8px;}.hdr-logo{font-size:.88rem;}.main{padding:14px 10px;}}
 @keyframes pulseRed{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+.bnav{position:fixed;bottom:0;left:0;right:0;background:var(--sur);border-top:1px solid var(--brd);display:flex;justify-content:space-around;padding:8px 4px calc(env(safe-area-inset-bottom,0px) + 8px);z-index:100;}
+.bnav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--mu);font-family:'JetBrains Mono',monospace;font-size:.5rem;cursor:pointer;padding:6px 20px;border-radius:10px;transition:all .12s;flex:1;}
+.bnav-btn .bi{font-size:1.2rem;line-height:1;}
+.bnav-btn.active{color:var(--acc);background:rgba(245,158,11,.08);}
+.agpage{display:none;}.agpage.active{display:block;}
+.stab{padding:8px 14px;border:1.5px solid var(--brd);border-radius:8px;background:var(--sur2);color:var(--mu);font-size:.68rem;font-weight:700;font-family:'Sora',sans-serif;cursor:pointer;white-space:nowrap;transition:all .12s;}
+.stab.active{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:var(--acc);}
+.abtab{display:none;}.abtab.active{display:block;}
 </style>
 </head>
 <body>
@@ -88,19 +96,79 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="hdr-firma" id="hdrFirma"></div>
     <button class="hdr-btn" onclick="doLogout()">⎋ Abmelden</button>
   </div>
-  <div class="main">
-    <div class="page-title" id="welcomeTitle">Willkommen</div>
-    <div class="page-sub" id="welcomeSub"></div>
-    <div class="stat-row">
-      <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Auszubildende</div></div>
-      <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Lehrgängen</div></div>
-      <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
+  <div class="main" style="padding-bottom:80px">
+    <!-- ÜBERSICHT -->
+    <div class="agpage active" id="agpage-uebersicht">
+      <div class="page-title" id="welcomeTitle">Willkommen</div>
+      <div class="page-sub" id="welcomeSub"></div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Auszubildende</div></div>
+        <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Lehrgängen</div></div>
+        <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
+      </div>
+      <div id="agNotifBanner"></div>
+      <div class="card">
+        <div class="card-title">👥 Ihre Auszubildenden</div>
+        <div id="azubiList"><div class="empty">Lädt…</div></div>
+      </div>
     </div>
-    <div id="agNotifBanner"></div>
-    <div class="card">
-      <div class="card-title">👥 Ihre Auszubildenden</div>
-      <div id="azubiList"><div class="empty">Lädt…</div></div>
+
+    <!-- BETRIEB -->
+    <div class="agpage" id="agpage-betrieb">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:1.4rem">🏭</span>
+        <div style="font-size:1.1rem;font-weight:800">Betrieb</div>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto" id="agBetriebTabs">
+        <button class="stab active" onclick="showAgBetriebTab('zeiten')">⏱ Zeiten</button>
+        <button class="stab" onclick="showAgBetriebTab('baustellen')">🏗 Baustelle</button>
+        <button class="stab" onclick="showAgBetriebTab('urlaub')">🏖 Urlaub</button>
+        <button class="stab" onclick="showAgBetriebTab('meldungen')">💬 Meldungen</button>
+      </div>
+      <!-- AG: Zeiten -->
+      <div class="abtab active" id="abtab-zeiten">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div class="card-title" style="margin:0">⏱ Arbeitszeiten</div>
+            <select id="agZeitMonat" onchange="loadAgZeiten()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+          </div>
+          <div id="agZeitenListe"><div class="empty">Lädt…</div></div>
+        </div>
+      </div>
+      <!-- AG: Baustellen -->
+      <div class="abtab" id="abtab-baustellen">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div class="card-title" style="margin:0">🏗 Baustellennachweise</div>
+            <select id="agBsMonat" onchange="loadAgBaustellen()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+          </div>
+          <div id="agBsListe"><div class="empty">Lädt…</div></div>
+        </div>
+      </div>
+      <!-- AG: Urlaub -->
+      <div class="abtab" id="abtab-urlaub">
+        <div class="card">
+          <div class="card-title">🏖 Offene Urlaubsanträge</div>
+          <div id="agUrlaubOffen"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Alle Anträge</div>
+          <div id="agUrlaubAlle"><div class="empty">Lädt…</div></div>
+        </div>
+      </div>
+      <!-- AG: Meldungen -->
+      <div class="abtab" id="abtab-meldungen">
+        <div class="card">
+          <div class="card-title">💬 Meldungen der Azubis</div>
+          <div id="agMeldListe"><div class="empty">Lädt…</div></div>
+        </div>
+      </div>
     </div>
+  </div>
+  <!-- Bottom Nav -->
+  <div class="bnav">
+    <button class="bnav-btn active" id="agnav-uebersicht" onclick="showAgPage('uebersicht')"><span class="bi">👥</span>Übersicht</button>
+    <button class="bnav-btn" id="agnav-betrieb" onclick="showAgPage('betrieb')"><span class="bi">🏭</span>Betrieb</button>
   </div>
   <div class="toast" id="toast"></div>
 </div>
@@ -597,6 +665,219 @@ function showInstallBanner(){
 }
 function doInstallAG(){if(_installPrompt){_installPrompt.prompt();_installPrompt.userChoice.then(()=>{_installPrompt=null;const b=document.getElementById('installBanner');if(b)b.remove();});}}
 function dismissInstallAG(){const b=document.getElementById('installBanner');if(b)b.remove();sessionStorage.setItem('ag_install_dismissed','1');}
+
+// ═══════════════════════════════════
+// AG NAVIGATION
+// ═══════════════════════════════════
+function showAgPage(id){
+  document.querySelectorAll('.agpage').forEach(p=>p.classList.remove('active'));
+  document.getElementById('agpage-'+id).classList.add('active');
+  document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
+  const nb=document.getElementById('agnav-'+id);
+  if(nb) nb.classList.add('active');
+  if(id==='betrieb') initAgBetrieb();
+}
+function showAgBetriebTab(tab){
+  document.querySelectorAll('.abtab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#agBetriebTabs .stab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('abtab-'+tab).classList.add('active');
+  event.target.classList.add('active');
+  if(tab==='zeiten'){fillAgMonatSelect('agZeitMonat');loadAgZeiten();}
+  if(tab==='baustellen'){fillAgMonatSelect('agBsMonat');loadAgBaustellen();}
+  if(tab==='urlaub') loadAgUrlaub();
+  if(tab==='meldungen') loadAgMeldungen();
+}
+function initAgBetrieb(){
+  fillAgMonatSelect('agZeitMonat');
+  fillAgMonatSelect('agBsMonat');
+  const active=document.querySelector('.abtab.active');
+  if(!active||active.id==='abtab-zeiten') loadAgZeiten();
+}
+function fillAgMonatSelect(id){
+  const sel=document.getElementById(id);
+  if(!sel||sel.children.length>0) return;
+  const now=new Date();
+  for(let i=0;i<6;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const ym=d.toISOString().slice(0,7);
+    const label=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+    sel.innerHTML+='<option value="'+ym+'"'+(i===0?' selected':'')+'>'+label+'</option>';
+  }
+}
+function minToStr(m){const h=Math.floor(Math.abs(m)/60);const min=Math.abs(m)%60;return(m<0?'-':'')+h+'h '+String(min).padStart(2,'0')+'m';}
+
+// AG: ZEITEN
+function loadAgZeiten(){
+  const el=document.getElementById('agZeitenListe');
+  if(!el||!_azubis.length){el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
+  const ym=document.getElementById('agZeitMonat')?.value||new Date().toISOString().slice(0,7);
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('zeiterfassung')
+      .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
+      .orderBy('datum').get()
+      .then(snap=>({az, entries:snap.docs.map(d=>({id:d.id,...d.data()}))}))
+      .catch(()=>({az, entries:[]}))
+  );
+  Promise.all(promises).then(results=>{
+    let html='';
+    results.forEach(({az, entries})=>{
+      const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Azubi';
+      let totalIst=0;
+      html+='<div style="margin-bottom:12px;padding:10px;border:1px solid var(--brd);border-radius:10px">';
+      html+='<div style="font-size:.82rem;font-weight:800;margin-bottom:6px">'+esc(name)+'</div>';
+      if(!entries.length) html+='<div style="font-size:.7rem;color:var(--mu)">Keine Einträge</div>';
+      else {
+        entries.forEach(e=>{
+          const ist=e.istMinuten||0; totalIst+=ist;
+          const datDE=new Date(e.datum+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+          const manuell=e.manuell?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(245,158,11,.15);color:#d97706;border-radius:4px;font-weight:700;margin-left:4px">manuell'+(e.agBestaetigt?' ✓':' – offen')+'</span>':'';
+          const bestBtn=e.manuell&&!e.agBestaetigt?'<button onclick="agBestaetigeZeit(\''+az.id+'\',\''+e.datum+'\')" style="font-size:.5rem;padding:2px 8px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:4px">✓ Bestätigen</button>':'';
+          html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.7rem">'
+            +'<span style="color:var(--mu)">'+datDE+'</span>'
+            +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+manuell+bestBtn+'</span>'
+            +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?minToStr(ist):'…')+'</span></div>';
+        });
+        html+='<div style="margin-top:6px;font-size:.75rem;font-weight:800;text-align:right">Gesamt: '+minToStr(totalIst)+'</div>';
+      }
+      html+='</div>';
+    });
+    el.innerHTML=html||'<div class="empty">Keine Daten</div>';
+  });
+}
+function agBestaetigeZeit(tnId, datum){
+  db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum)
+    .update({agBestaetigt:true,agBestaetigtAm:Date.now()})
+    .then(()=>{toast('✓ Zeit bestätigt');loadAgZeiten();})
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// AG: BAUSTELLEN
+function loadAgBaustellen(){
+  const el=document.getElementById('agBsListe');
+  if(!el||!_azubis.length){el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
+  const ym=document.getElementById('agBsMonat')?.value||new Date().toISOString().slice(0,7);
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('baustellen')
+      .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
+      .orderBy('datum','desc').get()
+      .then(snap=>({az, entries:snap.docs.map(d=>d.data())}))
+      .catch(()=>({az, entries:[]}))
+  );
+  Promise.all(promises).then(results=>{
+    let html='';
+    results.forEach(({az, entries})=>{
+      if(!entries.length) return;
+      const name=((az.vorname||'')+' '+(az.nachname||'')).trim();
+      html+='<div style="margin-bottom:12px;padding:10px;border:1px solid var(--brd);border-radius:10px">';
+      html+='<div style="font-size:.82rem;font-weight:800;margin-bottom:6px">'+esc(name)+'</div>';
+      entries.forEach(e=>{
+        const datDE=new Date(e.datum+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+        html+='<div style="padding:4px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.7rem">'
+          +'<div style="display:flex;justify-content:space-between"><span style="font-weight:700">'+esc(e.baustelle||'')+'</span><span style="color:var(--mu)">'+datDE+'</span></div>'
+          +(e.adresse?'<div style="color:var(--mu)">📍 '+esc(e.adresse)+'</div>':'')
+          +(e.taetigkeit?'<div style="color:var(--mu)">🔧 '+esc(e.taetigkeit)+'</div>':'')
+          +'<div style="color:var(--acc);font-family:\'JetBrains Mono\',monospace">'+e.von+' – '+e.bis+'</div></div>';
+      });
+      html+='</div>';
+    });
+    el.innerHTML=html||'<div class="empty">Keine Baustellennachweise</div>';
+  });
+}
+
+// AG: URLAUB
+function loadAgUrlaub(){
+  const oEl=document.getElementById('agUrlaubOffen');
+  const aEl=document.getElementById('agUrlaubAlle');
+  if(!oEl||!aEl||!_azubis.length){if(oEl)oEl.innerHTML='<div class="empty">Keine Azubis</div>';return;}
+  oEl.innerHTML='<div class="empty">Lädt…</div>';aEl.innerHTML='<div class="empty">Lädt…</div>';
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .orderBy('beantragAm','desc').limit(20).get()
+      .then(snap=>({az, entries:snap.docs.map(d=>({docId:d.id,...d.data()}))}))
+      .catch(()=>({az, entries:[]}))
+  );
+  Promise.all(promises).then(results=>{
+    let offenHtml='',alleHtml='';
+    results.forEach(({az, entries})=>{
+      entries.forEach(e=>{
+        const name=((az.vorname||'')+' '+(az.nachname||'')).trim();
+        const vonDE=new Date(e.von+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+        const bisDE=new Date(e.bis+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+        const statusCol=e.status==='genehmigt'?'#059669':e.status==='abgelehnt'?'#ef4444':'#d97706';
+        const statusIcon=e.status==='genehmigt'?'✅':e.status==='abgelehnt'?'❌':'⏳';
+        const card='<div style="padding:10px;border:1.5px solid '+(e.status==='beantragt'?'rgba(245,158,11,.4)':'var(--brd)')+';border-radius:10px;margin-bottom:6px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+          +'<span style="font-size:.8rem;font-weight:700">'+esc(name)+'</span>'
+          +'<span style="font-size:.6rem;font-weight:700;color:'+statusCol+';padding:2px 8px;background:'+statusCol+'15;border-radius:4px">'+statusIcon+' '+e.status+'</span></div>'
+          +'<div style="font-size:.7rem;color:var(--mu);margin-top:4px">'+vonDE+' – '+bisDE+' · '+e.tage+' Tage'+(e.grund?' · '+esc(e.grund):'')+'</div>';
+        if(e.status==='beantragt'){
+          offenHtml+=card+'<div style="display:flex;gap:6px;margin-top:8px">'
+            +'<button onclick="agUrlaubEntscheidung(\''+az.id+'\',\''+e.docId+'\',\'genehmigt\')" style="flex:1;padding:8px;background:#059669;color:#fff;border:none;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Genehmigen</button>'
+            +'<button onclick="agUrlaubEntscheidung(\''+az.id+'\',\''+e.docId+'\',\'abgelehnt\')" style="flex:1;padding:8px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">❌ Ablehnen</button></div></div>';
+        } else { alleHtml+=card+'</div>'; }
+      });
+    });
+    oEl.innerHTML=offenHtml||'<div class="empty">Keine offenen Anträge</div>';
+    aEl.innerHTML=alleHtml||'<div class="empty">Keine Anträge</div>';
+  });
+}
+function agUrlaubEntscheidung(tnId, docId, status){
+  if(!confirm('Urlaubsantrag '+(status==='genehmigt'?'genehmigen':'ablehnen')+'?')) return;
+  db.collection('globalTN').doc(tnId).collection('urlaubsantraege').doc(docId)
+    .update({status, entschiedenAm:Date.now(), entschiedenVon:_firma||_email})
+    .then(()=>{
+      toast(status==='genehmigt'?'✅ Genehmigt':'❌ Abgelehnt');
+      db.collection('globalTN').doc(tnId).update({
+        benachrichtigungen:firebase.firestore.FieldValue.arrayUnion({
+          typ:'urlaub_'+status, text:'Dein Urlaubsantrag wurde '+status+'.',
+          datum:new Date().toISOString(), gelesen:false
+        })
+      }).catch(()=>{});
+      loadAgUrlaub();
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// AG: MELDUNGEN
+function loadAgMeldungen(){
+  const el=document.getElementById('agMeldListe');
+  if(!el||!_azubis.length){el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .orderBy('zeit','desc').limit(10).get()
+      .then(snap=>({az, entries:snap.docs.map(d=>({docId:d.id,...d.data()}))}))
+      .catch(()=>({az, entries:[]}))
+  );
+  Promise.all(promises).then(results=>{
+    const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
+    let all=[];
+    results.forEach(({az, entries})=>{
+      entries.forEach(e=>all.push({...e, azName:((az.vorname||'')+' '+(az.nachname||'')).trim(), tnId:az.id}));
+    });
+    all.sort((a,b)=>(b.zeit||'').localeCompare(a.zeit||''));
+    if(!all.length){el.innerHTML='<div class="empty">Keine Meldungen</div>';return;}
+    let html='';
+    all.forEach(m=>{
+      const zeit=m.zeit?new Date(m.zeit).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+      const gelesenBadge=m.gelesen?'<span style="font-size:.5rem;color:var(--mu)">✓ gelesen</span>':'<button onclick="agMeldGelesen(\''+m.tnId+'\',\''+m.docId+'\')" style="font-size:.5rem;padding:2px 8px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700">✓ Gelesen</button>';
+      html+='<div style="padding:8px;border-bottom:1px solid rgba(0,0,0,.05);display:flex;align-items:flex-start;gap:8px">'
+        +'<span style="font-size:1.1rem">'+(icons[m.type]||'💬')+'</span>'
+        +'<div style="flex:1;min-width:0"><div style="font-size:.75rem;font-weight:700">'+esc(m.azName)+'</div>'
+        +'<div style="font-size:.7rem;color:var(--tx)">'+esc(m.text||'')+'</div>'
+        +'<div style="font-size:.55rem;color:var(--mu);margin-top:2px">'+zeit+'</div></div>'
+        +'<div>'+gelesenBadge+'</div></div>';
+    });
+    el.innerHTML=html;
+  });
+}
+function agMeldGelesen(tnId, docId){
+  db.collection('globalTN').doc(tnId).collection('betriebMeldungen').doc(docId)
+    .update({gelesen:true,gelesenAm:Date.now(),gelesenVon:_firma||_email})
+    .then(()=>{toast('✓ Gelesen');loadAgMeldungen();})
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
 </script>
 </body>
 </html>
