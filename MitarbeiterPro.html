@@ -15,7 +15,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 :root{--bg:#0f1219;--sur:#181d2a;--sur2:#1e2536;--brd:#2a3148;--acc:#10b981;--acc2:#34d399;--bad:#ef4444;--tx:#e8ecf4;--mu:#6b7a99;--warn:#f59e0b;}
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -169,33 +168,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
-<!-- QR KURS BEITRETEN MODAL -->
-<div id="qrJoinOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9997;align-items:center;justify-content:center;padding:20px">
-  <div style="max-width:400px;width:100%;background:var(--sur);border:2px solid var(--brd);border-radius:16px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.4);max-height:90vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <div style="font-size:1.1rem;font-weight:800;color:var(--tx)">📱 Kurs beitreten</div>
-      <button onclick="closeQrJoin()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--mu)">✕</button>
-    </div>
-    <div style="font-size:.75rem;color:var(--mu);line-height:1.6;margin-bottom:14px">Scanne den QR-Code im Klassenraum oder gib den Beitritts-Link ein.</div>
-    <!-- QR Scanner -->
-    <div id="qrScannerWrap" style="margin-bottom:14px">
-      <div id="qrReader" style="width:100%;border-radius:10px;overflow:hidden"></div>
-      <div id="qrScanStatus" style="font-size:.7rem;color:var(--mu);text-align:center;margin-top:6px"></div>
-    </div>
-    <button onclick="startQrScanner()" id="qrStartBtn" style="width:100%;padding:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border:none;border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:14px">📷 Kamera starten</button>
-    <!-- Oder-Trenner -->
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <div style="flex:1;height:1px;background:var(--brd)"></div>
-      <div style="font-size:.65rem;color:var(--mu);font-weight:600">ODER</div>
-      <div style="flex:1;height:1px;background:var(--brd)"></div>
-    </div>
-    <!-- Link eingeben -->
-    <div style="font-size:.7rem;font-weight:700;color:var(--tx);margin-bottom:6px">Link eingeben</div>
-    <input class="fi" id="qrJoinLink" placeholder="Link einfügen (z.B. ...?join=abc123)" style="margin-bottom:8px">
-    <button onclick="joinFromLink()" style="width:100%;padding:10px;background:rgba(16,185,129,.15);color:#059669;border:1.5px solid rgba(16,185,129,.3);border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✓ Kurs beitreten</button>
-    <div class="err" id="qrJoinErr" style="margin-top:6px"></div>
-  </div>
-</div>
 
 <!-- KRANKMELDUNG BESTÄTIGUNG -->
 <div id="krankOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9998;align-items:center;justify-content:center;padding:20px">
@@ -456,17 +428,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
     </div>
 
-    <!-- KURSDETAIL -->
-    <div class="page" id="page-kursdetail">
-      <button onclick="showPage('home')" style="background:none;border:none;color:var(--acc);font-size:.78rem;font-weight:600;cursor:pointer;padding:0;margin-bottom:12px">← Zurück</button>
-      <div id="kdContent"><div class="empty">Lädt…</div></div>
-    </div>
-
     <!-- HILFE -->
     <div class="page" id="page-hilfe">
       <div style="text-align:center;margin-bottom:16px">
-        <div style="font-size:1.5rem;font-weight:800">Azubi<span style="color:var(--acc)">Pro</span></div>
-        <div style="font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace">Dein Lehrgangsportal</div>
+        <div style="font-size:1.5rem;font-weight:800">Mitarbeiter<span style="color:var(--acc)">Pro</span></div>
+        <div style="font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace">Zeiterfassung & Betrieb</div>
         <div style="font-size:.6rem;color:var(--mu);margin-top:4px;border-top:1px solid var(--brd);padding-top:6px;display:inline-block">by <span style="font-weight:700;color:var(--tx)">Stefan Mohr</span></div>
       </div>
       <div class="card">
@@ -535,7 +501,7 @@ const auth=firebase.auth();
 const db=firebase.firestore();
 db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
 const st=firebase.storage();
-let _uid=null, _email=null, _tnId=null, _tnData=null, _kurse=[];
+let _uid=null, _email=null, _tnId=null, _tnData=null;
 
 // ISO → deutsch
 function fmtDE(d){ if(!d||d.length<10) return d||'?'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
@@ -543,15 +509,12 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 
 // ── Auth ──
 auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
-let _registering=false; // Guard: verhindert signOut während Selbstregistrierung
 auth.onAuthStateChanged(u=>{
-  if(_registering) return; // Registrierung läuft – nicht eingreifen
   if(u){
     _uid=u.uid;
     _email=u.email.toLowerCase();
     // Prüfe ob TN existiert
     findTN(_email).then(found=>{
-      if(_registering) return;
       if(found){
         document.getElementById('loginWrap').style.display='none';
         document.getElementById('joinWrap').style.display='none';
@@ -565,7 +528,7 @@ auth.onAuthStateChanged(u=>{
     });
   } else {
     _uid=null; _tnId=null; _tnData=null;
-    if(!_registering&&!_joinKursId){
+    {
       document.getElementById('loginWrap').style.display='flex';
     }
     document.getElementById('app').classList.remove('show');
@@ -603,247 +566,6 @@ function doReset(){
 function doLogout(){ if(confirm('Wirklich abmelden?')) auth.signOut(); }
 function showErr(m){ const el=document.getElementById('lErr'); el.style.color='var(--bad)'; el.textContent=m; }
 
-// ── SELF-REGISTRATION (QR Join) ──
-let _joinKursId=null;
-(function checkJoinParam(){
-  const params=new URLSearchParams(window.location.search);
-  const joinId=params.get('join');
-  if(!joinId) return;
-  _joinKursId=joinId;
-  const infoEl=document.getElementById('joinKursInfo');
-  // Kursinfo laden (braucht Auth – versuchen, bei Fehler trotzdem Registrierung erlauben)
-  db.collection('shared').doc('kurse').collection('list').doc(joinId).get().then(doc=>{
-    if(!doc.exists){
-      infoEl.innerHTML='<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Kurs-ID: '+esc(joinId.substring(0,8))+'…</div>';
-      return;
-    }
-    const k=doc.data();
-    infoEl.innerHTML=
-      '<div style="font-weight:800;font-size:.88rem">'+esc(k.name||k.lehrgangsart||'Lehrgang')+'</div>'
-      +'<div style="font-size:.68rem;color:var(--mu);margin-top:4px;font-family:\'JetBrains Mono\',monospace">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div>'
-      +(k.ausbilderName?'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">Ausbilder: '+esc(k.ausbilderName)+'</div>':'');
-  }).catch(()=>{
-    infoEl.innerHTML='<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Registriere dich um dem Lehrgang beizutreten.</div>';
-  });
-  // Join-Screen anzeigen statt Login
-  document.getElementById('loginWrap').style.display='none';
-  document.getElementById('joinWrap').style.display='flex';
-})();
-
-function showNormalLogin(){
-  document.getElementById('joinWrap').style.display='none';
-  document.getElementById('loginWrap').style.display='flex';
-}
-
-function submitJoinLogin(){
-  const email=(document.getElementById('jLoginEmail').value||'').trim();
-  const pass=document.getElementById('jLoginPass').value||'';
-  const errEl=document.getElementById('jLoginErr');
-  errEl.textContent='';
-  if(!email||!pass){errEl.textContent='Bitte E-Mail und Passwort eingeben';return;}
-  if(!_joinKursId){errEl.textContent='Kein Kurs-Link erkannt';return;}
-
-  errEl.style.color='var(--acc)';
-  errEl.textContent='Wird angemeldet…';
-  _registering=true;
-
-  auth.signInWithEmailAndPassword(email, pass).then(cred=>{
-    // TN finden
-    return db.collection('globalTN').where('email','==',email.toLowerCase()).limit(1).get().then(snap=>{
-      if(snap.empty){
-        errEl.style.color='var(--bad)';
-        errEl.textContent='Kein Teilnehmer-Konto für diese E-Mail gefunden.';
-        _registering=false;
-        return;
-      }
-      const tnDoc=snap.docs[0];
-      const tnId=tnDoc.id;
-      const tnData=tnDoc.data();
-
-      // Prüfe ob bereits in diesem Kurs
-      if(tnData.aktiverKursId===_joinKursId){
-        errEl.style.color='var(--acc)';
-        errEl.textContent='✓ Du bist bereits in diesem Kurs!';
-        _registering=false;
-        _joinKursId=null;
-        window.history.replaceState({},'',window.location.pathname);
-        _uid=cred.user.uid;
-        _email=email.toLowerCase();
-        _tnId=tnId;
-        _tnData=tnData;
-        document.getElementById('joinWrap').style.display='none';
-        document.getElementById('app').classList.add('show');
-        document.getElementById('hdrUser').textContent=_email.split('@')[0];
-        loadData();
-        return;
-      }
-
-      // Kursinfo laden für History
-      return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get().then(kDoc=>{
-        const kd=kDoc.exists?kDoc.data():{};
-        const histEntry={
-          kursId: _joinKursId,
-          kursName: kd.name||kd.lehrgangsart||'Lehrgang',
-          von: kd.von||'',
-          bis: kd.bis||'',
-          addedAt: Date.now()
-        };
-        const hist=tnData.kursHistory||[];
-        if(!hist.some(h=>h.kursId===_joinKursId)) hist.push(histEntry);
-
-        // globalTN updaten – Sitzplatz zurücksetzen für neuen Kurs
-        return db.collection('globalTN').doc(tnId).update({
-          aktiverKursId: _joinKursId,
-          kursHistory: hist,
-          wunschSitzplatz: ''
-        });
-      }).then(()=>{
-        // In Kurs-TN eintragen
-        return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId)
-          .collection('teilnehmer').doc(tnId).set({
-            vorname: tnData.vorname||'',
-            nachname: tnData.nachname||'',
-            firma: tnData.firma||'',
-            beruf: tnData.beruf||'',
-            ausbjahr: tnData.ausbjahr||'',
-            kontaktEmail: tnData.kontaktEmail||tnData.email||'',
-            kontaktTelefon: tnData.kontaktTelefon||'',
-            status: 'active',
-            addedAt: Date.now()
-          },{merge:true});
-      }).then(()=>{
-        errEl.style.color='var(--acc)';
-        errEl.textContent='✓ Lehrgang beigetreten!';
-        _registering=false;
-        window.history.replaceState({},'',window.location.pathname);
-        const savedKursId=_joinKursId;
-        _joinKursId=null;
-        _uid=cred.user.uid;
-        _email=email.toLowerCase();
-        _tnId=tnId;
-        // Reload TN data
-        return db.collection('globalTN').doc(tnId).get().then(doc=>{
-          _tnData=doc.exists?doc.data():tnData;
-          document.getElementById('joinWrap').style.display='none';
-          document.getElementById('app').classList.add('show');
-          document.getElementById('hdrUser').textContent=_email.split('@')[0];
-          loadData();
-        });
-      });
-    });
-  }).catch(err=>{
-    _registering=false;
-    errEl.style.color='var(--bad)';
-    const map={'auth/user-not-found':'E-Mail oder Passwort falsch','auth/wrong-password':'E-Mail oder Passwort falsch','auth/invalid-credential':'E-Mail oder Passwort falsch','auth/invalid-email':'Ungültige E-Mail','auth/too-many-requests':'Zu viele Versuche – kurz warten'};
-    errEl.textContent=map[err.code]||'Fehler: '+err.message;
-  });
-}
-
-function submitJoinRegistration(){
-  const vorname=(document.getElementById('jVorname').value||'').trim();
-  const nachname=(document.getElementById('jNachname').value||'').trim();
-  const firma=(document.getElementById('jFirma').value||'').trim();
-  const beruf=(document.getElementById('jBeruf').value||'').trim();
-  const ausbjahr=document.getElementById('jLehrjahr').value||'';
-  const geburtsdatum=document.getElementById('jGeburt').value||'';
-  const email=(document.getElementById('jEmail').value||'').trim().toLowerCase();
-  const telefon=(document.getElementById('jTelefon').value||'').trim();
-  const passwort=document.getElementById('jPasswort').value||'';
-  const errEl=document.getElementById('jErr');
-  errEl.textContent='';
-
-  if(!vorname||!nachname){errEl.textContent='Bitte Vor- und Nachname eingeben';return;}
-  if(!firma){errEl.textContent='Bitte Betrieb angeben';return;}
-  if(!email){errEl.textContent='Bitte E-Mail eingeben';return;}
-  if(passwort.length<6){errEl.textContent='Passwort muss mindestens 6 Zeichen haben';return;}
-  if(!document.getElementById('jDsgvo')?.checked){errEl.textContent='Bitte Datenschutzerklärung und Nutzungsbedingungen zustimmen';return;}
-  if(!_joinKursId){errEl.textContent='Kein Kurs-Link erkannt';return;}
-
-  errEl.style.color='var(--acc)';
-  errEl.textContent='Wird registriert…';
-
-  _registering=true; // Auth-Listener blockieren
-
-  // 1. Firebase Auth Konto erstellen
-  auth.createUserWithEmailAndPassword(email, passwort).then(cred=>{
-    const uid=cred.user.uid;
-    // 2. globalTN Dokument erstellen
-    const tnData={
-      vorname, nachname, firma, beruf, ausbjahr, geburtsdatum,
-      email: email,
-      kontaktEmail: email,
-      kontaktTelefon: telefon,
-      aktiverKursId: _joinKursId,
-      selfRegistered: true,
-      registeredAt: Date.now(),
-      dsgvoZustimmung: {
-        datenschutz: true,
-        nutzungsbedingungen: true,
-        zeitpunkt: new Date().toISOString(),
-        ip: '',
-        version: '1.0'
-      }
-    };
-    // Kursinfo für History laden
-    return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get().then(kDoc=>{
-      const kd=kDoc.exists?kDoc.data():{};
-      tnData.kursHistory=[{
-        kursId: _joinKursId,
-        kursName: kd.name||kd.lehrgangsart||'Lehrgang',
-        von: kd.von||'',
-        bis: kd.bis||'',
-        addedAt: Date.now()
-      }];
-      return db.collection('globalTN').add(tnData);
-    }).then(ref=>{
-      // 3. In Kurs-TN-Subcollection eintragen
-      return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId)
-        .collection('teilnehmer').doc(ref.id).set({
-          vorname, nachname, firma, beruf, ausbjahr,
-          kontaktEmail: email,
-          kontaktTelefon: telefon,
-          status: 'active',
-          selfRegistered: true,
-          addedAt: Date.now()
-        }).then(()=>{
-          // 4. users-Dokument mit azubi-Rolle
-          return db.collection('users').doc(uid).set({email: email, role:'arbeitnehmer'},{merge:true});
-        });
-    });
-  }).then(()=>{
-    errEl.style.color='var(--acc)';
-    errEl.textContent='✓ Registrierung erfolgreich!';
-    // URL bereinigen
-    window.history.replaceState({},'',window.location.pathname);
-    _joinKursId=null;
-    _registering=false;
-    // Auth-Listener manuell triggern
-    const u=auth.currentUser;
-    if(u){
-      _uid=u.uid;
-      _email=u.email.toLowerCase();
-      findTN(_email).then(found=>{
-        if(found){
-          document.getElementById('joinWrap').style.display='none';
-          document.getElementById('loginWrap').style.display='none';
-          document.getElementById('app').classList.add('show');
-          document.getElementById('hdrUser').textContent=_email.split('@')[0];
-          loadData();
-        }
-      });
-    }
-  }).catch(err=>{
-    _registering=false;
-    errEl.style.color='var(--bad)';
-    const map={
-      'auth/email-already-in-use':'Diese E-Mail ist bereits registriert. Bitte über "Anmelden" einloggen.',
-      'auth/invalid-email':'Ungültige E-Mail-Adresse',
-      'auth/weak-password':'Passwort zu schwach (min. 6 Zeichen)'
-    };
-    errEl.textContent=map[err.code]||'Fehler: '+err.message;
-  });
-}
-
 // ── Navigation ──
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -871,201 +593,9 @@ function loadData(){
 
   // Lade zugewiesene Kurse
   loadHVKontakt();
-  checkSitzplatzPopup();
   checkDsgvoConsent();
   checkAzubiBadges();
 
-}
-
-function checkSitzplatzPopup(){
-  // Popup entfernt – Sitzplatz wird jetzt direkt in der Kurs-Karte angezeigt
-  const el=document.getElementById('sitzplatzPopup');
-  if(el) el.innerHTML='';
-}
-
-function saveHomeSitzplatz(){
-  const nr=(document.getElementById('homeSitzplatz')?.value||'').trim();
-  if(!nr){toast('Bitte Platznummer eingeben','bad');return;}
-  if(!_tnId){toast('Nicht angemeldet','bad');return;}
-  db.collection('globalTN').doc(_tnId).update({wunschSitzplatz:nr}).then(()=>{
-    _tnData.wunschSitzplatz=nr;
-    if(_tnData.aktiverKursId){
-      db.collection('shared').doc('kurse').collection('list').doc(_tnData.aktiverKursId)
-        .collection('teilnehmer').doc(_tnId).update({wunschSitzplatz:nr}).catch(()=>{});
-    }
-    toast('✓ Platz '+nr+' gespeichert!');
-    loadKurse(); // Karte neu rendern
-  }).catch(err=>toast('Fehler: '+err.message,'bad'));
-}
-
-function saveSitzplatzPopup(){
-  saveHomeSitzplatz();
-}
-
-function sendMeldung(type, kursId){
-  if(!_tnId||!kursId) return;
-  // Krankmeldung: erst AG-Hinweis anzeigen
-  if(type==='krank'){
-    _pendingKrankKursId=kursId;
-    document.getElementById('krankOverlay').style.display='flex';
-    document.getElementById('krankCheck').checked=false;
-    return;
-  }
-  // Bestätigung für spaeter/frueher
-  const labels={'spaeter':'Meldung "Komme später" senden?','frueher':'Meldung "Gehe früher" senden?'};
-  if(labels[type]){
-    if(!confirm(labels[type])) return;
-  }
-  _doSendMeldung(type, kursId);
-}
-let _pendingKrankKursId=null;
-function confirmKrankmeldung(){
-  if(!document.getElementById('krankCheck').checked){
-    document.getElementById('krankErr').textContent='Bitte Checkbox bestätigen';
-    return;
-  }
-  document.getElementById('krankOverlay').style.display='none';
-  // Betrieb-Meldung?
-  if(_pendingBetriebMeld){
-    _doSendBetriebMeldung(_pendingBetriebMeld.type, _pendingBetriebMeld.text);
-    _pendingBetriebMeld=null;
-    return;
-  }
-  // ÜBL-Kurs-Meldung
-  _doSendMeldung('krank', _pendingKrankKursId);
-}
-function _doSendMeldung(type, kursId){
-  if(!_tnId||!kursId) return;
-  const msgs = {
-    'spaeter': '🕐 Ich komme heute später',
-    'frueher': '🚶 Ich gehe heute früher',
-    'krank': '🤒 Ich bin heute krank'
-  };
-  let text = msgs[type]||'';
-  if(type==='text'){
-    const inp=document.getElementById('meldungText');
-    text=(inp?.value||'').trim();
-    if(!text){toast('Bitte Nachricht eingeben','bad');return;}
-  }
-  const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Azubi';
-  const meldung = {
-    type, text, name,
-    tnId: _tnId,
-    zeit: new Date().toISOString(),
-    gelesen: false
-  };
-  db.collection('shared').doc('kurse').collection('list').doc(kursId)
-    .collection('meldungen').add(meldung).then(()=>{
-      const st=document.getElementById('meldungStatus');
-      if(st){st.textContent='✓ Meldung gesendet';st.style.display='';}
-      if(type==='text'){const inp=document.getElementById('meldungText');if(inp)inp.value='';}
-      setTimeout(()=>{if(st)st.style.display='none';},3000);
-      toast('Meldung gesendet ✓');
-    }).catch(err=>toast('Fehler: '+err.message,'bad'));
-}
-
-// ── QR KURS BEITRETEN ──
-let _qrScanner=null;
-function openQrJoin(){
-  document.getElementById('qrJoinOverlay').style.display='flex';
-  document.getElementById('qrJoinErr').textContent='';
-  document.getElementById('qrJoinLink').value='';
-  document.getElementById('qrScanStatus').textContent='';
-  document.getElementById('qrStartBtn').style.display='';
-}
-function closeQrJoin(){
-  if(_qrScanner){try{_qrScanner.stop();}catch(e){}; _qrScanner=null;}
-  document.getElementById('qrJoinOverlay').style.display='none';
-}
-function startQrScanner(){
-  const errEl=document.getElementById('qrJoinErr');
-  const statusEl=document.getElementById('qrScanStatus');
-  errEl.textContent='';
-  if(typeof Html5Qrcode==='undefined'){
-    errEl.textContent='QR-Scanner konnte nicht geladen werden. Bitte Link unten eingeben.';
-    return;
-  }
-  document.getElementById('qrStartBtn').style.display='none';
-  statusEl.textContent='Kamera wird gestartet…';
-  _qrScanner=new Html5Qrcode('qrReader');
-  _qrScanner.start(
-    {facingMode:'environment'},
-    {fps:10, qrbox:{width:250,height:250}},
-    (text)=>{
-      // QR erkannt
-      _qrScanner.stop().then(()=>{_qrScanner=null;}).catch(()=>{});
-      statusEl.textContent='✓ QR-Code erkannt!';
-      processJoinUrl(text);
-    },
-    ()=>{}
-  ).catch(err=>{
-    statusEl.textContent='';
-    document.getElementById('qrStartBtn').style.display='';
-    errEl.textContent='Kamera nicht verfügbar: '+(err.message||err)+'. Bitte Link unten eingeben.';
-  });
-}
-function joinFromLink(){
-  const link=(document.getElementById('qrJoinLink').value||'').trim();
-  if(!link){document.getElementById('qrJoinErr').textContent='Bitte Link eingeben';return;}
-  processJoinUrl(link);
-}
-function processJoinUrl(url){
-  const errEl=document.getElementById('qrJoinErr');
-  // join-Parameter extrahieren
-  let kursId=null;
-  try{
-    const u=new URL(url);
-    kursId=u.searchParams.get('join');
-  }catch(e){
-    // Vielleicht ist es direkt eine ID
-    if(url.length>10&&!url.includes(' ')) kursId=url;
-  }
-  if(!kursId){errEl.textContent='Kein gültiger Kurs-Link erkannt';return;}
-  errEl.style.color='var(--acc)';
-  errEl.textContent='Trete Kurs bei…';
-  // Prüfen ob Kurs existiert
-  db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(kDoc=>{
-    if(!kDoc.exists){errEl.style.color='var(--bad)';errEl.textContent='Kurs nicht gefunden';return;}
-    const kd=kDoc.data();
-    // Prüfen ob bereits im Kurs
-    if(_tnData.aktiverKursId===kursId || (_tnData.kursHistory||[]).some(h=>h.kursId===kursId)){
-      errEl.style.color='var(--bad)';errEl.textContent='Du bist bereits in diesem Kurs eingetragen';
-      return;
-    }
-    // Kurshistorie updaten
-    const histEntry={kursId, kursName:kd.name||kd.lehrgangsart||'Lehrgang', von:kd.von||'', bis:kd.bis||'', addedAt:Date.now()};
-    const hist=(_tnData.kursHistory||[]).slice();
-    hist.push(histEntry);
-    return db.collection('globalTN').doc(_tnId).update({
-      aktiverKursId: kursId,
-      kursHistory: hist,
-      wunschSitzplatz: ''
-    }).then(()=>{
-      // In Kurs-TN eintragen
-      return db.collection('shared').doc('kurse').collection('list').doc(kursId)
-        .collection('teilnehmer').doc(_tnId).set({
-          vorname:_tnData.vorname||'',
-          nachname:_tnData.nachname||'',
-          firma:_tnData.firma||'',
-          beruf:_tnData.beruf||'',
-          ausbjahr:_tnData.ausbjahr||'',
-          kontaktEmail:_tnData.kontaktEmail||_tnData.email||'',
-          kontaktTelefon:_tnData.kontaktTelefon||'',
-          status:'active',
-          addedAt:Date.now()
-        },{merge:true});
-    }).then(()=>{
-      _tnData.aktiverKursId=kursId;
-      _tnData.kursHistory=hist;
-      _tnData.wunschSitzplatz='';
-      closeQrJoin();
-      toast('✓ Lehrgang beigetreten: '+(kd.name||kd.lehrgangsart||'Kurs'));
-      loadKurse();
-    });
-  }).catch(err=>{
-    errEl.style.color='var(--bad)';
-    errEl.textContent='Fehler: '+err.message;
-  });
 }
 
 // ═══════════════════════════════════
@@ -1764,152 +1294,6 @@ function loadHVKontakt(){
   }).catch(()=>{ el.innerHTML='<div class="empty">Kontaktdaten nicht verfügbar</div>'; });
 }
 
-function loadKurse(){
-  const el=document.getElementById('homeKurse');
-  if(!_tnData) return;
-
-  // Alle Kurse aus kursHistory + aktiverKursId
-  const kursIds=new Set();
-  if(_tnData.aktiverKursId) kursIds.add(_tnData.aktiverKursId);
-  // Nur nicht-abgebrochene Kurse aus Historie laden
-  (_tnData.kursHistory||[]).forEach(h=>{ if(h.kursId&&!h.abgebrochen&&!h.entfernt&&!h.nichtErschienen) kursIds.add(h.kursId); });
-
-  if(!kursIds.size){ el.innerHTML='<div class="empty">Aktuell keine Lehrgänge zugewiesen.<br>Du wirst benachrichtigt wenn ein neuer Lehrgang startet.</div>'; return; }
-
-  el.innerHTML='<div class="empty">Lädt…</div>';
-  const today=localDate();
-
-  // Alle Kurse laden
-  const promises=[...kursIds].map(id=>
-    db.collection('shared').doc('kurse').collection('list').doc(id).get()
-      .then(doc=>doc.exists?{id:doc.id,...doc.data()}:null)
-      .catch(()=>null)
-  );
-
-  Promise.all(promises).then(results=>{
-    _kurse=results.filter(Boolean);
-    _kurse.sort((a,b)=>(b.von||'')>(a.von||'')?1:-1);
-
-    // Stale aktiverKursId aufräumen (Kurs existiert nicht mehr in Firestore)
-    if(_tnData.aktiverKursId && !_kurse.find(k=>k.id===_tnData.aktiverKursId)){
-      db.collection('globalTN').doc(_tnId).update({
-        aktiverKursId: firebase.firestore.FieldValue.delete()
-      }).catch(()=>{});
-      _tnData.aktiverKursId=null;
-    }
-
-    if(!_kurse.length){ el.innerHTML='<div class="empty">Aktuell keine Lehrgänge zugewiesen.<br>Du wirst benachrichtigt wenn ein neuer Lehrgang startet.</div>'; return; }
-
-    // Bestätigungsstatus für jeden Kurs laden
-    const confirmPromises=_kurse.map(k=>
-      db.collection('shared').doc('kurse').collection('list').doc(k.id)
-        .collection('teilnehmer').doc(_tnId).get()
-        .then(doc=>{ k._tnExists=doc.exists; k._tnDoc=doc.exists?doc.data():{}; })
-        .catch(()=>{ k._tnExists=false; k._tnDoc={}; })
-    );
-
-    return Promise.all(confirmPromises).then(()=>{
-    // Auto-Bereinigung: Kurse entfernen wenn TN nicht mehr in Teilnehmer-Subcollection
-    const orphaned=_kurse.filter(k=>k._tnExists===false);
-    if(orphaned.length){
-      const cleanHist=(_tnData.kursHistory||[]).filter(h=>!orphaned.find(o=>o.id===h.kursId));
-      const cleanUpdates={kursHistory:cleanHist};
-      if(_tnData.aktiverKursId && orphaned.find(o=>o.id===_tnData.aktiverKursId)){
-        cleanUpdates.aktiverKursId=firebase.firestore.FieldValue.delete();
-        _tnData.aktiverKursId=null;
-      }
-      _tnData.kursHistory=cleanHist;
-      _kurse=_kurse.filter(k=>!orphaned.find(o=>o.id===k.id));
-      db.collection('globalTN').doc(_tnId).update(cleanUpdates).catch(()=>{});
-    }
-
-    const aktiv=_kurse.find(k=>k.von&&k.bis&&today>=k.von&&today<=k.bis);
-    const naechster=_kurse.find(k=>k.von&&k.von>today);
-    const highlight=aktiv||naechster;
-
-    let html='';
-
-    // Unbestätigte Kurse ganz oben
-    const unconfirmed=_kurse.filter(k=>!k._tnDoc?.bestaetigtAm && (k.von>=today || (k.von&&k.bis&&today>=k.von&&today<=k.bis)));
-    if(unconfirmed.length){
-      html+='<div style="margin-bottom:14px">';
-      unconfirmed.forEach(k=>{
-        html+='<div class="kurs-card kurs-unconfirmed" style="cursor:default">';
-        html+='<div style="font-size:.6rem;font-weight:700;color:var(--warn);margin-bottom:6px">⚠️ NEUER LEHRGANG – BITTE BESTÄTIGEN</div>';
-        html+='<div class="kurs-name">'+esc(k.name||k.lehrgangsart||'Lehrgang')+'</div>';
-        html+='<div class="kurs-dates">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div>';
-        html+='<div class="kurs-ausb">'+(k.ausbilderName?'Ausbilder: '+esc(k.ausbilderName):'')+'</div>';
-        html+='<button class="confirm-btn" onclick="event.stopPropagation();confirmKurs(\''+k.id+'\',\''+esc(k.name||k.lehrgangsart||'')+'\')">✅ Zur Kenntnis genommen</button>';
-        html+='</div>';
-      });
-      html+='</div>';
-    }
-
-    if(highlight && !unconfirmed.find(u=>u.id===highlight.id)){
-      const isAktiv=aktiv&&highlight.id===aktiv.id;
-      const daysUntil=naechster&&!isAktiv?Math.ceil((new Date(naechster.von)-new Date())/(1000*60*60*24)):0;
-      html+='<div class="kurs-card" onclick="showKursDetail(\''+highlight.id+'\')">';
-      html+='<div class="kurs-name">'+esc(highlight.name||highlight.lehrgangsart||'Lehrgang')+'</div>';
-      html+='<div class="kurs-dates">'+fmtDE(highlight.von)+' – '+fmtDE(highlight.bis)+'</div>';
-      html+='<div class="kurs-ausb">'+(highlight.ausbilderName?'Ausbilder: '+esc(highlight.ausbilderName):'')+'</div>';
-      if(isAktiv) html+='<div class="kurs-countdown kurs-status-laufend">● Aktuell laufend</div>';
-      else if(daysUntil>0) html+='<div class="kurs-countdown kurs-status-geplant">Startet in '+daysUntil+' Tag'+(daysUntil>1?'en':'')+'</div>';
-      if(highlight._tnDoc&&highlight._tnDoc.werkzeugStatus==='fehlt'){
-        html+='<div style="margin-top:6px;padding:6px 10px;background:rgba(239,68,68,.06);border:2px solid rgba(239,68,68,.25);border-radius:7px;font-size:.72rem;color:#dc2626;font-weight:700">🔧 Werkzeug unvollständig'+(highlight._tnDoc.werkzeugFehlt?' – fehlt: '+esc(highlight._tnDoc.werkzeugFehlt):'')+'</div>';
-      }
-      // Sitzplatz-Feld immer anzeigen
-      const spVal=_tnData?.wunschSitzplatz||'';
-      html+='<div onclick="event.stopPropagation()" style="margin-top:8px;padding:10px 12px;background:rgba(59,130,246,.05);border:2px solid rgba(59,130,246,.2);border-radius:10px;display:flex;align-items:center;gap:10px">'
-        +'<span style="font-size:.78rem;font-weight:700;color:var(--acc)">🪑 Mein Platz:</span>'
-        +'<input id="homeSitzplatz" type="number" min="1" value="'+esc(spVal)+'" placeholder="Nr." style="width:60px;padding:6px 8px;border:2px solid rgba(59,130,246,.3);border-radius:7px;font-size:.88rem;font-weight:800;text-align:center;background:var(--sur);color:var(--tx);font-family:\'Sora\',sans-serif">'
-        +'<button onclick="saveHomeSitzplatz()" style="padding:6px 14px;background:var(--acc);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">'+(spVal?'Ändern':'Speichern')+'</button>'
-        +(spVal?'<span style="font-size:.6rem;color:#10b981;font-weight:600">✓</span>':'')
-        +'</div>';
-      // Meldung an Ausbilder
-      html+='<div onclick="event.stopPropagation()" style="margin-top:8px;padding:10px 12px;background:rgba(139,92,246,.04);border:2px solid rgba(139,92,246,.15);border-radius:10px">'
-        +'<div style="font-size:.7rem;font-weight:700;color:#7c3aed;margin-bottom:8px">💬 Meldung an Ausbilder</div>'
-        +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'
-        +'<button onclick="sendMeldung(\'spaeter\',\''+highlight.id+'\')" style="padding:5px 10px;background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.3);border-radius:7px;font-size:.68rem;font-weight:600;color:#d97706;cursor:pointer;font-family:\'Sora\',sans-serif">🕐 Komme später</button>'
-        +'<button onclick="sendMeldung(\'frueher\',\''+highlight.id+'\')" style="padding:5px 10px;background:rgba(99,102,241,.1);border:1.5px solid rgba(99,102,241,.3);border-radius:7px;font-size:.68rem;font-weight:600;color:#6366f1;cursor:pointer;font-family:\'Sora\',sans-serif">🚶 Gehe früher</button>'
-        +'<button onclick="sendMeldung(\'krank\',\''+highlight.id+'\')" style="padding:5px 10px;background:rgba(239,68,68,.1);border:1.5px solid rgba(239,68,68,.3);border-radius:7px;font-size:.68rem;font-weight:600;color:#ef4444;cursor:pointer;font-family:\'Sora\',sans-serif">🤒 Bin krank</button>'
-        +'</div>'
-        +'<div style="display:flex;gap:6px">'
-        +'<input id="meldungText" type="text" placeholder="Nachricht an Ausbilder…" style="flex:1;padding:6px 10px;border:1.5px solid rgba(139,92,246,.25);border-radius:7px;font-size:.72rem;font-family:\'Sora\',sans-serif;background:var(--sur);color:var(--tx)">'
-        +'<button onclick="sendMeldung(\'text\',\''+highlight.id+'\')" style="padding:6px 12px;background:#7c3aed;color:#fff;border:none;border-radius:7px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">Senden</button>'
-        +'</div>'
-        +'<div id="meldungStatus" style="font-size:.6rem;color:#10b981;margin-top:4px;display:none"></div>'
-        +'</div>';
-      html+='</div>';
-    }
-
-    // Alle Kurse als Liste (ohne den hervorgehobenen oben)
-    const listeKurse=_kurse.filter(k=>{
-      if(highlight && k.id===highlight.id && !unconfirmed.find(u=>u.id===k.id)) return false;
-      return true;
-    });
-    if(listeKurse.length){
-    html+='<div class="card"><div class="card-title">📅 Weitere Lehrgänge ('+listeKurse.length+')</div>';
-    listeKurse.forEach(k=>{
-      let st='beendet', stLabel='Beendet';
-      if(k.von&&k.bis&&today>=k.von&&today<=k.bis){ st='laufend'; stLabel='● Laufend'; }
-      else if(k.von&&k.von>today){ st='geplant'; stLabel='◐ Geplant'; }
-      const confirmed=!!k._tnDoc?.bestaetigtAm;
-      html+='<div class="hist-item" style="cursor:pointer" onclick="showKursDetail(\''+k.id+'\')">';
-      html+='<div class="hist-dot" style="background:'+(st==='laufend'?'#10b981':st==='geplant'?'#3b82f6':'#6b7a99')+'"></div>';
-      html+='<div style="flex:1"><div class="hist-name">'+esc(k.name||k.lehrgangsart||'?')+(confirmed?'':' ⚠️')+'</div>';
-      html+='<div class="hist-dates">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div></div>';
-      html+='<span class="kurs-countdown kurs-status-'+st+'" style="font-size:.55rem">'+stLabel+'</span>';
-      if(k._tnDoc&&k._tnDoc.werkzeugStatus==='fehlt') html+='<span style="font-size:.5rem;color:#dc2626;font-weight:700;margin-left:4px">🔧</span>';
-      html+='</div>';
-    });
-    html+='</div>';
-    }
-
-    el.innerHTML=html;
-    });
-  });
-}
-
 // ── Benachrichtigungen ──
 function checkBenachrichtigungen(){
   if(!_tnData||!_tnId) return;
@@ -1919,15 +1303,7 @@ function checkBenachrichtigungen(){
   if(!el) return;
   if(!notifs.length){ el.innerHTML=''; return; }
   el.innerHTML=notifs.map((n,i)=>{
-    if(n.typ==='kurs_ausfall'){
-      return '<div style="padding:14px;background:rgba(239,68,68,.12);border:3px solid #ef4444;border-radius:12px;margin-bottom:10px;animation:pulseRed 1.5s infinite">'
-        +'<div style="font-size:1rem;font-weight:800;color:#ef4444;margin-bottom:6px">🚨 LEHRGANG FÄLLT HEUTE AUS</div>'
-        +'<div style="font-size:.85rem;font-weight:700;margin-bottom:4px">'+esc(n.kursName||'Lehrgang')+'</div>'
-        +'<div style="font-size:.78rem;color:#1e293b;line-height:1.5;margin-bottom:6px">'+esc(n.nachricht||'')+'</div>'
-        +'<div style="font-size:.65rem;color:var(--mu)">Von: '+esc(n.von||'Ausbilder')+' · '+esc(n.datumDE||'')+'</div>'
-        +'<button onclick="markNotifRead('+i+')" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;background:#ef4444;color:#fff;font-family:\'Sora\',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">✓ Zur Kenntnis genommen</button>'
-        +'</div>';
-    }
+
     if(n.typ==='kurs_abgebrochen'){
       if(n.bis&&n.bis<today) return ''; // Nach Kursende nicht mehr als abgebrochen anzeigen
       return '<div style="padding:12px;background:rgba(239,68,68,.08);border:2px solid rgba(239,68,68,.3);border-radius:12px;margin-bottom:10px">'
@@ -1978,14 +1354,7 @@ function checkBenachrichtigungen(){
         +'<button onclick="markNotifRead('+i+')" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;background:#fff;color:#d97706;font-family:\'Sora\',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">✓ Zur Kenntnis genommen</button>'
         +'</div>';
     }
-    if(n.typ==='ausbilder_spaeter'){
-      return '<div style="padding:14px;background:#d97706;border:3px solid #b45309;border-radius:12px;margin-bottom:10px">'
-        +'<div style="font-size:1rem;font-weight:800;color:#fff;margin-bottom:8px">🕐 Ausbilder kommt später</div>'
-        +'<div style="font-size:.85rem;font-weight:700;color:#fff;margin-bottom:6px">'+esc(n.kursName||'Lehrgang')+'</div>'
-        +'<div style="font-size:.82rem;color:#fff;line-height:1.6;margin-bottom:8px">'+esc(n.text||'')+'</div>'
-        +'<button onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:10px;border:none;border-radius:8px;background:#fff;color:#d97706;font-family:\'Sora\',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">✓ Zur Kenntnis genommen</button>'
-        +'</div>';
-    }
+
     if(n.typ==='urlaub_genehmigt'){
       return '<div style="padding:12px;background:#059669;border:2px solid #047857;border-radius:12px;margin-bottom:10px">'
         +'<div style="font-size:.85rem;font-weight:800;color:#fff;margin-bottom:6px">✅ Urlaub genehmigt</div>'
@@ -2037,7 +1406,7 @@ function markNotifRead(filteredIdx){
     // Schritt 1: globalTN updaten (als Admin-ähnliche Felder)
     db.collection('globalTN').doc(_tnId).update({
       benachrichtigungen:notifs,
-      aktiverKursId:null,
+      
       pendingRemoval:null,
       pendingRemovalKurs:null,
       kursHistory:hist
@@ -2057,127 +1426,6 @@ function markNotifRead(filteredIdx){
       .then(()=>location.reload())
       .catch(err=>alert('Fehler: '+err.message));
   }
-}
-
-// ── Kurs bestätigen ──
-function confirmKurs(kursId, kursName){
-  if(!confirm('Hiermit bestätige ich, dass ich den Lehrgang "'+kursName+'" zur Kenntnis genommen habe.')) return;
-  if(!_tnId){toast('Fehler: TN nicht zugeordnet','bad');return;}
-  const ref=db.collection('shared').doc('kurse').collection('list').doc(kursId)
-    .collection('teilnehmer').doc(_tnId);
-  ref.update({bestaetigtAm:Date.now(),bestaetigtVon:_email})
-    .then(()=>{
-      toast('✅ Bestätigt');
-      loadKurse();
-    })
-    .catch(()=>{
-      // Doc existiert noch nicht → set
-      ref.set({bestaetigtAm:Date.now(),bestaetigtVon:_email},{merge:true})
-        .then(()=>{ toast('✅ Bestätigt'); loadKurse(); })
-        .catch(err=>toast('Fehler: '+err.message,'bad'));
-    });
-}
-
-// ── Kursdetail ──
-function showKursDetail(kursId){
-  showPage('kursdetail');
-  const el=document.getElementById('kdContent');
-  const k=_kurse.find(x=>x.id===kursId);
-  if(!k){ el.innerHTML='<div class="empty">Kurs nicht gefunden</div>'; return; }
-  // Frische TN-Daten nachladen
-  db.collection('shared').doc('kurse').collection('list').doc(kursId)
-    .collection('teilnehmer').doc(_tnId).get()
-    .then(doc=>{ k._tnDoc=doc.exists?doc.data():{}; })
-    .catch(()=>{})
-    .finally(()=>renderKursDetail(k));
-}
-function renderKursDetail(k){
-  const el=document.getElementById('kdContent');
-  if(!k||!el) return;
-
-  const today=localDate();
-  let st='Beendet', stCol='#6b7a99';
-  if(k.von&&k.bis&&today>=k.von&&today<=k.bis){ st='● Laufend'; stCol='#10b981'; }
-  else if(k.von&&k.von>today){ st='◐ Geplant'; stCol='#3b82f6'; }
-
-  let html='<div class="kurs-card" style="cursor:default">';
-  html+='<div class="kurs-name" style="font-size:1.15rem">'+esc(k.name||k.lehrgangsart||'Lehrgang')+'</div>';
-  html+='<div class="kurs-dates" style="font-size:.78rem">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div>';
-  html+='<div class="kurs-ausb">'+(k.ausbilderName?'Ausbilder: '+esc(k.ausbilderName):'')+'</div>';
-  html+='<div class="kurs-countdown" style="color:'+stCol+';border-color:'+stCol+'30;background:'+stCol+'15">'+st+'</div>';
-  html+='</div>';
-
-  // Ausbilder Kontakt
-  if(k.ausbilderName&&(k.ausbilderTel||k.ausbilderEmail)){
-    html+='<div class="card"><div class="card-title">👷 Dein Ausbilder</div>';
-    html+='<div style="font-size:.85rem;font-weight:700;margin-bottom:8px">'+esc(k.ausbilderName)+'</div>';
-    if(k.ausbilderTel){
-      html+='<a href="tel:'+esc(k.ausbilderTel)+'" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;text-decoration:none;color:var(--tx);margin-bottom:6px">'
-        +'<span style="font-size:1.2rem">📞</span>'
-        +'<div><div style="font-size:.78rem;font-weight:600">Anrufen</div><div style="font-size:.65rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+esc(k.ausbilderTel)+'</div></div></a>';
-    }
-    if(k.ausbilderEmail){
-      html+='<a href="mailto:'+esc(k.ausbilderEmail)+'" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;text-decoration:none;color:var(--tx)">'
-        +'<span style="font-size:1.2rem">✉️</span>'
-        +'<div><div style="font-size:.78rem;font-weight:600">E-Mail</div><div style="font-size:.65rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+esc(k.ausbilderEmail)+'</div></div></a>';
-    }
-    html+='</div>';
-  }
-
-  // Standort
-  if(k.standortName){
-    html+='<div class="card"><div class="card-title">🏢 Unterrichtsort</div>';
-    html+='<div style="font-size:.85rem;font-weight:700;margin-bottom:4px">'+esc(k.standortName)+'</div>';
-    if(k.standortAdresse) html+='<div style="font-size:.74rem;color:var(--mu)">'+esc(k.standortAdresse)+'</div>';
-    if(k.standortGebaeude) html+='<div style="font-size:.74rem;color:var(--tx);margin-top:2px">📍 '+esc(k.standortGebaeude)+'</div>';
-    if(k.standortHinweis) html+='<div style="font-size:.68rem;color:var(--mu);margin-top:4px;font-style:italic">ℹ '+esc(k.standortHinweis)+'</div>';
-    if(k.standortMapsUrl){
-      html+='<a href="'+esc(k.standortMapsUrl)+'" target="_blank" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:10px;text-decoration:none;color:var(--tx);margin-top:8px">'
-        +'<span style="font-size:1.2rem">🗺</span>'
-        +'<div><div style="font-size:.78rem;font-weight:600;color:#3b82f6">Route anzeigen</div><div style="font-size:.6rem;color:var(--mu)">Öffnet Google Maps</div></div></a>';
-    }
-    html+='</div>';
-  }
-
-  // Werkzeug + Kleidung
-  if((k.werkzeug&&k.werkzeug.length)||(k.kleidung&&k.kleidung.length)){
-    html+='<div class="card"><div class="card-title">🎒 Mitzubringen</div>';
-    if(k.werkzeug&&k.werkzeug.length){
-      html+='<div style="font-size:.7rem;font-weight:700;color:var(--mu);margin-bottom:4px">🔧 Werkzeug</div>';
-      k.werkzeug.forEach(w=>{ html+='<div style="font-size:.76rem;padding:4px 0;border-bottom:1px solid var(--brd)">• '+esc(w)+'</div>'; });
-      // Werkzeug-Status anzeigen
-      if(k._tnDoc&&k._tnDoc.werkzeugStatus==='fehlt'){
-        html+='<div style="margin-top:8px;padding:8px 10px;background:rgba(239,68,68,.06);border:2px solid rgba(239,68,68,.25);border-radius:7px;font-size:.75rem;color:#dc2626;font-weight:700">⚠ Werkzeug unvollständig'+(k._tnDoc.werkzeugFehlt?' – fehlt: '+esc(k._tnDoc.werkzeugFehlt):'')+'</div>';
-      } else if(k._tnDoc&&k._tnDoc.werkzeugStatus==='ok'){
-        html+='<div style="margin-top:8px;font-size:.68rem;color:#16a34a;font-weight:600">✓ Werkzeug vollständig</div>';
-      }
-    }
-    if(k.kleidung&&k.kleidung.length){
-      html+='<div style="font-size:.7rem;font-weight:700;color:var(--mu);margin:'+(k.werkzeug?.length?'10':'0')+'px 0 4px">👔 Arbeitskleidung</div>';
-      k.kleidung.forEach(w=>{ html+='<div style="font-size:.76rem;padding:4px 0;border-bottom:1px solid var(--brd)">• '+esc(w)+'</div>'; });
-    }
-    html+='</div>';
-  }
-
-  // Kurs-Dokumente
-  html+='<div class="card"><div class="card-title">📁 Kursunterlagen</div><div id="kdDocs"><div class="empty">Lädt…</div></div></div>';
-
-  el.innerHTML=html;
-
-  // Docs laden
-  db.collection('shared').doc('kurse').collection('list').doc(kursId)
-    .collection('dokumente').orderBy('ts','desc').get()
-    .then(snap=>{
-      const docsEl=document.getElementById('kdDocs');
-      if(snap.empty){ docsEl.innerHTML='<div class="empty">Keine Unterlagen vorhanden</div>'; return; }
-      docsEl.innerHTML='';
-      snap.forEach(doc=>{
-        const d=doc.data();
-        docsEl.innerHTML+=renderDocItem(d, false);
-      });
-    }).catch(()=>{
-      document.getElementById('kdDocs').innerHTML='<div class="empty" style="color:var(--bad)">Fehler beim Laden</div>';
-    });
 }
 
 function renderDocItem(d, canDelete, docId, tnId){
@@ -2200,20 +1448,7 @@ function loadDocs(){
   loadMyDocs();
 }
 
-function loadKursDocs(){
-  const el=document.getElementById('docsKurs');
-  if(!_tnData?.aktiverKursId){ el.innerHTML='<div class="empty">Kein aktiver Kurs zugewiesen</div>'; return; }
-  el.innerHTML='<div class="empty">Lädt…</div>';
-  db.collection('shared').doc('kurse').collection('list').doc(_tnData.aktiverKursId)
-    .collection('dokumente').orderBy('ts','desc').get()
-    .then(snap=>{
-      if(snap.empty){ el.innerHTML='<div class="empty">Keine Kursunterlagen vorhanden</div>'; return; }
-      el.innerHTML='';
-      snap.forEach(doc=>{
-        el.innerHTML+=renderDocItem(doc.data(), false);
-      });
-    }).catch(()=>{ el.innerHTML='<div class="empty" style="color:var(--bad)">Fehler beim Laden</div>'; });
-}
+function loadKursDocs(){}
 
 function loadMyDocs(){
   const elMy=document.getElementById('docsMy');
@@ -2357,7 +1592,6 @@ function loadProfil(){
     +'<div class="profile-field"><span class="pf-label">Beruf</span><span class="pf-value">'+esc(t.beruf||'–')+'</span></div>'
     +'<div class="profile-field"><span class="pf-label">Betrieb</span><span class="pf-value">'+esc(t.firma||'–')+'</span></div>'
     +'<div class="profile-field"><span class="pf-label">Lehrjahr</span><span class="pf-value">'+(t.ausbjahr?t.ausbjahr+'. Jahr':'–')+'</span></div>'
-    +'<div class="profile-field"><span class="pf-label">Aktiver Kurs</span><span class="pf-value" style="color:var(--acc)">'+esc(_kurse.find(k=>k.id===t.aktiverKursId)?.name||'Keiner')+'</span></div>'
     +'<div style="margin-top:14px;padding:14px;background:rgba(59,130,246,.04);border:2px solid rgba(59,130,246,.15);border-radius:10px">'
     +'<div style="font-size:.7rem;font-weight:800;color:var(--acc);margin-bottom:8px">📞 Kontaktdaten</div>'
     +'<div style="font-size:.55rem;color:var(--mu);margin-bottom:8px">Deine Kontaktdaten sind für Ausbilder und Verwaltung sichtbar.</div>'
@@ -2372,7 +1606,7 @@ function loadProfil(){
   const hist=(t.kursHistory||[]).slice().sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
   if(!hist.length){ histEl.innerHTML='<div class="empty">Noch keine Kurshistorie</div>'; return; }
   histEl.innerHTML=hist.map(h=>{
-    const isAkt=t.aktiverKursId===h.kursId;
+    const isAkt=false;
     return '<div class="hist-item">'
       +'<div class="hist-dot" style="background:'+(isAkt?'#10b981':'var(--brd)')+'"></div>'
       +'<div style="flex:1"><div class="hist-name">'+esc(h.kursName||h.kursId)+'</div>'
