@@ -347,8 +347,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="stab" onclick="showBetriebTab('urlaub')">🏖 Urlaub</button>
         <button class="stab" onclick="showBetriebTab('meldung')">💬 Meldungen</button>
       </div>
-      <!-- Zeiten -->
-      <div class="btab active" id="btab-zeiten">
+      <!-- Meldung an AG -->
+      <div class="btab" id="btab-meldung">
         <div class="card">
           <div class="card-title">Meldung an den Betrieb</div>
           <div style="display:flex;flex-direction:column;gap:8px">
@@ -368,7 +368,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
       <!-- Zeiten -->
-      <div class="btab" id="btab-zeiten">
+      <div class="btab active" id="btab-zeiten">
         <div class="card" id="zeitStempelCard">
           <div style="text-align:center;margin-bottom:12px">
             <div style="font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace" id="zeitDatumHeute"></div>
@@ -390,6 +390,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <select id="zeitMonat" onchange="loadZeitkonto()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
           </div>
           <div id="zeitKonto"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✏ Zeit nachtragen</div>
+          <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Vergessen einzustempeln? Trage die Zeit manuell nach – dein Betrieb muss den Eintrag bestätigen.</div>
+          <div><label class="fl">Datum</label><input class="fi" type="date" id="zeitNachDatum" style="font-size:.76rem"></div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <div style="flex:1"><label class="fl">Eingang</label><input class="fi" type="time" id="zeitNachEin" style="font-size:.76rem"></div>
+            <div style="flex:1"><label class="fl">Ausgang</label><input class="fi" type="time" id="zeitNachAus" style="font-size:.76rem"></div>
+          </div>
+          <div><label class="fl">Bemerkung (optional)</label><input class="fi" id="zeitNachBem" placeholder="z.B. Stempeln vergessen" style="font-size:.76rem"></div>
+          <button class="btn" onclick="zeitNachtragen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px">✏ Nachtragen (AG-Bestätigung nötig)</button>
+          <div class="err" id="zeitNachErr" style="margin-top:4px"></div>
         </div>
       </div>
       <!-- Urlaub -->
@@ -1348,6 +1360,32 @@ function loadZeitkonto(){
 }
 
 // ═══════════════════════════════════
+function zeitNachtragen(){
+  const datum=document.getElementById('zeitNachDatum').value;
+  const ein=document.getElementById('zeitNachEin').value;
+  const aus=document.getElementById('zeitNachAus').value;
+  const bem=document.getElementById('zeitNachBem').value.trim();
+  const err=document.getElementById('zeitNachErr');
+  err.textContent='';
+  if(!datum||!ein||!aus){err.textContent='Bitte Datum, Eingang und Ausgang eingeben';return;}
+  if(aus<=ein){err.textContent='Ausgang muss nach Eingang liegen';return;}
+  const istMin=timeToMin(aus)-timeToMin(ein);
+  if(!confirm('Zeit nachtragen?\n\n'+datum+': '+ein+' – '+aus+' ('+minToStr(istMin)+')\n\nDein Betrieb muss diesen Eintrag bestätigen.')) return;
+  db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(datum).set({
+    datum, eingang:ein, ausgang:aus, pauseLog:[], pauseMinuten:0, istMinuten:istMin,
+    manuell:true, agBestaetigt:false,
+    bemerkung:bem,
+    nachgetragenAm:Date.now()
+  },{merge:true}).then(()=>{
+    document.getElementById('zeitNachDatum').value='';
+    document.getElementById('zeitNachEin').value='';
+    document.getElementById('zeitNachAus').value='';
+    document.getElementById('zeitNachBem').value='';
+    toast('✏ Zeit nachgetragen – wartet auf AG-Bestätigung');
+    loadZeitHeute();loadZeitkonto();
+  }).catch(e=>{err.textContent='Fehler: '+e.message;});
+}
+
 // URLAUB
 // ═══════════════════════════════════
 function initUrlaub(){
