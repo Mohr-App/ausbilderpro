@@ -978,6 +978,8 @@ function loadAgUrlaub(){
           offenHtml+=card+'<div style="display:flex;gap:6px;margin-top:8px">'
             +'<button onclick="agUrlaubEntscheidung(\''+az.id+'\',\''+e.docId+'\',\'genehmigt\')" style="flex:1;padding:8px;background:#059669;color:#fff;border:none;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Genehmigen</button>'
             +'<button onclick="agUrlaubEntscheidung(\''+az.id+'\',\''+e.docId+'\',\'abgelehnt\')" style="flex:1;padding:8px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">❌ Ablehnen</button></div></div>';
+        } else if(e.status==='genehmigt'){
+          alleHtml+=card+'<button onclick="agUrlaubWiderrufen(\''+az.id+'\',\''+e.docId+'\',\''+e.von+'\',\''+e.bis+'\')" style="margin-top:6px;width:100%;padding:6px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.25);border-radius:8px;font-size:.65rem;font-weight:700;color:#ef4444;cursor:pointer;font-family:\'Sora\',sans-serif">🗑 Urlaub widerrufen</button></div>';
         } else { alleHtml+=card+'</div>'; }
       });
     });
@@ -1013,6 +1015,30 @@ function agUrlaubEntscheidung(tnId, docId, status){
       loadAgUrlaub();
     });
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function agUrlaubWiderrufen(tnId, docId, von, bis){
+  if(!confirm('Urlaub widerrufen?\n\n'+von+' – '+bis+'\n\nDer Azubi wird benachrichtigt.')) return;
+  // 1. Antrag als widerrufen markieren
+  db.collection('globalTN').doc(tnId).collection('urlaubsantraege').doc(docId)
+    .update({status:'widerrufen', widerrufenAm:Date.now(), widerrufenVon:_firma||_email}).catch(()=>{});
+  // 2. Aus globalTN.urlaub Array entfernen
+  db.collection('globalTN').doc(tnId).get().then(doc=>{
+    if(!doc.exists) return;
+    const data=doc.data();
+    const urlaub=(data.urlaub||[]).filter(u=>!(u.von===von&&u.bis===bis));
+    return db.collection('globalTN').doc(tnId).update({urlaub});
+  }).catch(()=>{});
+  // 3. Azubi benachrichtigen
+  db.collection('globalTN').doc(tnId).update({
+    benachrichtigungen:firebase.firestore.FieldValue.arrayUnion({
+      typ:'urlaub_widerrufen',
+      text:'Dein genehmigter Urlaub ('+von+' – '+bis+') wurde vom Betrieb widerrufen. Bitte kontaktiere deinen Arbeitgeber.',
+      datum:new Date().toISOString(), gelesen:false
+    })
+  }).catch(()=>{});
+  toast('🗑 Urlaub widerrufen');
+  setTimeout(()=>loadAgUrlaub(),500);
 }
 
 // AG: MELDUNGEN
