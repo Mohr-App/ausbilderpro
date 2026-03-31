@@ -382,23 +382,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <button onclick="zeitPause()" id="zeitPauseBtn" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;background:rgba(245,158,11,.15);color:#d97706;border:1.5px solid rgba(245,158,11,.3)">⏸ Pause starten</button>
           </div>
         </div>
-        <!-- Wochenarbeitszeit -->
+        <!-- Wochenarbeitszeit (vom AG festgelegt) -->
         <div class="card" id="azPlanCard">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <div class="card-title" style="margin:0">⏱ Wochenarbeitszeit</div>
-            <button onclick="toggleAzPlan()" id="azPlanToggle" style="font-size:.6rem;padding:3px 10px;background:var(--sur2);border:1px solid var(--brd);border-radius:6px;color:var(--mu);cursor:pointer;font-family:'Sora',sans-serif;font-weight:600">✏ Ändern</button>
-          </div>
+          <div class="card-title" style="margin-bottom:6px">⏱ Wochenarbeitszeit</div>
           <div id="azPlanDisplay" style="font-size:.72rem;color:var(--mu)">Lädt…</div>
-          <div id="azPlanEdit" style="display:none;margin-top:8px">
-            <div style="display:flex;gap:4px;flex-wrap:wrap">
-              <div style="flex:1;min-width:50px;text-align:center"><label class="fl">Mo</label><input class="fi" type="number" id="azPlanMo" min="0" max="12" step="0.5" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
-              <div style="flex:1;min-width:50px;text-align:center"><label class="fl">Di</label><input class="fi" type="number" id="azPlanDi" min="0" max="12" step="0.5" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
-              <div style="flex:1;min-width:50px;text-align:center"><label class="fl">Mi</label><input class="fi" type="number" id="azPlanMi" min="0" max="12" step="0.5" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
-              <div style="flex:1;min-width:50px;text-align:center"><label class="fl">Do</label><input class="fi" type="number" id="azPlanDo" min="0" max="12" step="0.5" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
-              <div style="flex:1;min-width:50px;text-align:center"><label class="fl">Fr</label><input class="fi" type="number" id="azPlanFr" min="0" max="12" step="0.5" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
-            </div>
-            <button class="btn" onclick="saveAzPlan()" style="margin-top:6px;width:100%;font-size:.75rem;padding:8px">✓ Speichern</button>
-          </div>
         </div>
         <div class="card">
           <div class="card-title">📊 Heute</div>
@@ -1285,7 +1272,7 @@ function renderAzPlan(){
   const el=document.getElementById('azPlanDisplay');
   if(!el) return;
   if(!_azPlan){
-    el.innerHTML='<span style="color:var(--warn)">⚠ Noch nicht konfiguriert – bitte Arbeitszeiten eintragen.</span>';
+    el.innerHTML='<span style="color:var(--warn)">⚠ Noch nicht konfiguriert – wird vom Betrieb festgelegt.</span>';
     return;
   }
   const tage=['Mo','Di','Mi','Do','Fr'];
@@ -1295,30 +1282,6 @@ function renderAzPlan(){
     const h=_azPlan[keys[i]]||0; woche+=h;
     return '<span style="font-weight:700">'+t+'</span> '+h+'h';
   }).join(' · ')+'<span style="margin-left:8px;font-weight:800;color:var(--acc)">= '+woche+'h/Woche</span>';
-}
-function toggleAzPlan(){
-  const ed=document.getElementById('azPlanEdit');
-  const show=ed.style.display==='none';
-  ed.style.display=show?'':'none';
-  if(show&&_azPlan){
-    const keys=['mo','di','mi','do','fr'];
-    keys.forEach(k=>{const inp=document.getElementById('azPlan'+k.charAt(0).toUpperCase()+k.slice(1));if(inp)inp.value=_azPlan[k]||8;});
-  } else if(show){
-    ['Mo','Di','Mi','Do','Fr'].forEach(t=>{const inp=document.getElementById('azPlan'+t);if(inp)inp.value=t==='Fr'?6:8;});
-  }
-}
-function saveAzPlan(){
-  const keys=['mo','di','mi','do','fr'];
-  const ids=['Mo','Di','Mi','Do','Fr'];
-  const plan={};
-  ids.forEach((t,i)=>{plan[keys[i]]=parseFloat(document.getElementById('azPlan'+t).value)||0;});
-  db.collection('globalTN').doc(_tnId).update({arbeitszeitPlan:plan}).then(()=>{
-    _azPlan=plan;
-    renderAzPlan();
-    document.getElementById('azPlanEdit').style.display='none';
-    toast('✓ Wochenarbeitszeit gespeichert');
-    loadZeitkonto();
-  }).catch(e=>toast('Fehler: '+e.message,'bad'));
 }
 function getSollMin(dateStr){
   if(!_azPlan) return 0;

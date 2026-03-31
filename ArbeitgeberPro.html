@@ -112,6 +112,20 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <!-- AG: Zeiten -->
       <div class="abtab active" id="abtab-zeiten">
+        <div class="card">
+          <div class="card-title">⏱ Arbeitszeiten festlegen</div>
+          <div><label class="fl">Azubi</label><select class="fi" id="agPlanAzubi" onchange="loadAgPlanForAzubi()" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
+          <div id="agPlanCurrent" style="font-size:.72rem;color:var(--mu);margin-bottom:6px"></div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <div style="flex:1;min-width:48px;text-align:center"><label class="fl">Mo</label><input class="fi" type="number" id="agPlanMo" min="0" max="12" step="0.5" value="8" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+            <div style="flex:1;min-width:48px;text-align:center"><label class="fl">Di</label><input class="fi" type="number" id="agPlanDi" min="0" max="12" step="0.5" value="8" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+            <div style="flex:1;min-width:48px;text-align:center"><label class="fl">Mi</label><input class="fi" type="number" id="agPlanMi" min="0" max="12" step="0.5" value="8" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+            <div style="flex:1;min-width:48px;text-align:center"><label class="fl">Do</label><input class="fi" type="number" id="agPlanDo" min="0" max="12" step="0.5" value="8" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+            <div style="flex:1;min-width:48px;text-align:center"><label class="fl">Fr</label><input class="fi" type="number" id="agPlanFr" min="0" max="12" step="0.5" value="6" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+          </div>
+          <button class="btn" onclick="saveAgPlan()" style="margin-top:6px;width:100%;font-size:.75rem;padding:8px">✓ Arbeitszeit speichern</button>
+          <div class="err" id="agPlanErr" style="margin-top:4px"></div>
+        </div>
         <div class="card" style="border:2px solid rgba(16,185,129,.25)">
           <div class="card-title">📡 Heute – Live</div>
           <div id="agZeitLive"><div class="empty">Lädt…</div></div>
@@ -777,13 +791,62 @@ function initAgBetrieb(){
 }
 
 function fillAgAzubiSelect(){
-  const sel=document.getElementById('agNachAzubi');
-  if(!sel) return;
-  sel.innerHTML='<option value="">Bitte wählen…</option>';
-  _azubis.forEach(az=>{
-    const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Azubi';
-    sel.innerHTML+='<option value="'+az.id+'">'+esc(name)+'</option>';
+  ['agNachAzubi','agPlanAzubi'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel) return;
+    sel.innerHTML='<option value="">Bitte wählen…</option>';
+    _azubis.forEach(az=>{
+      const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Azubi';
+      sel.innerHTML+='<option value="'+az.id+'">'+esc(name)+'</option>';
+    });
   });
+}
+
+function loadAgPlanForAzubi(){
+  const tnId=document.getElementById('agPlanAzubi').value;
+  const el=document.getElementById('agPlanCurrent');
+  if(!tnId){el.textContent='';return;}
+  const az=_azubis.find(a=>a.id===tnId);
+  const plan=az?.arbeitszeitPlan;
+  if(plan){
+    const keys=['mo','di','mi','do','fr'];
+    const ids=['Mo','Di','Mi','Do','Fr'];
+    let woche=0;
+    ids.forEach((t,i)=>{
+      const v=plan[keys[i]]||0; woche+=v;
+      const inp=document.getElementById('agPlan'+t);
+      if(inp) inp.value=v;
+    });
+    el.innerHTML='Aktuell: <b>'+woche+'h/Woche</b>';
+  } else {
+    el.innerHTML='<span style="color:#d97706">⚠ Noch nicht konfiguriert</span>';
+    ['Mo','Di','Mi','Do','Fr'].forEach(t=>{
+      const inp=document.getElementById('agPlan'+t);
+      if(inp) inp.value=t==='Fr'?6:8;
+    });
+  }
+}
+
+function saveAgPlan(){
+  const tnId=document.getElementById('agPlanAzubi').value;
+  const err=document.getElementById('agPlanErr');
+  err.textContent='';
+  if(!tnId){err.textContent='Bitte Azubi wählen';return;}
+  const keys=['mo','di','mi','do','fr'];
+  const ids=['Mo','Di','Mi','Do','Fr'];
+  const plan={};
+  ids.forEach((t,i)=>{plan[keys[i]]=parseFloat(document.getElementById('agPlan'+t).value)||0;});
+  const woche=keys.reduce((s,k)=>s+plan[k],0);
+  const azName=document.getElementById('agPlanAzubi').selectedOptions[0]?.text||'Azubi';
+  if(!confirm('Arbeitszeit für '+azName+' speichern?\n\n'+woche+'h/Woche')) return;
+  db.collection('globalTN').doc(tnId).update({arbeitszeitPlan:plan}).then(()=>{
+    // Lokal aktualisieren
+    const az=_azubis.find(a=>a.id===tnId);
+    if(az) az.arbeitszeitPlan=plan;
+    toast('✓ Arbeitszeit für '+azName+' gespeichert – Azubi sieht es sofort');
+    loadAgPlanForAzubi();
+    loadAgZeiten();
+  }).catch(e=>{err.textContent='Fehler: '+e.message;});
 }
 
 function agZeitNachtragen(){
