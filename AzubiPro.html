@@ -382,6 +382,24 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <button onclick="zeitPause()" id="zeitPauseBtn" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;background:rgba(245,158,11,.15);color:#d97706;border:1.5px solid rgba(245,158,11,.3)">⏸ Pause starten</button>
           </div>
         </div>
+        <!-- Wochenarbeitszeit -->
+        <div class="card" id="azPlanCard">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div class="card-title" style="margin:0">⏱ Wochenarbeitszeit</div>
+            <button onclick="toggleAzPlan()" id="azPlanToggle" style="font-size:.6rem;padding:3px 10px;background:var(--sur2);border:1px solid var(--brd);border-radius:6px;color:var(--mu);cursor:pointer;font-family:'Sora',sans-serif;font-weight:600">✏ Ändern</button>
+          </div>
+          <div id="azPlanDisplay" style="font-size:.72rem;color:var(--mu)">Lädt…</div>
+          <div id="azPlanEdit" style="display:none;margin-top:8px">
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <div style="flex:1;min-width:50px;text-align:center"><label class="fl">Mo</label><input class="fi" type="number" id="azPlanMo" min="0" max="12" step="0.5" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+              <div style="flex:1;min-width:50px;text-align:center"><label class="fl">Di</label><input class="fi" type="number" id="azPlanDi" min="0" max="12" step="0.5" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+              <div style="flex:1;min-width:50px;text-align:center"><label class="fl">Mi</label><input class="fi" type="number" id="azPlanMi" min="0" max="12" step="0.5" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+              <div style="flex:1;min-width:50px;text-align:center"><label class="fl">Do</label><input class="fi" type="number" id="azPlanDo" min="0" max="12" step="0.5" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+              <div style="flex:1;min-width:50px;text-align:center"><label class="fl">Fr</label><input class="fi" type="number" id="azPlanFr" min="0" max="12" step="0.5" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+            </div>
+            <button class="btn" onclick="saveAzPlan()" style="margin-top:6px;width:100%;font-size:.75rem;padding:8px">✓ Speichern</button>
+          </div>
+        </div>
         <div class="card">
           <div class="card-title">📊 Heute</div>
           <div id="zeitHeute"><div class="empty">Noch keine Einträge</div></div>
@@ -1240,8 +1258,8 @@ let _zeitState='aus'; // 'aus'|'ein'|'pause'
 let _zeitHeute=null;
 let _zeitTimer=null;
 
+let _azPlan=null;
 function initZeiten(){
-  // Uhr aktualisieren
   if(_zeitTimer) clearInterval(_zeitTimer);
   _zeitTimer=setInterval(()=>{
     const n=new Date();
@@ -1250,10 +1268,64 @@ function initZeiten(){
   },1000);
   const hEl=document.getElementById('zeitDatumHeute');
   if(hEl) hEl.textContent=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-  // Monats-Dropdown
   fillMonatSelect('zeitMonat');
+  loadAzPlan();
   loadZeitHeute();
   loadZeitkonto();
+}
+
+function loadAzPlan(){
+  if(!_tnId||!db) return;
+  db.collection('globalTN').doc(_tnId).get().then(doc=>{
+    _azPlan=doc.exists&&doc.data().arbeitszeitPlan?doc.data().arbeitszeitPlan:null;
+    renderAzPlan();
+  }).catch(()=>{});
+}
+function renderAzPlan(){
+  const el=document.getElementById('azPlanDisplay');
+  if(!el) return;
+  if(!_azPlan){
+    el.innerHTML='<span style="color:var(--warn)">⚠ Noch nicht konfiguriert – bitte Arbeitszeiten eintragen.</span>';
+    return;
+  }
+  const tage=['Mo','Di','Mi','Do','Fr'];
+  const keys=['mo','di','mi','do','fr'];
+  let woche=0;
+  el.innerHTML=tage.map((t,i)=>{
+    const h=_azPlan[keys[i]]||0; woche+=h;
+    return '<span style="font-weight:700">'+t+'</span> '+h+'h';
+  }).join(' · ')+'<span style="margin-left:8px;font-weight:800;color:var(--acc)">= '+woche+'h/Woche</span>';
+}
+function toggleAzPlan(){
+  const ed=document.getElementById('azPlanEdit');
+  const show=ed.style.display==='none';
+  ed.style.display=show?'':'none';
+  if(show&&_azPlan){
+    const keys=['mo','di','mi','do','fr'];
+    keys.forEach(k=>{const inp=document.getElementById('azPlan'+k.charAt(0).toUpperCase()+k.slice(1));if(inp)inp.value=_azPlan[k]||8;});
+  } else if(show){
+    ['Mo','Di','Mi','Do','Fr'].forEach(t=>{const inp=document.getElementById('azPlan'+t);if(inp)inp.value=t==='Fr'?6:8;});
+  }
+}
+function saveAzPlan(){
+  const keys=['mo','di','mi','do','fr'];
+  const ids=['Mo','Di','Mi','Do','Fr'];
+  const plan={};
+  ids.forEach((t,i)=>{plan[keys[i]]=parseFloat(document.getElementById('azPlan'+t).value)||0;});
+  db.collection('globalTN').doc(_tnId).update({arbeitszeitPlan:plan}).then(()=>{
+    _azPlan=plan;
+    renderAzPlan();
+    document.getElementById('azPlanEdit').style.display='none';
+    toast('✓ Wochenarbeitszeit gespeichert');
+    loadZeitkonto();
+  }).catch(e=>toast('Fehler: '+e.message,'bad'));
+}
+function getSollMin(dateStr){
+  if(!_azPlan) return 0;
+  const dow=new Date(dateStr+'T12:00').getDay();
+  const map={1:'mo',2:'di',3:'mi',4:'do',5:'fr'};
+  const key=map[dow];
+  return key?(_azPlan[key]||0)*60:0;
 }
 
 function loadZeitHeute(){
@@ -1388,24 +1460,48 @@ function loadZeitkonto(){
     .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
     .orderBy('datum').get().then(snap=>{
       if(snap.empty){el.innerHTML='<div class="empty">Keine Einträge in diesem Monat</div>';return;}
-      let totalIst=0,tage=0;
-      let html='<div style="font-size:.65rem;color:var(--mu);margin-bottom:6px">'+snap.size+' Tage erfasst</div>';
+      let totalIst=0,totalSoll=0,tage=0;
+      let html='';
+      if(_azPlan){
+        html+='<div style="display:flex;justify-content:space-between;font-size:.58rem;color:var(--mu);padding:2px 0;border-bottom:1px solid var(--brd);margin-bottom:4px;font-weight:700"><span style="flex:2">Tag</span><span style="flex:2;text-align:center">Zeit</span><span style="flex:1;text-align:right">Ist</span><span style="flex:1;text-align:right">Soll</span><span style="flex:1;text-align:right">+/-</span></div>';
+      }
       snap.forEach(doc=>{
         const d=doc.data();
         if(!d.eingang) return;
         const ist=d.istMinuten||0;
-        totalIst+=ist;
+        const soll=getSollMin(d.datum);
+        const diff=ist-soll;
+        totalIst+=ist;totalSoll+=soll;
         if(d.ausgang) tage++;
         const datDE=new Date(d.datum+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
-        html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,49,72,.3);font-size:.72rem">'
-          +'<span style="color:var(--mu)">'+datDE+'</span>'
-          +'<span>'+d.eingang+(d.ausgang?' – '+d.ausgang:'')+'</span>'
-          +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(d.ausgang?minToStr(ist):'…')+'</span>'
-          +'</div>';
+        const manuell=d.manuell?'<span style="font-size:.45rem;color:#d97706;font-weight:700">✎</span>':'';
+        if(_azPlan){
+          const diffCol=diff>=0?'#059669':'#ef4444';
+          html+='<div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid rgba(42,49,72,.2);font-size:.68rem">'
+            +'<span style="flex:2;color:var(--mu)">'+datDE+manuell+'</span>'
+            +'<span style="flex:2;text-align:center">'+d.eingang+(d.ausgang?' – '+d.ausgang:'…')+'</span>'
+            +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(d.ausgang?minToStr(ist):'…')+'</span>'
+            +'<span style="flex:1;text-align:right;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+minToStr(soll)+'</span>'
+            +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(d.ausgang?(diff>=0?'+':'')+minToStr(diff):'…')+'</span>'
+            +'</div>';
+        } else {
+          html+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(42,49,72,.3);font-size:.72rem">'
+            +'<span style="color:var(--mu)">'+datDE+manuell+'</span>'
+            +'<span>'+d.eingang+(d.ausgang?' – '+d.ausgang:'')+'</span>'
+            +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(d.ausgang?minToStr(ist):'…')+'</span></div>';
+        }
       });
-      html+='<div style="margin-top:10px;padding:10px;background:var(--sur2);border-radius:8px;display:flex;justify-content:space-between">'
-        +'<span style="font-size:.78rem;font-weight:700">Gesamt ('+tage+' Tage)</span>'
-        +'<span style="font-size:.85rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+minToStr(totalIst)+'</span></div>';
+      const totalDiff=totalIst-totalSoll;
+      const diffCol=totalDiff>=0?'#059669':'#ef4444';
+      html+='<div style="margin-top:10px;padding:10px;background:var(--sur2);border-radius:8px">';
+      if(_azPlan){
+        html+='<div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:4px"><span>Ist ('+tage+' Tage)</span><span style="font-weight:800;font-family:\'JetBrains Mono\',monospace">'+minToStr(totalIst)+'</span></div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:4px"><span>Soll</span><span style="font-weight:700;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+minToStr(totalSoll)+'</span></div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:.85rem;padding-top:6px;border-top:1px solid var(--brd)"><span style="font-weight:800">'+(totalDiff>=0?'📈 Überstunden':'📉 Fehlstunden')+'</span><span style="font-weight:800;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace;font-size:.95rem">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</span></div>';
+      } else {
+        html+='<div style="display:flex;justify-content:space-between"><span style="font-size:.78rem;font-weight:700">Gesamt ('+tage+' Tage)</span><span style="font-size:.85rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+minToStr(totalIst)+'</span></div>';
+      }
+      html+='</div>';
       el.innerHTML=html;
     }).catch(err=>{el.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
 }
