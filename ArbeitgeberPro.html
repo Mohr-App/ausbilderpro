@@ -987,18 +987,31 @@ function loadAgUrlaub(){
 }
 function agUrlaubEntscheidung(tnId, docId, status){
   if(!confirm('Urlaubsantrag '+(status==='genehmigt'?'genehmigen':'ablehnen')+'?')) return;
-  db.collection('globalTN').doc(tnId).collection('urlaubsantraege').doc(docId)
-    .update({status, entschiedenAm:Date.now(), entschiedenVon:_firma||_email})
-    .then(()=>{
+  const antragRef=db.collection('globalTN').doc(tnId).collection('urlaubsantraege').doc(docId);
+  // Erst Antragsdaten laden (für von/bis bei Genehmigung)
+  antragRef.get().then(doc=>{
+    const antrag=doc.exists?doc.data():{};
+    return antragRef.update({status, entschiedenAm:Date.now(), entschiedenVon:_firma||_email}).then(()=>{
       toast(status==='genehmigt'?'✅ Genehmigt':'❌ Abgelehnt');
-      db.collection('globalTN').doc(tnId).update({
+      // Azubi benachrichtigen
+      const updates={
         benachrichtigungen:firebase.firestore.FieldValue.arrayUnion({
-          typ:'urlaub_'+status, text:'Dein Urlaubsantrag wurde '+status+'.',
+          typ:'urlaub_'+status, text:'Dein Urlaubsantrag wurde '+status+'.'+(status==='genehmigt'?' ('+antrag.von+' – '+antrag.bis+')':''),
           datum:new Date().toISOString(), gelesen:false
         })
-      }).catch(()=>{});
+      };
+      // Bei Genehmigung: Urlaub ins globalTN.urlaub Array schreiben (für VerwaltungPro/Kursplanung)
+      if(status==='genehmigt'&&antrag.von&&antrag.bis){
+        updates.urlaub=firebase.firestore.FieldValue.arrayUnion({
+          von:antrag.von, bis:antrag.bis,
+          label:antrag.grund||'Urlaub (genehmigt)',
+          ts:Date.now(), genehmigt:true, genehmigtVon:_firma||_email
+        });
+      }
+      db.collection('globalTN').doc(tnId).update(updates).catch(()=>{});
       loadAgUrlaub();
-    }).catch(err=>toast('Fehler: '+err.message,'bad'));
+    });
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 // AG: MELDUNGEN
