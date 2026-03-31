@@ -1275,18 +1275,20 @@ function renderAzPlan(){
     el.innerHTML='<span style="color:var(--warn)">⚠ Noch nicht konfiguriert – wird vom Betrieb festgelegt.</span>';
     return;
   }
-  const tage=['Mo','Di','Mi','Do','Fr'];
-  const keys=['mo','di','mi','do','fr'];
+  const tage=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const keys=['mo','di','mi','do','fr','sa','so'];
   let woche=0;
-  el.innerHTML=tage.map((t,i)=>{
+  const parts=[];
+  tage.forEach((t,i)=>{
     const h=_azPlan[keys[i]]||0; woche+=h;
-    return '<span style="font-weight:700">'+t+'</span> '+h+'h';
-  }).join(' · ')+'<span style="margin-left:8px;font-weight:800;color:var(--acc)">= '+woche+'h/Woche</span>';
+    if(h>0) parts.push('<span style="font-weight:700">'+t+'</span> '+h+'h');
+  });
+  el.innerHTML=parts.join(' · ')+'<span style="margin-left:8px;font-weight:800;color:var(--acc)">= '+woche+'h/Woche</span>';
 }
 function getSollMin(dateStr){
   if(!_azPlan) return 0;
   const dow=new Date(dateStr+'T12:00').getDay();
-  const map={1:'mo',2:'di',3:'mi',4:'do',5:'fr'};
+  const map={0:'so',1:'mo',2:'di',3:'mi',4:'do',5:'fr',6:'sa'};
   const key=map[dow];
   return key?(_azPlan[key]||0)*60:0;
 }
@@ -1445,13 +1447,11 @@ function loadZeitkonto(){
     // Zeiterfassung-Map
     const zeitMap={};
     zeitSnap.forEach(doc=>{zeitMap[doc.data().datum]=doc.data();});
-    // Alle Arbeitstage des Monats
+    // Alle Tage des Monats (inkl. Sa/So wenn konfiguriert)
     const allDays=[];
     const mStart=new Date(ym+'-01T12:00');
     const mEnd=new Date(mStart.getFullYear(),mStart.getMonth()+1,0);
     for(let dt=new Date(mStart);dt<=mEnd;dt.setDate(dt.getDate()+1)){
-      const dow=dt.getDay();
-      if(dow===0||dow===6) continue;
       const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
       const today=localDate();
       if(ds>today) continue;
@@ -1470,6 +1470,8 @@ function loadZeitkonto(){
       const ist=zeit?.istMinuten||0;
       const sollRaw=getSollMin(ds);
       const soll=(isKrank||isUrlaub)?0:sollRaw;
+      // Tag überspringen wenn kein Soll, kein Eintrag, nicht krank/urlaub
+      if(!sollRaw&&!zeit&&!isKrank&&!isUrlaub) return;
       const diff=ist-soll;
       totalIst+=ist;totalSoll+=soll;
       if(zeit?.ausgang) tage++;
