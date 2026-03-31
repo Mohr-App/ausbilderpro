@@ -114,7 +114,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="abtab active" id="abtab-zeiten">
         <div class="card">
           <div class="card-title">⏱ Arbeitszeiten festlegen</div>
-          <div><label class="fl">Azubi</label><select class="fi" id="agPlanAzubi" onchange="loadAgPlanForAzubi()" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
+          <div><label class="fl">Mitarbeiter / Azubi</label><select class="fi" id="agPlanAzubi" onchange="loadAgPlanForAzubi()" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
           <div id="agPlanCurrent" style="font-size:.72rem;color:var(--mu);margin-bottom:6px"></div>
           <div style="display:flex;gap:4px;flex-wrap:wrap">
             <div style="flex:1;min-width:42px;text-align:center"><label class="fl">Mo</label><input class="fi" type="number" id="agPlanMo" min="0" max="12" step="0.5" value="8" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
@@ -141,7 +141,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
         <div class="card">
           <div class="card-title">✏ Zeit nachtragen (als AG)</div>
-          <div><label class="fl">Azubi</label><select class="fi" id="agNachAzubi" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
+          <div><label class="fl">Mitarbeiter / Azubi</label><select class="fi" id="agNachAzubi" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
           <div><label class="fl">Datum</label><input class="fi" type="date" id="agNachDatum" style="font-size:.76rem"></div>
           <div style="display:flex;gap:6px;margin-bottom:6px">
             <div style="flex:1"><label class="fl">Eingang</label><input class="fi" type="time" id="agNachEin" style="font-size:.76rem"></div>
@@ -1043,9 +1043,15 @@ function loadAgZeiten(){
     }).catch(()=>({az, zeitMap:{}, krankDates:new Set(), urlaubDates:new Set()}));
   });
   Promise.all(promises).then(results=>{
+    // Sortieren: Azubis zuerst, dann Arbeitnehmer
+    const azubis=results.filter(r=>r.az.typ!=='arbeitnehmer');
+    const mitarbeiter=results.filter(r=>r.az.typ==='arbeitnehmer');
     let html='';
     let idx=0;
-    results.forEach(({az, zeitMap, krankDates, urlaubDates})=>{
+    function renderGroup(label,icon,items){
+      if(!items.length) return;
+      html+='<div style="font-size:.7rem;font-weight:700;color:var(--mu);margin:10px 0 6px;letter-spacing:.04em">'+icon+' '+label+' ('+items.length+')</div>';
+      items.forEach(({az, zeitMap, krankDates, urlaubDates})=>{
       const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
       const plan=az.arbeitszeitPlan||null;
       let totalIst=0,totalSoll=0,tage=0;
@@ -1123,7 +1129,10 @@ function loadAgZeiten(){
           +'<span style="font-weight:800;color:'+diffCol+'">'+(totalDiff>=0?'📈 +':'📉 ')+minToStr(totalDiff)+'</span></div>';
       }
       html+='</div></div>';
-    });
+      });
+    }
+    renderGroup('Auszubildende','👷',azubis);
+    renderGroup('Arbeitnehmer','👤',mitarbeiter);
     el.innerHTML=html||'<div class="empty">Keine Daten</div>';
   });
 }
