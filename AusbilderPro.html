@@ -2176,8 +2176,8 @@ function renderMain(){
     return;
   }
   el.innerHTML=
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #c4cce0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="hdr-menu-btn" onclick="toggleHdrMenu()" id="hdrMenuBtn">☰ Aktionen</button></div></div>'
-    +'<div class="hdr-actions" id="hdrActions">'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #c4cce0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="hdr-menu-btn" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button></div></div>'
+    +'<div class="hdr-actions" id="kursActions">'
     +'<button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button>'
     +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button>'
     +'<button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button>'
@@ -2432,9 +2432,10 @@ function showMeldungen(kursId){
     }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
-function toggleHdrMenu(){
-  const el=document.getElementById('hdrActions');
-  const btn=document.getElementById('hdrMenuBtn');
+function toggleKursActions(){
+  event.stopPropagation();
+  const el=document.getElementById('kursActions');
+  const btn=document.getElementById('kursActBtn');
   if(!el) return;
   el.classList.toggle('show');
   if(btn) btn.classList.toggle('open');
