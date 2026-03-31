@@ -988,7 +988,8 @@ function loadAgUrlaub(){
   });
 }
 function agUrlaubEntscheidung(tnId, docId, status){
-  if(!confirm('Urlaubsantrag '+(status==='genehmigt'?'genehmigen':'ablehnen')+'?')) return;
+  const hinweis=status==='genehmigt'?'\n\nHinweis: Der Urlaubszeitraum wird mit der Verwaltung für die überbetriebliche Lehrgangsplanung geteilt. Der Grund des Urlaubs wird nicht weitergegeben.':'';
+  if(!confirm('Urlaubsantrag '+(status==='genehmigt'?'genehmigen':'ablehnen')+'?'+hinweis)) return;
   const antragRef=db.collection('globalTN').doc(tnId).collection('urlaubsantraege').doc(docId);
   // Erst Antragsdaten laden (für von/bis bei Genehmigung)
   antragRef.get().then(doc=>{
@@ -1002,12 +1003,12 @@ function agUrlaubEntscheidung(tnId, docId, status){
           datum:new Date().toISOString(), gelesen:false
         })
       }).catch(()=>{});
-      // Bei Genehmigung: Urlaub ins globalTN.urlaub Array schreiben (für VerwaltungPro/Kursplanung)
+      // Bei Genehmigung: Urlaub ins globalTN.urlaub Array schreiben (nur Zeitraum, OHNE Grund)
       if(status==='genehmigt'&&antrag.von&&antrag.bis){
         db.collection('globalTN').doc(tnId).update({
           urlaub:firebase.firestore.FieldValue.arrayUnion({
             von:antrag.von, bis:antrag.bis,
-            label:antrag.grund||'Urlaub (genehmigt)',
+            label:'Urlaub (genehmigt)',
             ts:Date.now(), genehmigt:true, genehmigtVon:_firma||_email
           })
         }).catch(()=>{});
