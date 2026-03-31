@@ -1220,7 +1220,7 @@ function _doSendBetriebMeldung(type, text){
     type, text, name, firma,
     tnId: _tnId,
     zeit: new Date().toISOString(),
-    datum: new Date().toISOString().slice(0,10),
+    datum: localDate(),
     gelesen: false
   }).then(()=>{
     toast('✓ Meldung an Betrieb gesendet');
@@ -1330,7 +1330,7 @@ function getSollMin(dateStr){
 
 function loadZeitHeute(){
   if(!_tnId||!db) return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today).get().then(doc=>{
     _zeitHeute=doc.exists?doc.data():null;
     renderZeitHeute();
@@ -1376,7 +1376,7 @@ function updateZeitBtn(){
 
 function zeitStempeln(){
   if(!_tnId||!db) return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
   if(_zeitState==='aus'){
@@ -1394,7 +1394,7 @@ function zeitStempeln(){
 
 function zeitPause(){
   if(!_tnId||!db||!_zeitHeute) return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
   const pLog=(_zeitHeute.pauseLog||[]).slice();
@@ -1454,7 +1454,7 @@ function loadZeitkonto(){
   const el=document.getElementById('zeitKonto');
   if(!el||!_tnId||!db) return;
   const sel=document.getElementById('zeitMonat');
-  const ym=sel?sel.value:new Date().toISOString().slice(0,7);
+  const ym=sel?sel.value:localYM();
   el.innerHTML='<div class="empty">Lädt…</div>';
   db.collection('globalTN').doc(_tnId).collection('zeiterfassung')
     .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
@@ -1658,7 +1658,7 @@ function baustelleErfassen(){
   if(!name){err.textContent='Bitte Baustelle/Projekt eingeben';return;}
   if(!von||!bis){err.textContent='Bitte Zeiten eingeben';return;}
   if(!_tnId){err.textContent='Fehler: Nicht angemeldet (_tnId fehlt)';return;}
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   err.textContent='Speichert…';
   db.collection('globalTN').doc(_tnId).collection('baustellen').add({
     datum:today, baustelle:name, adresse, taetigkeit, von, bis,
@@ -1684,7 +1684,7 @@ function loadBaustellen(){
   const el=document.getElementById('bsListe');
   if(!el||!_tnId||!db) return;
   const sel=document.getElementById('bsMonat');
-  const ym=sel?sel.value:new Date().toISOString().slice(0,7);
+  const ym=sel?sel.value:localYM();
   el.innerHTML='<div class="empty">Lädt… ('+ym+')</div>';
   db.collection('globalTN').doc(_tnId).collection('baustellen')
     .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
@@ -1712,6 +1712,9 @@ function loadBaustellen(){
 // ═══════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════
+function localDate(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function localYM(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+
 function fillMonatSelect(id){
   const sel=document.getElementById(id);
   if(!sel) return;
@@ -1719,7 +1722,7 @@ function fillMonatSelect(id){
   sel.innerHTML='';
   for(let i=0;i<6;i++){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    const ym=d.toISOString().slice(0,7);
+    const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     const label=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
     sel.innerHTML+='<option value="'+ym+'"'+(i===0?' selected':'')+'>'+label+'</option>';
   }
@@ -1794,7 +1797,7 @@ function loadKurse(){
   if(!kursIds.size){ el.innerHTML='<div class="empty">Aktuell keine Lehrgänge zugewiesen.<br>Du wirst benachrichtigt wenn ein neuer Lehrgang startet.</div>'; return; }
 
   el.innerHTML='<div class="empty">Lädt…</div>';
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
 
   // Alle Kurse laden
   const promises=[...kursIds].map(id=>
@@ -1930,7 +1933,7 @@ function loadKurse(){
 // ── Benachrichtigungen ──
 function checkBenachrichtigungen(){
   if(!_tnData||!_tnId) return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   const notifs=(_tnData.benachrichtigungen||[]).filter(n=>!n.gelesen);
   const el=document.getElementById('notifBanner');
   if(!el) return;
@@ -2112,7 +2115,7 @@ function renderKursDetail(k){
   const el=document.getElementById('kdContent');
   if(!k||!el) return;
 
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   let st='Beendet', stCol='#6b7a99';
   if(k.von&&k.bis&&today>=k.von&&today<=k.bis){ st='● Laufend'; stCol='#10b981'; }
   else if(k.von&&k.von>today){ st='◐ Geplant'; stCol='#3b82f6'; }
@@ -2481,7 +2484,7 @@ function loadAzubiUrlaub(){
   const el=document.getElementById('myUrlaubAzubi');
   if(!el||!_tnData) return;
   const urlaub=(_tnData.urlaub||[]).sort((a,b)=>(a.von||'')>(b.von||'')?1:-1);
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   if(!urlaub.length){ el.innerHTML='<div class="empty">Kein Urlaub eingetragen</div>'; return; }
   el.innerHTML=urlaub.map((u,i)=>{
     const past=u.bis&&u.bis<today;
@@ -2495,7 +2498,7 @@ function loadAzubiUrlaub(){
 
 function showAzubiUrlaubForm(){
   document.getElementById('azubiUrlaubForm').style.display='';
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   if(!document.getElementById('azUrlVon').value) document.getElementById('azUrlVon').value=today;
   if(!document.getElementById('azUrlBis').value) document.getElementById('azUrlBis').value=today;
 }

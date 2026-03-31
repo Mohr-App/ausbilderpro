@@ -332,7 +332,7 @@ function setupKursListeners(){
 function renderAusfallBanner(){
   const el=document.getElementById('agNotifBanner');
   if(!el) return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   const ausfaelle=[];
   _azubis.forEach(a=>{
     const notifs=(a.benachrichtigungen||[]).filter(n=>n.typ==='kurs_ausfall'&&n.datum===today&&!n.gelesen);
@@ -376,7 +376,7 @@ function renderAzubiList(){
   const openIds=new Set();
   document.querySelectorAll('.azubi-card.expanded').forEach(c=>{if(c.dataset.tnId)openIds.add(c.dataset.tnId);});
   el.innerHTML='';
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   // Sync-Hinweis
   const hint=document.createElement('div');
   hint.id='agSyncHint';
@@ -818,7 +818,7 @@ function startAgZeitLive(){
   _agZeitLiveUnsubs.forEach(u=>u());
   _agZeitLiveUnsubs=[];
   if(!_azubis.length) return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDate();
   const liveData={};
   const el=document.getElementById('agZeitLive');
   function render(){
@@ -861,13 +861,16 @@ function startAgZeitLive(){
     _agZeitLiveUnsubs.push(unsub);
   });
 }
+function localDate(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function localYM(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+
 function fillAgMonatSelect(id){
   const sel=document.getElementById(id);
   if(!sel||sel.children.length>0) return;
   const now=new Date();
   for(let i=0;i<6;i++){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    const ym=d.toISOString().slice(0,7);
+    const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     const label=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
     sel.innerHTML+='<option value="'+ym+'"'+(i===0?' selected':'')+'>'+label+'</option>';
   }
@@ -878,7 +881,7 @@ function minToStr(m){const h=Math.floor(Math.abs(m)/60);const min=Math.abs(m)%60
 function loadAgZeiten(){
   const el=document.getElementById('agZeitenListe');
   if(!el||!_azubis.length){el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
-  const ym=document.getElementById('agZeitMonat')?.value||new Date().toISOString().slice(0,7);
+  const ym=document.getElementById('agZeitMonat')?.value||localYM();
   el.innerHTML='<div class="empty">Lädt…</div>';
   const promises=_azubis.map(az=>
     db.collection('globalTN').doc(az.id).collection('zeiterfassung')
@@ -956,7 +959,7 @@ function agBestaetigeZeit(tnId, datum){
 function loadAgBaustellen(){
   const el=document.getElementById('agBsListe');
   if(!el||!_azubis.length){el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
-  const ym=document.getElementById('agBsMonat')?.value||new Date().toISOString().slice(0,7);
+  const ym=document.getElementById('agBsMonat')?.value||localYM();
   el.innerHTML='<div class="empty">Lädt…</div>';
   const promises=_azubis.map(az=>
     db.collection('globalTN').doc(az.id).collection('baustellen')
