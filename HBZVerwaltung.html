@@ -577,6 +577,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="sb-icon-btn" onclick="showPage('urlaub')" id="nav-urlaub" title="Urlaubsübersicht">🏖<span class="nav-label">Urlaub</span></button>
         <button class="sb-icon-btn" onclick="showPage('kursplanung')" id="nav-kursplanung" title="Kursplanung">📅<span class="nav-label">Planung</span></button>
         <button class="sb-icon-btn" onclick="showPage('einstellungen')" id="nav-einstellungen" title="Einstellungen">⚙️<span class="nav-label">Settings</span></button>
+        <button class="sb-icon-btn" onclick="showPage('agverwaltung')" id="nav-agverwaltung" title="Arbeitgeber">🏭<span class="nav-label">Betriebe</span></button>
       </div>
     </div>
 
@@ -827,6 +828,19 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
 
             <!-- EINSTELLUNGEN PAGE -->
+      <div class="page" id="page-agverwaltung">
+        <div class="page-title">🏭 Arbeitgeber-Verwaltung</div>
+        <div class="page-sub">Betriebe freischalten, Lizenzen verwalten</div>
+        <div class="card">
+          <div class="card-title">⏳ Neue Anfragen</div>
+          <div id="agPendingList"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✅ Aktive Betriebe</div>
+          <div id="agActiveList"><div class="empty">Lädt…</div></div>
+        </div>
+      </div>
+
       <div class="page" id="page-einstellungen">
         <div class="page-title">⚙️ Einstellungen</div>
         <div class="page-sub">Ausbilder · Lehrgangsarten · Berufsgruppen verwalten</div>
@@ -1802,6 +1816,7 @@ function showPage(id){
   if(id==='urlaub') renderUrlaubPage();
   if(id==='kursplanung') renderGantt();
   if(id==='einstellungen'){ loadHVKontakt(); loadAGUsers(); }
+  if(id==='agverwaltung'){ loadAgVerwaltung(); }
 }
 
 function toggleSbSection(treeId, arrId){
@@ -7485,6 +7500,62 @@ function collectFirmen(){
 
 // ── ARBEITGEBER ZUGÄNGE ──
 let _agUsers=[];
+function loadAgVerwaltung(){
+  const pendEl=document.getElementById('agPendingList');
+  const actEl=document.getElementById('agActiveList');
+  if(!pendEl||!actEl) return;
+  pendEl.innerHTML='<div class="empty">Lädt…</div>';
+  actEl.innerHTML='<div class="empty">Lädt…</div>';
+  db.collection('users').where('role','==','arbeitgeber').get().then(snap=>{
+    let pendHtml='',actHtml='';
+    const docs=[];
+    snap.forEach(doc=>docs.push({uid:doc.id,...doc.data()}));
+    docs.sort((a,b)=>(b.registriertAm||0)-(a.registriertAm||0));
+    docs.forEach(d=>{
+      const name=((d.vorname||'')+' '+(d.nachname||'')).trim()||d.email;
+      const firma=d.firma||'?';
+      const datum=d.registriertAm?new Date(d.registriertAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}):'?';
+      // MA-Anzahl zählen
+      const maCount=d.maCount||0;
+      if(d.agStatus==='pending'){
+        pendHtml+='<div style="padding:10px;border:2px solid rgba(245,158,11,.3);border-radius:10px;margin-bottom:6px;background:rgba(245,158,11,.04)">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+          +'<div><div style="font-size:.85rem;font-weight:800">'+esc(firma)+'</div>'
+          +'<div style="font-size:.7rem;color:var(--mu)">'+esc(name)+' · '+esc(d.email||'')+' · '+datum+'</div>'
+          +(d.tel?'<div style="font-size:.65rem;color:var(--mu)">📞 '+esc(d.tel)+'</div>':'')+'</div>'
+          +'<button onclick="freischaltenAG(\''+d.uid+'\')" style="padding:8px 16px;background:#059669;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif;flex-shrink:0">✅ Freischalten</button>'
+          +'</div></div>';
+      } else {
+        actHtml+='<div style="padding:10px;border:1px solid var(--brd);border-radius:10px;margin-bottom:6px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+          +'<div><div style="font-size:.85rem;font-weight:800">'+esc(firma)+'</div>'
+          +'<div style="font-size:.7rem;color:var(--mu)">'+esc(name)+' · '+esc(d.email||'')+'</div></div>'
+          +'<div style="text-align:right"><div style="font-size:.7rem;font-weight:700;color:var(--acc)">✅ Aktiv</div>'
+          +'<button onclick="sperrenAG(\''+d.uid+'\')" style="font-size:.55rem;padding:2px 8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:4px;color:#ef4444;cursor:pointer;font-weight:600;margin-top:4px">Sperren</button>'
+          +'</div></div></div>';
+      }
+    });
+    pendEl.innerHTML=pendHtml||'<div class="empty">Keine offenen Anfragen</div>';
+    actEl.innerHTML=actHtml||'<div class="empty">Keine aktiven Betriebe</div>';
+  }).catch(err=>{pendEl.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
+}
+
+function freischaltenAG(uid){
+  if(!confirm('Betrieb freischalten? Der Arbeitgeber kann sich danach einloggen.')) return;
+  db.collection('users').doc(uid).update({agStatus:'active',freigeschaltetAm:Date.now()}).then(()=>{
+    toast('✅ Betrieb freigeschaltet');
+    loadAgVerwaltung();
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function sperrenAG(uid){
+  if(!confirm('Betrieb sperren? Der Arbeitgeber kann sich nicht mehr einloggen.')) return;
+  db.collection('users').doc(uid).update({agStatus:'pending'}).then(()=>{
+    toast('🔒 Betrieb gesperrt');
+    loadAgVerwaltung();
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
 function loadAGUsers(){
   db.collection('users').where('role','==','arbeitgeber').onSnapshot(snap=>{
     _agUsers=[];

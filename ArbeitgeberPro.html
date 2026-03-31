@@ -81,7 +81,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 </head>
 <body>
 <div id="loginWrap">
-  <div class="login-box">
+  <div class="login-box" id="loginForm">
     <div class="login-logo">Arbeitgeber<span>Pro</span></div>
     <div class="login-sub">Ausbildungsportal für Betriebe</div>
     <div class="fg"><label class="fl">E-Mail</label><input class="fi" type="email" id="lEmail" placeholder="name@firma.de"></div>
@@ -89,6 +89,33 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="err" id="lErr"></div>
     <button class="btn" onclick="doLogin()" style="margin-top:8px">Anmelden</button>
     <button class="btn" onclick="doReset()" style="background:#fff;border:1px solid var(--brd);box-shadow:none;color:var(--mu);font-size:.72rem;padding:8px;margin-top:6px">Passwort vergessen</button>
+    <div style="border-top:1px solid var(--brd);margin-top:14px;padding-top:14px;text-align:center">
+      <div style="font-size:.65rem;color:var(--mu);margin-bottom:6px">Noch kein Konto?</div>
+      <button class="btn" onclick="showRegForm()" style="background:linear-gradient(135deg,#059669,#10b981);font-size:.78rem;padding:10px;width:100%">🏭 Als Betrieb registrieren</button>
+    </div>
+  </div>
+  <div class="login-box" id="regForm" style="display:none">
+    <div class="login-logo">Arbeitgeber<span>Pro</span></div>
+    <div class="login-sub">Betrieb registrieren</div>
+    <div class="fg"><label class="fl">Firmenname *</label><input class="fi" id="rFirma" placeholder="z.B. Elektro-Service Müller"></div>
+    <div style="display:flex;gap:6px">
+      <div class="fg" style="flex:1"><label class="fl">Vorname *</label><input class="fi" id="rVorname" placeholder="Max"></div>
+      <div class="fg" style="flex:1"><label class="fl">Nachname *</label><input class="fi" id="rNachname" placeholder="Müller"></div>
+    </div>
+    <div class="fg"><label class="fl">E-Mail *</label><input class="fi" type="email" id="rEmail" placeholder="name@firma.de"></div>
+    <div class="fg"><label class="fl">Telefon (optional)</label><input class="fi" type="tel" id="rTel" placeholder="0228 123456"></div>
+    <div class="fg"><label class="fl">Passwort * (min. 6 Zeichen)</label><input class="fi" type="password" id="rPw" placeholder="••••••••"></div>
+    <div class="err" id="rErr"></div>
+    <button class="btn" onclick="doRegister()" style="margin-top:8px;background:linear-gradient(135deg,#059669,#10b981)">🏭 Registrieren</button>
+    <button class="btn" onclick="showLoginForm()" style="background:#fff;border:1px solid var(--brd);box-shadow:none;color:var(--mu);font-size:.72rem;padding:8px;margin-top:6px">← Zurück zum Login</button>
+  </div>
+  <div class="login-box" id="pendingScreen" style="display:none;text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:12px">⏳</div>
+    <div class="login-logo">Arbeitgeber<span>Pro</span></div>
+    <div style="font-size:.85rem;font-weight:700;color:var(--tx);margin:14px 0 8px">Registrierung eingegangen!</div>
+    <div style="font-size:.75rem;color:var(--mu);line-height:1.6;margin-bottom:16px">Ihr Konto wird geprüft und freigeschaltet. Sie erhalten eine Benachrichtigung sobald der Zugang aktiv ist.</div>
+    <div style="padding:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:10px;font-size:.7rem;color:#d97706;font-weight:600">Status: Warten auf Freischaltung</div>
+    <button class="btn" onclick="doLogout()" style="background:#fff;border:1px solid var(--brd);box-shadow:none;color:var(--mu);font-size:.72rem;padding:8px;margin-top:14px">Abmelden</button>
   </div>
 </div>
 <div id="appWrap" style="display:none">
@@ -285,15 +312,65 @@ function doReset(){
 }
 function doLogout(){auth.signOut();}
 
+function showRegForm(){document.getElementById('loginForm').style.display='none';document.getElementById('regForm').style.display='';}
+function showLoginForm(){document.getElementById('regForm').style.display='none';document.getElementById('loginForm').style.display='';}
+
+function doRegister(){
+  const firma=document.getElementById('rFirma').value.trim();
+  const vorname=document.getElementById('rVorname').value.trim();
+  const nachname=document.getElementById('rNachname').value.trim();
+  const email=document.getElementById('rEmail').value.trim().toLowerCase();
+  const tel=document.getElementById('rTel').value.trim();
+  const pw=document.getElementById('rPw').value;
+  const err=document.getElementById('rErr');
+  err.textContent='';
+  if(!firma){err.textContent='Bitte Firmennamen eingeben';return;}
+  if(!vorname||!nachname){err.textContent='Bitte Vor- und Nachname eingeben';return;}
+  if(!email){err.textContent='Bitte E-Mail eingeben';return;}
+  if(pw.length<6){err.textContent='Passwort min. 6 Zeichen';return;}
+  err.textContent='Wird registriert…';
+  auth.createUserWithEmailAndPassword(email,pw).then(cred=>{
+    const uid=cred.user.uid;
+    return db.collection('users').doc(uid).set({
+      email, role:'arbeitgeber', firma, vorname, nachname, tel,
+      agStatus:'pending', registriertAm:Date.now()
+    });
+  }).then(()=>{
+    err.textContent='';
+    // Auth state change will handle the pending screen
+  }).catch(e=>{
+    const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach'};
+    err.textContent=msgs[e.code]||e.message;
+  });
+}
+
 auth.onAuthStateChanged(user=>{
   if(user){
     _uid=user.uid;_email=user.email;
     document.getElementById('loginWrap').style.display='none';
-    document.getElementById('appWrap').style.display='';
-    loadUserData();
+    // Erst prüfen ob freigeschaltet
+    db.collection('users').doc(user.uid).get().then(doc=>{
+      if(!doc.exists){toast('Kein Zugang','bad');auth.signOut();return;}
+      const d=doc.data();
+      if(d.role!=='arbeitgeber'){toast('Kein Arbeitgeber-Zugang','bad');auth.signOut();return;}
+      if(d.agStatus==='pending'){
+        // Pending screen zeigen
+        document.getElementById('loginWrap').style.display='';
+        document.getElementById('loginForm').style.display='none';
+        document.getElementById('regForm').style.display='none';
+        document.getElementById('pendingScreen').style.display='';
+        return;
+      }
+      // Freigeschaltet → App laden
+      document.getElementById('appWrap').style.display='';
+      loadUserData();
+    });
   } else {
     _uid=null;
     document.getElementById('loginWrap').style.display='';
+    document.getElementById('loginForm').style.display='';
+    document.getElementById('regForm').style.display='none';
+    document.getElementById('pendingScreen').style.display='none';
     document.getElementById('appWrap').style.display='none';
     Object.values(_kursListeners).forEach(u=>u());
     _kursListeners={};
