@@ -44,7 +44,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .main{flex:1;overflow-y:auto;padding:16px 16px 90px;-webkit-overflow-scrolling:touch;}
 /* Bottom nav */
 .bnav{position:fixed;bottom:0;left:0;right:0;background:var(--sur);border-top:1px solid var(--brd);display:flex;justify-content:space-around;padding:8px 4px calc(env(safe-area-inset-bottom,0px) + 8px);z-index:100;}
-.bnav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--mu);font-family:'JetBrains Mono',monospace;font-size:.5rem;cursor:pointer;padding:6px 12px;border-radius:10px;transition:all .12s;}
+.bnav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--mu);font-family:'JetBrains Mono',monospace;font-size:.48rem;cursor:pointer;padding:6px 8px;border-radius:10px;transition:all .12s;flex:1;}
 .bnav-btn .bi{font-size:1.2rem;line-height:1;}
 .bnav-btn.active{color:var(--acc);background:rgba(16,185,129,.08);}
 /* Cards */
@@ -309,6 +309,91 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <button class="btn" onclick="doLogout()" style="background:var(--sur2);color:var(--bad);box-shadow:none;margin-top:8px">Abmelden</button>
     </div>
 
+    <!-- ZEITEN -->
+    <div class="page" id="page-zeiten">
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:14px">⏱ Zeiterfassung</div>
+      <div class="card" id="zeitStempelCard">
+        <div style="text-align:center;margin-bottom:12px">
+          <div style="font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace" id="zeitDatumHeute"></div>
+          <div style="font-size:2.5rem;font-weight:800;font-family:'JetBrains Mono',monospace;margin:8px 0" id="zeitUhr">--:--</div>
+          <div id="zeitStatus" style="font-size:.75rem;color:var(--mu)">Nicht eingestempelt</div>
+        </div>
+        <button id="zeitBtn" onclick="zeitStempeln()" style="width:100%;padding:16px;border:none;border-radius:14px;font-size:1rem;font-weight:800;cursor:pointer;font-family:'Sora',sans-serif;background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.3)">▶ Einstempeln</button>
+        <div id="zeitPauseRow" style="display:none;margin-top:8px">
+          <button onclick="zeitPause()" id="zeitPauseBtn" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;background:rgba(245,158,11,.15);color:#d97706;border:1.5px solid rgba(245,158,11,.3)">⏸ Pause starten</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Heute</div>
+        <div id="zeitHeute"><div class="empty">Noch keine Einträge</div></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="card-title" style="margin:0">📅 Zeitkonto</div>
+          <select id="zeitMonat" onchange="loadZeitkonto()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+        </div>
+        <div id="zeitKonto"><div class="empty">Lädt…</div></div>
+      </div>
+    </div>
+
+    <!-- URLAUB -->
+    <div class="page" id="page-urlaub">
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:14px">🏖 Urlaub</div>
+      <div class="card">
+        <div class="card-title">📊 Übersicht</div>
+        <div id="urlaubUebersicht"><div class="empty">Lädt…</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">+ Urlaub beantragen</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <div style="flex:1"><label class="fl">Von</label><input class="fi" type="date" id="urlVon" style="font-size:.76rem"></div>
+          <div style="flex:1"><label class="fl">Bis</label><input class="fi" type="date" id="urlBis" style="font-size:.76rem"></div>
+        </div>
+        <div><label class="fl">Grund (optional)</label><input class="fi" id="urlGrund" placeholder="z.B. Familienurlaub" style="font-size:.76rem"></div>
+        <button class="btn" onclick="urlaubBeantragen()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px">🏖 Urlaub beantragen</button>
+        <div class="err" id="urlErr" style="margin-top:4px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Meine Anträge</div>
+        <div id="urlaubAntraege"><div class="empty">Keine Anträge</div></div>
+      </div>
+    </div>
+
+    <!-- BAUSTELLEN -->
+    <div class="page" id="page-baustellen">
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:14px">🏗 Baustellennachweis</div>
+      <div class="card">
+        <div class="card-title">+ Heutigen Einsatz erfassen</div>
+        <div><label class="fl">Baustelle / Projekt</label><input class="fi" id="bsName" placeholder="z.B. Neubau Müller" style="font-size:.76rem"></div>
+        <div><label class="fl">Adresse</label><input class="fi" id="bsAdresse" placeholder="Straße, PLZ Ort" style="font-size:.76rem"></div>
+        <div><label class="fl">Tätigkeit</label><input class="fi" id="bsTaetigkeit" placeholder="z.B. Leitungsverlegung" style="font-size:.76rem"></div>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <div style="flex:1"><label class="fl">Von</label><input class="fi" type="time" id="bsVon" style="font-size:.76rem"></div>
+          <div style="flex:1"><label class="fl">Bis</label><input class="fi" type="time" id="bsBis" style="font-size:.76rem"></div>
+        </div>
+        <button class="btn" onclick="baustelleErfassen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px">🏗 Einsatz speichern</button>
+        <div class="err" id="bsErr" style="margin-top:4px"></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="card-title" style="margin:0">📋 Meine Einsätze</div>
+          <select id="bsMonat" onchange="loadBaustellen()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+        </div>
+        <div id="bsListe"><div class="empty">Keine Einsätze</div></div>
+      </div>
+    </div>
+
+    <!-- MEHR -->
+    <div class="page" id="page-mehr">
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:14px">⚙ Mehr</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button class="card" onclick="showPage('profil')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px"><span style="font-size:1.4rem">👤</span><div><div style="font-weight:700;font-size:.85rem">Mein Profil</div><div style="font-size:.65rem;color:var(--mu)">Name, Kontakt, Passwort</div></div></button>
+        <button class="card" onclick="showPage('docs')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px"><span style="font-size:1.4rem">📁</span><div><div style="font-weight:700;font-size:.85rem">Dokumente</div><div style="font-size:.65rem;color:var(--mu)">Kursunterlagen, Betrieb, eigene Dateien</div></div></button>
+        <button class="card" onclick="showPage('hilfe')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px"><span style="font-size:1.4rem">❓</span><div><div style="font-weight:700;font-size:.85rem">Hilfe</div><div style="font-size:.65rem;color:var(--mu)">Anleitung & Tipps</div></div></button>
+        <button onclick="doLogout()" style="margin-top:8px;width:100%;padding:12px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Abmelden</button>
+      </div>
+    </div>
+
     <!-- KURSDETAIL -->
     <div class="page" id="page-kursdetail">
       <button onclick="showPage('home')" style="background:none;border:none;color:var(--acc);font-size:.78rem;font-weight:600;cursor:pointer;padding:0;margin-bottom:12px">← Zurück</button>
@@ -366,9 +451,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <!-- BOTTOM NAV -->
   <div class="bnav">
     <button class="bnav-btn active" id="nav-home" onclick="showPage('home')"><span class="bi">🏠</span>Home</button>
-    <button class="bnav-btn" id="nav-docs" onclick="showPage('docs')"><span class="bi">📁</span>Dokumente</button>
-    <button class="bnav-btn" id="nav-profil" onclick="showPage('profil')"><span class="bi">👤</span>Profil</button>
-    <button class="bnav-btn" id="nav-hilfe" onclick="showPage('hilfe')"><span class="bi">❓</span>Hilfe</button>
+    <button class="bnav-btn" id="nav-zeiten" onclick="showPage('zeiten')"><span class="bi">⏱</span>Zeiten</button>
+    <button class="bnav-btn" id="nav-urlaub" onclick="showPage('urlaub')"><span class="bi">🏖</span>Urlaub</button>
+    <button class="bnav-btn" id="nav-baustellen" onclick="showPage('baustellen')"><span class="bi">🏗</span>Baustellen</button>
+    <button class="bnav-btn" id="nav-mehr" onclick="showPage('mehr')"><span class="bi">⚙</span>Mehr</button>
   </div>
 </div>
 
@@ -703,10 +789,16 @@ function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
-  const nb=document.getElementById('nav-'+id);
+  // Sub-Seiten unter "Mehr" → Mehr-Tab highlighten
+  const navMap={'docs':'mehr','profil':'mehr','hilfe':'mehr'};
+  const navId=navMap[id]||id;
+  const nb=document.getElementById('nav-'+navId);
   if(nb) nb.classList.add('active');
   if(id==='docs') loadDocs();
   if(id==='profil'){ loadProfil(); loadAzubiUrlaub(); }
+  if(id==='zeiten') initZeiten();
+  if(id==='urlaub') initUrlaub();
+  if(id==='baustellen') initBaustellen();
 }
 
 // ── Load Data ──
@@ -909,6 +1001,347 @@ function processJoinUrl(url){
     errEl.style.color='var(--bad)';
     errEl.textContent='Fehler: '+err.message;
   });
+}
+
+// ═══════════════════════════════════
+// ZEITERFASSUNG
+// ═══════════════════════════════════
+let _zeitState='aus'; // 'aus'|'ein'|'pause'
+let _zeitHeute=null;
+let _zeitTimer=null;
+
+function initZeiten(){
+  // Uhr aktualisieren
+  if(_zeitTimer) clearInterval(_zeitTimer);
+  _zeitTimer=setInterval(()=>{
+    const n=new Date();
+    const el=document.getElementById('zeitUhr');
+    if(el) el.textContent=n.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  },1000);
+  const hEl=document.getElementById('zeitDatumHeute');
+  if(hEl) hEl.textContent=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  // Monats-Dropdown
+  fillMonatSelect('zeitMonat');
+  loadZeitHeute();
+  loadZeitkonto();
+}
+
+function loadZeitHeute(){
+  if(!_tnId||!db) return;
+  const today=new Date().toISOString().slice(0,10);
+  db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today).get().then(doc=>{
+    _zeitHeute=doc.exists?doc.data():null;
+    renderZeitHeute();
+    updateZeitBtn();
+  }).catch(()=>{});
+}
+
+function updateZeitBtn(){
+  const btn=document.getElementById('zeitBtn');
+  const status=document.getElementById('zeitStatus');
+  const pauseRow=document.getElementById('zeitPauseRow');
+  const pauseBtn=document.getElementById('zeitPauseBtn');
+  if(!btn) return;
+  if(!_zeitHeute||!_zeitHeute.eingang||_zeitHeute.ausgang){
+    _zeitState='aus';
+    btn.textContent='▶ Einstempeln';
+    btn.style.background='linear-gradient(135deg,#059669,#10b981)';
+    status.textContent=_zeitHeute?.ausgang?'✓ Feierabend – '+_zeitHeute.eingang+' bis '+_zeitHeute.ausgang:'Nicht eingestempelt';
+    pauseRow.style.display='none';
+  } else if(_zeitHeute.eingang&&!_zeitHeute.ausgang){
+    // Prüfen ob in Pause
+    const pLog=_zeitHeute.pauseLog||[];
+    const offenePause=pLog.find(p=>p.start&&!p.ende);
+    if(offenePause){
+      _zeitState='pause';
+      btn.textContent='⏸ In Pause seit '+offenePause.start;
+      btn.style.background='linear-gradient(135deg,#d97706,#f59e0b)';
+      status.textContent='Eingestempelt seit '+_zeitHeute.eingang+' – Pause läuft';
+      pauseRow.style.display='';
+      pauseBtn.textContent='▶ Pause beenden';
+      pauseBtn.style.background='rgba(16,185,129,.15)';pauseBtn.style.color='#059669';pauseBtn.style.borderColor='rgba(16,185,129,.3)';
+    } else {
+      _zeitState='ein';
+      btn.textContent='⏹ Ausstempeln';
+      btn.style.background='linear-gradient(135deg,#dc2626,#ef4444)';
+      status.textContent='Eingestempelt seit '+_zeitHeute.eingang;
+      pauseRow.style.display='';
+      pauseBtn.textContent='⏸ Pause starten';
+      pauseBtn.style.background='rgba(245,158,11,.15)';pauseBtn.style.color='#d97706';pauseBtn.style.borderColor='rgba(245,158,11,.3)';
+    }
+  }
+}
+
+function zeitStempeln(){
+  if(!_tnId||!db) return;
+  const today=new Date().toISOString().slice(0,10);
+  const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
+  if(_zeitState==='aus'){
+    if(_zeitHeute&&_zeitHeute.ausgang){if(!confirm('Bereits ausgestempelt. Neuen Tag starten?'))return;}
+    ref.set({eingang:jetzt,pauseLog:[],datum:today},{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
+  } else if(_zeitState==='ein'||_zeitState==='pause'){
+    if(!confirm('Ausstempeln um '+jetzt+'?')) return;
+    // Offene Pause schließen
+    const pLog=(_zeitHeute?.pauseLog||[]).map(p=>p.start&&!p.ende?{...p,ende:jetzt}:p);
+    const pauseMin=calcPauseMinuten(pLog);
+    const istMin=calcIstMinuten(_zeitHeute.eingang,jetzt,pauseMin);
+    ref.update({ausgang:jetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin}).then(()=>{loadZeitHeute();toast('⏹ Ausgestempelt um '+jetzt);});
+  }
+}
+
+function zeitPause(){
+  if(!_tnId||!db||!_zeitHeute) return;
+  const today=new Date().toISOString().slice(0,10);
+  const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
+  const pLog=(_zeitHeute.pauseLog||[]).slice();
+  if(_zeitState==='ein'){
+    pLog.push({start:jetzt,ende:null});
+    ref.update({pauseLog:pLog}).then(()=>{loadZeitHeute();toast('⏸ Pause gestartet');});
+  } else if(_zeitState==='pause'){
+    const idx=pLog.findIndex(p=>p.start&&!p.ende);
+    if(idx>=0) pLog[idx].ende=jetzt;
+    ref.update({pauseLog:pLog}).then(()=>{loadZeitHeute();toast('▶ Pause beendet');});
+  }
+}
+
+function calcPauseMinuten(pLog){
+  let total=0;
+  (pLog||[]).forEach(p=>{
+    if(p.start&&p.ende) total+=timeToMin(p.ende)-timeToMin(p.start);
+  });
+  return Math.max(0,total);
+}
+function calcIstMinuten(ein,aus,pause){
+  return Math.max(0,timeToMin(aus)-timeToMin(ein)-(pause||0));
+}
+function timeToMin(t){
+  const p=(t||'0:0').split(':');
+  return parseInt(p[0])*60+parseInt(p[1]||0);
+}
+function minToStr(m){
+  const h=Math.floor(Math.abs(m)/60);
+  const min=Math.abs(m)%60;
+  return (m<0?'-':'')+h+'h '+String(min).padStart(2,'0')+'m';
+}
+
+function renderZeitHeute(){
+  const el=document.getElementById('zeitHeute');
+  if(!el) return;
+  if(!_zeitHeute||!_zeitHeute.eingang){el.innerHTML='<div class="empty">Noch nicht eingestempelt</div>';return;}
+  let html='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--brd)">'
+    +'<span style="font-size:.78rem;font-weight:700;color:var(--acc)">▶ '+_zeitHeute.eingang+'</span>';
+  if(_zeitHeute.ausgang) html+='<span style="font-size:.78rem;font-weight:700;color:#ef4444">⏹ '+_zeitHeute.ausgang+'</span>';
+  else html+='<span style="font-size:.7rem;color:var(--mu)">läuft…</span>';
+  html+='</div>';
+  const pLog=_zeitHeute.pauseLog||[];
+  if(pLog.length){
+    html+='<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Pausen: ';
+    html+=pLog.map(p=>p.start+(p.ende?' – '+p.ende:' – …')).join(', ');
+    html+=' ('+calcPauseMinuten(pLog)+' min)</div>';
+  }
+  if(_zeitHeute.ausgang){
+    const ist=_zeitHeute.istMinuten||calcIstMinuten(_zeitHeute.eingang,_zeitHeute.ausgang,calcPauseMinuten(pLog));
+    html+='<div style="font-size:.82rem;font-weight:700;color:var(--tx);margin-top:8px">Arbeitszeit: '+minToStr(ist)+'</div>';
+  }
+  el.innerHTML=html;
+}
+
+function loadZeitkonto(){
+  const el=document.getElementById('zeitKonto');
+  if(!el||!_tnId||!db) return;
+  const sel=document.getElementById('zeitMonat');
+  const ym=sel?sel.value:new Date().toISOString().slice(0,7);
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  db.collection('globalTN').doc(_tnId).collection('zeiterfassung')
+    .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
+    .orderBy('datum').get().then(snap=>{
+      if(snap.empty){el.innerHTML='<div class="empty">Keine Einträge in diesem Monat</div>';return;}
+      let totalIst=0,tage=0;
+      let html='<div style="font-size:.65rem;color:var(--mu);margin-bottom:6px">'+snap.size+' Tage erfasst</div>';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        if(!d.eingang) return;
+        const ist=d.istMinuten||0;
+        totalIst+=ist;
+        if(d.ausgang) tage++;
+        const datDE=new Date(d.datum+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+        html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,49,72,.3);font-size:.72rem">'
+          +'<span style="color:var(--mu)">'+datDE+'</span>'
+          +'<span>'+d.eingang+(d.ausgang?' – '+d.ausgang:'')+'</span>'
+          +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(d.ausgang?minToStr(ist):'…')+'</span>'
+          +'</div>';
+      });
+      html+='<div style="margin-top:10px;padding:10px;background:var(--sur2);border-radius:8px;display:flex;justify-content:space-between">'
+        +'<span style="font-size:.78rem;font-weight:700">Gesamt ('+tage+' Tage)</span>'
+        +'<span style="font-size:.85rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+minToStr(totalIst)+'</span></div>';
+      el.innerHTML=html;
+    }).catch(err=>{el.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
+}
+
+// ═══════════════════════════════════
+// URLAUB
+// ═══════════════════════════════════
+function initUrlaub(){
+  loadUrlaubUebersicht();
+  loadUrlaubAntraege();
+}
+
+function loadUrlaubUebersicht(){
+  const el=document.getElementById('urlaubUebersicht');
+  if(!el||!_tnId||!db) return;
+  // Alle Anträge laden für Statistik
+  db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').get().then(snap=>{
+    let beantragt=0,genehmigt=0,abgelehnt=0,genTage=0;
+    snap.forEach(doc=>{
+      const d=doc.data();
+      if(d.status==='beantragt') beantragt++;
+      else if(d.status==='genehmigt'){genehmigt++;genTage+=(d.tage||0);}
+      else if(d.status==='abgelehnt') abgelehnt++;
+    });
+    el.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:10px;text-align:center">'
+      +'<div style="font-size:1.2rem;font-weight:800;color:#d97706">'+beantragt+'</div><div style="font-size:.55rem;color:var(--mu)">Offen</div></div>'
+      +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;text-align:center">'
+      +'<div style="font-size:1.2rem;font-weight:800;color:#059669">'+genehmigt+'</div><div style="font-size:.55rem;color:var(--mu)">Genehmigt ('+genTage+' Tage)</div></div>'
+      +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:10px;text-align:center">'
+      +'<div style="font-size:1.2rem;font-weight:800;color:#ef4444">'+abgelehnt+'</div><div style="font-size:.55rem;color:var(--mu)">Abgelehnt</div></div>'
+      +'</div>';
+  }).catch(()=>{});
+}
+
+function urlaubBeantragen(){
+  const von=document.getElementById('urlVon').value;
+  const bis=document.getElementById('urlBis').value;
+  const grund=document.getElementById('urlGrund').value.trim();
+  const err=document.getElementById('urlErr');
+  err.textContent='';
+  if(!von||!bis){err.textContent='Bitte Von und Bis ausfüllen';return;}
+  if(bis<von){err.textContent='Bis-Datum muss nach Von liegen';return;}
+  // Arbeitstage berechnen (Mo-Fr)
+  let tage=0;
+  const d=new Date(von);
+  const end=new Date(bis);
+  while(d<=end){
+    const dow=d.getDay();
+    if(dow!==0&&dow!==6) tage++;
+    d.setDate(d.getDate()+1);
+  }
+  if(!confirm('Urlaub beantragen?\n\n'+von+' bis '+bis+' ('+tage+' Arbeitstage)'+(grund?'\nGrund: '+grund:''))) return;
+  db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').add({
+    von, bis, tage, grund, status:'beantragt', beantragAm:Date.now(),
+    tnName:((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim(),
+    firma:_tnData?.firma||''
+  }).then(()=>{
+    document.getElementById('urlVon').value='';
+    document.getElementById('urlBis').value='';
+    document.getElementById('urlGrund').value='';
+    toast('🏖 Urlaubsantrag eingereicht ✓');
+    loadUrlaubUebersicht();
+    loadUrlaubAntraege();
+  }).catch(err2=>{err.textContent='Fehler: '+err2.message;});
+}
+
+function loadUrlaubAntraege(){
+  const el=document.getElementById('urlaubAntraege');
+  if(!el||!_tnId||!db) return;
+  db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').orderBy('beantragAm','desc').limit(20).get().then(snap=>{
+    if(snap.empty){el.innerHTML='<div class="empty">Keine Anträge</div>';return;}
+    let html='';
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const statusCol=d.status==='genehmigt'?'#059669':d.status==='abgelehnt'?'#ef4444':'#d97706';
+      const statusIcon=d.status==='genehmigt'?'✅':d.status==='abgelehnt'?'❌':'⏳';
+      const vonDE=new Date(d.von+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+      const bisDE=new Date(d.bis+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+      html+='<div style="padding:8px;border:1px solid var(--brd);border-radius:8px;margin-bottom:4px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="font-size:.78rem;font-weight:700">'+vonDE+' – '+bisDE+'</span>'
+        +'<span style="font-size:.65rem;font-weight:700;color:'+statusCol+';padding:2px 8px;background:'+statusCol+'15;border-radius:4px">'+statusIcon+' '+d.status+'</span></div>'
+        +'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">'+d.tage+' Tage'+(d.grund?' · '+esc(d.grund):'')+'</div>'
+        +'</div>';
+    });
+    el.innerHTML=html;
+  }).catch(()=>{});
+}
+
+// ═══════════════════════════════════
+// BAUSTELLEN
+// ═══════════════════════════════════
+function initBaustellen(){
+  fillMonatSelect('bsMonat');
+  loadBaustellen();
+}
+
+function baustelleErfassen(){
+  const name=document.getElementById('bsName').value.trim();
+  const adresse=document.getElementById('bsAdresse').value.trim();
+  const taetigkeit=document.getElementById('bsTaetigkeit').value.trim();
+  const von=document.getElementById('bsVon').value;
+  const bis=document.getElementById('bsBis').value;
+  const err=document.getElementById('bsErr');
+  err.textContent='';
+  if(!name){err.textContent='Bitte Baustelle/Projekt eingeben';return;}
+  if(!von||!bis){err.textContent='Bitte Zeiten eingeben';return;}
+  const today=new Date().toISOString().slice(0,10);
+  db.collection('globalTN').doc(_tnId).collection('baustellen').add({
+    datum:today, baustelle:name, adresse, taetigkeit, von, bis,
+    erstellt:Date.now(),
+    tnName:((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim(),
+    firma:_tnData?.firma||''
+  }).then(()=>{
+    document.getElementById('bsName').value='';
+    document.getElementById('bsAdresse').value='';
+    document.getElementById('bsTaetigkeit').value='';
+    document.getElementById('bsVon').value='';
+    document.getElementById('bsBis').value='';
+    toast('🏗 Baustelleneinsatz gespeichert ✓');
+    loadBaustellen();
+  }).catch(err2=>{err.textContent='Fehler: '+err2.message;});
+}
+
+function loadBaustellen(){
+  const el=document.getElementById('bsListe');
+  if(!el||!_tnId||!db) return;
+  const sel=document.getElementById('bsMonat');
+  const ym=sel?sel.value:new Date().toISOString().slice(0,7);
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  db.collection('globalTN').doc(_tnId).collection('baustellen')
+    .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
+    .orderBy('datum','desc').get().then(snap=>{
+      if(snap.empty){el.innerHTML='<div class="empty">Keine Einsätze in diesem Monat</div>';return;}
+      let html='';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const datDE=new Date(d.datum+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+        html+='<div style="padding:8px;border:1px solid var(--brd);border-radius:8px;margin-bottom:4px">'
+          +'<div style="display:flex;justify-content:space-between">'
+          +'<span style="font-size:.78rem;font-weight:700">'+esc(d.baustelle)+'</span>'
+          +'<span style="font-size:.6rem;color:var(--mu)">'+datDE+'</span></div>'
+          +(d.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(d.adresse)+'</div>':'')
+          +(d.taetigkeit?'<div style="font-size:.65rem;color:var(--mu)">🔧 '+esc(d.taetigkeit)+'</div>':'')
+          +'<div style="font-size:.65rem;color:var(--acc);font-family:\'JetBrains Mono\',monospace;margin-top:2px">'+d.von+' – '+d.bis+'</div>'
+          +'</div>';
+      });
+      el.innerHTML=html;
+    }).catch(err=>{el.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
+}
+
+// ═══════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════
+function fillMonatSelect(id){
+  const sel=document.getElementById(id);
+  if(!sel) return;
+  const now=new Date();
+  sel.innerHTML='';
+  for(let i=0;i<6;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const ym=d.toISOString().slice(0,7);
+    const label=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+    sel.innerHTML+='<option value="'+ym+'"'+(i===0?' selected':'')+'>'+label+'</option>';
+  }
 }
 
 function checkDsgvoConsent(){
