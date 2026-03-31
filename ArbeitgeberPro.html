@@ -946,59 +946,96 @@ function loadAgZeiten(){
   if(!el||!_azubis.length){el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
   const ym=document.getElementById('agZeitMonat')?.value||localYM();
   el.innerHTML='<div class="empty">Lädt…</div>';
-  const promises=_azubis.map(az=>
-    db.collection('globalTN').doc(az.id).collection('zeiterfassung')
-      .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
-      .orderBy('datum').get()
-      .then(snap=>({az, entries:snap.docs.map(d=>({id:d.id,...d.data()}))}))
-      .catch(()=>({az, entries:[]}))
-  );
+  // Alle Arbeitstage des Monats (Mo-Fr bis heute)
+  const allDays=[];
+  const mStart=new Date(ym+'-01T12:00');
+  const mEnd=new Date(mStart.getFullYear(),mStart.getMonth()+1,0);
+  const today=localDate();
+  for(let dt=new Date(mStart);dt<=mEnd;dt.setDate(dt.getDate()+1)){
+    if(dt.getDay()===0||dt.getDay()===6) continue;
+    const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+    if(ds>today) continue;
+    allDays.push(ds);
+  }
+  const promises=_azubis.map(az=>{
+    const p1=db.collection('globalTN').doc(az.id).collection('zeiterfassung')
+      .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').orderBy('datum').get();
+    const p2=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('type','==','krank').get();
+    const p3=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .where('status','==','genehmigt').get();
+    return Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlSnap])=>{
+      const zeitMap={};
+      zeitSnap.forEach(d=>{zeitMap[d.data().datum]={id:d.id,...d.data()};});
+      const krankDates=new Set();
+      krankSnap.forEach(d=>{const dd=d.data();if(dd.datum&&dd.datum.startsWith(ym))krankDates.add(dd.datum);});
+      const urlaubDates=new Set();
+      urlSnap.forEach(d=>{
+        const dd=d.data();if(!dd.von||!dd.bis)return;
+        const s=new Date(dd.von+'T12:00'),e=new Date(dd.bis+'T12:00');
+        for(let dt=new Date(s);dt<=e;dt.setDate(dt.getDate()+1)){
+          const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+          if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6)urlaubDates.add(ds);
+        }
+      });
+      return {az, zeitMap, krankDates, urlaubDates};
+    }).catch(()=>({az, zeitMap:{}, krankDates:new Set(), urlaubDates:new Set()}));
+  });
   Promise.all(promises).then(results=>{
     let html='';
-    results.forEach(({az, entries})=>{
+    results.forEach(({az, zeitMap, krankDates, urlaubDates})=>{
       const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Azubi';
       const plan=az.arbeitszeitPlan||null;
-      let totalIst=0,totalSoll=0;
+      let totalIst=0,totalSoll=0,tage=0;
       html+='<div style="margin-bottom:12px;padding:10px;border:1px solid var(--brd);border-radius:10px">';
       html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:.82rem;font-weight:800">'+esc(name)+'</span>';
       if(plan){
         const woche=['mo','di','mi','do','fr'].reduce((s,k)=>s+(plan[k]||0),0);
-        html+='<span style="font-size:.55rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+woche+'h/Woche</span>';
+        html+='<span style="font-size:.55rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+woche+'h/W · 🤒'+krankDates.size+' · 🏖'+urlaubDates.size+'</span>';
       } else {
         html+='<span style="font-size:.55rem;color:#d97706">⚠ Keine Arbeitszeit</span>';
       }
       html+='</div>';
-      if(!entries.length) html+='<div style="font-size:.7rem;color:var(--mu)">Keine Einträge</div>';
-      else {
-        entries.forEach(e=>{
-          const ist=e.istMinuten||0;
-          const soll=plan?getAgSollMin(e.datum,plan):0;
-          totalIst+=ist; totalSoll+=soll;
-          const datDE=new Date(e.datum+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
-          const manuell=e.manuell?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(245,158,11,.15);color:#d97706;border-radius:4px;font-weight:700;margin-left:4px">manuell'+(e.agBestaetigt?' ✓':' – offen')+'</span>':'';
-          const bestBtn=e.manuell&&!e.agBestaetigt?'<button onclick="agBestaetigeZeit(\''+az.id+'\',\''+e.datum+'\')" style="font-size:.5rem;padding:2px 8px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:4px">✓ Bestätigen</button>':'';
-          if(plan){
-            const diff=ist-soll;const diffCol=diff>=0?'#059669':'#ef4444';
-            html+='<div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.68rem">'
-              +'<span style="flex:1.5;color:var(--mu)">'+datDE+'</span>'
-              +'<span style="flex:2">'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+manuell+bestBtn+'</span>'
-              +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?minToStr(ist):'…')+'</span>'
-              +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?(diff>=0?'+':'')+minToStr(diff):'')+'</span></div>';
-          } else {
-            html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.7rem">'
-              +'<span style="color:var(--mu)">'+datDE+'</span>'
-              +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+manuell+bestBtn+'</span>'
-              +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?minToStr(ist):'…')+'</span></div>';
-          }
-        });
+      allDays.forEach(ds=>{
+        const e=zeitMap[ds];
+        const isKrank=krankDates.has(ds);
+        const isUrlaub=urlaubDates.has(ds);
+        const ist=e?.istMinuten||0;
+        const sollRaw=plan?getAgSollMin(ds,plan):0;
+        const soll=(isKrank||isUrlaub)?0:sollRaw;
+        totalIst+=ist;totalSoll+=soll;
+        if(e?.ausgang) tage++;
+        const datDE=new Date(ds+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+        const manuell=e?.manuell?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(245,158,11,.15);color:#d97706;border-radius:4px;font-weight:700;margin-left:3px">✎'+(e.agBestaetigt?' ✓':' offen')+'</span>':'';
+        const bestBtn=e?.manuell&&!e.agBestaetigt?'<button onclick="agBestaetigeZeit(\''+az.id+'\',\''+ds+'\')" style="font-size:.5rem;padding:2px 6px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:3px">✓</button>':'';
+        let statusTag='';
+        if(isKrank) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.15);color:#ef4444;border-radius:3px;font-weight:700;margin-left:3px">🤒</span>';
+        else if(isUrlaub) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(16,185,129,.15);color:#059669;border-radius:3px;font-weight:700;margin-left:3px">🏖</span>';
         if(plan){
-          const diff=totalIst-totalSoll;const diffCol=diff>=0?'#059669':'#ef4444';
-          html+='<div style="margin-top:6px;padding:6px;background:var(--sur2);border-radius:6px;display:flex;justify-content:space-between;font-size:.72rem">'
-            +'<span>Ist: <b>'+minToStr(totalIst)+'</b> · Soll: <b>'+minToStr(totalSoll)+'</b></span>'
-            +'<span style="font-weight:800;color:'+diffCol+'">'+(diff>=0?'📈 +':'📉 ')+minToStr(diff)+'</span></div>';
-        } else {
-          html+='<div style="margin-top:6px;font-size:.75rem;font-weight:800;text-align:right">Gesamt: '+minToStr(totalIst)+'</div>';
+          const diff=ist-soll;const diffCol=(isKrank||isUrlaub)?'var(--mu)':diff>=0?'#059669':'#ef4444';
+          const zeitText=e?(e.eingang+(e.ausgang?' – '+e.ausgang:'…')):(isKrank||isUrlaub?'—':'');
+          html+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem">'
+            +'<span style="flex:1.5;color:var(--mu)">'+datDE+statusTag+'</span>'
+            +'<span style="flex:2">'+zeitText+manuell+bestBtn+'</span>'
+            +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e?.ausgang?minToStr(ist):(isKrank||isUrlaub?'—':''))+'</span>'
+            +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isKrank||isUrlaub?'—':(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
+        } else if(e){
+          html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
+            +'<span style="color:var(--mu)">'+datDE+statusTag+'</span>'
+            +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+manuell+bestBtn+'</span>'
+            +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?minToStr(ist):'…')+'</span></div>';
+        } else if(isKrank||isUrlaub){
+          html+='<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
+            +'<span style="color:var(--mu)">'+datDE+statusTag+'</span><span>—</span><span>—</span></div>';
         }
+      });
+      if(plan){
+        const diff=totalIst-totalSoll;const diffCol=diff>=0?'#059669':'#ef4444';
+        html+='<div style="margin-top:6px;padding:6px;background:var(--sur2);border-radius:6px;display:flex;justify-content:space-between;font-size:.7rem">'
+          +'<span>Ist: <b>'+minToStr(totalIst)+'</b> · Soll: <b>'+minToStr(totalSoll)+'</b></span>'
+          +'<span style="font-weight:800;color:'+diffCol+'">'+(diff>=0?'📈 +':'📉 ')+minToStr(diff)+'</span></div>';
+      } else if(tage) {
+        html+='<div style="margin-top:6px;font-size:.72rem;font-weight:800;text-align:right">Gesamt: '+minToStr(totalIst)+'</div>';
       }
       html+='</div>';
     });
