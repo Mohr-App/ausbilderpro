@@ -691,14 +691,11 @@ function renderAGSyncStatus(){
 function loadHVKontakt(){
   db.collection('shared').doc('kursSettings').get().then(doc=>{
     if(!doc.exists)return;const d=doc.data();
-    let ex=document.getElementById('hvKontaktCard');if(ex)ex.remove();
-    if(!d.hvName&&!d.hvTel&&!d.hvEmail)return;
-    const c=document.createElement('div');c.className='card';c.id='hvKontaktCard';
-    c.innerHTML='<div class="card-title">📞 Kontakt Hauptverwaltung</div>'
-      +(d.hvName?'<div class="kurs-field"><span class="kurs-field-label">Name</span><span>'+esc(d.hvName)+'</span></div>':'')
+    const target=document.getElementById('agHVKontakt');
+    if(target) target.innerHTML=
+      (d.hvName?'<div class="kurs-field"><span class="kurs-field-label">Name</span><span>'+esc(d.hvName)+'</span></div>':'')
       +(d.hvEmail?'<div class="kurs-field"><span class="kurs-field-label">E-Mail</span><span><a href="mailto:'+esc(d.hvEmail)+'" style="color:var(--acc)">'+esc(d.hvEmail)+'</a></span></div>':'')
       +(d.hvTel?'<div class="kurs-field"><span class="kurs-field-label">Telefon</span><span><a href="tel:'+esc(d.hvTel)+'" style="color:var(--acc)">📞 '+esc(d.hvTel)+'</a></span></div>':'');
-    document.querySelector('.main').appendChild(c);
   }).catch(()=>{});
 }
 
