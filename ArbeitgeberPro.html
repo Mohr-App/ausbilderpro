@@ -76,6 +76,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .stab{padding:8px 14px;border:1.5px solid var(--brd);border-radius:8px;background:var(--sur2);color:var(--mu);font-size:.68rem;font-weight:700;font-family:'Sora',sans-serif;cursor:pointer;white-space:nowrap;transition:all .12s;}
 .stab.active{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:var(--acc);}
 .abtab{display:none;}.abtab.active{display:block;}
+.ag-badge{position:absolute;top:2px;right:8px;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 2px 6px rgba(239,68,68,.4);animation:pulseRed 1.5s infinite;}
 </style>
 </head>
 <body>
@@ -290,6 +291,7 @@ function loadAzubis(){
     snap.forEach(doc=>_azubis.push({id:doc.id,...doc.data()}));
     _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
     renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
+    checkAgBadges();
   });
 }
 
@@ -1078,8 +1080,34 @@ function loadAgMeldungen(){
 function agMeldGelesen(tnId, docId){
   db.collection('globalTN').doc(tnId).collection('betriebMeldungen').doc(docId)
     .update({gelesen:true,gelesenAm:Date.now(),gelesenVon:_firma||_email})
-    .then(()=>{toast('✓ Gelesen');loadAgMeldungen();})
+    .then(()=>{toast('✓ Gelesen');loadAgMeldungen();checkAgBadges();})
     .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function checkAgBadges(){
+  if(!_azubis.length) return;
+  let meldCount=0, urlaubCount=0, zeitCount=0;
+  const promises=_azubis.map(az=>{
+    const p1=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('gelesen','==',false).get().then(s=>{meldCount+=s.size;}).catch(()=>{});
+    const p2=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .where('status','==','beantragt').get().then(s=>{urlaubCount+=s.size;}).catch(()=>{});
+    const p3=db.collection('globalTN').doc(az.id).collection('zeiterfassung')
+      .where('manuell','==',true).where('agBestaetigt','==',false).get().then(s=>{zeitCount+=s.size;}).catch(()=>{});
+    return Promise.all([p1,p2,p3]);
+  });
+  Promise.all(promises).then(()=>{
+    const total=meldCount+urlaubCount+zeitCount;
+    // Betrieb-Tab Badge
+    const betriebBtn=document.getElementById('agnav-betrieb');
+    if(betriebBtn){
+      let badge=betriebBtn.querySelector('.ag-badge');
+      if(total>0){
+        if(!badge){badge=document.createElement('span');badge.className='ag-badge';betriebBtn.style.position='relative';betriebBtn.appendChild(badge);}
+        badge.textContent=total;
+      } else if(badge) badge.remove();
+    }
+  });
 }
 </script>
 </body>
