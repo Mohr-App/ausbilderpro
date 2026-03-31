@@ -4304,9 +4304,18 @@ function kursAusfall(){
       tnIds.forEach(tnId=>{
         promises.push(_db.collection('globalTN').doc(tnId).get().then(doc=>{
           if(!doc.exists)return;
-          const benach=(doc.data().benachrichtigungen||[]);
+          const tnData=doc.data();
+          const benach=(tnData.benachrichtigungen||[]);
           if(benach.some(n=>n.typ==='kurs_ausfall'&&n.datum===today&&n.kursId===kursId))return;
           benach.push(notification);
+          // E-Mail an Azubi
+          sendTnEmail(tnData, '🚨 Lehrgang "'+kursLabel+'" fällt heute aus!',
+            '<div style="padding:14px;background:#fef2f2;border:3px solid #ef4444;border-radius:10px;margin-bottom:12px">'
+            +'<p style="margin:0 0 8px;font-size:1rem;font-weight:800;color:#ef4444">🚨 LEHRGANG FÄLLT HEUTE AUS</p>'
+            +'<p style="margin:0;font-size:.9rem;color:#1e293b;font-weight:700">'+kursLabel+' – '+todayDE+'</p></div>'
+            +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.</p>'
+            +'<p style="margin:0;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
+          );
           return _db.collection('globalTN').doc(tnId).update({benachrichtigungen:benach});
         }).then(()=>ok++).catch(()=>fail++));
       });
@@ -4981,6 +4990,27 @@ function _pwHash(s){
 
 // ── Status-Sync: globalTN in HBZVerwaltung aktualisieren ──
 // Wird aufgerufen wenn Ausbilder in APro den Status ändert (Fehlt/Wiederholer/Zurück)
+function sendTnEmail(tnData, subject, htmlBody){
+  if(!_db) return;
+  const email=tnData.kontaktEmail||tnData.email||'';
+  if(!email) return;
+  const name=((tnData.vorname||'')+' '+(tnData.nachname||'')).trim();
+  _db.collection('mail').add({
+    to: email,
+    message: {
+      subject: subject,
+      html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
+        +'<div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div>'
+        +'<div style="padding:20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">'
+        +(name?'<p style="margin:0 0 12px;font-size:.9rem;color:#374151">Hallo '+name+',</p>':'')
+        +htmlBody
+        +'</div>'
+        +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
+        +'</div>'
+    }
+  }).catch(err=>console.warn('Mail-Fehler:',err));
+}
+
 function syncGlobalTNStatus(tnId, statusType){
   // tnId = globalTN doc ID (= kurs subcollection doc ID)
   // statusType: 'absent' | 'wiederholer' | 'clear'
@@ -5008,6 +5038,13 @@ function syncGlobalTNStatus(tnId, statusType){
       };
       if(data.aktiverKursId===kursId) upd.aktiverKursId=firebase.firestore.FieldValue.delete();
       ref.update(upd).catch(()=>{});
+      // E-Mail an Azubi
+      sendTnEmail(data, '🚫 Lehrgang "'+kursName+'" – Nicht angetreten',
+        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">für den Lehrgang <b>"'+kursName+'"</b> wurdest du leider als <b style="color:#ef4444">"Nicht angetreten"</b> eingestuft.</p>'
+        +'<div style="padding:12px;background:#fef2f2;border:2px solid #fecaca;border-radius:8px;margin-bottom:12px">'
+        +'<p style="margin:0;font-size:.85rem;color:#991b1b;font-weight:700">Du brauchst zu diesem Lehrgang nicht mehr zu erscheinen.</p></div>'
+        +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">📞 Bitte informiere zeitnah deinen Ausbildungsbetrieb.</p>'
+      );
     }).catch(()=>{});
   } else if(statusType === 'wiederholer'){
     ref.update({wiederholer:true, status: firebase.firestore.FieldValue.delete()}).catch(()=>{});
@@ -5028,6 +5065,13 @@ function syncGlobalTNStatus(tnId, statusType){
       };
       if(data.aktiverKursId===kursId) upd.aktiverKursId=firebase.firestore.FieldValue.delete();
       ref.update(upd).catch(()=>{});
+      // E-Mail an Azubi
+      sendTnEmail(data, '↩ Lehrgang "'+kursName+'" – Wiederholung',
+        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">für den Lehrgang <b>"'+kursName+'"</b> wurdest du als <b style="color:#d97706">Wiederholer</b> eingestuft.</p>'
+        +'<div style="padding:12px;background:#fffbeb;border:2px solid #fde68a;border-radius:8px;margin-bottom:12px">'
+        +'<p style="margin:0;font-size:.85rem;color:#92400e;font-weight:700">Du brauchst zu diesem Lehrgang nicht mehr zu erscheinen – der Kurs wird zu einem späteren Zeitpunkt wiederholt.</p></div>'
+        +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">📞 Bitte informiere deinen Ausbildungsbetrieb.</p>'
+      );
     }).catch(()=>{});
   } else {
     // clear – back to normal
