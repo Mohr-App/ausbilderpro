@@ -1688,11 +1688,13 @@ function loadBaustellen(){
   el.innerHTML='<div class="empty">Lädt… ('+ym+')</div>';
   db.collection('globalTN').doc(_tnId).collection('baustellen')
     .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
-    .orderBy('datum','desc').get().then(snap=>{
+    .get().then(snap=>{
       if(snap.empty){el.innerHTML='<div class="empty">Keine Einsätze in '+ym+'</div>';return;}
+      const docs=[];
+      snap.forEach(doc=>docs.push(doc.data()));
+      docs.sort((a,b)=>(b.datum||'').localeCompare(a.datum||''));
       let html='';
-      snap.forEach(doc=>{
-        const d=doc.data();
+      docs.forEach(d=>{
         const datDE=new Date(d.datum+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
         html+='<div style="padding:8px;border:1px solid var(--brd);border-radius:8px;margin-bottom:4px">'
           +'<div style="display:flex;justify-content:space-between">'

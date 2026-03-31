@@ -961,8 +961,11 @@ function loadAgBaustellen(){
   const promises=_azubis.map(az=>
     db.collection('globalTN').doc(az.id).collection('baustellen')
       .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
-      .orderBy('datum','desc').get()
-      .then(snap=>({az, entries:snap.docs.map(d=>d.data())}))
+      .get()
+      .then(snap=>{
+        const entries=snap.docs.map(d=>d.data()).sort((a,b)=>(b.datum||'').localeCompare(a.datum||''));
+        return {az, entries};
+      })
       .catch(()=>({az, entries:[]}))
   );
   Promise.all(promises).then(results=>{
