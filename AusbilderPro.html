@@ -4337,11 +4337,22 @@ function ausbilderKommtSpaeter(){
   const kursLabel=S.kats[S.curKat]?.label||'Lehrgang';
   const ausbilderName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
   const todayDE=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-  if(!confirm('Alle Azubis benachrichtigen?\n\n"'+ausbilderName+' kommt heute später (ca. '+zeit.trim()+' Uhr)"'+(freitext?'\n\nNachricht: "'+freitext+'"':''))) return;
-  // Alle TN-IDs sammeln
   const tnIds=new Set();
   Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
   if(!tnIds.size){toast('Keine verknüpften TN','bad');return;}
+  safeConfirm(
+    '🕐 Komme später',
+    '<b>'+esc(ausbilderName)+'</b> kommt heute um ca. <b>'+esc(zeit.trim())+' Uhr</b>.'
+    +(freitext?'<br><br><span style="font-style:italic;color:#6B7280">"'+esc(freitext)+'"</span>':'')
+    +'<br><br><span style="font-size:.75rem;color:#6B7280">Alle <b>'+tnIds.size+' Azubis</b> werden per App und E-Mail benachrichtigt.</span>',
+    'Ja, alle Azubis jetzt benachrichtigen',
+    '🕐 Benachrichtigen',
+    ()=>{ _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, todayDE, zeit.trim(), freitext); }
+  );
+}
+function _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, todayDE, zeit, freitext){
+  const tnIds=new Set();
+  Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
   let ok=0,fail=0;
   const promises=[];
   tnIds.forEach(tnId=>{
