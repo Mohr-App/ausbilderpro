@@ -97,24 +97,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <button class="hdr-btn" onclick="doLogout()">⎋ Abmelden</button>
   </div>
   <div class="main" style="padding-bottom:80px">
-    <!-- ÜBERSICHT -->
-    <div class="agpage active" id="agpage-uebersicht">
-      <div class="page-title" id="welcomeTitle">Willkommen</div>
-      <div class="page-sub" id="welcomeSub"></div>
-      <div class="stat-row">
-        <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Auszubildende</div></div>
-        <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Lehrgängen</div></div>
-        <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
-      </div>
-      <div id="agNotifBanner"></div>
-      <div class="card">
-        <div class="card-title">👥 Ihre Auszubildenden</div>
-        <div id="azubiList"><div class="empty">Lädt…</div></div>
-      </div>
-    </div>
-
-    <!-- BETRIEB -->
-    <div class="agpage" id="agpage-betrieb">
+    <!-- BETRIEB (default/active) -->
+    <div class="agpage active" id="agpage-betrieb">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <span style="font-size:1.4rem">🏭</span>
         <div style="font-size:1.1rem;font-weight:800">Betrieb</div>
@@ -164,11 +148,51 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
     </div>
+
+    <!-- ÜBL -->
+    <div class="agpage" id="agpage-uebl">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:1.4rem">👨‍🏫</span>
+        <div style="font-size:1.1rem;font-weight:800">ÜBL-Kurse</div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Auszubildende</div></div>
+        <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Lehrgängen</div></div>
+        <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
+      </div>
+      <div id="agNotifBanner"></div>
+      <div class="card">
+        <div class="card-title">👥 Ihre Auszubildenden</div>
+        <div id="azubiList"><div class="empty">Lädt…</div></div>
+      </div>
+    </div>
+
+    <!-- HOME / INFO -->
+    <div class="agpage" id="agpage-home">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:1.4rem">ℹ</span>
+        <div style="font-size:1.1rem;font-weight:800">Informationen</div>
+      </div>
+      <div class="page-title" id="welcomeTitle">Willkommen</div>
+      <div class="page-sub" id="welcomeSub"></div>
+      <div class="card">
+        <div class="card-title">📞 Kontakt Verwaltung</div>
+        <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📱 App installieren</div>
+        <div style="font-size:.75rem;color:var(--mu);line-height:1.6">
+          <b>iPhone:</b> Safari → Teilen → „Zum Home-Bildschirm"<br>
+          <b>Android:</b> Chrome → Menü → „App installieren"
+        </div>
+      </div>
+    </div>
   </div>
   <!-- Bottom Nav -->
   <div class="bnav">
-    <button class="bnav-btn active" id="agnav-uebersicht" onclick="showAgPage('uebersicht')"><span class="bi">👥</span>Übersicht</button>
-    <button class="bnav-btn" id="agnav-betrieb" onclick="showAgPage('betrieb')"><span class="bi">🏭</span>Betrieb</button>
+    <button class="bnav-btn active" id="agnav-betrieb" onclick="showAgPage('betrieb')"><span class="bi">🏭</span>Betrieb</button>
+    <button class="bnav-btn" id="agnav-uebl" onclick="showAgPage('uebl')"><span class="bi">👨‍🏫</span>ÜBL</button>
+    <button class="bnav-btn" id="agnav-home" onclick="showAgPage('home')"><span class="bi">ℹ</span>Info</button>
   </div>
   <div class="toast" id="toast"></div>
 </div>
@@ -229,6 +253,8 @@ function loadUserData(){
     document.getElementById('welcomeSub').textContent='Übersicht Ihrer Auszubildenden und deren Lehrgänge · Echtzeit-Anwesenheit';
     loadAzubis();
     checkAGPremium();
+    // Betrieb-Tab ist Default → initialisieren
+    setTimeout(()=>initAgBetrieb(), 1500);
   });
 }
 
@@ -676,6 +702,7 @@ function showAgPage(id){
   const nb=document.getElementById('agnav-'+id);
   if(nb) nb.classList.add('active');
   if(id==='betrieb') initAgBetrieb();
+  if(id==='uebl') loadAzubis();
 }
 function showAgBetriebTab(tab){
   document.querySelectorAll('.abtab').forEach(t=>t.classList.remove('active'));
