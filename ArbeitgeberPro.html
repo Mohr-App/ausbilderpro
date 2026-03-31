@@ -189,7 +189,19 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="agpage" id="agpage-azubis">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <span style="font-size:1.4rem">👥</span>
-        <div style="font-size:1.1rem;font-weight:800">Meine Azubis</div>
+        <div style="font-size:1.1rem;font-weight:800">Meine Mitarbeiter</div>
+      </div>
+      <div class="card">
+        <div class="card-title">+ Arbeitnehmer hinzufügen</div>
+        <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Erstellt einen Zugang für die MitarbeiterPro-App (Zeiterfassung, Urlaub, Baustellen).</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <div style="flex:1"><label class="fl">Vorname</label><input class="fi" id="newMaVorname" style="font-size:.76rem"></div>
+          <div style="flex:1"><label class="fl">Nachname</label><input class="fi" id="newMaNachname" style="font-size:.76rem"></div>
+        </div>
+        <div><label class="fl">E-Mail</label><input class="fi" type="email" id="newMaEmail" style="font-size:.76rem"></div>
+        <div><label class="fl">Passwort (min. 6 Zeichen)</label><input class="fi" type="text" id="newMaPw" style="font-size:.76rem" placeholder="Wird dem Mitarbeiter mitgeteilt"></div>
+        <button class="btn" onclick="agCreateMitarbeiter()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px">👤+ Mitarbeiter anlegen</button>
+        <div class="err" id="newMaErr" style="margin-top:4px"></div>
       </div>
       <div id="agAzubiKontakte"><div class="empty">Lädt…</div></div>
     </div>
@@ -236,7 +248,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <!-- Bottom Nav -->
   <div class="bnav">
     <button class="bnav-btn active" id="agnav-betrieb" onclick="showAgPage('betrieb')"><span class="bi">🏭</span>Betrieb</button>
-    <button class="bnav-btn" id="agnav-azubis" onclick="showAgPage('azubis')"><span class="bi">👥</span>Azubis</button>
+    <button class="bnav-btn" id="agnav-azubis" onclick="showAgPage('azubis')"><span class="bi">👥</span>Mitarbeiter</button>
     <button class="bnav-btn" id="agnav-uebl" onclick="showAgPage('uebl')"><span class="bi">👨‍🏫</span>ÜBL</button>
     <button class="bnav-btn" id="agnav-home" onclick="showAgPage('home')"><span class="bi">ℹ</span>Info</button>
   </div>
@@ -750,22 +762,73 @@ function showAgPage(id){
   if(id==='azubis') renderAgAzubiKontakte();
 }
 
+// Secondary Firebase App for creating users without logging out AG
+let _secondaryApp=null;
+function getSecondaryAuth(){
+  if(!_secondaryApp){
+    _secondaryApp=firebase.initializeApp(firebaseConfig,'secondary');
+  }
+  return _secondaryApp.auth();
+}
+
+function agCreateMitarbeiter(){
+  const vorname=document.getElementById('newMaVorname').value.trim();
+  const nachname=document.getElementById('newMaNachname').value.trim();
+  const email=document.getElementById('newMaEmail').value.trim().toLowerCase();
+  const pw=document.getElementById('newMaPw').value;
+  const err=document.getElementById('newMaErr');
+  err.textContent='';
+  if(!vorname||!nachname){err.textContent='Bitte Vor- und Nachname eingeben';return;}
+  if(!email){err.textContent='Bitte E-Mail eingeben';return;}
+  if(pw.length<6){err.textContent='Passwort min. 6 Zeichen';return;}
+  if(!confirm('Mitarbeiter anlegen?\n\n'+vorname+' '+nachname+'\n'+email+'\n\nDer Mitarbeiter kann sich mit diesen Daten in der MitarbeiterPro-App anmelden.')) return;
+  err.textContent='Wird angelegt…';
+  const secAuth=getSecondaryAuth();
+  secAuth.createUserWithEmailAndPassword(email,pw).then(cred=>{
+    const uid=cred.user.uid;
+    // Users-Doc mit Secondary Auth (damit Rules uid==uid passen)
+    const secDb=_secondaryApp.firestore();
+    secDb.collection('users').doc(uid).set({email,role:'arbeitnehmer',firma:_firma});
+    // GlobalTN-Doc mit Haupt-DB (create erlaubt für alle auth)
+    db.collection('globalTN').doc(uid).set({
+      vorname,nachname,email,firma:_firma,typ:'arbeitnehmer',
+      erstelltAm:Date.now(),erstelltVon:_firma||_email
+    });
+    secAuth.signOut();
+    document.getElementById('newMaVorname').value='';
+    document.getElementById('newMaNachname').value='';
+    document.getElementById('newMaEmail').value='';
+    document.getElementById('newMaPw').value='';
+    err.textContent='';
+    toast('✅ '+vorname+' '+nachname+' angelegt');
+  }).catch(e=>{
+    const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach'};
+    err.textContent='❌ '+(msgs[e.code]||e.message);
+  });
+}
+
 function renderAgAzubiKontakte(){
   const el=document.getElementById('agAzubiKontakte');
   if(!el) return;
-  if(!_azubis.length){el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
+  if(!_azubis.length){el.innerHTML='<div class="empty">Keine Mitarbeiter</div>';return;}
   let html='';
   _azubis.forEach(az=>{
-    const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Azubi';
+    const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
     const initials=name.split(' ').map(w=>(w[0]||'').toUpperCase()).join('').slice(0,2);
     const tel=az.kontaktTelefon||'';
     const email=az.kontaktEmail||az.email||'';
     const beruf=az.beruf||'';
     const lj=az.ausbjahr?az.ausbjahr+'. Lehrjahr':'';
+    const isMA=az.typ==='arbeitnehmer';
+    const typBadge=isMA?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(217,119,6,.12);color:#d97706;border-radius:4px;font-weight:700;margin-left:6px">Arbeitnehmer</span>'
+      :'<span style="font-size:.5rem;padding:2px 6px;background:rgba(37,99,235,.1);color:#3b82f6;border-radius:4px;font-weight:700;margin-left:6px">Azubi</span>';
+    const avatarBg=isMA?'rgba(217,119,6,.1)':'rgba(37,99,235,.1)';
+    const avatarBorder=isMA?'rgba(217,119,6,.25)':'rgba(37,99,235,.25)';
+    const avatarColor=isMA?'#d97706':'var(--acc)';
     html+='<div class="card" style="display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:6px">'
-      +'<div style="width:44px;height:44px;border-radius:50%;background:rgba(37,99,235,.1);border:2px solid rgba(37,99,235,.25);display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:var(--acc);flex-shrink:0">'+initials+'</div>'
+      +'<div style="width:44px;height:44px;border-radius:50%;background:'+avatarBg+';border:2px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:'+avatarColor+';flex-shrink:0">'+initials+'</div>'
       +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:.88rem;font-weight:800">'+esc(name)+'</div>'
+      +'<div style="font-size:.88rem;font-weight:800;display:flex;align-items:center;flex-wrap:wrap">'+esc(name)+typBadge+'</div>'
       +(beruf||lj?'<div style="font-size:.65rem;color:var(--mu)">'+esc([beruf,lj].filter(Boolean).join(' · '))+'</div>':'')
       +(tel?'<a href="tel:'+esc(tel)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:6px 14px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:#059669">📞 '+esc(tel)+'</a>':'')
       +(email?'<a href="mailto:'+esc(email)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-left:'+(tel?'6px':'0')+';padding:6px 14px;background:rgba(37,99,235,.1);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:var(--acc)">✉ '+esc(email)+'</a>':'')
