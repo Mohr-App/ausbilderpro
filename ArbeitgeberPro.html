@@ -1011,7 +1011,7 @@ function loadAgZeiten(){
   // Alle Tage des Monats (inkl. Sa/So wenn konfiguriert)
   const allDays=[];
   const mStart=new Date(ym+'-01T12:00');
-  const mEnd=new Date(mStart.getFullYear(),mStart.getMonth()+1,0);
+  const mEnd=new Date(mStart.getFullYear(),mStart.getMonth()+1,0,23,59);
   const today=localDate();
   for(let dt=new Date(mStart);dt<=mEnd;dt.setDate(dt.getDate()+1)){
     const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
@@ -1044,19 +1044,13 @@ function loadAgZeiten(){
   });
   Promise.all(promises).then(results=>{
     let html='';
+    let idx=0;
     results.forEach(({az, zeitMap, krankDates, urlaubDates})=>{
-      const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Azubi';
+      const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
       const plan=az.arbeitszeitPlan||null;
       let totalIst=0,totalSoll=0,tage=0;
-      html+='<div style="margin-bottom:12px;padding:10px;border:1px solid var(--brd);border-radius:10px">';
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:.82rem;font-weight:800">'+esc(name)+'</span>';
-      if(plan){
-        const woche=['mo','di','mi','do','fr'].reduce((s,k)=>s+(plan[k]||0),0);
-        html+='<span style="font-size:.55rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+woche+'h/W · 🤒'+krankDates.size+' · 🏖'+urlaubDates.size+'</span>';
-      } else {
-        html+='<span style="font-size:.55rem;color:#d97706">⚠ Keine Arbeitszeit</span>';
-      }
-      html+='</div>';
+      // Tages-HTML sammeln
+      let dayHtml='';
       allDays.forEach(ds=>{
         const e=zeitMap[ds];
         const isKrank=krankDates.has(ds);
@@ -1064,43 +1058,71 @@ function loadAgZeiten(){
         const ist=e?.istMinuten||0;
         const sollRaw=plan?getAgSollMin(ds,plan):0;
         const soll=(isKrank||isUrlaub)?0:sollRaw;
-        // Tag überspringen wenn kein Soll, kein Eintrag, nicht krank/urlaub
         if(!sollRaw&&!e&&!isKrank&&!isUrlaub) return;
         totalIst+=ist;totalSoll+=soll;
         if(e?.ausgang) tage++;
         const datDE=new Date(ds+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
         const manuell=e?.manuell?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(245,158,11,.15);color:#d97706;border-radius:4px;font-weight:700;margin-left:3px">✎'+(e.agBestaetigt?' ✓':' offen')+'</span>':'';
-        const bestBtn=e?.manuell&&!e.agBestaetigt?'<button onclick="agBestaetigeZeit(\''+az.id+'\',\''+ds+'\')" style="font-size:.5rem;padding:2px 6px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:3px">✓</button>':'';
+        const bestBtn=e?.manuell&&!e.agBestaetigt?'<button onclick="event.stopPropagation();agBestaetigeZeit(\''+az.id+'\',\''+ds+'\')" style="font-size:.5rem;padding:2px 6px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:3px">✓</button>':'';
         let statusTag='';
         if(isKrank) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.15);color:#ef4444;border-radius:3px;font-weight:700;margin-left:3px">🤒</span>';
         else if(isUrlaub) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(16,185,129,.15);color:#059669;border-radius:3px;font-weight:700;margin-left:3px">🏖</span>';
         if(plan){
           const diff=ist-soll;const diffCol=(isKrank||isUrlaub)?'var(--mu)':diff>=0?'#059669':'#ef4444';
           const zeitText=e?(e.eingang+(e.ausgang?' – '+e.ausgang:'…')):(isKrank||isUrlaub?'—':'');
-          html+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem">'
+          dayHtml+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem">'
             +'<span style="flex:1.5;color:var(--mu)">'+datDE+statusTag+'</span>'
             +'<span style="flex:2">'+zeitText+manuell+bestBtn+'</span>'
             +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e?.ausgang?minToStr(ist):(isKrank||isUrlaub?'—':''))+'</span>'
             +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isKrank||isUrlaub?'—':(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
         } else if(e){
-          html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
+          dayHtml+='<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
             +'<span style="color:var(--mu)">'+datDE+statusTag+'</span>'
             +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+manuell+bestBtn+'</span>'
             +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?minToStr(ist):'…')+'</span></div>';
         } else if(isKrank||isUrlaub){
-          html+='<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
+          dayHtml+='<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
             +'<span style="color:var(--mu)">'+datDE+statusTag+'</span><span>—</span><span>—</span></div>';
         }
       });
+      // Heute-Status ermitteln
+      const todayE=zeitMap[today];
+      const todayKrank=krankDates.has(today);
+      const todayUrlaub=urlaubDates.has(today);
+      let todayStatus='',todayCol='var(--mu)';
+      if(todayKrank){todayStatus='🤒 Krank';todayCol='#ef4444';}
+      else if(todayUrlaub){todayStatus='🏖 Urlaub';todayCol='#059669';}
+      else if(todayE&&!todayE.ausgang){
+        const pLog=todayE.pauseLog||[];
+        const inPause=pLog.find(p=>p.start&&!p.ende);
+        todayStatus=inPause?'⏸ Pause seit '+inPause.start:'🟢 Arbeitet seit '+todayE.eingang;
+        todayCol=inPause?'#d97706':'#059669';
+      } else if(todayE?.ausgang){todayStatus='✅ '+todayE.eingang+' – '+todayE.ausgang;todayCol='var(--mu)';}
+      else {todayStatus='❌ Nicht eingestempelt';}
+      // Überstunden
+      const totalDiff=totalIst-totalSoll;
+      const diffCol=totalDiff>=0?'#059669':'#ef4444';
+      const diffStr=plan?(totalDiff>=0?'+':'')+minToStr(totalDiff):'';
+      const cid='agZeitDetail'+idx++;
+      // Header (immer sichtbar)
+      html+='<div style="margin-bottom:8px;border:1px solid var(--brd);border-radius:10px;overflow:hidden">'
+        +'<div onclick="document.getElementById(\''+cid+'\').style.display=document.getElementById(\''+cid+'\').style.display===\'none\'?\'block\':\'none\'" style="padding:10px;cursor:pointer;display:flex;align-items:center;gap:10px">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:800">'+esc(name)+'</div>'
+        +'<div style="font-size:.65rem;color:'+todayCol+';font-weight:700;margin-top:2px">'+todayStatus+'</div></div>'
+        +'<div style="text-align:right">';
+      if(plan) html+='<div style="font-size:.78rem;font-weight:800;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+diffStr+'</div>'
+        +'<div style="font-size:.5rem;color:var(--mu)">🤒'+krankDates.size+' 🏖'+urlaubDates.size+' · '+tage+'T</div>';
+      else html+='<div style="font-size:.72rem;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+minToStr(totalIst)+'</div>';
+      html+='</div><span style="color:var(--mu);font-size:.8rem">▼</span></div>'
+        // Details (ausgeblendet)
+        +'<div id="'+cid+'" style="display:none;padding:0 10px 10px;border-top:1px solid var(--brd)">'
+        +dayHtml;
       if(plan){
-        const diff=totalIst-totalSoll;const diffCol=diff>=0?'#059669':'#ef4444';
         html+='<div style="margin-top:6px;padding:6px;background:var(--sur2);border-radius:6px;display:flex;justify-content:space-between;font-size:.7rem">'
           +'<span>Ist: <b>'+minToStr(totalIst)+'</b> · Soll: <b>'+minToStr(totalSoll)+'</b></span>'
-          +'<span style="font-weight:800;color:'+diffCol+'">'+(diff>=0?'📈 +':'📉 ')+minToStr(diff)+'</span></div>';
-      } else if(tage) {
-        html+='<div style="margin-top:6px;font-size:.72rem;font-weight:800;text-align:right">Gesamt: '+minToStr(totalIst)+'</div>';
+          +'<span style="font-weight:800;color:'+diffCol+'">'+(totalDiff>=0?'📈 +':'📉 ')+minToStr(totalDiff)+'</span></div>';
       }
-      html+='</div>';
+      html+='</div></div>';
     });
     el.innerHTML=html||'<div class="empty">Keine Daten</div>';
   });
