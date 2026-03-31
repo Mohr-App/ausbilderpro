@@ -409,17 +409,21 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <!-- Urlaub -->
       <div class="btab" id="btab-urlaub">
         <div class="card">
-          <div class="card-title">📊 Übersicht</div>
-          <div id="urlaubUebersicht"><div class="empty">Lädt…</div></div>
+          <div class="card-title">📅 Jahresübersicht</div>
+          <div id="jahresUebersicht"><div class="empty">Lädt…</div></div>
         </div>
         <div class="card">
-          <div class="card-title">+ Urlaub beantragen</div>
+          <div class="card-title">+ Abwesenheit beantragen</div>
+          <div><label class="fl">Art</label><select class="fi" id="urlArt" style="font-size:.76rem">
+            <option value="urlaub">🏖 Urlaub</option>
+            <option value="ueberstunden">⏱ Überstundenabbau</option>
+          </select></div>
           <div style="display:flex;gap:6px;margin-bottom:6px">
             <div style="flex:1"><label class="fl">Von</label><input class="fi" type="date" id="urlVon" style="font-size:.76rem"></div>
             <div style="flex:1"><label class="fl">Bis</label><input class="fi" type="date" id="urlBis" style="font-size:.76rem"></div>
           </div>
-          <div><label class="fl">Grund (optional)</label><input class="fi" id="urlGrund" placeholder="z.B. Familienurlaub" style="font-size:.76rem"></div>
-          <button class="btn" onclick="urlaubBeantragen()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px">🏖 Urlaub beantragen</button>
+          <div><label class="fl">Bemerkung (optional)</label><input class="fi" id="urlGrund" placeholder="z.B. Familienurlaub" style="font-size:.76rem"></div>
+          <button class="btn" onclick="urlaubBeantragen()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px">📨 Antrag einreichen</button>
           <div class="err" id="urlErr" style="margin-top:4px"></div>
         </div>
         <div class="card">
@@ -1436,34 +1440,52 @@ function zeitNachtragen(){
 // URLAUB
 // ═══════════════════════════════════
 function initUrlaub(){
-  loadUrlaubUebersicht();
+  loadJahresUebersicht();
   loadUrlaubAntraege();
 }
 
-function loadUrlaubUebersicht(){
-  const el=document.getElementById('urlaubUebersicht');
+function loadJahresUebersicht(){
+  const el=document.getElementById('jahresUebersicht');
   if(!el||!_tnId||!db) return;
-  // Alle Anträge laden für Statistik
-  db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').get().then(snap=>{
-    let beantragt=0,genehmigt=0,abgelehnt=0,genTage=0;
-    snap.forEach(doc=>{
+  const year=new Date().getFullYear();
+  // Parallel laden: Urlaubsanträge, Krankmeldungen
+  const p1=db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').get();
+  const p2=db.collection('globalTN').doc(_tnId).collection('betriebMeldungen')
+    .where('type','==','krank').get();
+  Promise.all([p1,p2]).then(([urlSnap, krankSnap])=>{
+    let urlaubTage=0, ueberTage=0, urlaubGen=0, ueberGen=0, beantragt=0;
+    urlSnap.forEach(doc=>{
       const d=doc.data();
+      const tage=d.tage||0;
+      const art=d.art||'urlaub';
+      if(d.status==='genehmigt'){
+        if(art==='ueberstunden'){ueberGen++;ueberTage+=tage;}
+        else {urlaubGen++;urlaubTage+=tage;}
+      }
       if(d.status==='beantragt') beantragt++;
-      else if(d.status==='genehmigt'){genehmigt++;genTage+=(d.tage||0);}
-      else if(d.status==='abgelehnt') abgelehnt++;
     });
-    el.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap">'
-      +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:10px;text-align:center">'
-      +'<div style="font-size:1.2rem;font-weight:800;color:#d97706">'+beantragt+'</div><div style="font-size:.55rem;color:var(--mu)">Offen</div></div>'
-      +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;text-align:center">'
-      +'<div style="font-size:1.2rem;font-weight:800;color:#059669">'+genehmigt+'</div><div style="font-size:.55rem;color:var(--mu)">Genehmigt ('+genTage+' Tage)</div></div>'
+    // Kranktage: unique Tage zählen
+    const krankDates=new Set();
+    krankSnap.forEach(doc=>{
+      const d=doc.data();
+      if(d.datum) krankDates.add(d.datum);
+    });
+    const krankTage=krankDates.size;
+    el.innerHTML='<div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">'+year+'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
       +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:10px;text-align:center">'
-      +'<div style="font-size:1.2rem;font-weight:800;color:#ef4444">'+abgelehnt+'</div><div style="font-size:.55rem;color:var(--mu)">Abgelehnt</div></div>'
-      +'</div>';
-  }).catch(()=>{});
+      +'<div style="font-size:1.4rem;font-weight:800;color:#ef4444">'+krankTage+'</div><div style="font-size:.55rem;color:var(--mu)">Krank-Tage</div></div>'
+      +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;text-align:center">'
+      +'<div style="font-size:1.4rem;font-weight:800;color:#059669">'+urlaubTage+'</div><div style="font-size:.55rem;color:var(--mu)">Urlaub ('+urlaubGen+' gen.)</div></div>'
+      +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:10px;text-align:center">'
+      +'<div style="font-size:1.4rem;font-weight:800;color:#6366f1">'+ueberTage+'</div><div style="font-size:.55rem;color:var(--mu)">Überstunden ('+ueberGen+' gen.)</div></div>'
+      +'</div>'
+      +(beantragt?'<div style="margin-top:8px;font-size:.65rem;color:#d97706;font-weight:600">⏳ '+beantragt+' Antrag'+(beantragt>1?'e':'')+' offen</div>':'');
+  }).catch(()=>{el.innerHTML='<div class="empty">Fehler beim Laden</div>';});
 }
 
 function urlaubBeantragen(){
+  const art=document.getElementById('urlArt').value;
   const von=document.getElementById('urlVon').value;
   const bis=document.getElementById('urlBis').value;
   const grund=document.getElementById('urlGrund').value.trim();
@@ -1471,7 +1493,6 @@ function urlaubBeantragen(){
   err.textContent='';
   if(!von||!bis){err.textContent='Bitte Von und Bis ausfüllen';return;}
   if(bis<von){err.textContent='Bis-Datum muss nach Von liegen';return;}
-  // Arbeitstage berechnen (Mo-Fr)
   let tage=0;
   const d=new Date(von);
   const end=new Date(bis);
@@ -1480,18 +1501,20 @@ function urlaubBeantragen(){
     if(dow!==0&&dow!==6) tage++;
     d.setDate(d.getDate()+1);
   }
-  if(!confirm('Urlaub beantragen?\n\n'+von+' bis '+bis+' ('+tage+' Arbeitstage)'+(grund?'\nGrund: '+grund:''))) return;
+  const artLabel=art==='ueberstunden'?'Überstundenabbau':'Urlaub';
+  if(!confirm(artLabel+' beantragen?\n\n'+von+' bis '+bis+' ('+tage+' Arbeitstage)'+(grund?'\nBemerkung: '+grund:''))) return;
   db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').add({
-    von, bis, tage, grund, status:'beantragt', beantragAm:Date.now(),
+    von, bis, tage, grund, art, status:'beantragt', beantragAm:Date.now(),
     tnName:((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim(),
     firma:_tnData?.firma||''
   }).then(()=>{
     document.getElementById('urlVon').value='';
     document.getElementById('urlBis').value='';
     document.getElementById('urlGrund').value='';
-    toast('🏖 Urlaubsantrag eingereicht ✓');
-    loadUrlaubUebersicht();
+    toast('📨 '+artLabel+'-Antrag eingereicht ✓');
+    loadJahresUebersicht();
     loadUrlaubAntraege();
+    checkAzubiBadges();
   }).catch(err2=>{err.textContent='Fehler: '+err2.message;});
 }
 
@@ -1503,15 +1526,17 @@ function loadUrlaubAntraege(){
     let html='';
     snap.forEach(doc=>{
       const d=doc.data();
-      const statusCol=d.status==='genehmigt'?'#059669':d.status==='abgelehnt'?'#ef4444':'#d97706';
-      const statusIcon=d.status==='genehmigt'?'✅':d.status==='abgelehnt'?'❌':'⏳';
+      const statusCol=d.status==='genehmigt'?'#059669':d.status==='abgelehnt'||d.status==='widerrufen'?'#ef4444':'#d97706';
+      const statusIcon=d.status==='genehmigt'?'✅':d.status==='abgelehnt'?'❌':d.status==='widerrufen'?'🗑':'⏳';
+      const artIcon=d.art==='ueberstunden'?'⏱':'🏖';
+      const artLabel=d.art==='ueberstunden'?'Überstundenabbau':'Urlaub';
       const vonDE=new Date(d.von+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
       const bisDE=new Date(d.bis+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
       html+='<div style="padding:8px;border:1px solid var(--brd);border-radius:8px;margin-bottom:4px">'
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
-        +'<span style="font-size:.78rem;font-weight:700">'+vonDE+' – '+bisDE+'</span>'
+        +'<span style="font-size:.78rem;font-weight:700">'+artIcon+' '+vonDE+' – '+bisDE+'</span>'
         +'<span style="font-size:.65rem;font-weight:700;color:'+statusCol+';padding:2px 8px;background:'+statusCol+'15;border-radius:4px">'+statusIcon+' '+d.status+'</span></div>'
-        +'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">'+d.tage+' Tage'+(d.grund?' · '+esc(d.grund):'')+'</div>'
+        +'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">'+artLabel+' · '+d.tage+' Tage'+(d.grund?' · '+esc(d.grund):'')+'</div>'
         +'</div>';
     });
     el.innerHTML=html;

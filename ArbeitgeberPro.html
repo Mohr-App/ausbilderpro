@@ -148,7 +148,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <!-- AG: Urlaub -->
       <div class="abtab" id="abtab-urlaub">
         <div class="card">
-          <div class="card-title">🏖 Offene Urlaubsanträge</div>
+          <div class="card-title">📅 Jahresübersicht</div>
+          <div id="agJahresUebersicht"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🏖 Offene Anträge</div>
           <div id="agUrlaubOffen"><div class="empty">Lädt…</div></div>
         </div>
         <div class="card">
@@ -952,6 +956,7 @@ function loadAgBaustellen(){
 
 // AG: URLAUB
 function loadAgUrlaub(){
+  loadAgJahresUebersicht();
   const oEl=document.getElementById('agUrlaubOffen');
   const aEl=document.getElementById('agUrlaubAlle');
   if(!oEl||!aEl||!_azubis.length){if(oEl)oEl.innerHTML='<div class="empty">Keine Azubis</div>';return;}
@@ -969,13 +974,15 @@ function loadAgUrlaub(){
         const name=((az.vorname||'')+' '+(az.nachname||'')).trim();
         const vonDE=new Date(e.von+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
         const bisDE=new Date(e.bis+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
-        const statusCol=e.status==='genehmigt'?'#059669':e.status==='abgelehnt'?'#ef4444':'#d97706';
-        const statusIcon=e.status==='genehmigt'?'✅':e.status==='abgelehnt'?'❌':'⏳';
+        const statusCol=e.status==='genehmigt'?'#059669':e.status==='abgelehnt'||e.status==='widerrufen'?'#ef4444':'#d97706';
+        const statusIcon=e.status==='genehmigt'?'✅':e.status==='abgelehnt'?'❌':e.status==='widerrufen'?'🗑':'⏳';
+        const artIcon=e.art==='ueberstunden'?'⏱':'🏖';
+        const artLabel=e.art==='ueberstunden'?'Überstundenabbau':'Urlaub';
         const card='<div style="padding:10px;border:1.5px solid '+(e.status==='beantragt'?'rgba(245,158,11,.4)':'var(--brd)')+';border-radius:10px;margin-bottom:6px">'
           +'<div style="display:flex;justify-content:space-between;align-items:center">'
           +'<span style="font-size:.8rem;font-weight:700">'+esc(name)+'</span>'
           +'<span style="font-size:.6rem;font-weight:700;color:'+statusCol+';padding:2px 8px;background:'+statusCol+'15;border-radius:4px">'+statusIcon+' '+e.status+'</span></div>'
-          +'<div style="font-size:.7rem;color:var(--mu);margin-top:4px">'+vonDE+' – '+bisDE+' · '+e.tage+' Tage'+(e.grund?' · '+esc(e.grund):'')+'</div>';
+          +'<div style="font-size:.7rem;color:var(--mu);margin-top:4px">'+artIcon+' '+artLabel+' · '+vonDE+' – '+bisDE+' · '+e.tage+' Tage'+(e.grund?' · '+esc(e.grund):'')+'</div>';
         if(e.status==='beantragt'){
           offenHtml+=card+'<div style="display:flex;gap:6px;margin-top:8px">'
             +'<button onclick="agUrlaubEntscheidung(\''+az.id+'\',\''+e.docId+'\',\'genehmigt\')" style="flex:1;padding:8px;background:#059669;color:#fff;border:none;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Genehmigen</button>'
@@ -989,13 +996,46 @@ function loadAgUrlaub(){
     aEl.innerHTML=alleHtml||'<div class="empty">Keine Anträge</div>';
   });
 }
+
+function loadAgJahresUebersicht(){
+  const el=document.getElementById('agJahresUebersicht');
+  if(!el||!_azubis.length){if(el)el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  const promises=_azubis.map(az=>{
+    const p1=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .where('status','==','genehmigt').get();
+    const p2=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('type','==','krank').get();
+    return Promise.all([p1,p2]).then(([urlSnap,krankSnap])=>{
+      let urlT=0,ueT=0;
+      urlSnap.forEach(d=>{const dd=d.data();if(dd.art==='ueberstunden')ueT+=(dd.tage||0);else urlT+=(dd.tage||0);});
+      const krankDates=new Set();
+      krankSnap.forEach(d=>{const dd=d.data();if(dd.datum)krankDates.add(dd.datum);});
+      return {az, krank:krankDates.size, urlaub:urlT, ueber:ueT};
+    }).catch(()=>({az, krank:0, urlaub:0, ueber:0}));
+  });
+  Promise.all(promises).then(results=>{
+    let html='<div style="font-size:.65rem;color:var(--mu);margin-bottom:6px">'+new Date().getFullYear()+'</div>';
+    results.forEach(r=>{
+      const name=((r.az.vorname||'')+' '+(r.az.nachname||'')).trim()||'Azubi';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.72rem">'
+        +'<span style="font-weight:700;flex:1">'+esc(name)+'</span>'
+        +'<span style="color:#ef4444;font-weight:700" title="Krank">🤒 '+r.krank+'T</span>'
+        +'<span style="color:#059669;font-weight:700" title="Urlaub">🏖 '+r.urlaub+'T</span>'
+        +'<span style="color:#6366f1;font-weight:700" title="Überstunden">⏱ '+r.ueber+'T</span>'
+        +'</div>';
+    });
+    el.innerHTML=html;
+  });
+}
 function agUrlaubEntscheidung(tnId, docId, status){
-  const hinweis=status==='genehmigt'?'\n\nHinweis: Der Urlaubszeitraum wird mit der Verwaltung für die überbetriebliche Lehrgangsplanung geteilt. Der Grund des Urlaubs wird nicht weitergegeben.':'';
-  if(!confirm('Urlaubsantrag '+(status==='genehmigt'?'genehmigen':'ablehnen')+'?'+hinweis)) return;
   const antragRef=db.collection('globalTN').doc(tnId).collection('urlaubsantraege').doc(docId);
   // Erst Antragsdaten laden (für von/bis bei Genehmigung)
   antragRef.get().then(doc=>{
     const antrag=doc.exists?doc.data():{};
+    const istUrlaub=antrag.art!=='ueberstunden';
+    const hinweis2=status==='genehmigt'&&istUrlaub?'\n\nHinweis: Der Urlaubszeitraum wird mit der Verwaltung für die überbetriebliche Lehrgangsplanung geteilt.':'';
+    if(!confirm('Antrag '+(status==='genehmigt'?'genehmigen':'ablehnen')+'?'+hinweis2)) return;
     return antragRef.update({status, entschiedenAm:Date.now(), entschiedenVon:_firma||_email}).then(()=>{
       toast(status==='genehmigt'?'✅ Genehmigt':'❌ Abgelehnt');
       // Azubi benachrichtigen
@@ -1005,8 +1045,8 @@ function agUrlaubEntscheidung(tnId, docId, status){
           datum:new Date().toISOString(), gelesen:false
         })
       }).catch(()=>{});
-      // Bei Genehmigung: Urlaub ins globalTN.urlaub Array schreiben (nur Zeitraum, OHNE Grund)
-      if(status==='genehmigt'&&antrag.von&&antrag.bis){
+      // Bei Genehmigung: Nur URLAUB ins globalTN.urlaub Array schreiben (nicht Überstundenabbau)
+      if(status==='genehmigt'&&antrag.von&&antrag.bis&&antrag.art!=='ueberstunden'){
         db.collection('globalTN').doc(tnId).update({
           urlaub:firebase.firestore.FieldValue.arrayUnion({
             von:antrag.von, bis:antrag.bis,
