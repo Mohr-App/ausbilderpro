@@ -1099,15 +1099,33 @@ function checkAgBadges(){
   Promise.all(promises).then(()=>{
     const total=meldCount+urlaubCount+zeitCount;
     // Betrieb-Tab Badge
-    const betriebBtn=document.getElementById('agnav-betrieb');
-    if(betriebBtn){
-      let badge=betriebBtn.querySelector('.ag-badge');
-      if(total>0){
-        if(!badge){badge=document.createElement('span');badge.className='ag-badge';betriebBtn.style.position='relative';betriebBtn.appendChild(badge);}
-        badge.textContent=total;
-      } else if(badge) badge.remove();
-    }
+    setBadge('agnav-betrieb', total);
+    // Sub-Tab Badges
+    const tabs=document.querySelectorAll('#agBetriebTabs .stab');
+    tabs.forEach(t=>{
+      const old=t.querySelector('.ag-badge');if(old)old.remove();
+      let count=0;
+      if(t.textContent.includes('Zeiten')) count=zeitCount;
+      else if(t.textContent.includes('Urlaub')) count=urlaubCount;
+      else if(t.textContent.includes('Meldungen')) count=meldCount;
+      if(count>0){
+        t.style.position='relative';
+        const b=document.createElement('span');b.className='ag-badge';
+        b.style.cssText='position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 2px 6px rgba(239,68,68,.4);animation:pulseRed 1.5s infinite;';
+        b.textContent=count;
+        t.appendChild(b);
+      }
+    });
   });
+}
+function setBadge(elId, count){
+  const el=document.getElementById(elId);
+  if(!el) return;
+  let badge=el.querySelector('.ag-badge');
+  if(count>0){
+    if(!badge){badge=document.createElement('span');badge.className='ag-badge';el.style.position='relative';el.appendChild(badge);}
+    badge.textContent=count;
+  } else if(badge) badge.remove();
 }
 </script>
 </body>
