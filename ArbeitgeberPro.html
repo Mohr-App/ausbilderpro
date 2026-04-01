@@ -187,7 +187,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div><label class="fl">Kunde</label><input class="fi" id="aufKunde" placeholder="z.B. Familie Müller" style="font-size:.76rem"></div>
           <div><label class="fl">Adresse</label><input class="fi" id="aufAdresse" placeholder="Straße, PLZ Ort" style="font-size:.76rem"></div>
           <div><label class="fl">Beschreibung</label><input class="fi" id="aufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.76rem"></div>
-          <div><label class="fl">Zuweisen an</label><select class="fi" id="aufMa" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
+          <div><label class="fl">Frist (optional)</label><input class="fi" type="date" id="aufFrist" style="font-size:.76rem"></div>
+          <div><label class="fl">Zuweisen an</label><select class="fi" id="aufMa" multiple style="font-size:.76rem;min-height:60px"><option value="" disabled>Bitte wählen (Mehrfach möglich)…</option></select></div>
           <button class="btn" onclick="agAuftragErstellen()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px">📋 Auftrag erstellen</button>
           <div class="err" id="aufErr" style="margin-top:4px"></div>
         </div>
@@ -1360,7 +1361,7 @@ function loadAgAuftraege(){
   // Fill MA dropdown
   const sel=document.getElementById('aufMa');
   if(sel&&_azubis.length){
-    sel.innerHTML='<option value="">Bitte wählen…</option>';
+    sel.innerHTML='';
     _azubis.forEach(a=>{
       const name=((a.vorname||'')+' '+(a.nachname||'')).trim();
       sel.innerHTML+='<option value="'+a.id+'">'+esc(name)+'</option>';
@@ -1402,6 +1403,7 @@ function renderAgAuftraege(){
         +(a.adresse?'<div style="font-size:.68rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
         +(a.beschreibung?'<div style="font-size:.68rem;color:var(--mu)">'+esc(a.beschreibung)+'</div>':'')
         +'<div style="font-size:.6rem;color:var(--acc);margin-top:4px">👤 '+esc(a.tnName)+'</div>'
+        +(a.frist?'<div style="font-size:.58rem;margin-top:2px;'+(a.frist<localDate()?'color:#dc2626;font-weight:700':'color:#d97706')+'">📅 Frist: '+new Date(a.frist+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})+(a.frist<localDate()?' ⚠ ÜBERFÄLLIG':'')+'</div>':'')
         +'</div>';
     });
     elO.innerHTML=h;
@@ -1437,22 +1439,25 @@ function agAuftragErstellen(){
   const kunde=document.getElementById('aufKunde').value.trim();
   const adresse=document.getElementById('aufAdresse').value.trim();
   const beschr=document.getElementById('aufBeschr').value.trim();
-  const maId=document.getElementById('aufMa').value;
+  const frist=document.getElementById('aufFrist').value;
+  const sel=document.getElementById('aufMa');
+  const maIds=Array.from(sel.selectedOptions).map(o=>o.value).filter(Boolean);
   const err=document.getElementById('aufErr');
   err.textContent='';
   if(!kunde){err.textContent='Bitte Kunde eingeben';return;}
-  if(!maId){err.textContent='Bitte Mitarbeiter auswählen';return;}
+  if(!maIds.length){err.textContent='Bitte mind. einen Mitarbeiter auswählen';return;}
   err.textContent='Wird erstellt…';
-  db.collection('globalTN').doc(maId).collection('auftraege').add({
-    kunde, adresse, beschreibung:beschr,
-    status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma
-  }).then(()=>{
+  const data={kunde, adresse, beschreibung:beschr, status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma};
+  if(frist) data.frist=frist;
+  const promises=maIds.map(id=>db.collection('globalTN').doc(id).collection('auftraege').add(data));
+  Promise.all(promises).then(()=>{
     err.textContent='';
     document.getElementById('aufKunde').value='';
     document.getElementById('aufAdresse').value='';
     document.getElementById('aufBeschr').value='';
-    document.getElementById('aufMa').value='';
-    toast('📋 Auftrag erstellt');
+    document.getElementById('aufFrist').value='';
+    sel.selectedIndex=-1;
+    toast('📋 Auftrag an '+maIds.length+' Mitarbeiter erstellt');
     loadAgAuftraege();
   }).catch(e=>{err.textContent='❌ '+e.message;});
 }

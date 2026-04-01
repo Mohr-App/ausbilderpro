@@ -1742,6 +1742,37 @@ function loadZeitkonto(){
       html+='<div style="display:flex;justify-content:space-between"><span style="font-size:.78rem;font-weight:700">Gesamt ('+tage+' Tage)</span><span style="font-size:.85rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+minToStr(totalIst)+'</span></div>';
     }
     html+='</div>';
+    // 48h/Woche Warnung
+    const weekMap={};
+    allDays.forEach(ds=>{
+      const d=new Date(ds+'T12:00');
+      // KW berechnen (ISO)
+      const jan4=new Date(d.getFullYear(),0,4);
+      const dayOfYear=Math.floor((d-new Date(d.getFullYear(),0,1))/86400000)+1;
+      const kw=Math.ceil((dayOfYear+jan4.getDay())/7);
+      const key='KW'+kw;
+      if(!weekMap[key]) weekMap[key]=0;
+      weekMap[key]+=(zeitMap[ds]?.istMinuten||0);
+    });
+    const overWeeks=Object.entries(weekMap).filter(([k,v])=>v>2880);
+    if(overWeeks.length){
+      html+='<div style="margin-top:8px;padding:10px;background:rgba(220,38,38,.08);border:1.5px solid rgba(220,38,38,.25);border-radius:8px;font-size:.72rem;color:#dc2626;font-weight:600">🚨 Wochenarbeitszeit überschritten (max. 48h/Woche §3 ArbZG): '+overWeeks.map(([k,v])=>k+': '+minToStr(v)).join(', ')+'</div>';
+    }
+    // Wochensicht
+    if(Object.keys(weekMap).length>1){
+      html+='<div style="margin-top:10px;padding:10px;background:var(--sur2);border-radius:8px">'
+        +'<div style="font-size:.68rem;font-weight:800;color:var(--mu);margin-bottom:6px">📊 WOCHENÜBERSICHT</div>';
+      Object.entries(weekMap).sort((a,b)=>parseInt(a[0].replace('KW',''))-parseInt(b[0].replace('KW',''))).forEach(([kw,min])=>{
+        const pct=_azPlan?Math.round(min/((_azPlan.mo+_azPlan.di+_azPlan.mi+_azPlan.do+_azPlan.fr+(_azPlan.sa||0)+(_azPlan.so||0))*60)*100):0;
+        const col=min>2880?'#dc2626':min>2400?'#d97706':'#059669';
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:.7rem">'
+          +'<span style="min-width:36px;font-weight:700;color:var(--mu)">'+kw+'</span>'
+          +'<div style="flex:1;height:6px;background:var(--brd);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+Math.min(pct,100)+'%;background:'+col+';border-radius:3px"></div></div>'
+          +'<span style="min-width:50px;text-align:right;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:'+col+'">'+minToStr(min)+'</span>'
+          +'</div>';
+      });
+      html+='</div>';
+    }
     el.innerHTML=html;
   }).catch(err=>{el.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
 }
@@ -1926,6 +1957,7 @@ function renderAuftraege(){
         +(a.adresse?'<a href="'+mapsUrl+'" target="_blank" style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:8px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:8px;text-decoration:none;font-size:.72rem;color:#2563eb;font-weight:600">📍 '+esc(a.adresse)+' <span style="margin-left:auto;font-size:.65rem">→ Maps</span></a>':'')
         +(a.beschreibung?'<div style="font-size:.78rem;color:var(--tx);margin-top:8px;padding:8px 10px;background:rgba(0,0,0,.02);border-radius:6px;line-height:1.5">'+esc(a.beschreibung)+'</div>':'')
         +(a.erstelltVon&&a.erstelltVon!=='selbst'?'<div style="font-size:.58rem;color:var(--mu);margin-top:4px">Von: '+esc(a.erstelltVon)+'</div>':'')
+        +(a.frist?'<div style="font-size:.62rem;margin-top:2px;'+(a.frist<localDate()?'color:#dc2626;font-weight:700':'color:#d97706')+'">📅 Frist: '+new Date(a.frist+"T12:00").toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"2-digit"})+(a.frist<localDate()?' ⚠ ÜBERFÄLLIG':'')+'</div>':'')
         +(isRunning
           ?'<button onclick="auftragErledigen(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Auftrag erledigen</button>'
           :'<button onclick="auftragStarten(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">▶ Auftrag starten</button>')
