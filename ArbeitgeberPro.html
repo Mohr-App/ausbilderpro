@@ -943,7 +943,6 @@ function showDoku(tnId,datum){
   const dvDate=document.getElementById('dvDate');
   const dvContent=document.getElementById('dvContent');
   dvContent.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px">Lädt…</div>';
-  // Format date
   const parts=datum.split('-');
   dvDate.textContent=parts[2]+'.'+parts[1]+'.'+parts[0];
   document.getElementById('dvModal').classList.add('open');
@@ -951,6 +950,13 @@ function showDoku(tnId,datum){
     if(!doc.exists){dvContent.innerHTML='<div class="empty">Keine Daten</div>';return;}
     const d=doc.data();
     let html='';
+    // GPS
+    if(d.gpsEingang||d.gpsAusgang){
+      html+='<div class="dv-section"><div class="dv-label">📍 Standorte</div>';
+      if(d.gpsEingang) html+='<div style="font-size:.72rem;margin-bottom:4px">▶ Eingang: <a href="https://maps.google.com/?q='+d.gpsEingang.lat+','+d.gpsEingang.lng+'" target="_blank" style="color:#2563eb">'+d.gpsEingang.lat+', '+d.gpsEingang.lng+'</a> <span style="color:#94a3b8">(±'+d.gpsEingang.acc+'m)</span></div>';
+      if(d.gpsAusgang) html+='<div style="font-size:.72rem">⏹ Ausgang: <a href="https://maps.google.com/?q='+d.gpsAusgang.lat+','+d.gpsAusgang.lng+'" target="_blank" style="color:#2563eb">'+d.gpsAusgang.lat+', '+d.gpsAusgang.lng+'</a> <span style="color:#94a3b8">(±'+d.gpsAusgang.acc+'m)</span></div>';
+      html+='</div>';
+    }
     if(d.fotos&&d.fotos.length){
       html+='<div class="dv-section"><div class="dv-label">📸 Fotos ('+d.fotos.length+')</div><div class="dv-photos">';
       d.fotos.forEach(f=>{html+='<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')" loading="lazy">';});
@@ -959,7 +965,7 @@ function showDoku(tnId,datum){
     if(d.unterschrift){
       html+='<div class="dv-section"><div class="dv-label">✍ Kundenunterschrift</div><div class="dv-sig"><img src="'+d.unterschrift+'"></div></div>';
     }
-    if(!d.fotos&&!d.unterschrift) html='<div class="empty">Keine Dokumentation vorhanden</div>';
+    if(!d.fotos&&!d.unterschrift&&!d.gpsEingang&&!d.gpsAusgang) html='<div class="empty">Keine Dokumentation vorhanden</div>';
     dvContent.innerHTML=html;
   });
 }
@@ -1233,7 +1239,7 @@ function loadAgZeiten(){
         if(plan){
           const diff=ist-soll;const diffCol=(isKrank||isUrlaub)?'var(--mu)':diff>=0?'#059669':'#ef4444';
           const zeitText=e?(e.eingang+(e.ausgang?' – '+e.ausgang:'…')):(isKrank||isUrlaub?'—':'');
-          const dokuIcons=e&&(e.fotos||e.unterschrift)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku anzeigen">'+(e.fotos?'📸':'')+(e.unterschrift?'✍':'')+'</span>':'';
+          const dokuIcons=e&&(e.fotos||e.unterschrift||e.gpsEingang)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku anzeigen">'+(e.gpsEingang?'📍':'')+(e.fotos?'📸':'')+(e.unterschrift?'✍':'')+'</span>':'';
           dayHtml+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem">'
             +'<span style="flex:1.5;color:var(--mu)">'+datDE+statusTag+'</span>'
             +'<span style="flex:2">'+zeitText+dokuIcons+manuell+bestBtn+'</span>'

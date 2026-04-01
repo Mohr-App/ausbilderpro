@@ -1377,6 +1377,18 @@ function updateZeitBtn(){
   }
 }
 
+// ── GPS Helper ──
+function getGPS(){
+  return new Promise(resolve=>{
+    if(!navigator.geolocation){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(
+      pos=>resolve({lat:Math.round(pos.coords.latitude*1e6)/1e6,lng:Math.round(pos.coords.longitude*1e6)/1e6,acc:Math.round(pos.coords.accuracy)}),
+      ()=>resolve(null),
+      {enableHighAccuracy:true,timeout:8000,maximumAge:60000}
+    );
+  });
+}
+
 function zeitStempeln(){
   if(!_tnId||!db) return;
   const today=localDate();
@@ -1384,9 +1396,12 @@ function zeitStempeln(){
   const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
   if(_zeitState==='aus'){
     if(_zeitHeute&&_zeitHeute.ausgang){if(!confirm('Bereits ausgestempelt. Neuen Tag starten?'))return;}
-    ref.set({eingang:jetzt,pauseLog:[],datum:today},{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
+    getGPS().then(gps=>{
+      const data={eingang:jetzt,pauseLog:[],datum:today};
+      if(gps) data.gpsEingang=gps;
+      ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
+    });
   } else if(_zeitState==='ein'||_zeitState==='pause'){
-    // Ausstempel-Modal öffnen
     _asJetzt=jetzt;
     _asPhotos=[];
     document.getElementById('asZeit').textContent='Feierabend um '+jetzt;
@@ -1409,15 +1424,16 @@ function asConfirm(){
   const pauseMin=calcPauseMinuten(pLog);
   const istMin=calcIstMinuten(_zeitHeute.eingang,_asJetzt,pauseMin);
   const update={ausgang:_asJetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin};
-  // Unterschrift
   const sig=sigGetData();
   if(sig) update.unterschrift=sig;
-  // Fotos
   if(_asPhotos.length) update.fotos=_asPhotos;
-  ref.update(update).then(()=>{
-    asClose();
-    loadZeitHeute();
-    toast('⏹ Ausgestempelt um '+_asJetzt);
+  getGPS().then(gps=>{
+    if(gps) update.gpsAusgang=gps;
+    ref.update(update).then(()=>{
+      asClose();
+      loadZeitHeute();
+      toast('⏹ Ausgestempelt um '+_asJetzt);
+    });
   });
 }
 
