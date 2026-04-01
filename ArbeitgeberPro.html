@@ -1278,9 +1278,10 @@ function loadAgZeiten(){
           const diff=ist-soll;const diffCol=(isKrank||isUrlaub)?'var(--mu)':diff>=0?'#059669':'#ef4444';
           const zeitText=e?(e.eingang+(e.ausgang?' – '+e.ausgang:'…')):(isKrank||isUrlaub?'—':'');
           const dokuIcons=e&&(e.fotos||e.unterschrift||e.gpsEingang)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku anzeigen">'+(e.gpsEingang?'📍':'')+(e.fotos?'📸':'')+(e.unterschrift?'✍':'')+'</span>':'';
+          const nachtarbeit=e&&e.ausgang&&parseInt(e.ausgang)>=22?'<span style="font-size:.5rem;margin-left:2px" title="Nachtarbeit">🌙</span>':'';
           dayHtml+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem">'
             +'<span style="flex:1.5;color:var(--mu)">'+datDE+statusTag+'</span>'
-            +'<span style="flex:2">'+zeitText+dokuIcons+manuell+bestBtn+'</span>'
+            +'<span style="flex:2">'+zeitText+nachtarbeit+dokuIcons+manuell+bestBtn+'</span>'
             +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e?.ausgang?minToStr(ist):(isKrank||isUrlaub?'—':''))+'</span>'
             +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isKrank||isUrlaub?'—':(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
         } else if(e){
@@ -1425,6 +1426,7 @@ function renderAgAuftraege(){
         +(a.gpsErledigt?'📍':'')
         +'</div>'
         +'<button onclick="event.stopPropagation();exportAuftragsprotokoll(\''+a.tnId+'\',\''+a.id+'\')" style="margin-top:6px;padding:5px 12px;background:#fff;border:1px solid #2563eb;border-radius:6px;color:#2563eb;font-size:.6rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📄 PDF</button>'
+        +' <button onclick="event.stopPropagation();agAuftragWiedereroeffnen(\''+a.tnId+'\',\''+a.id+'\')" style="padding:5px 12px;background:#fff;border:1px solid #d97706;border-radius:6px;color:#d97706;font-size:.6rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">↩ Nacharbeit</button>'
         +'</div>';
     });
     elE.innerHTML=h;
@@ -1488,6 +1490,13 @@ function showAuftragDoku(tnId,aufId){
     if(!html) html='<div class="empty">Keine Dokumentation</div>';
     dvContent.innerHTML=html;
   });
+}
+
+function agAuftragWiedereroeffnen(tnId,aufId){
+  if(!confirm('Auftrag wiedereröffnen? Der Mitarbeiter sieht ihn wieder als offenen Auftrag.')) return;
+  db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).update({
+    status:'offen', wiederoeffnetAm:Date.now(), wiederoeffnetVon:_firma||_email
+  }).then(()=>{toast('↩ Auftrag wiedereröffnet');loadAgAuftraege();});
 }
 
 // PDF EXPORTS

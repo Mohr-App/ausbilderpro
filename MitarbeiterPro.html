@@ -914,7 +914,12 @@ function updateZeitBtn(){
 
 function checkPauseErinnerung(){
   const banner=document.getElementById('pauseWarning');
-  if(!_zeitHeute||!_zeitHeute.eingang||_zeitHeute.ausgang){if(banner)banner.style.display='none';return;}
+  const banner10=document.getElementById('ueberstundenWarning');
+  if(!_zeitHeute||!_zeitHeute.eingang||_zeitHeute.ausgang){
+    if(banner)banner.style.display='none';
+    if(banner10)banner10.style.display='none';
+    return;
+  }
   const pLog=_zeitHeute.pauseLog||[];
   const hatPause=pLog.some(p=>p.start&&p.ende);
   const [h,m]=_zeitHeute.eingang.split(':').map(Number);
@@ -923,13 +928,20 @@ function checkPauseErinnerung(){
   const arbeitsMin=jetztMin-eingangMin;
   if(arbeitsMin>=360&&!hatPause){
     if(!banner){
-      const el=document.createElement('div');
-      el.id='pauseWarning';
+      const el=document.createElement('div');el.id='pauseWarning';
       el.style.cssText='padding:10px 14px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.25);border-radius:10px;margin-top:8px;font-size:.72rem;color:#dc2626;font-weight:600';
       el.textContent='⚠ Gesetzliche Pause: Nach 6 Stunden Arbeitszeit ist eine Pause von mind. 30 Minuten vorgeschrieben (§4 ArbZG).';
       document.getElementById('zeitBtn')?.parentElement?.appendChild(el);
     } else banner.style.display='';
   } else {if(banner)banner.style.display='none';}
+  if(arbeitsMin>=600){
+    if(!banner10){
+      const el=document.createElement('div');el.id='ueberstundenWarning';
+      el.style.cssText='padding:10px 14px;background:rgba(220,38,38,.1);border:1.5px solid rgba(220,38,38,.35);border-radius:10px;margin-top:8px;font-size:.72rem;color:#dc2626;font-weight:600';
+      el.textContent='🚨 Maximale Arbeitszeit: 10 Stunden pro Tag dürfen nicht überschritten werden (§3 ArbZG).';
+      document.getElementById('zeitBtn')?.parentElement?.appendChild(el);
+    } else banner10.style.display='';
+  } else {if(banner10)banner10.style.display='none';}
 }
 
 // ── GPS Helper ──
