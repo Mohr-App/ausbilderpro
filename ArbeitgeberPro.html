@@ -231,15 +231,20 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="font-size:1.1rem;font-weight:800">Meine Mitarbeiter</div>
       </div>
       <div class="card">
-        <div class="card-title">+ Arbeitnehmer hinzufügen</div>
-        <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Erstellt einen Zugang für die MitarbeiterPro-App (Zeiterfassung, Urlaub, Aufträge).</div>
+        <div class="card-title">+ Mitarbeiter / Azubi hinzufügen</div>
+        <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Erstellt einen Zugang für MitarbeiterPro oder AzubiPro.</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <button id="typBtnAn" onclick="setMaTyp('arbeitnehmer')" style="flex:1;padding:10px;border:2px solid #2563eb;border-radius:8px;background:rgba(37,99,235,.08);color:#2563eb;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">👤 Arbeitnehmer</button>
+          <button id="typBtnAz" onclick="setMaTyp('azubi')" style="flex:1;padding:10px;border:2px solid var(--brd);border-radius:8px;background:#fff;color:var(--mu);font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">🎓 Azubi</button>
+        </div>
+        <div id="berufRow" style="display:none;margin-bottom:6px"><label class="fl">Beruf</label><input class="fi" id="newMaBeruf" placeholder="z.B. Elektroniker" style="font-size:.76rem"></div>
         <div style="display:flex;gap:6px;margin-bottom:6px">
           <div style="flex:1"><label class="fl">Vorname</label><input class="fi" id="newMaVorname" style="font-size:.76rem"></div>
           <div style="flex:1"><label class="fl">Nachname</label><input class="fi" id="newMaNachname" style="font-size:.76rem"></div>
         </div>
         <div><label class="fl">E-Mail</label><input class="fi" type="email" id="newMaEmail" style="font-size:.76rem"></div>
         <div><label class="fl">Passwort (min. 6 Zeichen)</label><input class="fi" type="text" id="newMaPw" style="font-size:.76rem" placeholder="Wird dem Mitarbeiter mitgeteilt"></div>
-        <button class="btn" onclick="agCreateMitarbeiter()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px">👤+ Mitarbeiter anlegen</button>
+        <button class="btn" onclick="agCreateMitarbeiter()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px" id="createMaBtn">👤+ Arbeitnehmer anlegen</button>
         <div class="err" id="newMaErr" style="margin-top:4px"></div>
       </div>
       <div id="agAzubiKontakte"><div class="empty">Lädt…</div></div>
@@ -913,36 +918,73 @@ function getSecondaryAuth(){
   return _secondaryApp.auth();
 }
 
+let _maTyp='arbeitnehmer';
+function setMaTyp(typ){
+  _maTyp=typ;
+  const btnAn=document.getElementById('typBtnAn');
+  const btnAz=document.getElementById('typBtnAz');
+  const berufRow=document.getElementById('berufRow');
+  const createBtn=document.getElementById('createMaBtn');
+  if(typ==='azubi'){
+    btnAz.style.border='2px solid #2563eb';btnAz.style.background='rgba(37,99,235,.08)';btnAz.style.color='#2563eb';
+    btnAn.style.border='2px solid var(--brd)';btnAn.style.background='#fff';btnAn.style.color='var(--mu)';
+    berufRow.style.display='';
+    createBtn.textContent='🎓+ Azubi anlegen';
+  } else {
+    btnAn.style.border='2px solid #2563eb';btnAn.style.background='rgba(37,99,235,.08)';btnAn.style.color='#2563eb';
+    btnAz.style.border='2px solid var(--brd)';btnAz.style.background='#fff';btnAz.style.color='var(--mu)';
+    berufRow.style.display='none';
+    createBtn.textContent='👤+ Arbeitnehmer anlegen';
+  }
+}
+
 function agCreateMitarbeiter(){
   const vorname=document.getElementById('newMaVorname').value.trim();
   const nachname=document.getElementById('newMaNachname').value.trim();
   const email=document.getElementById('newMaEmail').value.trim().toLowerCase();
   const pw=document.getElementById('newMaPw').value;
+  const beruf=document.getElementById('newMaBeruf')?.value.trim()||'';
   const err=document.getElementById('newMaErr');
+  const isAzubi=_maTyp==='azubi';
+  const rolle=isAzubi?'azubi':'arbeitnehmer';
+  const app=isAzubi?'AzubiPro':'MitarbeiterPro';
   err.textContent='';
   if(!vorname||!nachname){err.textContent='Bitte Vor- und Nachname eingeben';return;}
   if(!email){err.textContent='Bitte E-Mail eingeben';return;}
   if(pw.length<6){err.textContent='Passwort min. 6 Zeichen';return;}
-  if(!confirm('Mitarbeiter anlegen?\n\n'+vorname+' '+nachname+'\n'+email+'\n\nDer Mitarbeiter kann sich mit diesen Daten in der MitarbeiterPro-App anmelden.')) return;
+  if(isAzubi&&!beruf){err.textContent='Bitte Beruf angeben';return;}
+  if(!confirm((isAzubi?'Azubi':'Arbeitnehmer')+' anlegen?\n\n'+vorname+' '+nachname+'\n'+email+'\n\nZugang über '+app+'-App.')) return;
   err.textContent='Wird angelegt…';
   const secAuth=getSecondaryAuth();
   secAuth.createUserWithEmailAndPassword(email,pw).then(cred=>{
     const uid=cred.user.uid;
-    // Users-Doc mit Secondary Auth (damit Rules uid==uid passen)
     const secDb=_secondaryApp.firestore();
-    secDb.collection('users').doc(uid).set({email,role:'arbeitnehmer',firma:_firma});
-    // GlobalTN-Doc mit Haupt-DB (create erlaubt für alle auth)
-    db.collection('globalTN').doc(uid).set({
-      vorname,nachname,email,firma:_firma,typ:'arbeitnehmer',
-      erstelltAm:Date.now(),erstelltVon:_firma||_email
-    });
+    secDb.collection('users').doc(uid).set({email,role:rolle,firma:_firma});
+    const tnData={vorname,nachname,email,firma:_firma,typ:rolle,erstelltAm:Date.now(),erstelltVon:_firma||_email};
+    if(isAzubi&&beruf) tnData.beruf=beruf;
+    db.collection('globalTN').doc(uid).set(tnData);
+    // E-Mail an Verwaltung bei neuem Azubi
+    if(isAzubi){
+      db.collection('mail').add({
+        to:'info@ausbilderpro.de',
+        message:{
+          subject:'🎓 Neuer Azubi angelegt: '+vorname+' '+nachname,
+          html:'<b>'+_firma+'</b> hat einen neuen Azubi angelegt:<br><br>'+
+            'Name: <b>'+vorname+' '+nachname+'</b><br>'+
+            'Beruf: '+beruf+'<br>'+
+            'E-Mail: '+email+'<br><br>'+
+            'Der Azubi kann in VerwaltungPro einem Kurs zugewiesen werden.'
+        }
+      });
+    }
     secAuth.signOut();
     document.getElementById('newMaVorname').value='';
     document.getElementById('newMaNachname').value='';
     document.getElementById('newMaEmail').value='';
     document.getElementById('newMaPw').value='';
+    if(document.getElementById('newMaBeruf')) document.getElementById('newMaBeruf').value='';
     err.textContent='';
-    toast('✅ '+vorname+' '+nachname+' angelegt');
+    toast('✅ '+vorname+' '+nachname+' als '+(isAzubi?'Azubi':'Arbeitnehmer')+' angelegt');
   }).catch(e=>{
     const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach'};
     err.textContent='❌ '+(msgs[e.code]||e.message);
