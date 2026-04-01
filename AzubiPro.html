@@ -639,6 +639,7 @@ auth.onAuthStateChanged(u=>{
     });
   } else {
     _uid=null; _tnId=null; _tnData=null;
+    if(_tnDocUnsub){_tnDocUnsub();_tnDocUnsub=null;}
     if(!_registering&&!_joinKursId){
       document.getElementById('loginWrap').style.display='flex';
     }
@@ -964,7 +965,25 @@ function loadData(){
   if(ki&&_tnData?.aktiverKursId){
     ki.textContent='Aktiver Kurs vorhanden · Tippe für Details';
   }
+
+  // Live-Listener auf TN-Dokument – erkennt Kursänderungen, Abbruch etc.
+  if(_tnId&&!_tnDocUnsub){
+    _tnDocUnsub=db.collection('globalTN').doc(_tnId).onSnapshot(doc=>{
+      if(!doc.exists) return;
+      const newData=doc.data();
+      const changed=newData.aktiverKursId!==_tnData?.aktiverKursId
+        || JSON.stringify(newData.kursHistory||[])!==JSON.stringify(_tnData?.kursHistory||[])
+        || newData.status!==_tnData?.status;
+      _tnData=newData;
+      if(changed){
+        loadKurse();
+        checkBenachrichtigungen();
+        checkAzubiBadges();
+      }
+    });
+  }
 }
+let _tnDocUnsub=null;
 
 function checkSitzplatzPopup(){
   // Popup entfernt – Sitzplatz wird jetzt direkt in der Kurs-Karte angezeigt
