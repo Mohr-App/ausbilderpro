@@ -504,11 +504,33 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .as-btns button{flex:1;padding:14px;border:none;border-radius:12px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif}
 .as-cancel{background:#f1f5f9;color:#64748b}
 .as-confirm{background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;box-shadow:0 4px 16px rgba(239,68,68,.3)}
+.mat-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.mat-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:6px;font-size:.68rem;font-weight:600;color:#2563eb}
+.mat-tag button{background:none;border:none;color:#ef4444;cursor:pointer;font-size:.7rem;padding:0}
 </style>
 <div class="as-overlay" id="asModal">
   <div class="as-box">
     <div class="as-title" id="asTitle">⏹ Ausstempeln</div>
     <div id="asZeit" style="text-align:center;font-size:.85rem;color:#64748b;margin-bottom:16px"></div>
+    <div class="as-section" id="asWorkSection">
+      <div class="as-label">🔧 Was wurde gemacht?</div>
+      <textarea id="asTaetigkeit" rows="2" style="width:100%;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-family:'Sora',sans-serif;resize:vertical" placeholder="z.B. Steckdosen installiert, Leitungen verlegt"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="flex:1">
+          <div class="as-label">⏱ Stundenaufwand</div>
+          <input type="number" id="asStunden" min="0" step="0.5" placeholder="z.B. 3.5" style="width:100%;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-family:'JetBrains Mono',monospace">
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <div class="as-label">🧱 Material</div>
+        <div style="display:flex;gap:4px">
+          <input type="text" id="asMatInput" list="asMatList" placeholder="z.B. NYM 3x1.5" style="flex:1;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.76rem;font-family:'Sora',sans-serif">
+          <datalist id="asMatList"></datalist>
+          <button onclick="asAddMat()" style="padding:8px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer">+</button>
+        </div>
+        <div class="mat-tags" id="asMatTags"></div>
+      </div>
+    </div>
     <div class="as-section" id="asPhotoSection">
       <div class="as-label">📸 Fotodokumentation (optional, max. 3)</div>
       <div class="photo-grid" id="asPhotos">
@@ -932,12 +954,21 @@ function asConfirm(){
   if(!_auftragId) return;
   const ref=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_auftragId);
   const update={status:'erledigt',erledigtAm:Date.now()};
+  const taet=document.getElementById('asTaetigkeit').value.trim();
+  const std=parseFloat(document.getElementById('asStunden').value);
+  if(taet) update.taetigkeit=taet;
+  if(std>0) update.stunden=std;
+  if(_asMaterialien.length) update.material=_asMaterialien;
   const sig=sigGetData();
   if(sig) update.unterschrift=sig;
   if(_asPhotos.length) update.fotos=_asPhotos;
   getGPS().then(gps=>{
     if(gps) update.gpsErledigt=gps;
-    ref.update(update).then(()=>{asClose();_auftragId=null;toast('✅ Auftrag erledigt');});
+    ref.update(update).then(()=>{
+      saveMaterialien();
+      asClose();_auftragId=null;
+      toast('✅ Auftrag erledigt');
+    });
   });
 }
 function asAddPhotos(files){
@@ -1348,19 +1379,58 @@ function renderAuftraege(){
 }
 
 let _auftragId=null;
+let _asMaterialien=[];
 function auftragErledigen(id){
   _auftragId=id;
   const a=_auftraege.find(x=>x.id===id);
   _asPhotos=[];
+  _asMaterialien=[];
   document.getElementById('asTitle').textContent='✅ Auftrag abschließen';
   document.getElementById('asZeit').textContent=a?esc(a.kunde||''):'';
+  document.getElementById('asWorkSection').style.display='';
+  document.getElementById('asPhotoSection').style.display='';
+  document.getElementById('asSigSection').style.display='';
+  document.getElementById('asTaetigkeit').value='';
+  document.getElementById('asStunden').value='';
+  document.getElementById('asMatInput').value='';
+  document.getElementById('asMatTags').innerHTML='';
   document.getElementById('asPhotos').innerHTML='<label class="photo-add" id="asPhotoAdd">📷<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="asAddPhotos(this.files)"></label>';
   sigClear();
+  loadMatListe();
   const btn=document.querySelector('.as-confirm');
   btn.textContent='✅ Auftrag erledigt';
   btn.style.background='linear-gradient(135deg,#059669,#10b981)';
   document.getElementById('asModal').classList.add('open');
   sigInit();
+}
+function loadMatListe(){
+  if(!_tnId||!db) return;
+  db.collection('globalTN').doc(_tnId).get().then(doc=>{
+    const list=(doc.exists&&doc.data().materialListe)||[];
+    const dl=document.getElementById('asMatList');
+    dl.innerHTML='';
+    list.forEach(m=>{dl.innerHTML+='<option value="'+esc(m)+'">';});
+  });
+}
+function asAddMat(){
+  const inp=document.getElementById('asMatInput');
+  const val=inp.value.trim();
+  if(!val||_asMaterialien.includes(val)) return;
+  _asMaterialien.push(val);
+  renderMatTags();
+  inp.value='';inp.focus();
+}
+function asRemoveMat(idx){_asMaterialien.splice(idx,1);renderMatTags();}
+function renderMatTags(){
+  document.getElementById('asMatTags').innerHTML=_asMaterialien.map((m,i)=>'<span class="mat-tag">'+esc(m)+'<button onclick="asRemoveMat('+i+')">✕</button></span>').join('');
+}
+function saveMaterialien(){
+  if(!_tnId||!db||!_asMaterialien.length) return;
+  db.collection('globalTN').doc(_tnId).get().then(doc=>{
+    const existing=(doc.exists&&doc.data().materialListe)||[];
+    const merged=[...new Set([...existing,..._asMaterialien])];
+    db.collection('globalTN').doc(_tnId).update({materialListe:merged}).catch(()=>{});
+  });
 }
 
 function eigenenAuftragErstellen(){
