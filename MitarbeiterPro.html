@@ -398,8 +398,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="btab" id="btab-baustellen">
         <div class="card">
           <div class="card-title">+ Eigenen Auftrag anlegen</div>
-          <div><label class="fl">Kunde</label><input class="fi" id="selfAufKunde" placeholder="z.B. Familie Müller" style="font-size:.76rem"></div>
-          <div><label class="fl">Adresse</label><input class="fi" id="selfAufAdresse" placeholder="Straße, PLZ Ort" style="font-size:.76rem"></div>
+          <div><label class="fl">Kunde</label><input class="fi" id="selfAufKunde" list="kundenList" placeholder="z.B. Familie Müller" style="font-size:.76rem" onchange="autoFillAdresse(this.value)"><datalist id="kundenList"></datalist></div>
+          <div><label class="fl">Adresse</label><input class="fi" id="selfAufAdresse" list="adressenList" placeholder="Straße, PLZ Ort" style="font-size:.76rem"><datalist id="adressenList"></datalist></div>
           <div><label class="fl">Beschreibung</label><input class="fi" id="selfAufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.76rem"></div>
           <button class="btn" onclick="eigenenAuftragErstellen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px">📋 Auftrag anlegen</button>
         </div>
@@ -909,6 +909,27 @@ function updateZeitBtn(){
       pauseBtn.style.background='rgba(245,158,11,.15)';pauseBtn.style.color='#d97706';pauseBtn.style.borderColor='rgba(245,158,11,.3)';
     }
   }
+  checkPauseErinnerung();
+}
+
+function checkPauseErinnerung(){
+  const banner=document.getElementById('pauseWarning');
+  if(!_zeitHeute||!_zeitHeute.eingang||_zeitHeute.ausgang){if(banner)banner.style.display='none';return;}
+  const pLog=_zeitHeute.pauseLog||[];
+  const hatPause=pLog.some(p=>p.start&&p.ende);
+  const [h,m]=_zeitHeute.eingang.split(':').map(Number);
+  const eingangMin=h*60+m;
+  const jetztMin=new Date().getHours()*60+new Date().getMinutes();
+  const arbeitsMin=jetztMin-eingangMin;
+  if(arbeitsMin>=360&&!hatPause){
+    if(!banner){
+      const el=document.createElement('div');
+      el.id='pauseWarning';
+      el.style.cssText='padding:10px 14px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.25);border-radius:10px;margin-top:8px;font-size:.72rem;color:#dc2626;font-weight:600';
+      el.textContent='⚠ Gesetzliche Pause: Nach 6 Stunden Arbeitszeit ist eine Pause von mind. 30 Minuten vorgeschrieben (§4 ArbZG).';
+      document.getElementById('zeitBtn')?.parentElement?.appendChild(el);
+    } else banner.style.display='';
+  } else {if(banner)banner.style.display='none';}
 }
 
 // ── GPS Helper ──
@@ -1328,6 +1349,7 @@ function loadUrlaubAntraege(){
 let _auftraege=[];
 function loadAuftraege(){
   if(!_tnId||!db) return;
+  loadKundenListe();
   db.collection('globalTN').doc(_tnId).collection('auftraege')
     .orderBy('erstelltAm','desc').onSnapshot(snap=>{
       _auftraege=[];
@@ -1340,25 +1362,35 @@ function loadAuftraege(){
 }
 
 function renderAuftraege(){
-  const offen=_auftraege.filter(a=>a.status!=='erledigt');
+  const offen=_auftraege.filter(a=>a.status==='offen');
+  const inArbeit=_auftraege.filter(a=>a.status==='inArbeit');
   const erledigt=_auftraege.filter(a=>a.status==='erledigt');
   const elO=document.getElementById('auftraegeOffen');
   const elE=document.getElementById('auftraegeErledigt');
   if(!elO||!elE) return;
-  if(!offen.length){elO.innerHTML='<div class="empty">Keine offenen Aufträge</div>';}
+  const aktiv=[...inArbeit,...offen];
+  if(!aktiv.length){elO.innerHTML='<div class="empty">Keine offenen Aufträge</div>';}
   else{
     let h='';
-    offen.forEach(a=>{
+    aktiv.forEach(a=>{
       const dat=a.erstelltAm?new Date(a.erstelltAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
       const mapsUrl=a.adresse?'https://maps.google.com/?q='+encodeURIComponent(a.adresse):'';
-      h+='<div style="padding:12px;border:1.5px solid rgba(37,99,235,.2);border-radius:10px;margin-bottom:8px;background:rgba(37,99,235,.03)">'
+      const isRunning=a.status==='inArbeit';
+      const borderCol=isRunning?'rgba(16,185,129,.4)':'rgba(37,99,235,.2)';
+      const bgCol=isRunning?'rgba(16,185,129,.04)':'rgba(37,99,235,.03)';
+      let seit='';
+      if(isRunning&&a.gestartetAm){const min=Math.round((Date.now()-a.gestartetAm)/60000);seit=min<60?min+'min':Math.floor(min/60)+'h '+min%60+'min';}
+      h+='<div style="padding:12px;border:1.5px solid '+borderCol+';border-radius:10px;margin-bottom:8px;background:'+bgCol+'">'
+        +(isRunning?'<div style="font-size:.6rem;font-weight:700;color:#059669;margin-bottom:4px">▶ In Arbeit'+(seit?' seit '+seit:'')+'</div>':'')
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
         +'<span style="font-size:.9rem;font-weight:800">'+esc(a.kunde||'Ohne Kunde')+'</span>'
         +'<span style="font-size:.58rem;color:var(--mu)">'+dat+'</span></div>'
         +(a.adresse?'<a href="'+mapsUrl+'" target="_blank" style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:8px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:8px;text-decoration:none;font-size:.72rem;color:#2563eb;font-weight:600">📍 '+esc(a.adresse)+' <span style="margin-left:auto;font-size:.65rem">→ Maps</span></a>':'')
         +(a.beschreibung?'<div style="font-size:.78rem;color:var(--tx);margin-top:8px;padding:8px 10px;background:rgba(0,0,0,.02);border-radius:6px;line-height:1.5">'+esc(a.beschreibung)+'</div>':'')
         +(a.erstelltVon&&a.erstelltVon!=='selbst'?'<div style="font-size:.58rem;color:var(--mu);margin-top:4px">Von: '+esc(a.erstelltVon)+'</div>':'')
-        +'<button onclick="auftragErledigen(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Auftrag erledigen</button>'
+        +(isRunning
+          ?'<button onclick="auftragErledigen(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Auftrag erledigen</button>'
+          :'<button onclick="auftragStarten(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">▶ Auftrag starten</button>')
         +'</div>';
     });
     elO.innerHTML=h;
@@ -1373,7 +1405,8 @@ function renderAuftraege(){
         +'<span style="font-size:.78rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
         +'<span style="font-size:.55rem;color:#059669;font-weight:600">✅ '+dat+'</span></div>'
         +(a.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
-        +((a.fotos||a.unterschrift)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(a.fotos?'📸 '+a.fotos.length+' Foto(s)':'')+(a.unterschrift?' · ✍ Unterschrift':'')+'</div>':'')
+        +(a.taetigkeit?'<div style="font-size:.6rem;color:var(--mu)">🔧 '+esc(a.taetigkeit)+'</div>':'')
+        +((a.fotos||a.unterschrift)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(a.stunden?'⏱ '+a.stunden+'h ':'')+(a.fotos?'📸 '+a.fotos.length+' ':'')+(a.unterschrift?'✍ ':'')+'</div>':'')
         +'</div>';
     });
     elE.innerHTML=h;
@@ -1444,11 +1477,47 @@ function eigenenAuftragErstellen(){
     kunde, adresse, beschreibung:beschr,
     status:'offen', erstelltAm:Date.now(), erstelltVon:'selbst'
   }).then(()=>{
+    saveKunde(kunde,adresse);
     document.getElementById('selfAufKunde').value='';
     document.getElementById('selfAufAdresse').value='';
     document.getElementById('selfAufBeschr').value='';
     toast('📋 Auftrag angelegt');
   });
+}
+
+// Kunden-Adressbuch
+function loadKundenListe(){
+  if(!_tnId||!db) return;
+  db.collection('globalTN').doc(_tnId).get().then(doc=>{
+    const list=(doc.exists&&doc.data().kundenListe)||[];
+    const kDl=document.getElementById('kundenList');
+    const aDl=document.getElementById('adressenList');
+    if(kDl){kDl.innerHTML='';list.forEach(k=>{kDl.innerHTML+='<option value="'+esc(k.kunde)+'">';});}
+    if(aDl){aDl.innerHTML='';[...new Set(list.map(k=>k.adresse).filter(Boolean))].forEach(a=>{aDl.innerHTML+='<option value="'+esc(a)+'">';});}
+    window._kundenCache=list;
+  });
+}
+function autoFillAdresse(kunde){
+  if(!window._kundenCache) return;
+  const match=window._kundenCache.find(k=>k.kunde===kunde);
+  if(match&&match.adresse){document.getElementById('selfAufAdresse').value=match.adresse;}
+}
+function saveKunde(kunde,adresse){
+  if(!_tnId||!db||!kunde) return;
+  db.collection('globalTN').doc(_tnId).get().then(doc=>{
+    const list=(doc.exists&&doc.data().kundenListe)||[];
+    const exists=list.find(k=>k.kunde===kunde);
+    if(exists){if(adresse&&adresse!==exists.adresse){exists.adresse=adresse;}}
+    else{list.push({kunde,adresse:adresse||''});}
+    db.collection('globalTN').doc(_tnId).update({kundenListe:list}).catch(()=>{});
+  });
+}
+
+// Status-Flow
+function auftragStarten(id){
+  db.collection('globalTN').doc(_tnId).collection('auftraege').doc(id).update({
+    status:'inArbeit', gestartetAm:Date.now()
+  }).then(()=>toast('▶ Auftrag gestartet'));
 }
 
 // ═══════════════════════════════════
