@@ -829,7 +829,16 @@ function dismissInstallAG(){const b=document.getElementById('installBanner');if(
 // ═══════════════════════════════════
 // AG NAVIGATION
 // ═══════════════════════════════════
+// History management for back button
+let _navFromPop=false, _curPage='betrieb';
+history.replaceState({page:'betrieb'},'');
+window.addEventListener('popstate',e=>{
+  if(e.state&&e.state.page){_navFromPop=true;showAgPage(e.state.page);}
+  else{_navFromPop=true;showAgPage('betrieb');history.replaceState({page:'betrieb'},'');}
+});
 function showAgPage(id){
+  if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
+  _curPage=id; _navFromPop=false;
   document.querySelectorAll('.agpage').forEach(p=>p.classList.remove('active'));
   document.getElementById('agpage-'+id).classList.add('active');
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));

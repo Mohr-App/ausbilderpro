@@ -853,7 +853,16 @@ function submitJoinRegistration(){
 }
 
 // ── Navigation ──
+// History management for back button
+let _navFromPop=false, _curPage='home';
+history.replaceState({page:'home'},'');
+window.addEventListener('popstate',e=>{
+  if(e.state&&e.state.page){_navFromPop=true;showPage(e.state.page);}
+  else{_navFromPop=true;showPage('home');history.replaceState({page:'home'},'');}
+});
 function showPage(id){
+  if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
+  _curPage=id; _navFromPop=false;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));

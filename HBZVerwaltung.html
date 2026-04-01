@@ -1813,7 +1813,16 @@ function toggleSCard(el){
   el.classList.toggle('open');
 }
 
+// History management for back button
+let _navFromPop=false, _curPage='dashboard';
+history.replaceState({page:'dashboard'},'');
+window.addEventListener('popstate',e=>{
+  if(e.state&&e.state.page){_navFromPop=true;showPage(e.state.page);}
+  else{_navFromPop=true;showPage('dashboard');history.replaceState({page:'dashboard'},'');}
+});
 function showPage(id){
+  if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
+  _curPage=id; _navFromPop=false;
   closeMobileSb();
   // Kursdetail-Listener abmelden wenn weg navigiert
   if(id!=='kursdetail'){
