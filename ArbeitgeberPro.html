@@ -282,6 +282,32 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <button class="bnav-btn" id="agnav-home" onclick="showAgPage('home')"><span class="bi">ℹ</span>Info</button>
   </div>
   <div class="toast" id="toast"></div>
+<!-- DOKU-VIEWER -->
+<style>
+.dv-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto}
+.dv-overlay.open{display:flex}
+.dv-box{background:#fff;border-radius:16px;width:100%;max-width:460px;padding:24px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.dv-title{font-size:1rem;font-weight:800;margin-bottom:16px;text-align:center}
+.dv-section{margin-bottom:16px}
+.dv-label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.dv-photos{display:flex;gap:8px;flex-wrap:wrap}
+.dv-photos img{width:100%;max-width:200px;border-radius:10px;border:2px solid #e2e8f0;cursor:pointer}
+.dv-sig{border:2px solid #e2e8f0;border-radius:10px;padding:8px;background:#fafbfc}
+.dv-sig img{width:100%;display:block}
+.dv-close{width:100%;padding:12px;border:none;border-radius:12px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;background:#f1f5f9;color:#64748b;margin-top:16px}
+.dv-img-full{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center;padding:20px;cursor:pointer}
+.dv-img-full.open{display:flex}
+.dv-img-full img{max-width:100%;max-height:90vh;border-radius:8px}
+</style>
+<div class="dv-overlay" id="dvModal">
+  <div class="dv-box">
+    <div class="dv-title">📋 Tagesdokumentation</div>
+    <div id="dvDate" style="text-align:center;font-size:.8rem;color:#64748b;margin-bottom:16px"></div>
+    <div id="dvContent"></div>
+    <button class="dv-close" onclick="document.getElementById('dvModal').classList.remove('open')">Schließen</button>
+  </div>
+</div>
+<div class="dv-img-full" id="dvFullImg" onclick="this.classList.remove('open')"><img id="dvFullImgSrc"></div>
 </div>
 <div class="copyright">© ArbeitgeberPro v1.0.0 ─ by Stefan Mohr</div>
 <script>
@@ -913,6 +939,31 @@ function agCreateMitarbeiter(){
   });
 }
 
+function showDoku(tnId,datum){
+  const dvDate=document.getElementById('dvDate');
+  const dvContent=document.getElementById('dvContent');
+  dvContent.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px">Lädt…</div>';
+  // Format date
+  const parts=datum.split('-');
+  dvDate.textContent=parts[2]+'.'+parts[1]+'.'+parts[0];
+  document.getElementById('dvModal').classList.add('open');
+  db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum).get().then(doc=>{
+    if(!doc.exists){dvContent.innerHTML='<div class="empty">Keine Daten</div>';return;}
+    const d=doc.data();
+    let html='';
+    if(d.fotos&&d.fotos.length){
+      html+='<div class="dv-section"><div class="dv-label">📸 Fotos ('+d.fotos.length+')</div><div class="dv-photos">';
+      d.fotos.forEach(f=>{html+='<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')" loading="lazy">';});
+      html+='</div></div>';
+    }
+    if(d.unterschrift){
+      html+='<div class="dv-section"><div class="dv-label">✍ Kundenunterschrift</div><div class="dv-sig"><img src="'+d.unterschrift+'"></div></div>';
+    }
+    if(!d.fotos&&!d.unterschrift) html='<div class="empty">Keine Dokumentation vorhanden</div>';
+    dvContent.innerHTML=html;
+  });
+}
+
 function renderAgAzubiKontakte(){
   const el=document.getElementById('agAzubiKontakte');
   if(!el) return;
@@ -1182,15 +1233,16 @@ function loadAgZeiten(){
         if(plan){
           const diff=ist-soll;const diffCol=(isKrank||isUrlaub)?'var(--mu)':diff>=0?'#059669':'#ef4444';
           const zeitText=e?(e.eingang+(e.ausgang?' – '+e.ausgang:'…')):(isKrank||isUrlaub?'—':'');
+          const dokuIcons=e&&(e.fotos||e.unterschrift)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku anzeigen">'+(e.fotos?'📸':'')+(e.unterschrift?'✍':'')+'</span>':'';
           dayHtml+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem">'
             +'<span style="flex:1.5;color:var(--mu)">'+datDE+statusTag+'</span>'
-            +'<span style="flex:2">'+zeitText+manuell+bestBtn+'</span>'
+            +'<span style="flex:2">'+zeitText+dokuIcons+manuell+bestBtn+'</span>'
             +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e?.ausgang?minToStr(ist):(isKrank||isUrlaub?'—':''))+'</span>'
             +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isKrank||isUrlaub?'—':(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
         } else if(e){
           dayHtml+='<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
             +'<span style="color:var(--mu)">'+datDE+statusTag+'</span>'
-            +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+manuell+bestBtn+'</span>'
+            +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+(e&&(e.fotos||e.unterschrift)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku">📋</span>':'')+manuell+bestBtn+'</span>'
             +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?minToStr(ist):'…')+'</span></div>';
         } else if(isKrank||isUrlaub){
           dayHtml+='<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'

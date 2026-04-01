@@ -529,6 +529,53 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <div class="toast" id="toast"></div>
 
+<!-- AUSSTEMPEL-MODAL -->
+<style>
+.as-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto}
+.as-overlay.open{display:flex}
+.as-box{background:#fff;border-radius:16px;width:100%;max-width:420px;padding:24px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.as-title{font-size:1rem;font-weight:800;margin-bottom:16px;text-align:center}
+.as-section{margin-bottom:16px}
+.as-label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.sig-canvas{width:100%;height:160px;border:2px solid #e2e8f0;border-radius:10px;touch-action:none;cursor:crosshair;background:#fafbfc}
+.sig-actions{display:flex;gap:8px;margin-top:6px}
+.sig-actions button{flex:1;padding:8px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;font-size:.72rem;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif}
+.photo-grid{display:flex;gap:8px;flex-wrap:wrap}
+.photo-thumb{width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid #e2e8f0}
+.photo-add{width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#94a3b8;cursor:pointer;background:#f8fafc}
+.photo-add:hover{border-color:#2563eb;color:#2563eb}
+.photo-wrap{position:relative;display:inline-block}
+.photo-del{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:.65rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.as-btns{display:flex;gap:10px;margin-top:20px}
+.as-btns button{flex:1;padding:14px;border:none;border-radius:12px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif}
+.as-cancel{background:#f1f5f9;color:#64748b}
+.as-confirm{background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;box-shadow:0 4px 16px rgba(239,68,68,.3)}
+</style>
+<div class="as-overlay" id="asModal">
+  <div class="as-box">
+    <div class="as-title">⏹ Ausstempeln</div>
+    <div id="asZeit" style="text-align:center;font-size:.85rem;color:#64748b;margin-bottom:16px"></div>
+    <div class="as-section">
+      <div class="as-label">📸 Fotodokumentation (optional, max. 3)</div>
+      <div class="photo-grid" id="asPhotos">
+        <label class="photo-add" id="asPhotoAdd">📷<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="asAddPhotos(this.files)"></label>
+      </div>
+    </div>
+    <div class="as-section">
+      <div class="as-label">✍ Kundenunterschrift (optional)</div>
+      <canvas class="sig-canvas" id="sigCanvas"></canvas>
+      <div class="sig-actions">
+        <button onclick="sigClear()">🗑 Löschen</button>
+        <button onclick="sigUndo()">↩ Rückgängig</button>
+      </div>
+    </div>
+    <div class="as-btns">
+      <button class="as-cancel" onclick="asClose()">Abbrechen</button>
+      <button class="as-confirm" onclick="asConfirm()">⏹ Ausstempeln</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── Firebase ──
 const _fbCfg={
@@ -1339,13 +1386,127 @@ function zeitStempeln(){
     if(_zeitHeute&&_zeitHeute.ausgang){if(!confirm('Bereits ausgestempelt. Neuen Tag starten?'))return;}
     ref.set({eingang:jetzt,pauseLog:[],datum:today},{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
   } else if(_zeitState==='ein'||_zeitState==='pause'){
-    if(!confirm('Ausstempeln um '+jetzt+'?')) return;
-    // Offene Pause schließen
-    const pLog=(_zeitHeute?.pauseLog||[]).map(p=>p.start&&!p.ende?{...p,ende:jetzt}:p);
-    const pauseMin=calcPauseMinuten(pLog);
-    const istMin=calcIstMinuten(_zeitHeute.eingang,jetzt,pauseMin);
-    ref.update({ausgang:jetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin}).then(()=>{loadZeitHeute();toast('⏹ Ausgestempelt um '+jetzt);});
+    // Ausstempel-Modal öffnen
+    _asJetzt=jetzt;
+    _asPhotos=[];
+    document.getElementById('asZeit').textContent='Feierabend um '+jetzt;
+    document.getElementById('asPhotos').innerHTML='<label class="photo-add" id="asPhotoAdd">📷<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="asAddPhotos(this.files)"></label>';
+    sigClear();
+    document.getElementById('asModal').classList.add('open');
+    sigInit();
   }
+}
+
+// ── Ausstempel-Modal ──
+let _asJetzt='',_asPhotos=[];
+
+function asClose(){document.getElementById('asModal').classList.remove('open');}
+
+function asConfirm(){
+  const today=localDate();
+  const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
+  const pLog=(_zeitHeute?.pauseLog||[]).map(p=>p.start&&!p.ende?{...p,ende:_asJetzt}:p);
+  const pauseMin=calcPauseMinuten(pLog);
+  const istMin=calcIstMinuten(_zeitHeute.eingang,_asJetzt,pauseMin);
+  const update={ausgang:_asJetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin};
+  // Unterschrift
+  const sig=sigGetData();
+  if(sig) update.unterschrift=sig;
+  // Fotos
+  if(_asPhotos.length) update.fotos=_asPhotos;
+  ref.update(update).then(()=>{
+    asClose();
+    loadZeitHeute();
+    toast('⏹ Ausgestempelt um '+_asJetzt);
+  });
+}
+
+// ── Foto-Komprimierung ──
+function asAddPhotos(files){
+  const grid=document.getElementById('asPhotos');
+  const addBtn=document.getElementById('asPhotoAdd');
+  Array.from(files).forEach(file=>{
+    if(_asPhotos.length>=3){toast('Max. 3 Fotos','bad');return;}
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const maxW=800;
+        let w=img.width,h=img.height;
+        if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
+        const cv=document.createElement('canvas');
+        cv.width=w;cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        const b64=cv.toDataURL('image/jpeg',0.5);
+        _asPhotos.push(b64);
+        const wrap=document.createElement('div');
+        wrap.className='photo-wrap';
+        const idx=_asPhotos.length-1;
+        wrap.innerHTML='<img class="photo-thumb" src="'+b64+'"><button class="photo-del" onclick="asDelPhoto('+idx+',this.parentElement)">✕</button>';
+        grid.insertBefore(wrap,addBtn);
+        if(_asPhotos.length>=3) addBtn.style.display='none';
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function asDelPhoto(idx,wrap){
+  _asPhotos.splice(idx,1);
+  wrap.remove();
+  document.getElementById('asPhotoAdd').style.display='';
+  // Re-index delete buttons
+  document.querySelectorAll('#asPhotos .photo-wrap').forEach((w,i)=>{
+    w.querySelector('.photo-del').setAttribute('onclick','asDelPhoto('+i+',this.parentElement)');
+  });
+}
+
+// ── Signature Pad ──
+let _sigCanvas,_sigCtx,_sigDrawing=false,_sigPaths=[],_sigCurPath=[];
+function sigInit(){
+  _sigCanvas=document.getElementById('sigCanvas');
+  _sigCtx=_sigCanvas.getContext('2d');
+  const r=_sigCanvas.getBoundingClientRect();
+  _sigCanvas.width=r.width*2;_sigCanvas.height=r.height*2;
+  _sigCtx.scale(2,2);
+  _sigCtx.strokeStyle='#0f172a';_sigCtx.lineWidth=2;_sigCtx.lineCap='round';_sigCtx.lineJoin='round';
+  _sigPaths=[];_sigCurPath=[];
+  _sigCanvas.onpointerdown=e=>{e.preventDefault();_sigDrawing=true;_sigCurPath=[];const p=sigPos(e);_sigCurPath.push(p);_sigCtx.beginPath();_sigCtx.moveTo(p.x,p.y);};
+  _sigCanvas.onpointermove=e=>{if(!_sigDrawing)return;e.preventDefault();const p=sigPos(e);_sigCurPath.push(p);_sigCtx.lineTo(p.x,p.y);_sigCtx.stroke();};
+  _sigCanvas.onpointerup=_sigCanvas.onpointerleave=e=>{if(_sigDrawing){_sigDrawing=false;if(_sigCurPath.length>1)_sigPaths.push([..._sigCurPath]);_sigCurPath=[];}};
+}
+function sigPos(e){const r=_sigCanvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+function sigClear(){
+  _sigPaths=[];_sigCurPath=[];
+  if(_sigCtx){_sigCtx.clearRect(0,0,_sigCanvas.width,_sigCanvas.height);}
+}
+function sigUndo(){
+  _sigPaths.pop();sigRedraw();
+}
+function sigRedraw(){
+  _sigCtx.clearRect(0,0,_sigCanvas.width,_sigCanvas.height);
+  _sigPaths.forEach(path=>{
+    if(path.length<2)return;
+    _sigCtx.beginPath();_sigCtx.moveTo(path[0].x,path[0].y);
+    for(let i=1;i<path.length;i++)_sigCtx.lineTo(path[i].x,path[i].y);
+    _sigCtx.stroke();
+  });
+}
+function sigGetData(){
+  if(!_sigPaths.length)return null;
+  // Export as small PNG
+  const cv=document.createElement('canvas');
+  cv.width=400;cv.height=160;
+  const ctx=cv.getContext('2d');
+  const sx=400/(_sigCanvas.width/2),sy=160/(_sigCanvas.height/2);
+  ctx.strokeStyle='#0f172a';ctx.lineWidth=1.5;ctx.lineCap='round';ctx.lineJoin='round';
+  _sigPaths.forEach(path=>{
+    if(path.length<2)return;
+    ctx.beginPath();ctx.moveTo(path[0].x*sx,path[0].y*sy);
+    for(let i=1;i<path.length;i++)ctx.lineTo(path[i].x*sx,path[i].y*sy);
+    ctx.stroke();
+  });
+  return cv.toDataURL('image/png',0.8);
 }
 
 function zeitPause(){
