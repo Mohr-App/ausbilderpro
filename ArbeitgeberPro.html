@@ -336,6 +336,18 @@ function doRegister(){
     return db.collection('users').doc(uid).set({
       email, role:'arbeitgeber', firma, vorname, nachname, tel,
       agStatus:'pending', registriertAm:Date.now()
+    }).then(()=>{
+      // Admin per E-Mail benachrichtigen
+      db.collection('mail').add({
+        to:'info@ausbilderpro.de',
+        message:{
+          subject:'🏭 Neue Betrieb-Registrierung: '+firma,
+          html:'<b>'+firma+'</b> hat sich als Arbeitgeber registriert.<br><br>'+
+            'Ansprechpartner: '+vorname+' '+nachname+'<br>'+
+            'E-Mail: '+email+'<br>'+(tel?'Telefon: '+tel+'<br>':'')+
+            '<br>Bitte in VerwaltungPro → Betriebe freischalten.'
+        }
+      });
     });
   }).then(()=>{
     err.textContent='';
@@ -465,7 +477,8 @@ function renderAusfallBanner(){
 
 function renderStats(){
   document.getElementById('statAzubis').textContent=_azubis.length;
-  document.getElementById('statAktiv').textContent=_azubis.filter(a=>a.aktiverKursId).length;
+  const inKurs=_azubis.filter(a=>a.aktiverKursId).length;
+  document.getElementById('statAktiv').textContent=inKurs;
   let tp=0,cp=0;
   _azubis.forEach(a=>{
     if(!a.aktiverKursId)return;
@@ -475,11 +488,16 @@ function renderStats(){
     if(t.attPercent!=null){tp+=t.attPercent;cp++;}
   });
   document.getElementById('statAnw').textContent=cp?Math.round(tp/cp)+'%':'–';
+  // ÜBL-Hinweis wenn keine Azubis in Kursen
+  const banner=document.getElementById('agNotifBanner');
+  if(banner&&_azubis.length>0&&inKurs===0&&!banner.innerHTML.includes('kurs_ausfall')){
+    banner.innerHTML='<div style="padding:12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:10px;font-size:.75rem;color:var(--acc);margin-bottom:12px">ℹ Aktuell ist kein Auszubildender in einem ÜBL-Kurs eingeschrieben. Sobald ein Bildungszentrum Ihre Azubis einem Kurs zuweist, erscheinen hier die Kursinfos.</div>';
+  }
 }
 
 function renderAzubiList(){
   const el=document.getElementById('azubiList');
-  if(!_azubis.length){el.innerHTML='<div class="empty">Keine Auszubildenden gefunden.<br>Bitte wenden Sie sich an die Hauptverwaltung.</div>';return;}
+  if(!_azubis.length){el.innerHTML='<div class="empty">Noch keine Mitarbeiter angelegt.<br>Legen Sie im Betrieb-Tab unter Zeiten Ihre Mitarbeiter an.</div>';return;}
   const openIds=new Set();
   document.querySelectorAll('.azubi-card.expanded').forEach(c=>{if(c.dataset.tnId)openIds.add(c.dataset.tnId);});
   el.innerHTML='';
