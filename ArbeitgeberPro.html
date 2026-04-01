@@ -135,7 +135,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto" id="agBetriebTabs">
         <button class="stab active" onclick="showAgBetriebTab('zeiten')">⏱ Zeiten</button>
-        <button class="stab" onclick="showAgBetriebTab('baustellen')">🏗 Baustelle</button>
+        <button class="stab" onclick="showAgBetriebTab('baustellen')">📋 Aufträge</button>
         <button class="stab" onclick="showAgBetriebTab('urlaub')">🏖 Urlaub</button>
         <button class="stab" onclick="showAgBetriebTab('meldungen')">💬 Meldungen</button>
       </div>
@@ -180,14 +180,24 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div class="err" id="agNachErr" style="margin-top:4px"></div>
         </div>
       </div>
-      <!-- AG: Baustellen -->
+      <!-- AG: Aufträge -->
       <div class="abtab" id="abtab-baustellen">
         <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div class="card-title" style="margin:0">🏗 Baustellennachweise</div>
-            <select id="agBsMonat" onchange="loadAgBaustellen()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
-          </div>
-          <div id="agBsListe"><div class="empty">Lädt…</div></div>
+          <div class="card-title">+ Neuen Auftrag erstellen</div>
+          <div><label class="fl">Kunde</label><input class="fi" id="aufKunde" placeholder="z.B. Familie Müller" style="font-size:.76rem"></div>
+          <div><label class="fl">Adresse</label><input class="fi" id="aufAdresse" placeholder="Straße, PLZ Ort" style="font-size:.76rem"></div>
+          <div><label class="fl">Beschreibung</label><input class="fi" id="aufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.76rem"></div>
+          <div><label class="fl">Zuweisen an</label><select class="fi" id="aufMa" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
+          <button class="btn" onclick="agAuftragErstellen()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px">📋 Auftrag erstellen</button>
+          <div class="err" id="aufErr" style="margin-top:4px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Offene Aufträge</div>
+          <div id="agAufOffen"><div class="empty">Keine offenen Aufträge</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✅ Erledigte Aufträge</div>
+          <div id="agAufErledigt"><div class="empty">Keine erledigten Aufträge</div></div>
         </div>
       </div>
       <!-- AG: Urlaub -->
@@ -222,7 +232,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <div class="card">
         <div class="card-title">+ Arbeitnehmer hinzufügen</div>
-        <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Erstellt einen Zugang für die MitarbeiterPro-App (Zeiterfassung, Urlaub, Baustellen).</div>
+        <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Erstellt einen Zugang für die MitarbeiterPro-App (Zeiterfassung, Urlaub, Aufträge).</div>
         <div style="display:flex;gap:6px;margin-bottom:6px">
           <div style="flex:1"><label class="fl">Vorname</label><input class="fi" id="newMaVorname" style="font-size:.76rem"></div>
           <div style="flex:1"><label class="fl">Nachname</label><input class="fi" id="newMaNachname" style="font-size:.76rem"></div>
@@ -1006,7 +1016,7 @@ function showAgBetriebTab(tab){
   document.getElementById('abtab-'+tab).classList.add('active');
   event.target.classList.add('active');
   if(tab==='zeiten'){fillAgMonatSelect('agZeitMonat');loadAgZeiten();startAgZeitLive();}
-  if(tab==='baustellen'){fillAgMonatSelect('agBsMonat');loadAgBaustellen();}
+  if(tab==='baustellen') loadAgAuftraege();
   if(tab==='urlaub') loadAgUrlaub();
   if(tab==='meldungen') loadAgMeldungen();
 }
@@ -1314,39 +1324,120 @@ function agBestaetigeZeit(tnId, datum){
 }
 
 // AG: BAUSTELLEN
-function loadAgBaustellen(){
-  const el=document.getElementById('agBsListe');
-  if(!el||!_azubis.length){el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
-  const ym=document.getElementById('agBsMonat')?.value||localYM();
-  el.innerHTML='<div class="empty">Lädt…</div>';
+// AG: AUFTRÄGE
+let _agAuftraege=[];
+function loadAgAuftraege(){
+  // Fill MA dropdown
+  const sel=document.getElementById('aufMa');
+  if(sel&&_azubis.length){
+    sel.innerHTML='<option value="">Bitte wählen…</option>';
+    _azubis.forEach(a=>{
+      const name=((a.vorname||'')+' '+(a.nachname||'')).trim();
+      sel.innerHTML+='<option value="'+a.id+'">'+esc(name)+'</option>';
+    });
+  }
+  // Load all auftraege from all employees
+  const elO=document.getElementById('agAufOffen');
+  const elE=document.getElementById('agAufErledigt');
+  if(!elO||!_azubis.length){if(elO)elO.innerHTML='<div class="empty">Keine Mitarbeiter</div>';return;}
+  elO.innerHTML='<div class="empty">Lädt…</div>';
   const promises=_azubis.map(az=>
-    db.collection('globalTN').doc(az.id).collection('baustellen')
-      .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
-      .get()
+    db.collection('globalTN').doc(az.id).collection('auftraege')
+      .orderBy('erstelltAm','desc').get()
       .then(snap=>{
-        const entries=snap.docs.map(d=>d.data()).sort((a,b)=>(b.datum||'').localeCompare(a.datum||''));
-        return {az, entries};
-      })
-      .catch(()=>({az, entries:[]}))
+        const docs=snap.docs.map(d=>({id:d.id,tnId:az.id,tnName:((az.vorname||'')+' '+(az.nachname||'')).trim(),...d.data()}));
+        return docs;
+      }).catch(()=>[])
   );
   Promise.all(promises).then(results=>{
-    let html='';
-    results.forEach(({az, entries})=>{
-      if(!entries.length) return;
-      const name=((az.vorname||'')+' '+(az.nachname||'')).trim();
-      html+='<div style="margin-bottom:12px;padding:10px;border:1px solid var(--brd);border-radius:10px">';
-      html+='<div style="font-size:.82rem;font-weight:800;margin-bottom:6px">'+esc(name)+'</div>';
-      entries.forEach(e=>{
-        const datDE=new Date(e.datum+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
-        html+='<div style="padding:4px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.7rem">'
-          +'<div style="display:flex;justify-content:space-between"><span style="font-weight:700">'+esc(e.baustelle||'')+'</span><span style="color:var(--mu)">'+datDE+'</span></div>'
-          +(e.adresse?'<div style="color:var(--mu)">📍 '+esc(e.adresse)+'</div>':'')
-          +(e.taetigkeit?'<div style="color:var(--mu)">🔧 '+esc(e.taetigkeit)+'</div>':'')
-          +'<div style="color:var(--acc);font-family:\'JetBrains Mono\',monospace">'+e.von+' – '+e.bis+'</div></div>';
-      });
-      html+='</div>';
+    _agAuftraege=results.flat();
+    renderAgAuftraege();
+  });
+}
+
+function renderAgAuftraege(){
+  const offen=_agAuftraege.filter(a=>a.status!=='erledigt');
+  const erledigt=_agAuftraege.filter(a=>a.status==='erledigt');
+  const elO=document.getElementById('agAufOffen');
+  const elE=document.getElementById('agAufErledigt');
+  if(!offen.length){elO.innerHTML='<div class="empty">Keine offenen Aufträge</div>';}
+  else{
+    let h='';
+    offen.forEach(a=>{
+      const dat=a.erstelltAm?new Date(a.erstelltAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
+      h+='<div style="padding:10px;border:1.5px solid rgba(37,99,235,.2);border-radius:10px;margin-bottom:8px;background:rgba(37,99,235,.03)">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="font-size:.82rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
+        +'<span style="font-size:.55rem;color:var(--mu)">'+dat+'</span></div>'
+        +(a.adresse?'<div style="font-size:.68rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
+        +(a.beschreibung?'<div style="font-size:.68rem;color:var(--mu)">'+esc(a.beschreibung)+'</div>':'')
+        +'<div style="font-size:.6rem;color:var(--acc);margin-top:4px">👤 '+esc(a.tnName)+'</div>'
+        +'</div>';
     });
-    el.innerHTML=html||'<div class="empty">Keine Baustellennachweise</div>';
+    elO.innerHTML=h;
+  }
+  if(!erledigt.length){elE.innerHTML='<div class="empty">Keine erledigten Aufträge</div>';}
+  else{
+    let h='';
+    erledigt.forEach(a=>{
+      const dat=a.erledigtAm?new Date(a.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+      h+='<div style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px">'
+        +'<div style="display:flex;justify-content:space-between">'
+        +'<span style="font-size:.78rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
+        +'<span style="font-size:.55rem;color:#059669;font-weight:600">✅ '+dat+'</span></div>'
+        +(a.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
+        +'<div style="font-size:.6rem;color:var(--mu)">👤 '+esc(a.tnName)+'</div>'
+        +((a.fotos||a.unterschrift)?'<span onclick="showDoku(\''+a.tnId+'\',\''+a.id+'\')" style="cursor:pointer;font-size:.6rem;color:var(--acc);margin-top:2px;display:inline-block">'+(a.fotos?'📸 '+a.fotos.length+' Foto(s) ':'')+(a.unterschrift?'✍ Unterschrift ':'')+(a.gpsErledigt?'📍 Standort':'')+'</span>':'')
+        +'</div>';
+    });
+    elE.innerHTML=h;
+  }
+}
+
+function agAuftragErstellen(){
+  const kunde=document.getElementById('aufKunde').value.trim();
+  const adresse=document.getElementById('aufAdresse').value.trim();
+  const beschr=document.getElementById('aufBeschr').value.trim();
+  const maId=document.getElementById('aufMa').value;
+  const err=document.getElementById('aufErr');
+  err.textContent='';
+  if(!kunde){err.textContent='Bitte Kunde eingeben';return;}
+  if(!maId){err.textContent='Bitte Mitarbeiter auswählen';return;}
+  err.textContent='Wird erstellt…';
+  db.collection('globalTN').doc(maId).collection('auftraege').add({
+    kunde, adresse, beschreibung:beschr,
+    status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma
+  }).then(()=>{
+    err.textContent='';
+    document.getElementById('aufKunde').value='';
+    document.getElementById('aufAdresse').value='';
+    document.getElementById('aufBeschr').value='';
+    document.getElementById('aufMa').value='';
+    toast('📋 Auftrag erstellt');
+    loadAgAuftraege();
+  }).catch(e=>{err.textContent='❌ '+e.message;});
+}
+
+// AG: Auftrags-Doku anzeigen (reuse showDoku for auftraege)
+function showAuftragDoku(tnId,aufId){
+  const dvDate=document.getElementById('dvDate');
+  const dvContent=document.getElementById('dvContent');
+  dvContent.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px">Lädt…</div>';
+  dvDate.textContent='Auftragsdokumentation';
+  document.getElementById('dvModal').classList.add('open');
+  db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).get().then(doc=>{
+    if(!doc.exists){dvContent.innerHTML='<div class="empty">Keine Daten</div>';return;}
+    const d=doc.data();
+    let html='';
+    if(d.gpsErledigt) html+='<div class="dv-section"><div class="dv-label">📍 Standort</div><div style="font-size:.72rem"><a href="https://maps.google.com/?q='+d.gpsErledigt.lat+','+d.gpsErledigt.lng+'" target="_blank" style="color:#2563eb">'+d.gpsErledigt.lat+', '+d.gpsErledigt.lng+'</a> <span style="color:#94a3b8">(±'+d.gpsErledigt.acc+'m)</span></div></div>';
+    if(d.fotos&&d.fotos.length){
+      html+='<div class="dv-section"><div class="dv-label">📸 Fotos ('+d.fotos.length+')</div><div class="dv-photos">';
+      d.fotos.forEach(f=>{html+='<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')" loading="lazy">';});
+      html+='</div></div>';
+    }
+    if(d.unterschrift) html+='<div class="dv-section"><div class="dv-label">✍ Kundenunterschrift</div><div class="dv-sig"><img src="'+d.unterschrift+'"></div></div>';
+    if(!html) html='<div class="empty">Keine Dokumentation</div>';
+    dvContent.innerHTML=html;
   });
 }
 

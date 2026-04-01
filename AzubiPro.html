@@ -240,7 +240,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <span style="font-size:2rem">🏭</span>
           <div>
             <div style="font-size:.95rem;font-weight:800">Mein Betrieb</div>
-            <div style="font-size:.65rem;color:var(--mu);margin-top:2px">Krankmeldung · Zeiten · Urlaub · Baustellen</div>
+            <div style="font-size:.65rem;color:var(--mu);margin-top:2px">Krankmeldung · Zeiten · Urlaub · Aufträge</div>
           </div>
           <span style="margin-left:auto;font-size:1.2rem;color:var(--mu)">→</span>
         </button>
@@ -327,7 +327,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <!-- Sub-Tabs -->
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="betriebTabs">
         <button class="stab active" onclick="showBetriebTab('zeiten')">⏱ Zeiten</button>
-        <button class="stab" onclick="showBetriebTab('baustellen')">🏗 Baustelle</button>
+        <button class="stab" onclick="showBetriebTab('baustellen')">📋 Aufträge</button>
         <button class="stab" onclick="showBetriebTab('urlaub')">🏖 Urlaub</button>
         <button class="stab" onclick="showBetriebTab('meldung')">💬 Meldungen</button>
       </div>
@@ -418,26 +418,22 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div id="urlaubAntraege"><div class="empty">Keine Anträge</div></div>
         </div>
       </div>
-      <!-- Baustellen -->
+      <!-- Aufträge -->
       <div class="btab" id="btab-baustellen">
         <div class="card">
-          <div class="card-title">+ Heutigen Einsatz erfassen</div>
-          <div><label class="fl">Baustelle / Projekt</label><input class="fi" id="bsName" placeholder="z.B. Neubau Müller" style="font-size:.76rem"></div>
-          <div><label class="fl">Adresse</label><input class="fi" id="bsAdresse" placeholder="Straße, PLZ Ort" style="font-size:.76rem"></div>
-          <div><label class="fl">Tätigkeit</label><input class="fi" id="bsTaetigkeit" placeholder="z.B. Leitungsverlegung" style="font-size:.76rem"></div>
-          <div style="display:flex;gap:6px;margin-bottom:6px">
-            <div style="flex:1"><label class="fl">Von</label><input class="fi" type="time" id="bsVon" style="font-size:.76rem"></div>
-            <div style="flex:1"><label class="fl">Bis</label><input class="fi" type="time" id="bsBis" style="font-size:.76rem"></div>
-          </div>
-          <button class="btn" onclick="baustelleErfassen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px">🏗 Einsatz speichern</button>
-          <div class="err" id="bsErr" style="margin-top:4px"></div>
+          <div class="card-title">+ Eigenen Auftrag anlegen</div>
+          <div><label class="fl">Kunde</label><input class="fi" id="selfAufKunde" placeholder="z.B. Familie Müller" style="font-size:.76rem"></div>
+          <div><label class="fl">Adresse</label><input class="fi" id="selfAufAdresse" placeholder="Straße, PLZ Ort" style="font-size:.76rem"></div>
+          <div><label class="fl">Beschreibung</label><input class="fi" id="selfAufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.76rem"></div>
+          <button class="btn" onclick="eigenenAuftragErstellen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px">📋 Auftrag anlegen</button>
         </div>
         <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div class="card-title" style="margin:0">📋 Meine Einsätze</div>
-            <select id="bsMonat" onchange="loadBaustellen()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
-          </div>
-          <div id="bsListe"><div class="empty">Keine Einsätze</div></div>
+          <div class="card-title">📋 Offene Aufträge</div>
+          <div id="auftraegeOffen"><div class="empty">Keine offenen Aufträge</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✅ Erledigte Aufträge</div>
+          <div id="auftraegeErledigt"><div class="empty">Keine erledigten Aufträge</div></div>
         </div>
       </div>
     </div>
@@ -553,15 +549,15 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 </style>
 <div class="as-overlay" id="asModal">
   <div class="as-box">
-    <div class="as-title">⏹ Ausstempeln</div>
+    <div class="as-title" id="asTitle">⏹ Ausstempeln</div>
     <div id="asZeit" style="text-align:center;font-size:.85rem;color:#64748b;margin-bottom:16px"></div>
-    <div class="as-section">
+    <div class="as-section" id="asPhotoSection">
       <div class="as-label">📸 Fotodokumentation (optional, max. 3)</div>
       <div class="photo-grid" id="asPhotos">
         <label class="photo-add" id="asPhotoAdd">📷<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="asAddPhotos(this.files)"></label>
       </div>
     </div>
-    <div class="as-section">
+    <div class="as-section" id="asSigSection">
       <div class="as-label">✍ Kundenunterschrift (optional)</div>
       <canvas class="sig-canvas" id="sigCanvas"></canvas>
       <div class="sig-actions">
@@ -1153,7 +1149,7 @@ function initBetrieb(){
   const active=document.querySelector('.btab.active');
   if(active&&active.id==='btab-zeiten') initZeiten();
   if(active&&active.id==='btab-urlaub') initUrlaub();
-  if(active&&active.id==='btab-baustellen') initBaustellen();
+  if(active&&active.id==='btab-baustellen') loadAuftraege();
   if(active&&active.id==='btab-meldung') loadBetriebMeldungen();
   // Default: Zeiten initialisieren
   if(!active||active.id==='btab-zeiten') initZeiten();
@@ -1209,7 +1205,7 @@ function showBetriebTab(tab){
   event.target.classList.add('active');
   if(tab==='zeiten') initZeiten();
   if(tab==='urlaub') initUrlaub();
-  if(tab==='baustellen') initBaustellen();
+  if(tab==='baustellen') loadAuftraege();
   if(tab==='meldung') loadBetriebMeldungen();
 }
 
@@ -1402,37 +1398,36 @@ function zeitStempeln(){
       ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
     });
   } else if(_zeitState==='ein'||_zeitState==='pause'){
-    _asJetzt=jetzt;
-    _asPhotos=[];
-    document.getElementById('asZeit').textContent='Feierabend um '+jetzt;
-    document.getElementById('asPhotos').innerHTML='<label class="photo-add" id="asPhotoAdd">📷<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="asAddPhotos(this.files)"></label>';
-    sigClear();
-    document.getElementById('asModal').classList.add('open');
-    sigInit();
+    if(!confirm('Ausstempeln um '+jetzt+'?')) return;
+    const pLog=(_zeitHeute?.pauseLog||[]).map(p=>p.start&&!p.ende?{...p,ende:jetzt}:p);
+    const pauseMin=calcPauseMinuten(pLog);
+    const istMin=calcIstMinuten(_zeitHeute.eingang,jetzt,pauseMin);
+    const update={ausgang:jetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin};
+    getGPS().then(gps=>{
+      if(gps) update.gpsAusgang=gps;
+      ref.update(update).then(()=>{loadZeitHeute();toast('⏹ Ausgestempelt um '+jetzt);});
+    });
   }
 }
 
-// ── Ausstempel-Modal ──
+// ── Auftrags-Modal ──
 let _asJetzt='',_asPhotos=[];
 
 function asClose(){document.getElementById('asModal').classList.remove('open');}
 
 function asConfirm(){
-  const today=localDate();
-  const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
-  const pLog=(_zeitHeute?.pauseLog||[]).map(p=>p.start&&!p.ende?{...p,ende:_asJetzt}:p);
-  const pauseMin=calcPauseMinuten(pLog);
-  const istMin=calcIstMinuten(_zeitHeute.eingang,_asJetzt,pauseMin);
-  const update={ausgang:_asJetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin};
+  if(!_auftragId) return;
+  const ref=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_auftragId);
+  const update={status:'erledigt',erledigtAm:Date.now()};
   const sig=sigGetData();
   if(sig) update.unterschrift=sig;
   if(_asPhotos.length) update.fotos=_asPhotos;
   getGPS().then(gps=>{
-    if(gps) update.gpsAusgang=gps;
+    if(gps) update.gpsErledigt=gps;
     ref.update(update).then(()=>{
       asClose();
-      loadZeitHeute();
-      toast('⏹ Ausgestempelt um '+_asJetzt);
+      _auftragId=null;
+      toast('✅ Auftrag erledigt');
     });
   });
 }
@@ -1823,71 +1818,90 @@ function loadUrlaubAntraege(){
 // ═══════════════════════════════════
 // BAUSTELLEN
 // ═══════════════════════════════════
-function initBaustellen(){
-  fillMonatSelect('bsMonat');
-  loadBaustellen();
+// ── Aufträge ──
+let _auftraege=[];
+function loadAuftraege(){
+  if(!_tnId||!db) return;
+  db.collection('globalTN').doc(_tnId).collection('auftraege')
+    .orderBy('erstelltAm','desc').onSnapshot(snap=>{
+      _auftraege=[];
+      snap.forEach(doc=>_auftraege.push({id:doc.id,...doc.data()}));
+      renderAuftraege();
+    },err=>{
+      const el=document.getElementById('auftraegeOffen');
+      if(el) el.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';
+    });
 }
 
-function baustelleErfassen(){
-  const name=document.getElementById('bsName').value.trim();
-  const adresse=document.getElementById('bsAdresse').value.trim();
-  const taetigkeit=document.getElementById('bsTaetigkeit').value.trim();
-  const von=document.getElementById('bsVon').value;
-  const bis=document.getElementById('bsBis').value;
-  const err=document.getElementById('bsErr');
-  err.textContent='';
-  if(!name){err.textContent='Bitte Baustelle/Projekt eingeben';return;}
-  if(!von||!bis){err.textContent='Bitte Zeiten eingeben';return;}
-  if(!_tnId){err.textContent='Fehler: Nicht angemeldet (_tnId fehlt)';return;}
-  const today=localDate();
-  err.textContent='Speichert…';
-  db.collection('globalTN').doc(_tnId).collection('baustellen').add({
-    datum:today, baustelle:name, adresse, taetigkeit, von, bis,
-    erstellt:Date.now(),
-    tnName:((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim(),
-    firma:_tnData?.firma||''
-  }).then(doc=>{
-    err.textContent='';
-    document.getElementById('bsName').value='';
-    document.getElementById('bsAdresse').value='';
-    document.getElementById('bsTaetigkeit').value='';
-    document.getElementById('bsVon').value='';
-    document.getElementById('bsBis').value='';
-    toast('🏗 Baustelleneinsatz gespeichert ✓ (ID: '+doc.id+')');
-    loadBaustellen();
-  }).catch(err2=>{
-    err.textContent='❌ FEHLER: '+err2.code+' – '+err2.message;
-    console.error('Baustelle save error:',err2);
+function renderAuftraege(){
+  const offen=_auftraege.filter(a=>a.status!=='erledigt');
+  const erledigt=_auftraege.filter(a=>a.status==='erledigt');
+  const elO=document.getElementById('auftraegeOffen');
+  const elE=document.getElementById('auftraegeErledigt');
+  if(!elO||!elE) return;
+  if(!offen.length){elO.innerHTML='<div class="empty">Keine offenen Aufträge</div>';}
+  else{
+    let h='';
+    offen.forEach(a=>{
+      const dat=a.erstelltAm?new Date(a.erstelltAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
+      h+='<div style="padding:12px;border:1.5px solid rgba(37,99,235,.2);border-radius:10px;margin-bottom:8px;background:rgba(37,99,235,.03)">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="font-size:.85rem;font-weight:700">'+esc(a.kunde||'Ohne Kunde')+'</span>'
+        +'<span style="font-size:.58rem;color:var(--mu)">'+dat+'</span></div>'
+        +(a.adresse?'<div style="font-size:.7rem;color:var(--mu);margin-top:2px">📍 '+esc(a.adresse)+'</div>':'')
+        +(a.beschreibung?'<div style="font-size:.7rem;color:var(--mu);margin-top:2px">'+esc(a.beschreibung)+'</div>':'')
+        +'<button onclick="auftragErledigen(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Auftrag erledigen</button>'
+        +'</div>';
+    });
+    elO.innerHTML=h;
+  }
+  if(!erledigt.length){elE.innerHTML='<div class="empty">Keine erledigten Aufträge</div>';}
+  else{
+    let h='';
+    erledigt.forEach(a=>{
+      const dat=a.erledigtAm?new Date(a.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+      h+='<div style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;opacity:.7">'
+        +'<div style="display:flex;justify-content:space-between">'
+        +'<span style="font-size:.78rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
+        +'<span style="font-size:.55rem;color:#059669;font-weight:600">✅ '+dat+'</span></div>'
+        +(a.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
+        +((a.fotos||a.unterschrift)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(a.fotos?'📸 '+a.fotos.length+' Foto(s)':'')+(a.unterschrift?' · ✍ Unterschrift':'')+'</div>':'')
+        +'</div>';
+    });
+    elE.innerHTML=h;
+  }
+}
+
+let _auftragId=null;
+function auftragErledigen(id){
+  _auftragId=id;
+  const a=_auftraege.find(x=>x.id===id);
+  _asPhotos=[];
+  document.getElementById('asTitle').textContent='✅ Auftrag abschließen';
+  document.getElementById('asZeit').textContent=a?esc(a.kunde||''):'';
+  document.getElementById('asPhotos').innerHTML='<label class="photo-add" id="asPhotoAdd">📷<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="asAddPhotos(this.files)"></label>';
+  sigClear();
+  const btn=document.querySelector('.as-confirm');
+  btn.textContent='✅ Auftrag erledigt';
+  btn.style.background='linear-gradient(135deg,#059669,#10b981)';
+  document.getElementById('asModal').classList.add('open');
+  sigInit();
+}
+
+function eigenenAuftragErstellen(){
+  const kunde=document.getElementById('selfAufKunde').value.trim();
+  const adresse=document.getElementById('selfAufAdresse').value.trim();
+  const beschr=document.getElementById('selfAufBeschr').value.trim();
+  if(!kunde){toast('Bitte Kunde eingeben','bad');return;}
+  db.collection('globalTN').doc(_tnId).collection('auftraege').add({
+    kunde, adresse, beschreibung:beschr,
+    status:'offen', erstelltAm:Date.now(), erstelltVon:'selbst'
+  }).then(()=>{
+    document.getElementById('selfAufKunde').value='';
+    document.getElementById('selfAufAdresse').value='';
+    document.getElementById('selfAufBeschr').value='';
+    toast('📋 Auftrag angelegt');
   });
-}
-
-function loadBaustellen(){
-  const el=document.getElementById('bsListe');
-  if(!el||!_tnId||!db) return;
-  const sel=document.getElementById('bsMonat');
-  const ym=sel?sel.value:localYM();
-  el.innerHTML='<div class="empty">Lädt… ('+ym+')</div>';
-  db.collection('globalTN').doc(_tnId).collection('baustellen')
-    .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
-    .get().then(snap=>{
-      if(snap.empty){el.innerHTML='<div class="empty">Keine Einsätze in '+ym+'</div>';return;}
-      const docs=[];
-      snap.forEach(doc=>docs.push(doc.data()));
-      docs.sort((a,b)=>(b.datum||'').localeCompare(a.datum||''));
-      let html='';
-      docs.forEach(d=>{
-        const datDE=new Date(d.datum+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
-        html+='<div style="padding:8px;border:1px solid var(--brd);border-radius:8px;margin-bottom:4px">'
-          +'<div style="display:flex;justify-content:space-between">'
-          +'<span style="font-size:.78rem;font-weight:700">'+esc(d.baustelle)+'</span>'
-          +'<span style="font-size:.6rem;color:var(--mu)">'+datDE+'</span></div>'
-          +(d.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(d.adresse)+'</div>':'')
-          +(d.taetigkeit?'<div style="font-size:.65rem;color:var(--mu)">🔧 '+esc(d.taetigkeit)+'</div>':'')
-          +'<div style="font-size:.65rem;color:var(--acc);font-family:\'JetBrains Mono\',monospace;margin-top:2px">'+d.von+' – '+d.bis+'</div>'
-          +'</div>';
-      });
-      el.innerHTML=html;
-    }).catch(err=>{el.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';console.error('Baustellen load:',err);});
 }
 
 // ═══════════════════════════════════
