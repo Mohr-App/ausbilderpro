@@ -1749,8 +1749,10 @@ function delInst(katId,instId,e){
       _db.collection('shared').doc('kurse').collection('list').doc(kursId).delete().catch(()=>{});
     });
   }
-  delete S.kats[katId].instances[instId];
-  if(S.curKat===katId&&S.curInst===instId) S.curInst=Object.keys(S.kats[katId].instances)[0]||null;
+  if(S.kats[katId]&&S.kats[katId].instances){
+    delete S.kats[katId].instances[instId];
+    if(S.curKat===katId&&S.curInst===instId) S.curInst=Object.keys(S.kats[katId].instances)[0]||null;
+  }
   persist();renderAll();loadHBZKurse();
   toast('🗑 Lehrgang gelöscht – 30 Tage im Papierkorb');
 }
@@ -5281,7 +5283,7 @@ function loadPool(){
           _meldSeen.add(ch.doc.id);
           const m=ch.doc.data();
           const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
-          toast((icons[m.type]||'💬')+' '+esc(m.name)+': '+esc(m.text));
+          toast((icons[m.type]||'💬')+' '+esc(m.name||'Unbekannt')+': '+esc(m.text||m.type||''));
         }
       });
     },err=>console.warn('Meldungen error:',err));
