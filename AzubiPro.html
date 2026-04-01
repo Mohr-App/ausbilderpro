@@ -2478,13 +2478,24 @@ function markNotifRead(filteredIdx){
           .collection('teilnehmer').doc(_tnId).delete().catch(()=>{});
       }
     }).then(()=>{
-      location.reload();
+      _tnData.benachrichtigungen=notifs;
+      _tnData.aktiverKursId=null;
+      _tnData.kursHistory=hist;
+      loadKurse();
+      checkBenachrichtigungen();
+      checkAzubiBadges();
+      toast('✓ Kurs entfernt');
     }).catch(err=>{
       alert('Fehler: '+err.message+'\n\nBitte Firestore-Regeln aktualisieren!\nVerwaltungPro → ⚙ → 📋 Regeln kopieren');
     });
   } else {
     db.collection('globalTN').doc(_tnId).update({benachrichtigungen:notifs})
-      .then(()=>location.reload())
+      .then(()=>{
+        _tnData.benachrichtigungen=notifs;
+        checkBenachrichtigungen();
+        checkAzubiBadges();
+        toast('✓ Gelesen');
+      })
       .catch(err=>alert('Fehler: '+err.message));
   }
 }
