@@ -1381,14 +1381,20 @@ function renderAgAuftraege(){
     let h='';
     erledigt.forEach(a=>{
       const dat=a.erledigtAm?new Date(a.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-      h+='<div style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px">'
+      h+='<div onclick="showAuftragDoku(\''+a.tnId+'\',\''+a.id+'\')" style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor=\'#2563eb\'" onmouseout="this.style.borderColor=\'\'">'
         +'<div style="display:flex;justify-content:space-between">'
         +'<span style="font-size:.78rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
         +'<span style="font-size:.55rem;color:#059669;font-weight:600">✅ '+dat+'</span></div>'
         +(a.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
         +'<div style="font-size:.6rem;color:var(--mu)">👤 '+esc(a.tnName)+'</div>'
-        +((a.fotos||a.unterschrift)?'<span onclick="showDoku(\''+a.tnId+'\',\''+a.id+'\')" style="cursor:pointer;font-size:.6rem;color:var(--acc);margin-top:2px;display:inline-block">'+(a.fotos?'📸 '+a.fotos.length+' Foto(s) ':'')+(a.unterschrift?'✍ Unterschrift ':'')+(a.gpsErledigt?'📍 Standort':'')+'</span>':'')
-        +'</div>';
+        +(a.taetigkeit?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">🔧 '+esc(a.taetigkeit)+'</div>':'')
+        +'<div style="font-size:.55rem;color:var(--acc);margin-top:2px">'
+        +(a.stunden?'⏱ '+a.stunden+'h ':'')
+        +(a.fotos?'📸 '+a.fotos.length+' ':'')
+        +(a.unterschrift?'✍ ':'')
+        +(a.material?'🧱 '+a.material.length+' ':'')
+        +(a.gpsErledigt?'📍':'')
+        +'</div></div>';
     });
     elE.innerHTML=h;
   }
@@ -1429,12 +1435,24 @@ function showAuftragDoku(tnId,aufId){
     if(!doc.exists){dvContent.innerHTML='<div class="empty">Keine Daten</div>';return;}
     const d=doc.data();
     let html='';
+    // Kunde + Adresse
+    if(d.kunde) html+='<div style="font-size:.9rem;font-weight:800;margin-bottom:4px">'+esc(d.kunde)+'</div>';
+    if(d.adresse) html+='<div style="font-size:.75rem;color:#64748b;margin-bottom:12px">📍 '+esc(d.adresse)+'</div>';
+    // Tätigkeit
+    if(d.taetigkeit) html+='<div class="dv-section"><div class="dv-label">🔧 Tätigkeit</div><div style="font-size:.78rem;line-height:1.5">'+esc(d.taetigkeit)+'</div></div>';
+    // Stunden
+    if(d.stunden) html+='<div class="dv-section"><div class="dv-label">⏱ Stundenaufwand</div><div style="font-size:1.1rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:#059669">'+d.stunden+' Stunden</div></div>';
+    // Material
+    if(d.material&&d.material.length) html+='<div class="dv-section"><div class="dv-label">🧱 Material ('+d.material.length+')</div><div style="display:flex;gap:4px;flex-wrap:wrap">'+d.material.map(m=>'<span style="padding:4px 10px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:6px;font-size:.68rem;font-weight:600;color:#2563eb">'+esc(m)+'</span>').join('')+'</div></div>';
+    // GPS
     if(d.gpsErledigt) html+='<div class="dv-section"><div class="dv-label">📍 Standort</div><div style="font-size:.72rem"><a href="https://maps.google.com/?q='+d.gpsErledigt.lat+','+d.gpsErledigt.lng+'" target="_blank" style="color:#2563eb">'+d.gpsErledigt.lat+', '+d.gpsErledigt.lng+'</a> <span style="color:#94a3b8">(±'+d.gpsErledigt.acc+'m)</span></div></div>';
+    // Fotos
     if(d.fotos&&d.fotos.length){
       html+='<div class="dv-section"><div class="dv-label">📸 Fotos ('+d.fotos.length+')</div><div class="dv-photos">';
       d.fotos.forEach(f=>{html+='<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')" loading="lazy">';});
       html+='</div></div>';
     }
+    // Unterschrift
     if(d.unterschrift) html+='<div class="dv-section"><div class="dv-label">✍ Kundenunterschrift</div><div class="dv-sig"><img src="'+d.unterschrift+'"></div></div>';
     if(!html) html='<div class="empty">Keine Dokumentation</div>';
     dvContent.innerHTML=html;
