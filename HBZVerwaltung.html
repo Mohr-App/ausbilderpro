@@ -623,8 +623,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <!-- Kursfortschritt Warnung -->
         <div id="dashCurrWarning" style="display:none;margin-bottom:20px"></div>
 
-        <!-- Letzte Aktivitäten -->
-        <div class="card" style="margin-bottom:14px">
+        <!-- Letzte Aktivitäten (nur Admin) -->
+        <div class="card" style="margin-bottom:14px;display:none" id="dashActivityCard">
           <div class="card-title">👁 Letzte Aktivitäten</div>
           <div id="dashActivity"><div class="empty">Lädt…</div></div>
         </div>
@@ -1582,6 +1582,7 @@ const _secondaryApp = firebase.initializeApp(FB_CFG, 'secondary');
 const _secondaryAuth = _secondaryApp.auth();
 
 let _uid = null;
+let _userRole = null;
 let _email = null;
 let _kurse = [];
 let _defaultKurstage = 5;
@@ -1627,6 +1628,7 @@ auth.onAuthStateChanged(u => {
 });
 
 function grantAccess(u, role){
+  _userRole = role;
   document.getElementById('loginWrap').style.display = 'none';
   document.getElementById('appWrap').style.display = 'flex';
   document.getElementById('hdrUser').textContent = _email;
@@ -2604,8 +2606,11 @@ function loadDashboard(){
 }
 
 function loadActivity(){
+  const card=document.getElementById('dashActivityCard');
   const el=document.getElementById('dashActivity');
-  if(!el) return;
+  if(!el||!card) return;
+  if(_userRole!=='admin'){card.style.display='none';return;}
+  card.style.display='';
   db.collection('users').where('lastActive','>',0).orderBy('lastActive','desc').limit(20).get().then(snap=>{
     if(snap.empty){el.innerHTML='<div class="empty">Keine Aktivitäten</div>';return;}
     let html='';
