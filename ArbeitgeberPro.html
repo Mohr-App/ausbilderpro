@@ -238,7 +238,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <button id="typBtnAn" onclick="setMaTyp('arbeitnehmer')" style="flex:1;padding:10px;border:2px solid #2563eb;border-radius:8px;background:rgba(37,99,235,.08);color:#2563eb;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">👤 Arbeitnehmer</button>
           <button id="typBtnAz" onclick="setMaTyp('azubi')" style="flex:1;padding:10px;border:2px solid var(--brd);border-radius:8px;background:#fff;color:var(--mu);font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">🎓 Azubi</button>
         </div>
-        <div id="berufRow" style="display:none;margin-bottom:6px"><label class="fl">Beruf</label><input class="fi" id="newMaBeruf" placeholder="z.B. Elektroniker" style="font-size:.76rem"></div>
+        <div id="berufRow" style="display:none;margin-bottom:6px">
+          <div><label class="fl">Berufsgruppe</label><select class="fi" id="newMaBerufGruppe" onchange="agFillFachrichtungen()" style="font-size:.76rem"><option value="">– Beruf wählen –</option></select></div>
+          <div id="newMaFachRow" style="display:none;margin-top:4px"><label class="fl">Fachrichtung</label><select class="fi" id="newMaFachrichtung" style="font-size:.76rem"><option value="">– erst Beruf wählen –</option></select></div>
+        </div>
         <div style="display:flex;gap:6px;margin-bottom:6px">
           <div style="flex:1"><label class="fl">Vorname</label><input class="fi" id="newMaVorname" style="font-size:.76rem"></div>
           <div style="flex:1"><label class="fl">Nachname</label><input class="fi" id="newMaNachname" style="font-size:.76rem"></div>
@@ -922,6 +925,33 @@ function getSecondaryAuth(){
 }
 
 let _maTyp='arbeitnehmer';
+let _agBerufeListe=[];
+function loadAgBerufe(){
+  db.collection('shared').doc('kursSettings').collection('berufe').orderBy('order').get().then(snap=>{
+    _agBerufeListe=[];
+    snap.forEach(doc=>_agBerufeListe.push({id:doc.id,...doc.data()}));
+    const sel=document.getElementById('newMaBerufGruppe');
+    if(sel){
+      sel.innerHTML='<option value="">– Beruf wählen –</option>';
+      _agBerufeListe.forEach(b=>{sel.innerHTML+='<option value="'+esc(b.name)+'">'+(b.emoji||'📁')+' '+esc(b.name)+'</option>';});
+    }
+  }).catch(()=>{});
+}
+function agFillFachrichtungen(){
+  const berufSel=document.getElementById('newMaBerufGruppe');
+  const fachSel=document.getElementById('newMaFachrichtung');
+  const row=document.getElementById('newMaFachRow');
+  if(!berufSel||!fachSel) return;
+  const beruf=_agBerufeListe.find(b=>b.name===berufSel.value);
+  if(beruf&&beruf.berufe&&beruf.berufe.length>0){
+    if(row) row.style.display='';
+    fachSel.innerHTML='<option value="">– Fachrichtung wählen –</option>';
+    beruf.berufe.forEach(f=>{fachSel.innerHTML+='<option value="'+esc(f)+'">'+esc(f)+'</option>';});
+  } else {
+    if(row) row.style.display='none';
+    fachSel.innerHTML='<option value="">–</option>';
+  }
+}
 function setMaTyp(typ){
   _maTyp=typ;
   const btnAn=document.getElementById('typBtnAn');
@@ -932,6 +962,7 @@ function setMaTyp(typ){
     btnAz.style.border='2px solid #2563eb';btnAz.style.background='rgba(37,99,235,.08)';btnAz.style.color='#2563eb';
     btnAn.style.border='2px solid var(--brd)';btnAn.style.background='#fff';btnAn.style.color='var(--mu)';
     berufRow.style.display='';
+    loadAgBerufe();
     createBtn.textContent='🎓+ Azubi anlegen';
   } else {
     btnAn.style.border='2px solid #2563eb';btnAn.style.background='rgba(37,99,235,.08)';btnAn.style.color='#2563eb';
@@ -946,7 +977,9 @@ function agCreateMitarbeiter(){
   const nachname=document.getElementById('newMaNachname').value.trim();
   const email=document.getElementById('newMaEmail').value.trim().toLowerCase();
   const pw=document.getElementById('newMaPw').value;
-  const beruf=document.getElementById('newMaBeruf')?.value.trim()||'';
+  const berufSel=document.getElementById('newMaBerufGruppe');
+  const fachSel=document.getElementById('newMaFachrichtung');
+  const beruf=fachSel&&fachSel.value?fachSel.value:(berufSel?berufSel.value:'');
   const err=document.getElementById('newMaErr');
   const isAzubi=_maTyp==='azubi';
   const rolle=isAzubi?'azubi':'arbeitnehmer';
@@ -956,7 +989,7 @@ function agCreateMitarbeiter(){
   if(!email){err.textContent='Bitte E-Mail eingeben';return;}
   if(pw.length<6){err.textContent='Passwort min. 6 Zeichen';return;}
   if(isAzubi&&!beruf){err.textContent='Bitte Beruf angeben';return;}
-  if(!confirm((isAzubi?'Azubi':'Arbeitnehmer')+' anlegen?\n\n'+vorname+' '+nachname+'\n'+email+'\n\nZugang über '+app+'-App.')) return;
+  if(!confirm((isAzubi?'Azubi':'Arbeitnehmer')+' anlegen?\n\n'+vorname+' '+nachname+'\n'+email+(beruf?'\nBeruf: '+beruf:'')+'\n\nZugang über '+app+'-App.')) return;
   err.textContent='Wird angelegt…';
   const secAuth=getSecondaryAuth();
   secAuth.createUserWithEmailAndPassword(email,pw).then(cred=>{
@@ -971,7 +1004,9 @@ function agCreateMitarbeiter(){
     document.getElementById('newMaNachname').value='';
     document.getElementById('newMaEmail').value='';
     document.getElementById('newMaPw').value='';
-    if(document.getElementById('newMaBeruf')) document.getElementById('newMaBeruf').value='';
+    if(berufSel) berufSel.value='';
+    if(fachSel) fachSel.value='';
+    if(document.getElementById('newMaFachRow')) document.getElementById('newMaFachRow').style.display='none';
     err.textContent='';
     toast('✅ '+vorname+' '+nachname+' als '+(isAzubi?'Azubi':'Arbeitnehmer')+' angelegt');
   }).catch(e=>{

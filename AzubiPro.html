@@ -123,7 +123,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="flex:1"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="jNachname" placeholder="Mustermann"></div>
       </div>
       <div style="margin-top:6px"><label class="fl">Betrieb / Ausbildungsfirma <span style="color:#ef4444">*</span></label><input class="fi" id="jFirma" placeholder="Firma GmbH"></div>
-      <div style="margin-top:6px"><label class="fl">Beruf</label><input class="fi" id="jBeruf" placeholder="Elektroniker"></div>
+      <div style="margin-top:6px"><label class="fl">Beruf</label><select class="fi" id="jBeruf" onchange="fillFachrichtungen('jBeruf','jFachrichtung')" style="font-size:.76rem"><option value="">– Beruf wählen –</option></select></div>
+      <div style="margin-top:6px" id="jFachrichtungRow" style="display:none"><label class="fl">Fachrichtung</label><select class="fi" id="jFachrichtung" style="font-size:.76rem"><option value="">– erst Beruf wählen –</option></select></div>
       <div style="display:flex;gap:8px;margin-top:6px">
         <div style="flex:1"><label class="fl">Lehrjahr</label><select class="fi" id="jLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
         <div style="flex:1"><label class="fl">Geburtsdatum</label><input type="date" class="fi" id="jGeburt"></div>
@@ -610,10 +611,46 @@ const db=firebase.firestore();
 db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
 const st=firebase.storage();
 let _uid=null, _email=null, _tnId=null, _tnData=null, _kurse=[];
+loadBerufeDropdown(); // Frühzeitig laden für Join-Formular
 
 // ISO → deutsch
 function fmtDE(d){ if(!d||d.length<10) return d||'?'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Berufe-Dropdown ──
+let _berufeListe=[];
+function loadBerufeDropdown(){
+  db.collection('shared').doc('kursSettings').collection('berufe').orderBy('order').get().then(snap=>{
+    _berufeListe=[];
+    snap.forEach(doc=>_berufeListe.push({id:doc.id,...doc.data()}));
+    populateBerufSelect('jBeruf');
+    populateBerufSelect('profBeruf');
+  }).catch(()=>{});
+}
+function populateBerufSelect(selId){
+  const sel=document.getElementById(selId);
+  if(!sel) return;
+  sel.innerHTML='<option value="">– Beruf wählen –</option>';
+  _berufeListe.forEach(b=>{
+    sel.innerHTML+='<option value="'+esc(b.name)+'">'+(b.emoji||'📁')+' '+esc(b.name)+'</option>';
+  });
+}
+function fillFachrichtungen(berufSelId,fachSelId){
+  const berufSel=document.getElementById(berufSelId);
+  const fachSel=document.getElementById(fachSelId);
+  const row=fachSel?.parentElement;
+  if(!berufSel||!fachSel) return;
+  const berufName=berufSel.value;
+  const beruf=_berufeListe.find(b=>b.name===berufName);
+  if(beruf&&beruf.berufe&&beruf.berufe.length>0){
+    if(row) row.style.display='';
+    fachSel.innerHTML='<option value="">– Fachrichtung wählen –</option>';
+    beruf.berufe.forEach(f=>{fachSel.innerHTML+='<option value="'+esc(f)+'">'+esc(f)+'</option>';});
+  } else {
+    if(row) row.style.display='none';
+    fachSel.innerHTML='<option value="">–</option>';
+  }
+}
 
 // ── Auth ──
 auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
@@ -818,7 +855,10 @@ function submitJoinRegistration(){
   const vorname=(document.getElementById('jVorname').value||'').trim();
   const nachname=(document.getElementById('jNachname').value||'').trim();
   const firma=(document.getElementById('jFirma').value||'').trim();
-  const beruf=(document.getElementById('jBeruf').value||'').trim();
+  const berufSel=document.getElementById('jBeruf');
+  const fachSel=document.getElementById('jFachrichtung');
+  const beruf=fachSel&&fachSel.value?fachSel.value:(berufSel?berufSel.value:'');
+  const berufGruppe=berufSel?berufSel.value:'';
   const ausbjahr=document.getElementById('jLehrjahr').value||'';
   const geburtsdatum=document.getElementById('jGeburt').value||'';
   const email=(document.getElementById('jEmail').value||'').trim().toLowerCase();
@@ -844,7 +884,7 @@ function submitJoinRegistration(){
     const uid=cred.user.uid;
     // 2. globalTN Dokument erstellen
     const tnData={
-      vorname, nachname, firma, beruf, ausbjahr, geburtsdatum,
+      vorname, nachname, firma, beruf, berufGruppe, ausbjahr, geburtsdatum,
       email: email,
       kontaktEmail: email,
       kontaktTelefon: telefon,
@@ -874,7 +914,7 @@ function submitJoinRegistration(){
       // 3. In Kurs-TN-Subcollection eintragen
       return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId)
         .collection('teilnehmer').doc(ref.id).set({
-          vorname, nachname, firma, beruf, ausbjahr,
+          vorname, nachname, firma, beruf, berufGruppe, ausbjahr,
           kontaktEmail: email,
           kontaktTelefon: telefon,
           status: 'active',
@@ -2797,7 +2837,13 @@ function loadProfil(){
     +'<div><div style="font-size:1rem;font-weight:800">'+esc((t.vorname||'')+' '+(t.nachname||''))+'</div>'
     +'<div style="font-size:.68rem;color:var(--mu)">'+esc(_email)+'</div></div></div>'
     +'<div style="font-size:.55rem;color:var(--warn);margin:-6px 0 10px;padding:6px 10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px">ℹ Dein Profilbild ist auch für den Ausbilder auf der Sitzplankarte sichtbar.</div>'
-    +'<div class="profile-field"><span class="pf-label">Beruf</span><span class="pf-value">'+esc(t.beruf||'–')+'</span></div>'
+    +'<div class="profile-field"><span class="pf-label">Beruf</span><span class="pf-value" id="profBerufDisplay">'+esc(t.beruf||'–')+'</span>'
+    +'<button onclick="toggleBerufEdit()" style="margin-left:6px;background:none;border:1px solid var(--brd);border-radius:4px;padding:2px 8px;font-size:.55rem;color:var(--mu);cursor:pointer">✏</button></div>'
+    +'<div id="profBerufEdit" style="display:none;padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;margin-bottom:8px">'
+    +'<div style="margin-bottom:6px"><label class="fl">Berufsgruppe</label><select class="fi" id="profBeruf" onchange="fillFachrichtungen(\'profBeruf\',\'profFachrichtung\')" style="font-size:.76rem"><option value="">– Beruf wählen –</option></select></div>'
+    +'<div id="profFachrichtungRow" style="display:none;margin-bottom:6px"><label class="fl">Fachrichtung</label><select class="fi" id="profFachrichtung" style="font-size:.76rem"><option value="">– erst Beruf wählen –</option></select></div>'
+    +'<button onclick="saveProfBeruf()" style="width:100%;padding:8px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">💾 Beruf speichern</button>'
+    +'</div>'
     +'<div class="profile-field"><span class="pf-label">Betrieb</span><span class="pf-value">'+esc(t.firma||'–')+'</span></div>'
     +'<div class="profile-field"><span class="pf-label">Lehrjahr</span><span class="pf-value">'+(t.ausbjahr?t.ausbjahr+'. Jahr':'–')+'</span></div>'
     +'<div class="profile-field"><span class="pf-label">Aktiver Kurs</span><span class="pf-value" style="color:var(--acc)">'+esc(_kurse.find(k=>k.id===t.aktiverKursId)?.name||'Keiner')+'</span></div>'
@@ -2823,6 +2869,40 @@ function loadProfil(){
       +(isAkt?'<span style="font-size:.6rem;color:var(--acc);font-weight:700">Aktuell</span>':'')
       +'</div>';
   }).join('');
+}
+
+function toggleBerufEdit(){
+  const el=document.getElementById('profBerufEdit');
+  if(el.style.display==='none'){
+    el.style.display='';
+    populateBerufSelect('profBeruf');
+    if(_tnData?.beruf){
+      const match=_berufeListe.find(b=>b.name===_tnData.beruf || (b.berufe||[]).includes(_tnData.beruf));
+      if(match){
+        document.getElementById('profBeruf').value=match.name;
+        fillFachrichtungen('profBeruf','profFachrichtung');
+        if((match.berufe||[]).includes(_tnData.beruf)){
+          document.getElementById('profFachrichtung').value=_tnData.beruf;
+        }
+      }
+    }
+  } else {
+    el.style.display='none';
+  }
+}
+
+function saveProfBeruf(){
+  if(!_tnId){toast('Nicht angemeldet','bad');return;}
+  const berufSel=document.getElementById('profBeruf');
+  const fachSel=document.getElementById('profFachrichtung');
+  const beruf=fachSel&&fachSel.value?fachSel.value:(berufSel?berufSel.value:'');
+  if(!beruf){toast('Bitte Beruf wählen','bad');return;}
+  db.collection('globalTN').doc(_tnId).update({beruf:beruf}).then(()=>{
+    _tnData.beruf=beruf;
+    document.getElementById('profBerufDisplay').textContent=beruf;
+    document.getElementById('profBerufEdit').style.display='none';
+    toast('✅ Beruf gespeichert');
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 function saveAzubiKontakt(){
