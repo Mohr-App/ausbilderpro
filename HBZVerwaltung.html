@@ -623,6 +623,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <!-- Kursfortschritt Warnung -->
         <div id="dashCurrWarning" style="display:none;margin-bottom:20px"></div>
 
+        <!-- Letzte Aktivitäten -->
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title">👁 Letzte Aktivitäten</div>
+          <div id="dashActivity"><div class="empty">Lädt…</div></div>
+        </div>
+
         <!-- Urlaub Badge -->
         <div id="urlaubBadge" style="display:none;padding:10px 14px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;margin-bottom:14px;font-size:.78rem;font-weight:600;color:#f59e0b;cursor:pointer" onclick="showUrlaubOverview()"></div>
 
@@ -1624,6 +1630,8 @@ function grantAccess(u, role){
   document.getElementById('loginWrap').style.display = 'none';
   document.getElementById('appWrap').style.display = 'flex';
   document.getElementById('hdrUser').textContent = _email;
+  // Activity tracking
+  if(_uid) db.collection('users').doc(_uid).set({lastActive:Date.now(),lastApp:'VerwaltungPro'},{merge:true}).catch(()=>{});
   // Badge zeigt Rolle
   const badge = document.getElementById('hdrBadge');
   if(badge) badge.textContent = role==='admin' ? 'ADMIN' : 'VERWALTUNG';
@@ -2592,6 +2600,45 @@ function loadDashboard(){
   }
   dl.innerHTML=html||'<div class="empty">Noch keine Kurse</div>';
   renderDashCharts();
+  loadActivity();
+}
+
+function loadActivity(){
+  const el=document.getElementById('dashActivity');
+  if(!el) return;
+  db.collection('users').where('lastActive','>',0).orderBy('lastActive','desc').limit(20).get().then(snap=>{
+    if(snap.empty){el.innerHTML='<div class="empty">Keine Aktivitäten</div>';return;}
+    let html='';
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const name=d.name||d.firma||d.email||doc.id;
+      const role=d.role||'–';
+      const app=d.lastApp||'–';
+      const ago=d.lastActive?timeAgo(d.lastActive):'–';
+      const roleColors={admin:'#2563eb',verwaltung:'#2563eb',ausbilder:'#2563eb',azubi:'#10b981',arbeitnehmer:'#d97706',arbeitgeber:'#d97706'};
+      const roleLabels={admin:'Admin',verwaltung:'Verwaltung',ausbilder:'Ausbilder',azubi:'Azubi',arbeitnehmer:'Mitarbeiter',arbeitgeber:'Arbeitgeber'};
+      const col=roleColors[role]||'#94a3b8';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.72rem">'
+        +'<span style="padding:2px 8px;background:'+col+'15;color:'+col+';border-radius:4px;font-size:.55rem;font-weight:700;min-width:65px;text-align:center">'+(roleLabels[role]||role)+'</span>'
+        +'<span style="flex:1;font-weight:600">'+esc(name)+'</span>'
+        +'<span style="color:var(--mu);font-size:.6rem">'+app+'</span>'
+        +'<span style="color:var(--mu);font-size:.6rem;min-width:60px;text-align:right">'+ago+'</span>'
+        +'</div>';
+    });
+    el.innerHTML=html;
+  }).catch(()=>{el.innerHTML='<div class="empty">Fehler beim Laden</div>';});
+}
+
+function timeAgo(ts){
+  const diff=Date.now()-ts;
+  const min=Math.floor(diff/60000);
+  if(min<1) return 'gerade eben';
+  if(min<60) return min+'min';
+  const h=Math.floor(min/60);
+  if(h<24) return h+'h';
+  const d=Math.floor(h/24);
+  if(d===1) return 'gestern';
+  return d+' Tage';
 }
 
 let _chartKursStatus=null, _chartBeruf=null;
