@@ -1188,6 +1188,7 @@ service cloud.firestore {
               <div class="fg" style="flex:1"><label class="fl">Telefon</label><input class="fi" id="addAusbTelInp" type="tel" placeholder="+49 151 123456"></div>
             </div>
             <div class="fg"><label class="fl">Login-Email (AusbilderPro) <span style="font-weight:400;color:var(--mu)">– wenn abweichend</span></label><input class="fi" id="addAusbLoginEmailInp" type="email" placeholder="login@provider.de"></div>
+            <div class="fg" id="addAusbPwRow"><label class="fl">Passwort (AusbilderPro Login) <span style="color:var(--bad)">*</span></label><input class="fi" id="addAusbPwInp" type="text" placeholder="Mind. 6 Zeichen – wird dem Ausbilder mitgeteilt"></div>
             <div class="fg"><label class="fl">Berufsgruppe <span style="color:var(--bad)">*</span></label><select class="fi" id="addAusbBerufInp"><option value="">– bitte wählen –</option></select></div>
             <div class="fg"><label class="fl">🏢 Standardort</label><select class="fi" id="addAusbStandortInp"><option value="">– kein Standardort –</option></select></div>
             <!-- URLAUB -->
@@ -2840,6 +2841,8 @@ function openAddAusbModal(){
   document.getElementById('addAusbNameInp').value = '';
   document.getElementById('addAusbEmailInp').value = '';
   document.getElementById('addAusbLoginEmailInp').value = '';
+  document.getElementById('addAusbPwInp').value = '';
+  document.getElementById('addAusbPwRow').style.display = '';
   document.getElementById('addAusbTelInp').value = '';
   document.getElementById('addAusbDelBtn').style.display = 'none';
   document.getElementById('addAusbModalTit').textContent = 'Ausbilder hinzufügen';
@@ -2858,6 +2861,7 @@ function openEditAusbSettings(id){
   document.getElementById('addAusbNameInp').value = a.name||'';
   document.getElementById('addAusbEmailInp').value = a.email||'';
   document.getElementById('addAusbLoginEmailInp').value = a.loginEmail||'';
+  document.getElementById('addAusbPwRow').style.display = 'none';
   document.getElementById('addAusbTelInp').value = a.tel||'';
   populateAusbBerufSelect();
   document.getElementById('addAusbBerufInp').value = a.berufId||'';
@@ -2877,23 +2881,48 @@ function saveAusbilder(){
   const name    = (document.getElementById('addAusbNameInp').value||'').trim();
   const email   = (document.getElementById('addAusbEmailInp').value||'').trim().toLowerCase();
   const loginEmail = (document.getElementById('addAusbLoginEmailInp').value||'').trim().toLowerCase();
+  const pw      = (document.getElementById('addAusbPwInp')?.value||'').trim();
   const tel     = (document.getElementById('addAusbTelInp').value||'').trim();
   const berufId = document.getElementById('addAusbBerufInp').value;
   if(!name){ toast('Bitte Name eingeben','bad'); return; }
   if(!berufId){ toast('Bitte Berufsgruppe wählen','bad'); return; }
+  const authEmail = loginEmail || email;
+  if(!id && !authEmail){ toast('Bitte E-Mail oder Login-Email eingeben','bad'); return; }
+  if(!id && pw.length<6){ toast('Passwort mind. 6 Zeichen','bad'); return; }
   const beruf = BERUFE[berufId];
   const berufLabel = beruf ? beruf.label : berufId;
   const standortId = document.getElementById('addAusbStandortInp')?.value||'';
   const col = db.collection('shared').doc('kursSettings').collection('ausbilder');
   const data = {name, email, loginEmail, tel, berufId, berufLabel, standortId, urlaub:_ausbUrlaubTemp||[]};
-  const p   = id ? col.doc(id).update(data) : col.add(data);
-  p.then(()=>{
-    // Log Urlaub changes
-    const oldA=_ausbilder.find(x=>x.id===id);
-    const oldLen=(oldA?.urlaub||[]).length;
-    if(_ausbUrlaubTemp.length!==oldLen) logUrlaub(name,'ausbilder','geändert','','');
-    closeAddAusbModal(); toast('Gespeichert ✓');
-  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+
+  if(id){
+    // Bearbeiten – nur Daten updaten
+    col.doc(id).update(data).then(()=>{
+      const oldA=_ausbilder.find(x=>x.id===id);
+      const oldLen=(oldA?.urlaub||[]).length;
+      if(_ausbUrlaubTemp.length!==oldLen) logUrlaub(name,'ausbilder','geändert','','');
+      closeAddAusbModal(); toast('Gespeichert ✓');
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
+  } else {
+    // Neu – Firebase Auth Account erstellen
+    toast('Wird angelegt…');
+    _secondaryAuth.createUserWithEmailAndPassword(authEmail, pw).then(cred=>{
+      const uid=cred.user.uid;
+      // users/{uid} Doc mit Secondary DB
+      const secDb=_secondaryApp.firestore();
+      secDb.collection('users').doc(uid).set({email:authEmail, role:'ausbilder', name:name});
+      _secondaryAuth.signOut();
+      // Ausbilder-Datensatz speichern
+      data.authUid=uid;
+      return col.add(data);
+    }).then(()=>{
+      closeAddAusbModal();
+      toast('✅ Ausbilder '+name+' angelegt – Login: '+authEmail);
+    }).catch(err=>{
+      const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach'};
+      toast('❌ '+(msgs[err.code]||err.message),'bad');
+    });
+  }
 }
 function confirmDeleteAusbilder(){
   const id = document.getElementById('addAusbId').value;
