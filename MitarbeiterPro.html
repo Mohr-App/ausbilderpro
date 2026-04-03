@@ -1163,7 +1163,9 @@ function loadZeitkonto(){
       allDays.push(ds);
     }
     if(!allDays.length&&zeitSnap.empty){el.innerHTML='<div class="empty">Keine Einträge in diesem Monat</div>';return;}
-    let totalIst=0,totalSoll=0,tage=0;
+    const [jy]=ym.split('-').map(Number);
+    const feiertage=getNRWFeiertage(jy);
+    let totalIst=0,totalSoll=0,tage=0,feiertagCount=0;
     let html='';
     if(_azPlan){
       html+='<div style="display:flex;justify-content:space-between;font-size:.58rem;color:var(--mu);padding:2px 0;border-bottom:1px solid var(--brd);margin-bottom:4px;font-weight:700"><span style="flex:2">Tag</span><span style="flex:2;text-align:center">Zeit</span><span style="flex:1;text-align:right">Ist</span><span style="flex:1;text-align:right">Soll</span><span style="flex:1;text-align:right">+/-</span></div>';
@@ -1172,36 +1174,39 @@ function loadZeitkonto(){
       const zeit=zeitMap[ds];
       const isKrank=krankDates.has(ds);
       const isUrlaub=urlaubDates.has(ds);
+      const isFeiertag=!!feiertage[ds];
       const ist=zeit?.istMinuten||0;
       const sollRaw=getSollMin(ds);
-      const soll=(isKrank||isUrlaub)?0:sollRaw;
-      // Tag überspringen wenn kein Soll, kein Eintrag, nicht krank/urlaub
-      if(!sollRaw&&!zeit&&!isKrank&&!isUrlaub) return;
+      const soll=(isKrank||isUrlaub||isFeiertag)?0:sollRaw;
+      if(!sollRaw&&!zeit&&!isKrank&&!isUrlaub&&!isFeiertag) return;
+      if(isFeiertag) feiertagCount++;
       const diff=ist-soll;
       totalIst+=ist;totalSoll+=soll;
       if(zeit?.ausgang) tage++;
       const datDE=new Date(ds+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
       const manuell=zeit?.manuell?'<span style="font-size:.45rem;color:#d97706;font-weight:700">✎</span>':'';
+      const isFrei=isKrank||isUrlaub||isFeiertag;
       let statusTag='';
-      if(isKrank) statusTag='<span style="font-size:.55rem;padding:1px 6px;background:rgba(239,68,68,.15);color:#ef4444;border-radius:4px;font-weight:700;margin-left:4px">🤒 Krank</span>';
+      if(isFeiertag) statusTag='<span style="font-size:.55rem;padding:1px 6px;background:rgba(139,92,246,.12);color:#7c3aed;border-radius:4px;font-weight:700;margin-left:4px">🎌 '+feiertage[ds]+'</span>';
+      else if(isKrank) statusTag='<span style="font-size:.55rem;padding:1px 6px;background:rgba(239,68,68,.15);color:#ef4444;border-radius:4px;font-weight:700;margin-left:4px">🤒 Krank</span>';
       else if(isUrlaub) statusTag='<span style="font-size:.55rem;padding:1px 6px;background:rgba(16,185,129,.15);color:#059669;border-radius:4px;font-weight:700;margin-left:4px">🏖 Urlaub</span>';
       if(_azPlan){
-        const diffCol=(isKrank||isUrlaub)?'var(--mu)':diff>=0?'#059669':'#ef4444';
-        const zeitText=zeit?(zeit.eingang+(zeit.ausgang?' – '+zeit.ausgang:'…')):(isKrank||isUrlaub?'—':'<span style="color:#ef4444;font-size:.55rem">nicht erfasst</span>');
-        html+='<div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.68rem">'
+        const diffCol=isFrei?'var(--mu)':diff>=0?'#059669':'#ef4444';
+        const zeitText=zeit?(zeit.eingang+(zeit.ausgang?' – '+zeit.ausgang:'…')):(isFrei?'—':'<span style="color:#ef4444;font-size:.55rem">nicht erfasst</span>');
+        html+='<div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.68rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
           +'<span style="flex:2;color:var(--mu)">'+datDE+manuell+statusTag+'</span>'
           +'<span style="flex:2;text-align:center">'+zeitText+'</span>'
-          +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(zeit?.ausgang?minToStr(ist):(isKrank||isUrlaub?'—':''))+'</span>'
-          +'<span style="flex:1;text-align:right;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+(isKrank||isUrlaub?'—':minToStr(sollRaw))+'</span>'
-          +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isKrank||isUrlaub?'—':(zeit?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span>'
+          +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(zeit?.ausgang?minToStr(ist):(isFrei?'—':''))+'</span>'
+          +'<span style="flex:1;text-align:right;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':minToStr(sollRaw))+'</span>'
+          +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':(zeit?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span>'
           +'</div>';
       } else if(zeit) {
         html+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.72rem">'
           +'<span style="color:var(--mu)">'+datDE+manuell+statusTag+'</span>'
           +'<span>'+zeit.eingang+(zeit.ausgang?' – '+zeit.ausgang:'')+'</span>'
           +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(zeit.ausgang?minToStr(ist):'…')+'</span></div>';
-      } else if(isKrank||isUrlaub){
-        html+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.72rem">'
+      } else if(isFrei){
+        html+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.72rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
           +'<span style="color:var(--mu)">'+datDE+statusTag+'</span>'
           +'<span>—</span><span>—</span></div>';
       }
@@ -1212,9 +1217,10 @@ function loadZeitkonto(){
     if(_azPlan){
       html+='<div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:3px"><span>🤒 Krank-Tage</span><span style="font-weight:700">'+krankDates.size+'</span></div>'
         +'<div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:3px"><span>🏖 Urlaub-Tage</span><span style="font-weight:700">'+urlaubDates.size+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:3px"><span>🎌 Feiertage</span><span style="font-weight:700">'+feiertagCount+'</span></div>'
         +'<div style="border-top:1px solid var(--brd);margin:6px 0"></div>'
         +'<div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:3px"><span>Ist ('+tage+' Tage)</span><span style="font-weight:800;font-family:\'JetBrains Mono\',monospace">'+minToStr(totalIst)+'</span></div>'
-        +'<div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:3px"><span>Soll (ohne Krank/Urlaub)</span><span style="font-weight:700;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+minToStr(totalSoll)+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:3px"><span>Soll (ohne Krank/Urlaub/Feiertage)</span><span style="font-weight:700;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+minToStr(totalSoll)+'</span></div>'
         +'<div style="display:flex;justify-content:space-between;font-size:.85rem;padding-top:6px;border-top:1px solid var(--brd)"><span style="font-weight:800">'+(totalDiff>=0?'📈 Überstunden':'📉 Fehlstunden')+'</span><span style="font-weight:800;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace;font-size:.95rem">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</span></div>';
     } else {
       html+='<div style="display:flex;justify-content:space-between"><span style="font-size:.78rem;font-weight:700">Gesamt ('+tage+' Tage)</span><span style="font-size:.85rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+minToStr(totalIst)+'</span></div>';
@@ -1570,6 +1576,21 @@ function auftragStarten(id){
 // ═══════════════════════════════════
 function localDate(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function localYM(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+
+function getNRWFeiertage(year){
+  const a=year%19,b=Math.floor(year/100),c=year%100,d2=Math.floor(b/4),e=b%4;
+  const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d2-g+15)%30;
+  const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),dy=((h+l-7*m+114)%31)+1;
+  const easter=new Date(year,mo-1,dy);
+  const eD=(off)=>{const d=new Date(easter);d.setDate(d.getDate()+off);return localDate(d);};
+  const ft={};
+  ft[year+'-01-01']='Neujahr';ft[eD(-2)]='Karfreitag';ft[eD(1)]='Ostermontag';
+  ft[year+'-05-01']='Tag der Arbeit';ft[eD(39)]='Christi Himmelfahrt';ft[eD(50)]='Pfingstmontag';
+  ft[eD(60)]='Fronleichnam';ft[year+'-10-03']='Tag der Dt. Einheit';ft[year+'-11-01']='Allerheiligen';
+  ft[year+'-12-25']='1. Weihnachtstag';ft[year+'-12-26']='2. Weihnachtstag';
+  return ft;
+}
 
 function fillMonatSelect(id){
   const sel=document.getElementById(id);
