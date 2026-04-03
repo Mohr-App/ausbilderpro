@@ -1309,41 +1309,44 @@ function loadAgZeiten(){
       const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
       const plan=az.arbeitszeitPlan||null;
       let totalIst=0,totalSoll=0,tage=0;
-      // Tages-HTML sammeln
+      const feiertage=getNRWFeiertage(parseInt(ym));
       let dayHtml='';
       allDays.forEach(ds=>{
         const e=zeitMap[ds];
         const isKrank=krankDates.has(ds);
         const isUrlaub=urlaubDates.has(ds);
+        const isFeiertag=!!feiertage[ds];
+        const isFrei=isKrank||isUrlaub||isFeiertag;
         const ist=e?.istMinuten||0;
         const sollRaw=plan?getAgSollMin(ds,plan):0;
-        const soll=(isKrank||isUrlaub)?0:sollRaw;
-        if(!sollRaw&&!e&&!isKrank&&!isUrlaub) return;
+        const soll=isFrei?0:sollRaw;
+        if(!sollRaw&&!e&&!isFrei) return;
         totalIst+=ist;totalSoll+=soll;
         if(e?.ausgang) tage++;
         const datDE=new Date(ds+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
         const manuell=e?.manuell?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(245,158,11,.15);color:#d97706;border-radius:4px;font-weight:700;margin-left:3px">✎'+(e.agBestaetigt?' ✓':' offen')+'</span>':'';
         const bestBtn=e?.manuell&&!e.agBestaetigt?'<button onclick="event.stopPropagation();agBestaetigeZeit(\''+az.id+'\',\''+ds+'\')" style="font-size:.5rem;padding:2px 6px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:3px">✓</button>':'';
         let statusTag='';
-        if(isKrank) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.15);color:#ef4444;border-radius:3px;font-weight:700;margin-left:3px">🤒</span>';
+        if(isFeiertag) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(139,92,246,.12);color:#7c3aed;border-radius:3px;font-weight:700;margin-left:3px">🎌</span>';
+        else if(isKrank) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.15);color:#ef4444;border-radius:3px;font-weight:700;margin-left:3px">🤒</span>';
         else if(isUrlaub) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(16,185,129,.15);color:#059669;border-radius:3px;font-weight:700;margin-left:3px">🏖</span>';
         if(plan){
-          const diff=ist-soll;const diffCol=(isKrank||isUrlaub)?'var(--mu)':diff>=0?'#059669':'#ef4444';
-          const zeitText=e?(e.eingang+(e.ausgang?' – '+e.ausgang:'…')):(isKrank||isUrlaub?'—':'');
+          const diff=ist-soll;const diffCol=isFrei?'var(--mu)':diff>=0?'#059669':'#ef4444';
+          const zeitText=e?(e.eingang+(e.ausgang?' – '+e.ausgang:'…')):(isFrei?'—':'');
           const dokuIcons=e&&(e.fotos||e.unterschrift||e.gpsEingang)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku anzeigen">'+(e.gpsEingang?'📍':'')+(e.fotos?'📸':'')+(e.unterschrift?'✍':'')+'</span>':'';
           const nachtarbeit=e&&e.ausgang&&parseInt(e.ausgang)>=22?'<span style="font-size:.5rem;margin-left:2px" title="Nachtarbeit">🌙</span>':'';
-          dayHtml+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem">'
+          dayHtml+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
             +'<span style="flex:1.5;color:var(--mu)">'+datDE+statusTag+'</span>'
             +'<span style="flex:2">'+zeitText+nachtarbeit+dokuIcons+manuell+bestBtn+'</span>'
-            +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e?.ausgang?minToStr(ist):(isKrank||isUrlaub?'—':''))+'</span>'
-            +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isKrank||isUrlaub?'—':(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
+            +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e?.ausgang?minToStr(ist):(isFrei?'—':''))+'</span>'
+            +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
         } else if(e){
           dayHtml+='<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
             +'<span style="color:var(--mu)">'+datDE+statusTag+'</span>'
             +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+(e&&(e.fotos||e.unterschrift)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku">📋</span>':'')+manuell+bestBtn+'</span>'
             +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?minToStr(ist):'…')+'</span></div>';
-        } else if(isKrank||isUrlaub){
-          dayHtml+='<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
+        } else if(isFrei){
+          dayHtml+='<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
             +'<span style="color:var(--mu)">'+datDE+statusTag+'</span><span>—</span><span>—</span></div>';
         }
       });
@@ -1384,7 +1387,24 @@ function loadAgZeiten(){
           +'<span>Ist: <b>'+minToStr(totalIst)+'</b> · Soll: <b>'+minToStr(totalSoll)+'</b></span>'
           +'<span style="font-weight:800;color:'+diffCol+'">'+(totalDiff>=0?'📈 +':'📉 ')+minToStr(totalDiff)+'</span></div>';
       }
-      html+='<button onclick="exportStundenzettel(\''+az.id+'\',\''+esc(name)+'\',\''+ym+'\')" style="margin-top:8px;width:100%;padding:8px;background:#fff;border:1.5px solid #2563eb;border-radius:8px;color:#2563eb;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📄 Stundenzettel PDF</button>';
+      html+='<div style="display:flex;gap:4px;margin-top:8px">'
+        +'<button onclick="exportStundenzettel(\''+az.id+'\',\''+esc(name)+'\',\''+ym+'\')" style="flex:1;padding:8px;background:#fff;border:1.5px solid #2563eb;border-radius:8px;color:#2563eb;font-size:.68rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📄 PDF</button>'
+        +'<button onclick="exportStundenzettel(\''+az.id+'\',\''+esc(name)+'\',\''+ym+'\',\'csv\')" style="flex:1;padding:8px;background:#fff;border:1.5px solid #059669;border-radius:8px;color:#059669;font-size:.68rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📊 CSV</button>'
+        +'</div>';
+      // Monatsabschluss
+      const abschlussId='abschluss-'+ym;
+      html+='<div id="abschluss-'+az.id+'-'+ym+'" style="margin-top:4px;font-size:.62rem;text-align:center;color:var(--mu)">Lädt…</div>';
+      // Load abschluss status async
+      db.collection('globalTN').doc(az.id).collection('zeiterfassung').doc(abschlussId).get().then(adoc=>{
+        const el2=document.getElementById('abschluss-'+az.id+'-'+ym);
+        if(!el2) return;
+        if(adoc.exists&&adoc.data().abgeschlossen){
+          const abDat=adoc.data().abgeschlossenAm?new Date(adoc.data().abgeschlossenAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+          el2.innerHTML='<span style="color:#059669;font-weight:700">✅ Monat abgeschlossen'+(abDat?' am '+abDat:'')+'</span>';
+        } else {
+          el2.innerHTML='<button onclick="monatsAbschluss(\''+az.id+'\',\''+esc(name)+'\',\''+ym+'\')" style="width:100%;padding:6px;background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.3);border-radius:8px;color:#d97706;font-size:.62rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">🔒 Monat abschließen</button>';
+        }
+      }).catch(()=>{});
       html+='</div></div>';
       });
     }
@@ -1557,53 +1577,109 @@ function agAuftragWiedereroeffnen(tnId,aufId){
 }
 
 // PDF EXPORTS
-function exportStundenzettel(tnId,name,ym){
-  toast('📄 Stundenzettel wird erstellt…');
+function exportStundenzettel(tnId,name,ym,format){
+  toast('📄 Wird erstellt…');
   const az=_azubis.find(a=>a.id===tnId);
   const plan=az?.arbeitszeitPlan||null;
-  db.collection('globalTN').doc(tnId).collection('zeiterfassung')
-    .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').get().then(snap=>{
-    const zeitMap={};snap.forEach(d=>{zeitMap[d.data().datum]={...d.data()};});
-    const [y,mo]=ym.split('-').map(Number);
+  const [y,mo]=ym.split('-').map(Number);
+  const feiertage=getNRWFeiertage(y);
+  // Parallel: Zeit + Krank + Urlaub
+  const p1=db.collection('globalTN').doc(tnId).collection('zeiterfassung')
+    .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').get();
+  const p2=db.collection('globalTN').doc(tnId).collection('betriebMeldungen')
+    .where('type','==','krank').get();
+  const p3=db.collection('globalTN').doc(tnId).collection('urlaubsantraege')
+    .where('status','==','genehmigt').get();
+  Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlaubSnap])=>{
+    const zeitMap={};zeitSnap.forEach(d=>{zeitMap[d.data().datum]={...d.data()};});
+    const krankDates=new Set();
+    krankSnap.forEach(doc=>{const d=doc.data();if(d.datum&&d.datum.startsWith(ym)) krankDates.add(d.datum);});
+    const urlaubDates=new Set();
+    urlaubSnap.forEach(doc=>{
+      const d=doc.data();if(!d.von||!d.bis) return;
+      const start=new Date(d.von+'T12:00'),end=new Date(d.bis+'T12:00');
+      for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){
+        const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+        if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6) urlaubDates.add(ds);
+      }
+    });
     const tage=new Date(y,mo,0).getDate();
-    let rows='',totalIst=0,totalSoll=0;
+    let rows='',csvRows=[],totalIst=0,totalSoll=0,krankCount=0,urlaubCount=0,feiertagCount=0;
+    csvRows.push(['Tag','Datum','Eingang','Ausgang','Pause(min)','Ist(min)','Soll(min)','Diff(min)','Status'].join(';'));
     for(let d=1;d<=tage;d++){
       const ds=ym+'-'+String(d).padStart(2,'0');
       const dat=new Date(ds+'T12:00');
       const tag=['So','Mo','Di','Mi','Do','Fr','Sa'][dat.getDay()];
       const e=zeitMap[ds];
-      const sollMin=plan?getAgSollMin(ds,plan):0;
+      const isWE=dat.getDay()===0||dat.getDay()===6;
+      const isFT=!!feiertage[ds];
+      const isKrank=krankDates.has(ds);
+      const isUrlaub=urlaubDates.has(ds);
+      const isFrei=isFT||isKrank||isUrlaub;
+      const sollMin=(isFrei||isWE)?0:(plan?getAgSollMin(ds,plan):0);
       const istMin=e?.istMinuten||0;
       const diff=istMin-sollMin;
-      const isWE=dat.getDay()===0||dat.getDay()===6;
-      totalIst+=istMin;totalSoll+=sollMin;
-      rows+='<tr style="'+(isWE?'background:#f8fafc;color:#94a3b8':'')+'">'
+      if(!isWE||e) {totalIst+=istMin;totalSoll+=sollMin;}
+      if(isFT&&!isWE) feiertagCount++;
+      if(isKrank) krankCount++;
+      if(isUrlaub) urlaubCount++;
+      let status='';
+      if(isFT) status=feiertage[ds];
+      else if(isKrank) status='Krank';
+      else if(isUrlaub) status='Urlaub';
+      const rowBg=isFT?'background:#f5f3ff':isKrank?'background:#fef2f2':isUrlaub?'background:#ecfdf5':isWE?'background:#f8fafc;color:#94a3b8':'';
+      rows+='<tr style="'+rowBg+'">'
         +'<td>'+tag+', '+String(d).padStart(2,'0')+'.'+String(mo).padStart(2,'0')+'.</td>'
         +'<td>'+(e?.eingang||'–')+'</td><td>'+(e?.ausgang||'–')+'</td>'
         +'<td>'+(e?.pauseMinuten?e.pauseMinuten+'min':'–')+'</td>'
         +'<td style="font-weight:700">'+(e?.ausgang?minToStr(istMin):'–')+'</td>'
-        +(plan?'<td>'+minToStr(sollMin)+'</td><td style="font-weight:700;color:'+(diff>=0?'#059669':'#ef4444')+'">'+(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):'–')+'</td>':'')
+        +(plan?'<td>'+(isFrei?'–':minToStr(sollMin))+'</td><td style="font-weight:700;color:'+(isFrei?'#7c3aed':diff>=0?'#059669':'#ef4444')+'">'+(isFrei?status:(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):'–'))+'</td>':'')
         +'</tr>';
+      csvRows.push([tag,String(d).padStart(2,'0')+'.'+String(mo).padStart(2,'0')+'.'+y,e?.eingang||'',e?.ausgang||'',e?.pauseMinuten||'',istMin,sollMin,diff,status].join(';'));
     }
     const totalDiff=totalIst-totalSoll;
-    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Stundenzettel '+name+' '+ym+'</title>'
+    csvRows.push(['','','','','Gesamt',totalIst,totalSoll,totalDiff,''].join(';'));
+    csvRows.push(['','','','','Krank: '+krankCount+', Urlaub: '+urlaubCount+', Feiertage: '+feiertagCount,'','','',''].join(';'));
+
+    if(format==='csv'){
+      const blob=new Blob(['\ufeff'+csvRows.join('\n')],{type:'text/csv;charset=utf-8'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download='Stundenzettel_'+name.replace(/\s/g,'_')+'_'+ym+'.csv';
+      a.click();URL.revokeObjectURL(a.href);
+      toast('📊 CSV heruntergeladen');
+      return;
+    }
+
+    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Stundenzettel '+esc(name)+' '+ym+'</title>'
       +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:30px;font-size:11px;color:#1e293b}'
       +'table{width:100%;border-collapse:collapse;margin-top:16px}th,td{padding:5px 8px;border:1px solid #cbd5e1;text-align:left}'
       +'th{background:#f1f5f9;font-size:10px;font-weight:700}h1{font-size:16px;margin-bottom:4px}'
-      +'.meta{color:#64748b;font-size:10px;margin-bottom:12px}.footer{margin-top:20px;padding-top:12px;border-top:2px solid #1e293b}'
-      +'.sig{display:flex;gap:60px;margin-top:40px}.sig div{flex:1;border-top:1px solid #94a3b8;padding-top:4px;font-size:9px;color:#64748b}'
+      +'.meta{color:#64748b;font-size:10px;margin-bottom:12px}'
+      +'.summary{margin-top:12px;padding:10px;border:1px solid #cbd5e1;border-radius:4px;font-size:10px}'
+      +'.sig{display:flex;gap:60px;margin-top:30px}.sig div{flex:1;border-top:1px solid #94a3b8;padding-top:4px;font-size:9px;color:#64748b}'
       +'@media print{body{padding:15px}}</style></head><body>'
       +'<h1>Stundenzettel</h1>'
       +'<div class="meta"><b>'+esc(name)+'</b> · '+esc(_firma||'')+'<br>Zeitraum: '+ym+'</div>'
       +'<table><thead><tr><th>Tag</th><th>Eingang</th><th>Ausgang</th><th>Pause</th><th>Ist</th>'
-      +(plan?'<th>Soll</th><th>+/–</th>':'')+'</tr></thead><tbody>'+rows+'</tbody>'
+      +(plan?'<th>Soll</th><th>+/– / Status</th>':'')+'</tr></thead><tbody>'+rows+'</tbody>'
       +'<tfoot><tr style="font-weight:700;background:#f1f5f9"><td colspan="4">Gesamt</td><td>'+minToStr(totalIst)+'</td>'
       +(plan?'<td>'+minToStr(totalSoll)+'</td><td style="color:'+(totalDiff>=0?'#059669':'#ef4444')+'">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</td>':'')
       +'</tr></tfoot></table>'
+      +'<div class="summary"><b>Zusammenfassung:</b> 🤒 Krank: '+krankCount+' · 🏖 Urlaub: '+urlaubCount+' · 🎌 Feiertage: '+feiertagCount
+      +(plan?' · Soll: '+minToStr(totalSoll)+' · Ist: '+minToStr(totalIst)+' · <b style="color:'+(totalDiff>=0?'#059669':'#ef4444')+'">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</b>':'')+'</div>'
       +'<div class="sig"><div>Datum, Unterschrift Arbeitnehmer</div><div>Datum, Unterschrift Arbeitgeber</div></div>'
       +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
+  });
+}
+
+function monatsAbschluss(tnId,name,ym){
+  if(!confirm('Monat '+ym+' für '+name+' abschließen?\n\nDanach sind keine Änderungen mehr möglich.')) return;
+  const ref=db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc('abschluss-'+ym);
+  ref.set({abgeschlossen:true,abgeschlossenAm:Date.now(),abgeschlossenVon:_email||_firma}).then(()=>{
+    toast('🔒 Monat abgeschlossen');
+    loadAgZeiten();
   });
 }
 
