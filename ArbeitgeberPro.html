@@ -1397,8 +1397,9 @@ function loadAgZeiten(){
         totalIst+=ist;totalSoll+=soll;
         if(e?.ausgang) tage++;
         const datDE=new Date(ds+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
-        const manuell=e?.manuell?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(245,158,11,.15);color:#d97706;border-radius:4px;font-weight:700;margin-left:3px">✎'+(e.agBestaetigt?' ✓':' offen')+'</span>':'';
+        const manuell=e?.manuell?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(245,158,11,.15);color:#d97706;border-radius:4px;font-weight:700;margin-left:3px">✎'+(e.agBestaetigt?' ✓':' offen')+'</span>':(e?.agKorrigiert?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(99,102,241,.12);color:#6366f1;border-radius:4px;font-weight:700;margin-left:3px">✏ korrigiert</span>':'');
         const bestBtn=e?.manuell&&!e.agBestaetigt?'<button onclick="event.stopPropagation();agBestaetigeZeit(\''+az.id+'\',\''+ds+'\')" style="font-size:.5rem;padding:2px 6px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:3px">✓</button>':'';
+        const korrekturBtn=e?'<button onclick="event.stopPropagation();agKorrekturZeit(\''+az.id+'\',\''+ds+'\')" style="font-size:.5rem;padding:2px 5px;background:rgba(99,102,241,.1);color:#6366f1;border:none;border-radius:3px;cursor:pointer;margin-left:2px" title="Zeit korrigieren">✏</button>':'';
         let statusTag='';
         if(isFeiertag) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(139,92,246,.12);color:#7c3aed;border-radius:3px;font-weight:700;margin-left:3px">🎌</span>';
         else if(isKrank) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.15);color:#ef4444;border-radius:3px;font-weight:700;margin-left:3px">🤒</span>';
@@ -1410,7 +1411,7 @@ function loadAgZeiten(){
           const nachtarbeit=e&&e.ausgang&&parseInt(e.ausgang)>=22?'<span style="font-size:.5rem;margin-left:2px" title="Nachtarbeit">🌙</span>':'';
           dayHtml+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
             +'<span style="flex:1.5;color:var(--mu)">'+datDE+statusTag+'</span>'
-            +'<span style="flex:2">'+zeitText+nachtarbeit+dokuIcons+manuell+bestBtn+'</span>'
+            +'<span style="flex:2">'+zeitText+nachtarbeit+dokuIcons+manuell+bestBtn+korrekturBtn+'</span>'
             +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e?.ausgang?minToStr(ist):(isFrei?'—':''))+'</span>'
             +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
         } else if(e){
@@ -1494,10 +1495,37 @@ function getAgSollMin(dateStr,plan){
 }
 function agBestaetigeZeit(tnId, datum){
   db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum)
-    .update({agBestaetigt:true,agBestaetigtAm:Date.now()})
+    .update({agBestaetigt:true,agBestaetigtAm:Date.now(),
+      historie:firebase.firestore.FieldValue.arrayUnion({aktion:'bestätigt',von:_email||_firma,am:Date.now()})
+    })
     .then(()=>{toast('✓ Zeit bestätigt');loadAgZeiten();})
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
+
+function agKorrekturZeit(tnId, datum){
+  const az=_azubis.find(a=>a.id===tnId);
+  const name=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
+  const neuEin=prompt('Korrektur für '+name+' am '+datum+'\n\nNeuer Eingang (HH:MM):');
+  if(!neuEin) return;
+  const neuAus=prompt('Neuer Ausgang (HH:MM):');
+  if(!neuAus) return;
+  if(!confirm('Zeit korrigieren?\n\n'+datum+': '+neuEin+' – '+neuAus+'\n\nDie Änderung wird protokolliert.')) return;
+  const istMin=timeToMin(neuAus)-timeToMin(neuEin);
+  if(istMin<=0){toast('Ausgang muss nach Eingang liegen','bad');return;}
+  const ref=db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum);
+  ref.get().then(doc=>{
+    const old=doc.exists?doc.data():{};
+    const histEintrag={aktion:'korrigiert',von:_email||_firma,am:Date.now(),
+      vorher:{eingang:old.eingang||'',ausgang:old.ausgang||'',istMinuten:old.istMinuten||0}};
+    ref.set({
+      datum,eingang:neuEin,ausgang:neuAus,pauseLog:old.pauseLog||[],pauseMinuten:old.pauseMinuten||0,
+      istMinuten:istMin,agKorrigiert:true,agKorrigiertAm:Date.now(),agKorrigiertVon:_email||_firma,
+      historie:firebase.firestore.FieldValue.arrayUnion(histEintrag)
+    },{merge:true}).then(()=>{toast('✅ Zeit korrigiert');loadAgZeiten();});
+  });
+}
+
+function timeToMin(t){const [h,m]=(t||'0:0').split(':').map(Number);return h*60+(m||0);}
 
 // AG: BAUSTELLEN
 // AG: AUFTRÄGE
