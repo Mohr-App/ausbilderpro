@@ -1504,6 +1504,21 @@ function getGPS(){
   });
 }
 
+function checkGeofence(gps){
+  if(!_tnData?.geofence||!gps) return true;
+  const geo=_tnData.geofence;
+  const R=6371000;
+  const dLat=(gps.lat-geo.lat)*Math.PI/180;
+  const dLng=(gps.lng-geo.lng)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(geo.lat*Math.PI/180)*Math.cos(gps.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  const dist=R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  if(dist>geo.radius){
+    toast('📍 Zu weit vom Arbeitsort entfernt ('+Math.round(dist)+'m, max '+geo.radius+'m)','bad');
+    return false;
+  }
+  return true;
+}
+
 function zeitStempeln(){
   if(!_tnId||!db) return;
   const today=localDate();
@@ -1512,6 +1527,7 @@ function zeitStempeln(){
   if(_zeitState==='aus'){
     if(_zeitHeute&&_zeitHeute.ausgang){if(!confirm('Bereits ausgestempelt. Neuen Tag starten?'))return;}
     getGPS().then(gps=>{
+      if(!checkGeofence(gps)) return;
       const data={eingang:jetzt,pauseLog:[],datum:today};
       if(gps) data.gpsEingang=gps;
       ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
@@ -1523,6 +1539,7 @@ function zeitStempeln(){
     const istMin=calcIstMinuten(_zeitHeute.eingang,jetzt,pauseMin);
     const update={ausgang:jetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin};
     getGPS().then(gps=>{
+      if(!checkGeofence(gps)) return;
       if(gps) update.gpsAusgang=gps;
       ref.update(update).then(()=>{loadZeitHeute();toast('⏹ Ausgestempelt um '+jetzt);});
     });
@@ -1840,11 +1857,69 @@ function loadZeitkonto(){
       });
       html+='</div>';
     }
+    // Kumulatives Überstundenkonto
+    if(_azPlan){
+      html+='<div id="ueberKonto" style="margin-top:10px;padding:10px;background:linear-gradient(135deg,rgba(99,102,241,.06),rgba(139,92,246,.06));border:1.5px solid rgba(99,102,241,.15);border-radius:8px">'
+        +'<div style="font-size:.68rem;font-weight:800;color:#6366f1;margin-bottom:4px">📊 ÜBERSTUNDENKONTO (Jahressaldo)</div>'
+        +'<div id="ueberKontoContent" style="font-size:.72rem;color:var(--mu)">Berechne…</div></div>';
+    }
     el.innerHTML=html;
+    // Async: Überstundenkonto berechnen
+    if(_azPlan) loadUeberKonto(ym);
   }).catch(err=>{el.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
 }
 
 // ═══════════════════════════════════
+function loadUeberKonto(currentYm){
+  if(!_tnId||!db||!_azPlan) return;
+  const year=currentYm.split('-')[0];
+  db.collection('globalTN').doc(_tnId).collection('zeiterfassung')
+    .where('datum','>=',year+'-01-01').where('datum','<=',year+'-12-31')
+    .get().then(snap=>{
+    const feiertage=getNRWFeiertage(parseInt(year));
+    const monatsDiff={};
+    snap.forEach(doc=>{
+      const d=doc.data();
+      if(!d.datum||d.datum.startsWith('abschluss')) return;
+      const ym=d.datum.substring(0,7);
+      if(!monatsDiff[ym]) monatsDiff[ym]={ist:0,soll:0};
+      monatsDiff[ym].ist+=(d.istMinuten||0);
+      const isFT=!!feiertage[d.datum];
+      const dow=new Date(d.datum+'T12:00').getDay();
+      const isWE=dow===0||dow===6;
+      if(!isFT&&!isWE){
+        const map={0:'so',1:'mo',2:'di',3:'mi',4:'do',5:'fr',6:'sa'};
+        const key=map[dow];
+        monatsDiff[ym].soll+=((_azPlan[key]||0)*60);
+      }
+    });
+    // Monate sortieren und kumulativ berechnen
+    const monate=Object.keys(monatsDiff).sort();
+    let cumDiff=0;
+    let rows='';
+    monate.forEach(ym=>{
+      const md=monatsDiff[ym];
+      const diff=md.ist-md.soll;
+      cumDiff+=diff;
+      const isCurrent=ym===currentYm;
+      const col=diff>=0?'#059669':'#ef4444';
+      const cumCol=cumDiff>=0?'#059669':'#ef4444';
+      rows+='<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.68rem'+(isCurrent?';font-weight:700':'')+'">'
+        +'<span style="min-width:55px;color:var(--mu)">'+ym+'</span>'
+        +'<span style="min-width:50px;text-align:right;font-family:\'JetBrains Mono\',monospace;color:'+col+'">'+(diff>=0?'+':'')+minToStr(diff)+'</span>'
+        +'<span style="flex:1;text-align:right;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:'+cumCol+'">Σ '+(cumDiff>=0?'+':'')+minToStr(cumDiff)+'</span>'
+        +'</div>';
+    });
+    const el=document.getElementById('ueberKontoContent');
+    if(!el) return;
+    const cumCol=cumDiff>=0?'#059669':'#ef4444';
+    el.innerHTML=rows
+      +'<div style="border-top:1.5px solid rgba(99,102,241,.2);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:.85rem">'
+      +'<span style="font-weight:800;color:#6366f1">'+(cumDiff>=0?'📈 Guthaben':'📉 Fehlstunden')+'</span>'
+      +'<span style="font-weight:900;font-family:\'JetBrains Mono\',monospace;color:'+cumCol+';font-size:.95rem">'+(cumDiff>=0?'+':'')+minToStr(cumDiff)+'</span></div>';
+  }).catch(()=>{});
+}
+
 function zeitNachtragen(){
   const datum=document.getElementById('zeitNachDatum').value;
   const ein=document.getElementById('zeitNachEin').value;

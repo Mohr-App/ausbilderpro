@@ -157,6 +157,20 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <button class="btn" onclick="saveAgPlan()" style="margin-top:6px;width:100%;font-size:.75rem;padding:8px">✓ Arbeitszeit speichern</button>
           <div class="err" id="agPlanErr" style="margin-top:4px"></div>
         </div>
+        <div class="card">
+          <div class="card-title">📍 Geofencing (Standort-Kontrolle)</div>
+          <div style="font-size:.62rem;color:var(--mu);margin-bottom:6px">Stempeln nur innerhalb des definierten Radius möglich.</div>
+          <div><label class="fl">Mitarbeiter / Azubi</label><select class="fi" id="geoAzubi" onchange="loadGeoForAzubi()" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
+          <div id="geoCurrent" style="font-size:.68rem;color:var(--mu);margin:6px 0"></div>
+          <div style="display:flex;gap:4px">
+            <button class="btn" onclick="setGeoHere()" style="flex:2;font-size:.72rem;padding:8px">📍 Meinen Standort setzen</button>
+            <button onclick="clearGeo()" style="flex:1;padding:8px;background:#fff;border:1.5px solid #ef4444;border-radius:8px;color:#ef4444;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✗ Aus</button>
+          </div>
+          <div style="margin-top:6px">
+            <label class="fl">Radius: <span id="geoRadiusVal">200</span>m</label>
+            <input type="range" id="geoRadius" min="50" max="1000" step="50" value="200" oninput="document.getElementById('geoRadiusVal').textContent=this.value" style="width:100%">
+          </div>
+        </div>
         <div class="card" style="border:2px solid rgba(16,185,129,.25)">
           <div class="card-title">📡 Heute – Live</div>
           <div id="agZeitLive"><div class="empty">Lädt…</div></div>
@@ -283,6 +297,22 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="card">
         <div class="card-title">📞 Kontakt Verwaltung</div>
         <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📍 Arbeitsort (Geofencing)</div>
+        <div style="font-size:.68rem;color:var(--mu);margin-bottom:8px">Stempeln ist nur innerhalb des definierten Radius möglich. Mitarbeiter werden gewarnt wenn sie sich außerhalb befinden.</div>
+        <div id="geoStatus" style="font-size:.72rem;margin-bottom:8px"><div class="empty">Lädt…</div></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" onclick="setGeofence()" style="flex:1;font-size:.72rem;padding:8px">📍 Aktuellen Standort setzen</button>
+          <select id="geoRadius" onchange="updateGeoRadius()" style="padding:8px;border:1.5px solid var(--brd);border-radius:8px;font-size:.72rem;font-family:'Sora',sans-serif">
+            <option value="100">100m</option>
+            <option value="250">250m</option>
+            <option value="500" selected>500m</option>
+            <option value="1000">1km</option>
+            <option value="2000">2km</option>
+            <option value="0">Deaktiviert</option>
+          </select>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">📱 App installieren</div>
@@ -913,6 +943,7 @@ function showAgPage(id){
   if(id==='betrieb') initAgBetrieb();
   if(id==='uebl') loadAzubis();
   if(id==='azubis') renderAgAzubiKontakte();
+  if(id==='home') loadGeofence();
 }
 
 // Secondary Firebase App for creating users without logging out AG
@@ -1095,7 +1126,7 @@ function initAgBetrieb(){
 }
 
 function fillAgAzubiSelect(){
-  ['agNachAzubi','agPlanAzubi'].forEach(id=>{
+  ['agNachAzubi','agPlanAzubi','geoAzubi'].forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel) return;
     sel.innerHTML='<option value="">Bitte wählen…</option>';
@@ -1148,6 +1179,48 @@ function saveAgPlan(){
     loadAgPlanForAzubi();
     loadAgZeiten();
   }).catch(e=>{err.textContent='Fehler: '+e.message;});
+}
+
+// Geofencing
+function loadGeoForAzubi(){
+  const tnId=document.getElementById('geoAzubi').value;
+  const el=document.getElementById('geoCurrent');
+  if(!tnId){el.textContent='';return;}
+  const az=_azubis.find(a=>a.id===tnId);
+  const geo=az?.geofence;
+  if(geo){
+    el.innerHTML='✅ Aktiv: <b>'+geo.lat.toFixed(5)+', '+geo.lng.toFixed(5)+'</b> (Radius: '+geo.radius+'m) <a href="https://maps.google.com/?q='+geo.lat+','+geo.lng+'" target="_blank" style="color:#2563eb;font-size:.6rem">→ Maps</a>';
+    document.getElementById('geoRadius').value=geo.radius;
+    document.getElementById('geoRadiusVal').textContent=geo.radius;
+  } else {
+    el.textContent='Kein Geofence aktiv – Stempeln überall möglich.';
+  }
+}
+function setGeoHere(){
+  const tnId=document.getElementById('geoAzubi').value;
+  if(!tnId){toast('Bitte MA wählen','bad');return;}
+  const radius=parseInt(document.getElementById('geoRadius').value)||200;
+  toast('📍 Standort wird ermittelt…');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const geo={lat:pos.coords.latitude,lng:pos.coords.longitude,radius:radius};
+    db.collection('globalTN').doc(tnId).update({geofence:geo}).then(()=>{
+      const az=_azubis.find(a=>a.id===tnId);
+      if(az) az.geofence=geo;
+      toast('✅ Geofence gesetzt ('+radius+'m Radius)');
+      loadGeoForAzubi();
+    });
+  },err=>{toast('❌ GPS-Fehler: '+err.message,'bad');},{enableHighAccuracy:true,timeout:10000});
+}
+function clearGeo(){
+  const tnId=document.getElementById('geoAzubi').value;
+  if(!tnId){toast('Bitte MA wählen','bad');return;}
+  if(!confirm('Geofencing für diesen Mitarbeiter deaktivieren?')) return;
+  db.collection('globalTN').doc(tnId).update({geofence:firebase.firestore.FieldValue.delete()}).then(()=>{
+    const az=_azubis.find(a=>a.id===tnId);
+    if(az) delete az.geofence;
+    toast('Geofencing deaktiviert');
+    loadGeoForAzubi();
+  });
 }
 
 function agZeitNachtragen(){
@@ -1715,6 +1788,68 @@ function exportAuftragsprotokoll(tnId,aufId){
       +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
+  });
+}
+
+// GEOFENCING
+function loadGeofence(){
+  const el=document.getElementById('geoStatus');
+  if(!el||!_uid) return;
+  db.collection('users').doc(_uid).get().then(doc=>{
+    const geo=doc.exists&&doc.data().geofence;
+    if(geo&&geo.lat){
+      const r=document.getElementById('geoRadius');
+      if(r) r.value=String(geo.radius||500);
+      el.innerHTML='<div style="padding:8px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:8px">'
+        +'<div style="font-size:.75rem;font-weight:700;color:#2563eb">✅ Arbeitsort aktiv</div>'
+        +'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">📍 '+geo.lat.toFixed(5)+', '+geo.lng.toFixed(5)+' · Radius: '+(geo.radius||500)+'m</div>'
+        +(geo.name?'<div style="font-size:.65rem;color:var(--mu)">'+esc(geo.name)+'</div>':'')
+        +'</div>';
+    } else {
+      el.innerHTML='<div style="font-size:.72rem;color:#d97706">⚠ Kein Arbeitsort definiert – Stempeln überall möglich</div>';
+    }
+  });
+}
+
+function setGeofence(){
+  if(!navigator.geolocation){toast('GPS nicht verfügbar','bad');return;}
+  toast('📍 Standort wird ermittelt…');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const geo={lat:pos.coords.latitude,lng:pos.coords.longitude,acc:Math.round(pos.coords.accuracy),radius:parseInt(document.getElementById('geoRadius').value)||500};
+    if(geo.radius===0){removeGeofence();return;}
+    // Speichere auf AG-User
+    db.collection('users').doc(_uid).update({geofence:geo}).then(()=>{
+      // Auf alle MA/Azubis übertragen
+      _azubis.forEach(az=>{
+        db.collection('globalTN').doc(az.id).update({geofence:geo}).catch(()=>{});
+      });
+      toast('✅ Arbeitsort gesetzt – '+_azubis.length+' Mitarbeiter aktualisiert');
+      loadGeofence();
+    });
+  },err=>{toast('GPS-Fehler: '+err.message,'bad');},{enableHighAccuracy:true,timeout:15000});
+}
+
+function updateGeoRadius(){
+  const r=parseInt(document.getElementById('geoRadius').value);
+  if(r===0){removeGeofence();return;}
+  db.collection('users').doc(_uid).get().then(doc=>{
+    const geo=doc.exists&&doc.data().geofence;
+    if(!geo||!geo.lat){toast('Bitte erst Standort setzen','bad');return;}
+    geo.radius=r;
+    db.collection('users').doc(_uid).update({geofence:geo}).then(()=>{
+      _azubis.forEach(az=>{db.collection('globalTN').doc(az.id).update({geofence:geo}).catch(()=>{});});
+      toast('✅ Radius auf '+r+'m gesetzt');
+      loadGeofence();
+    });
+  });
+}
+
+function removeGeofence(){
+  const del=firebase.firestore.FieldValue.delete();
+  db.collection('users').doc(_uid).update({geofence:del}).then(()=>{
+    _azubis.forEach(az=>{db.collection('globalTN').doc(az.id).update({geofence:del}).catch(()=>{});});
+    toast('Geofencing deaktiviert');
+    loadGeofence();
   });
 }
 
