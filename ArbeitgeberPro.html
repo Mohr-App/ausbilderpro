@@ -154,6 +154,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div style="flex:1;min-width:42px;text-align:center"><label class="fl" style="color:#d97706">Sa</label><input class="fi" type="number" id="agPlanSa" min="0" max="12" step="0.5" value="0" style="font-size:.74rem;text-align:center;padding:6px 4px;border-color:rgba(217,119,6,.3)"></div>
             <div style="flex:1;min-width:42px;text-align:center"><label class="fl" style="color:#d97706">So</label><input class="fi" type="number" id="agPlanSo" min="0" max="12" step="0.5" value="0" style="font-size:.74rem;text-align:center;padding:6px 4px;border-color:rgba(217,119,6,.3)"></div>
           </div>
+          <div style="margin-top:8px;padding:8px;background:var(--sur2);border-radius:8px">
+            <div style="font-size:.68rem;font-weight:700;color:var(--mu);margin-bottom:6px">🕐 Gleitzeit (optional)</div>
+            <div style="display:flex;gap:6px;margin-bottom:4px">
+              <div style="flex:1"><label class="fl">Kernzeit von</label><input class="fi" type="time" id="agPlanKernVon" style="font-size:.74rem;padding:6px"></div>
+              <div style="flex:1"><label class="fl">Kernzeit bis</label><input class="fi" type="time" id="agPlanKernBis" style="font-size:.74rem;padding:6px"></div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <div style="flex:1"><label class="fl">Rahmenzeit von</label><input class="fi" type="time" id="agPlanRahmenVon" value="06:00" style="font-size:.74rem;padding:6px"></div>
+              <div style="flex:1"><label class="fl">Rahmenzeit bis</label><input class="fi" type="time" id="agPlanRahmenBis" value="20:00" style="font-size:.74rem;padding:6px"></div>
+            </div>
+            <div style="font-size:.58rem;color:var(--mu);margin-top:4px">Kernzeit = Anwesenheitspflicht · Rahmenzeit = erlaubtes Zeitfenster</div>
+          </div>
           <button class="btn" onclick="saveAgPlan()" style="margin-top:6px;width:100%;font-size:.75rem;padding:8px">✓ Arbeitszeit speichern</button>
           <div class="err" id="agPlanErr" style="margin-top:4px"></div>
         </div>
@@ -178,7 +190,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <div class="card-title" style="margin:0">⏱ Monatsübersicht</div>
-            <select id="agZeitMonat" onchange="loadAgZeiten()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+            <div style="display:flex;gap:4px;align-items:center">
+              <button onclick="exportDATEV()" style="padding:4px 10px;background:#fff;border:1.5px solid #6366f1;border-radius:6px;color:#6366f1;font-size:.58rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📊 DATEV</button>
+              <select id="agZeitMonat" onchange="loadAgZeiten()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+            </div>
           </div>
           <div id="agZeitenListe"><div class="empty">Lädt…</div></div>
         </div>
@@ -1152,11 +1167,21 @@ function loadAgPlanForAzubi(){
       const inp=document.getElementById('agPlan'+t);
       if(inp) inp.value=v;
     });
-    el.innerHTML='Aktuell: <b>'+woche+'h/Woche</b>'+(plan.sa||plan.so?' (inkl. Wochenende)':'');
+    el.innerHTML='Aktuell: <b>'+woche+'h/Woche</b>'+(plan.sa||plan.so?' (inkl. Wochenende)':'')
+      +(plan.kernVon?' · Kernzeit '+plan.kernVon+'–'+plan.kernBis:'');
+    // Gleitzeit-Felder befüllen
+    const kv=document.getElementById('agPlanKernVon');if(kv) kv.value=plan.kernVon||'';
+    const kb=document.getElementById('agPlanKernBis');if(kb) kb.value=plan.kernBis||'';
+    const rv=document.getElementById('agPlanRahmenVon');if(rv) rv.value=plan.rahmenVon||'06:00';
+    const rb=document.getElementById('agPlanRahmenBis');if(rb) rb.value=plan.rahmenBis||'20:00';
   } else {
     el.innerHTML='<span style="color:#d97706">⚠ Noch nicht konfiguriert</span>';
     ['Mo','Di','Mi','Do','Fr'].forEach(t=>{const inp=document.getElementById('agPlan'+t);if(inp) inp.value=t==='Fr'?6:8;});
     ['Sa','So'].forEach(t=>{const inp=document.getElementById('agPlan'+t);if(inp) inp.value=0;});
+    const kv=document.getElementById('agPlanKernVon');if(kv) kv.value='';
+    const kb=document.getElementById('agPlanKernBis');if(kb) kb.value='';
+    const rv=document.getElementById('agPlanRahmenVon');if(rv) rv.value='06:00';
+    const rb=document.getElementById('agPlanRahmenBis');if(rb) rb.value='20:00';
   }
 }
 
@@ -1169,9 +1194,21 @@ function saveAgPlan(){
   const ids=['Mo','Di','Mi','Do','Fr','Sa','So'];
   const plan={};
   ids.forEach((t,i)=>{plan[keys[i]]=parseFloat(document.getElementById('agPlan'+t).value)||0;});
+  // Gleitzeit
+  const kernVon=document.getElementById('agPlanKernVon')?.value||'';
+  const kernBis=document.getElementById('agPlanKernBis')?.value||'';
+  const rahmenVon=document.getElementById('agPlanRahmenVon')?.value||'';
+  const rahmenBis=document.getElementById('agPlanRahmenBis')?.value||'';
+  if(kernVon) plan.kernVon=kernVon;
+  if(kernBis) plan.kernBis=kernBis;
+  if(rahmenVon) plan.rahmenVon=rahmenVon;
+  if(rahmenBis) plan.rahmenBis=rahmenBis;
   const woche=keys.reduce((s,k)=>s+plan[k],0);
   const azName=document.getElementById('agPlanAzubi').selectedOptions[0]?.text||'Azubi';
-  if(!confirm('Arbeitszeit für '+azName+' speichern?\n\n'+woche+'h/Woche'+(plan.sa||plan.so?' (inkl. Wochenende)':''))) return;
+  let info=woche+'h/Woche'+(plan.sa||plan.so?' (inkl. Wochenende)':'');
+  if(kernVon&&kernBis) info+='\nKernzeit: '+kernVon+' – '+kernBis;
+  if(rahmenVon&&rahmenBis) info+='\nRahmenzeit: '+rahmenVon+' – '+rahmenBis;
+  if(!confirm('Arbeitszeit für '+azName+' speichern?\n\n'+info)) return;
   db.collection('globalTN').doc(tnId).update({arbeitszeitPlan:plan}).then(()=>{
     const az=_azubis.find(a=>a.id===tnId);
     if(az) az.arbeitszeitPlan=plan;
@@ -1772,6 +1809,79 @@ function exportStundenzettel(tnId,name,ym,format){
       +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
+  });
+}
+
+function exportDATEV(){
+  const ym=document.getElementById('agZeitMonat')?.value||localYM();
+  const [y,mo]=ym.split('-').map(Number);
+  const feiertage=getNRWFeiertage(y);
+  toast('📊 DATEV-Export wird erstellt…');
+  const tage=new Date(y,mo,0).getDate();
+  const promises=_azubis.map(az=>{
+    const plan=az.arbeitszeitPlan||null;
+    const p1=db.collection('globalTN').doc(az.id).collection('zeiterfassung')
+      .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').get();
+    const p2=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('type','==','krank').get();
+    const p3=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .where('status','==','genehmigt').get();
+    return Promise.all([p1,p2,p3]).then(([zSnap,kSnap,uSnap])=>{
+      const zeitMap={};zSnap.forEach(d=>{zeitMap[d.data().datum]=d.data();});
+      const krankDates=new Set();kSnap.forEach(doc=>{const d=doc.data();if(d.datum&&d.datum.startsWith(ym)) krankDates.add(d.datum);});
+      const urlaubDates=new Set();
+      uSnap.forEach(doc=>{
+        const d=doc.data();if(!d.von||!d.bis) return;
+        const start=new Date(d.von+'T12:00'),end=new Date(d.bis+'T12:00');
+        for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){
+          const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+          if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6) urlaubDates.add(ds);
+        }
+      });
+      let istMin=0,sollMin=0,arbeitstage=0;
+      for(let d=1;d<=tage;d++){
+        const ds=ym+'-'+String(d).padStart(2,'0');
+        const e=zeitMap[ds];
+        const dow=new Date(ds+'T12:00').getDay();
+        const isWE=dow===0||dow===6;
+        const isFT=!!feiertage[ds];
+        const isK=krankDates.has(ds);
+        const isU=urlaubDates.has(ds);
+        if(e?.istMinuten) istMin+=e.istMinuten;
+        if(e?.ausgang) arbeitstage++;
+        if(!isWE&&!isFT&&!isK&&!isU&&plan){
+          const map={0:'so',1:'mo',2:'di',3:'mi',4:'do',5:'fr',6:'sa'};
+          sollMin+=(plan[map[dow]]||0)*60;
+        }
+      }
+      const name=((az.vorname||'')+' '+(az.nachname||'')).trim();
+      return {
+        pnr:az.id.substring(0,8).toUpperCase(),
+        name, firma:_firma||'',
+        zeitraum:ym,
+        arbeitstage,
+        istStd:(istMin/60).toFixed(2),
+        sollStd:(sollMin/60).toFixed(2),
+        diffStd:((istMin-sollMin)/60).toFixed(2),
+        krankTage:krankDates.size,
+        urlaubTage:urlaubDates.size,
+        feierTage:Object.keys(feiertage).filter(d=>d.startsWith(ym)&&new Date(d+'T12:00').getDay()!==0&&new Date(d+'T12:00').getDay()!==6).length
+      };
+    });
+  });
+  Promise.all(promises).then(rows=>{
+    const header=['Personalnummer','Name','Firma','Zeitraum','Arbeitstage','Ist-Stunden','Soll-Stunden','Differenz','Lohnart 200 (Normal)','Lohnart 210 (Überstd.)','Krankheitstage','Urlaubstage','Feiertage'];
+    const csv=[header.join(';')];
+    rows.forEach(r=>{
+      const normal=Math.min(parseFloat(r.istStd),parseFloat(r.sollStd));
+      const ueberStd=Math.max(0,parseFloat(r.istStd)-parseFloat(r.sollStd));
+      csv.push([r.pnr,r.name,r.firma,r.zeitraum,r.arbeitstage,r.istStd,r.sollStd,r.diffStd,normal.toFixed(2),ueberStd.toFixed(2),r.krankTage,r.urlaubTage,r.feierTage].join(';'));
+    });
+    const blob=new Blob(['\ufeff'+csv.join('\n')],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='DATEV_'+(_firma||'Export').replace(/\s/g,'_')+'_'+ym+'.csv';
+    a.click();URL.revokeObjectURL(a.href);
+    toast('📊 DATEV-Export heruntergeladen ('+rows.length+' Mitarbeiter)');
   });
 }
 

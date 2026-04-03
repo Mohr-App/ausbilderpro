@@ -973,6 +973,32 @@ function checkGeofence(gps){
   return true;
 }
 
+function checkGleitzeit(jetzt, typ){
+  const plan=_tnData?.arbeitszeitPlan;
+  if(!plan) return;
+  const [h,m]=jetzt.split(':').map(Number);
+  const jetztMin=h*60+m;
+  if(plan.rahmenVon&&plan.rahmenBis){
+    const [rv1,rv2]=plan.rahmenVon.split(':').map(Number);
+    const [rb1,rb2]=plan.rahmenBis.split(':').map(Number);
+    const rahmenVonMin=rv1*60+rv2, rahmenBisMin=rb1*60+rb2;
+    if(jetztMin<rahmenVonMin||jetztMin>rahmenBisMin){
+      toast('⚠ Außerhalb der Rahmenzeit ('+plan.rahmenVon+'–'+plan.rahmenBis+')','bad');
+    }
+  }
+  if(plan.kernVon&&plan.kernBis){
+    const [kv1,kv2]=plan.kernVon.split(':').map(Number);
+    const [kb1,kb2]=plan.kernBis.split(':').map(Number);
+    const kernVonMin=kv1*60+kv2, kernBisMin=kb1*60+kb2;
+    if(typ==='ein'&&jetztMin>kernVonMin+15){
+      toast('⚠ Kernzeit beginnt um '+plan.kernVon+' – du bist '+(jetztMin-kernVonMin)+' Minuten zu spät','bad');
+    }
+    if(typ==='aus'&&jetztMin<kernBisMin){
+      toast('⚠ Kernzeit endet um '+plan.kernBis+' – noch '+(kernBisMin-jetztMin)+' Minuten','bad');
+    }
+  }
+}
+
 function zeitStempeln(){
   if(!_tnId||!db) return;
   const today=localDate();
@@ -982,12 +1008,14 @@ function zeitStempeln(){
     if(_zeitHeute&&_zeitHeute.ausgang){if(!confirm('Bereits ausgestempelt. Neuen Tag starten?'))return;}
     getGPS().then(gps=>{
       if(!checkGeofence(gps)) return;
+      checkGleitzeit(jetzt,'ein');
       const data={eingang:jetzt,pauseLog:[],datum:today};
       if(gps) data.gpsEingang=gps;
       ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
     });
   } else if(_zeitState==='ein'||_zeitState==='pause'){
     if(!confirm('Ausstempeln um '+jetzt+'?')) return;
+    checkGleitzeit(jetzt,'aus');
     const pLog=(_zeitHeute?.pauseLog||[]).map(p=>p.start&&!p.ende?{...p,ende:jetzt}:p);
     const pauseMin=calcPauseMinuten(pLog);
     const istMin=calcIstMinuten(_zeitHeute.eingang,jetzt,pauseMin);
