@@ -1945,11 +1945,11 @@ function renderSbAusbTree(){
     bDiv.dataset.berufKey = bKey;
     bDiv.dataset.section = 'ausb';
     const bHdr  = document.createElement('div'); bHdr.className = 'sb-branche-hdr';
+    bHdr.style.cssText = berufBgStyle(bKey);
     const bBody = document.createElement('div'); bBody.className = 'sb-branche-body';
     bHdr.innerHTML =
       '<span class="sb-drag-h">⠿</span>'
       + '<span class="sba">&#9654;</span>'
-      + berufBarHTML(bKey)
       + '<span>' + esc(berufLabel) + '</span>'
       + '<span style="margin-left:auto;font-size:.6rem;color:var(--mu)">' + ausbEntries.length + ' | ' + totalKurse + ' LG</span>';
     bHdr.onclick = function(){ this.classList.toggle('open'); bBody.classList.toggle('open'); };
@@ -2091,10 +2091,10 @@ function renderSbTnTree(){
     wrap.dataset.section = 'tn';
     const hdr = document.createElement('div');
     hdr.className = 'sb-branche-hdr';
+    hdr.style.cssText = berufBgStyle(key);
     hdr.innerHTML =
       '<span class="sb-drag-h">⠿</span>' +
       '<span class="sba">&#9654;</span>' +
-      berufBarHTML(key) +
       '<span>' + esc(def ? def.label : key) + '</span>' +
       '<span style="margin-left:auto;font-size:.6rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">' + tns.length + '</span>';
 
@@ -3007,11 +3007,11 @@ function renderLgartListSettings(){
     const items=groups.get(bId);
     if(!items.length) return;
     const beruf=bId?BERUFE[bId]:null;
-    const barH=bId?berufBarHTML(bId):'';
+    const bgSt=bId?berufBgStyle(bId):'';
     const label=beruf?beruf.name:'Übergreifend / Ohne Zuordnung';
     const gid='lgGrp_'+(bId||'none');
     h+='<div style="margin-bottom:6px">';
-    h+='<div onclick="var b=document.getElementById(\''+gid+'\');b.style.display=b.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.ga\').textContent=b.style.display===\'none\'?\'▸\':\'▾\'" style="font-size:.68rem;font-weight:700;color:var(--mu);padding:6px 4px;border-bottom:1px solid var(--brd);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;font-family:\'JetBrains Mono\',monospace;letter-spacing:.04em"><span class="ga" style="font-size:.6rem">▾</span>'+barH+esc(label)+' <span style="font-weight:500;opacity:.6">('+items.length+')</span></div>';
+    h+='<div onclick="var b=document.getElementById(\''+gid+'\');b.style.display=b.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.ga\').textContent=b.style.display===\'none\'?\'▸\':\'▾\'" style="font-size:.68rem;font-weight:700;color:var(--mu);padding:6px 8px;cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;font-family:\'JetBrains Mono\',monospace;letter-spacing:.04em;'+bgSt+'"><span class="ga" style="font-size:.6rem">▾</span>'+esc(label)+' <span style="font-weight:500;opacity:.6">('+items.length+')</span></div>';
     h+='<div id="'+gid+'">';
     items.sort((a,b)=>(a.name||'').localeCompare(b.name||'')).forEach(l=>{
       h+='<div class="settings-row" onclick="openEditLgartSettings(\''+l.id+'\')">'
@@ -7921,6 +7921,12 @@ function berufBarHTML(bKey){
   const idx=keys.indexOf(bKey);
   const c=_berufColors[(idx>=0?idx:0)%_berufColors.length];
   return '<span class="beruf-bar" style="background:'+c+'"></span>';
+}
+function berufBgStyle(bKey){
+  const keys=Object.keys(BERUFE);
+  const idx=keys.indexOf(bKey);
+  const c=_berufColors[(idx>=0?idx:0)%_berufColors.length];
+  return 'background:'+c+'0F;border-left:3px solid '+c+';border-radius:6px;margin:2px 0;';
 }
 // ISO "2026-03-04" → deutsch "04.03.2026"
 function fmtDE(d){ if(!d||d.length<10) return d||'?'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
