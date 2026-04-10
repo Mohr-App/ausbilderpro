@@ -486,8 +486,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   .kd-actions .btn-sm{font-size:.65rem!important;padding:5px 8px!important;}
   .card{overflow-x:auto;}
   body{overflow-x:hidden;max-width:100vw;}
-  .sb-branche-hdr,.sb-ausb-hdr,.sb-kurs-hdr,.sb-lg,.sb-sec-hdr,.sb-icon-btn{transition:none!important;}
+  .sb-branche-hdr,.sb-ausb-hdr,.sb-kurs-hdr,.sb-lg,.sb-sec-hdr,.sb-icon-btn{transition:none!important;-webkit-tap-highlight-color:transparent;}
   .sb-branche-hdr .sba,.sb-ausb-hdr .sa,.sb-kurs-hdr .sk,.sb-arr{transition:none!important;}
+  .sb-drag-h,.sb-sort-btn{display:none!important;}
 }
 @keyframes pulseWarn{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
 .bst-day{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;border:2px solid #e2e8f0;font-size:.75rem;font-weight:600;cursor:pointer;user-select:none;transition:all .12s;}
@@ -1943,11 +1944,11 @@ function renderSbAusbTree(){
     const totalKurse = ausbEntries.reduce((s,[,a]) => s + a.kurse.length, 0);
 
     const bDiv  = document.createElement('div'); bDiv.className = 'sb-branche';
+    bDiv.style.cssText = berufBgStyle(bKey);
     if(!('ontouchstart' in window)) bDiv.draggable = true;
     bDiv.dataset.berufKey = bKey;
     bDiv.dataset.section = 'ausb';
     const bHdr  = document.createElement('div'); bHdr.className = 'sb-branche-hdr';
-    bHdr.style.cssText = berufBgStyle(bKey);
     const bBody = document.createElement('div'); bBody.className = 'sb-branche-body';
     bHdr.innerHTML =
       '<span class="sb-drag-h">⠿</span>'
@@ -2020,7 +2021,8 @@ function renderSbAusbTree(){
 
     bDiv.appendChild(bHdr);
     bDiv.appendChild(bBody);
-    // Drag-and-drop für Berufsgruppen-Sortierung
+    // Drag-and-drop für Berufsgruppen-Sortierung (nur Desktop)
+    if(!('ontouchstart' in window)){
     bDiv.addEventListener('dragstart',e=>{
       if(e.target.closest&&e.target.closest('.sb-ausb,.sb-kurs,.sb-lg,.sb-tn-item')) return;
       e.stopPropagation();
@@ -2051,6 +2053,7 @@ function renderSbAusbTree(){
       _brancheDragKey=null;
       _brancheDragSection=null;
     });
+    }
     root.appendChild(bDiv);
   });
 }
@@ -2088,12 +2091,12 @@ function renderSbTnTree(){
 
     const wrap = document.createElement('div');
     wrap.className = 'sb-branche';
+    wrap.style.cssText = berufBgStyle(key);
     if(!('ontouchstart' in window)) wrap.draggable = true;
     wrap.dataset.berufKey = key;
     wrap.dataset.section = 'tn';
     const hdr = document.createElement('div');
     hdr.className = 'sb-branche-hdr';
-    hdr.style.cssText = berufBgStyle(key);
     hdr.innerHTML =
       '<span class="sb-drag-h">⠿</span>' +
       '<span class="sba">&#9654;</span>' +
@@ -2188,9 +2191,10 @@ function renderSbTnTree(){
 
     wrap.appendChild(hdr);
     wrap.appendChild(body);
-    // Drag-and-drop für Berufsgruppen-Sortierung
+    // Drag-and-drop für Berufsgruppen-Sortierung (nur Desktop)
+    if(!('ontouchstart' in window)){
     wrap.addEventListener('dragstart',e=>{
-      if(e.target.closest&&e.target.closest('.sb-tn-drag')) return; // TN-Drag, nicht Branche
+      if(e.target.closest&&e.target.closest('.sb-tn-drag')) return;
       e.stopPropagation();
       _brancheDragKey=key; _brancheDragSection='tn';
       e.dataTransfer.setData('application/beruf',key);
@@ -2219,6 +2223,7 @@ function renderSbTnTree(){
       _brancheDragKey=null;
       _brancheDragSection=null;
     });
+    }
     root.appendChild(wrap);
   });
 }
