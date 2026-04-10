@@ -412,7 +412,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div style="font-size:2.5rem;font-weight:800;font-family:'JetBrains Mono',monospace;margin:8px 0" id="zeitUhr">--:--</div>
             <div id="zeitStatus" style="font-size:.75rem;color:var(--mu)">Nicht eingestempelt</div>
           </div>
-          <button id="zeitBtn" onclick="zeitStempeln()" style="width:100%;padding:16px;border:none;border-radius:14px;font-size:1rem;font-weight:800;cursor:pointer;font-family:'Sora',sans-serif;background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.3)">▶ Einstempeln</button>
+          <button id="zeitBtn" style="width:100%;padding:16px;border:none;border-radius:14px;font-size:1rem;font-weight:800;cursor:pointer;font-family:'Sora',sans-serif;background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.3);position:relative;overflow:hidden;user-select:none;-webkit-user-select:none"><span id="zeitBtnBar" style="position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.25);border-radius:14px;transition:none;pointer-events:none"></span><span id="zeitBtnText" style="position:relative">▶ Einstempeln</span></button>
           <div id="zeitPauseRow" style="display:none;margin-top:8px">
             <button onclick="zeitPause()" id="zeitPauseBtn" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;background:rgba(245,158,11,.15);color:#d97706;border:1.5px solid rgba(245,158,11,.3)">⏸ Pause starten</button>
           </div>
@@ -1454,9 +1454,10 @@ function updateZeitBtn(){
   const pauseRow=document.getElementById('zeitPauseRow');
   const pauseBtn=document.getElementById('zeitPauseBtn');
   if(!btn) return;
+  const bar=document.getElementById('zeitBtnBar');if(bar) bar.style.width='0';
   if(!_zeitHeute||!_zeitHeute.eingang||_zeitHeute.ausgang){
     _zeitState='aus';
-    btn.textContent='▶ Einstempeln';
+    document.getElementById('zeitBtnText').textContent='▶ Einstempeln';
     btn.style.background='linear-gradient(135deg,#059669,#10b981)';
     status.textContent=_zeitHeute?.ausgang?'✓ Feierabend – '+_zeitHeute.eingang+' bis '+_zeitHeute.ausgang:'Nicht eingestempelt';
     pauseRow.style.display='none';
@@ -1466,7 +1467,7 @@ function updateZeitBtn(){
     const offenePause=pLog.find(p=>p.start&&!p.ende);
     if(offenePause){
       _zeitState='pause';
-      btn.textContent='⏸ In Pause seit '+offenePause.start;
+      document.getElementById('zeitBtnText').textContent='⏸ In Pause seit '+offenePause.start;
       btn.style.background='linear-gradient(135deg,#d97706,#f59e0b)';
       status.textContent='Eingestempelt seit '+_zeitHeute.eingang+' – Pause läuft';
       pauseRow.style.display='';
@@ -1474,7 +1475,7 @@ function updateZeitBtn(){
       pauseBtn.style.background='rgba(16,185,129,.15)';pauseBtn.style.color='#059669';pauseBtn.style.borderColor='rgba(16,185,129,.3)';
     } else {
       _zeitState='ein';
-      btn.textContent='⏹ Ausstempeln';
+      document.getElementById('zeitBtnText').textContent='⏹ Ausstempeln';
       btn.style.background='linear-gradient(135deg,#dc2626,#ef4444)';
       status.textContent='Eingestempelt seit '+_zeitHeute.eingang;
       pauseRow.style.display='';
@@ -1573,6 +1574,49 @@ function checkGleitzeit(jetzt, typ){
   }
 }
 
+// ── Long-Press Stempel-Button (1 Sekunde halten) ──
+(function(){
+  let _holdTimer=null,_holdStart=0,_holdAF=null;
+  function startHold(){
+    if(_holdTimer) return;
+    _holdStart=Date.now();
+    const bar=document.getElementById('zeitBtnBar');
+    if(bar) bar.style.width='0';
+    function animate(){
+      const elapsed=Date.now()-_holdStart;
+      const pct=Math.min(elapsed/1000,1);
+      if(bar) bar.style.width=(pct*100)+'%';
+      if(pct>=1){
+        cancelHold(true);
+        if(navigator.vibrate) navigator.vibrate(30);
+        zeitStempeln();
+        return;
+      }
+      _holdAF=requestAnimationFrame(animate);
+    }
+    _holdAF=requestAnimationFrame(animate);
+    _holdTimer=true;
+  }
+  function cancelHold(completed){
+    _holdTimer=null;
+    if(_holdAF){cancelAnimationFrame(_holdAF);_holdAF=null;}
+    if(!completed){
+      const bar=document.getElementById('zeitBtnBar');
+      if(bar) bar.style.width='0';
+    }
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    const btn=document.getElementById('zeitBtn');
+    if(!btn) return;
+    btn.addEventListener('touchstart',function(e){e.preventDefault();startHold();},{passive:false});
+    btn.addEventListener('touchend',function(){cancelHold();});
+    btn.addEventListener('touchcancel',function(){cancelHold();});
+    btn.addEventListener('mousedown',function(e){if(e.button===0)startHold();});
+    btn.addEventListener('mouseup',function(){cancelHold();});
+    btn.addEventListener('mouseleave',function(){cancelHold();});
+  });
+})();
+
 function zeitStempeln(){
   if(!_tnId||!db) return;
   const today=localDate();
@@ -1588,7 +1632,6 @@ function zeitStempeln(){
       ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
     });
   } else if(_zeitState==='ein'||_zeitState==='pause'){
-    if(!confirm('Ausstempeln um '+jetzt+'?')) return;
     checkGleitzeit(jetzt,'aus');
     const pLog=(_zeitHeute?.pauseLog||[]).map(p=>p.start&&!p.ende?{...p,ende:jetzt}:p);
     const pauseMin=calcPauseMinuten(pLog);
