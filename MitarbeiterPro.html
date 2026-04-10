@@ -301,9 +301,26 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <!-- BETRIEB -->
     <div class="page" id="page-betrieb">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-        <span style="font-size:1.4rem">🏭</span>
+        <div class="card-icon green" style="width:36px;height:36px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
         <div style="font-size:1.1rem;font-weight:800">Mein Betrieb</div>
       </div>
+      <!-- AG Hinweis -->
+      <div id="agHintBanner" style="display:none">
+        <div style="text-align:center;padding:30px 16px">
+          <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(5,150,105,.1));display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <div style="font-size:1rem;font-weight:800;color:var(--tx);margin-bottom:6px">Betrieb noch nicht verbunden</div>
+          <div style="font-size:.74rem;color:#475569;line-height:1.7;margin-bottom:20px;max-width:300px;margin-left:auto;margin-right:auto">Zeiterfassung, Aufträge, Urlaub und Meldungen stehen dir zur Verfügung, sobald dein Arbeitgeber ebenfalls die App nutzt.</div>
+          <div style="font-size:.72rem;font-weight:700;color:var(--tx);margin-bottom:10px">Teile diesen Link mit deinem Chef:</div>
+          <div style="display:flex;gap:6px;align-items:center;max-width:360px;margin:0 auto">
+            <input readonly value="https://mohr-app.github.io/ausbilderpro/ArbeitgeberPro.html" style="flex:1;padding:10px 12px;border:1.5px solid var(--brd);border-radius:8px;font-size:.62rem;font-family:'JetBrains Mono',monospace;color:var(--tx);background:var(--sur2)" onclick="this.select()">
+            <button onclick="navigator.clipboard.writeText('https://mohr-app.github.io/ausbilderpro/ArbeitgeberPro.html').then(()=>toast('Link kopiert'));this.textContent='Kopiert!';setTimeout(()=>this.textContent='Kopieren',2000)" style="padding:10px 16px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;border:none;border-radius:8px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;white-space:nowrap">Kopieren</button>
+          </div>
+          <div style="font-size:.6rem;color:var(--mu);margin-top:12px">Dein Arbeitgeber kann sich kostenlos registrieren und wird dann freigeschaltet.</div>
+        </div>
+      </div>
+      <div id="betriebContent">
       <!-- Sub-Tabs -->
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="betriebTabs">
         <button class="stab active" onclick="showBetriebTab('zeiten')">Zeiten</button>
@@ -416,6 +433,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div id="auftraegeErledigt"><div class="empty">Keine erledigten Aufträge</div></div>
         </div>
       </div>
+      </div><!-- /betriebContent -->
     </div>
 
     <!-- MEHR -->
@@ -652,6 +670,11 @@ function loadData(){
 // ═══════════════════════════════════
 let _betriebInit=false;
 function initBetrieb(){
+  const agBanner=document.getElementById('agHintBanner');
+  const agContent=document.getElementById('betriebContent');
+  const hasAG=_tnData&&(_tnData.arbeitgeberId||_tnData.betriebId||_tnData.arbeitszeitPlan);
+  if(agBanner) agBanner.style.display=hasAG?'none':'block';
+  if(agContent) agContent.style.display=hasAG?'block':'none';
   if(!_betriebInit){
     _betriebInit=true;
     loadBetriebMeldungen();
