@@ -1080,17 +1080,41 @@ function asConfirm(){
   if(taet) update.taetigkeit=taet;
   if(std>0) update.stunden=std;
   if(_asMaterialien.length) update.material=_asMaterialien;
-  const sig=sigGetData();
-  if(sig) update.unterschrift=sig;
-  if(_asPhotos.length) update.fotos=_asPhotos;
-  getGPS().then(gps=>{
+  toast('Wird gespeichert…');
+
+  const uploads=[];
+  _asPhotos.forEach((b64,i)=>{
+    const blob=b64toBlob(b64);
+    const path='betriebe/'+_tnId+'/auftraege/'+_auftragId+'/foto_'+i+'.jpg';
+    uploads.push(st.ref(path).put(blob,{contentType:'image/jpeg'}).then(()=>st.ref(path).getDownloadURL()));
+  });
+  const sigData=sigGetData();
+  let sigUpload=null;
+  if(sigData){
+    const sigBlob=b64toBlob(sigData);
+    const sigPath='betriebe/'+_tnId+'/auftraege/'+_auftragId+'/unterschrift.png';
+    sigUpload=st.ref(sigPath).put(sigBlob,{contentType:'image/png'}).then(()=>st.ref(sigPath).getDownloadURL());
+  }
+
+  Promise.all([Promise.all(uploads), sigUpload||Promise.resolve(null), getGPS()]).then(([fotoUrls,sigUrl,gps])=>{
+    if(fotoUrls.length) update.fotos=fotoUrls;
+    if(sigUrl) update.unterschrift=sigUrl;
     if(gps) update.gpsErledigt=gps;
     ref.update(update).then(()=>{
       saveMaterialien();
       asClose();_auftragId=null;
-      toast('✅ Auftrag erledigt');
+      toast('Auftrag erledigt');
     });
-  });
+  }).catch(e=>{toast('Fehler: '+e.message,'bad');});
+}
+
+function b64toBlob(b64){
+  const parts=b64.split(',');
+  const mime=parts[0].match(/:(.*?);/)[1];
+  const raw=atob(parts[1]);
+  const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  return new Blob([arr],{type:mime});
 }
 function asAddPhotos(files){
   const grid=document.getElementById('asPhotos');
@@ -1101,11 +1125,11 @@ function asAddPhotos(files){
     reader.onload=e=>{
       const img=new Image();
       img.onload=()=>{
-        const maxW=800;let w=img.width,h=img.height;
+        const maxW=600;let w=img.width,h=img.height;
         if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
         const cv=document.createElement('canvas');cv.width=w;cv.height=h;
         cv.getContext('2d').drawImage(img,0,0,w,h);
-        const b64=cv.toDataURL('image/jpeg',0.5);
+        const b64=cv.toDataURL('image/jpeg',0.3);
         _asPhotos.push(b64);
         const wrap=document.createElement('div');wrap.className='photo-wrap';
         const idx=_asPhotos.length-1;
