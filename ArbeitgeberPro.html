@@ -354,6 +354,43 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <button class="bnav-btn" id="agnav-home" onclick="showAgPage('home')"><span class="bi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>Info</button>
   </div>
   <div class="toast" id="toast"></div>
+<!-- MA Share Modal -->
+<div id="maShareModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
+    <div style="padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:.95rem;font-weight:800;color:#059669">Mitarbeiter angelegt</div>
+      <button onclick="closeMaShare()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--mu);padding:4px">✕</button>
+    </div>
+    <div style="padding:16px 20px">
+      <div id="maShareName" style="font-size:.85rem;font-weight:700;margin-bottom:12px"></div>
+      <div style="background:var(--sur2);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:14px;font-family:'JetBrains Mono',monospace;font-size:.68rem;line-height:1.8">
+        <div>App: <span id="maShareApp" style="font-weight:700;color:var(--acc)"></span></div>
+        <div>E-Mail: <span id="maShareEmail" style="font-weight:700"></span></div>
+        <div>Passwort: <span id="maSharePw" style="font-weight:700"></span></div>
+        <div>Link: <span id="maShareUrl" style="font-weight:700;color:var(--acc);word-break:break-all"></span></div>
+      </div>
+      <div style="font-size:.68rem;font-weight:700;color:var(--tx);margin-bottom:8px">Zugangsdaten an den Mitarbeiter senden:</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a id="maShareWA" target="_blank" style="display:flex;align-items:center;gap:6px;padding:10px 16px;background:#25D366;color:#fff;border-radius:10px;font-size:.72rem;font-weight:700;text-decoration:none;font-family:'Sora',sans-serif;cursor:pointer">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.11.547 4.093 1.504 5.82L0 24l6.335-1.652A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.82c-1.89 0-3.69-.508-5.27-1.45l-.38-.226-3.46.903.93-3.388-.25-.394A9.78 9.78 0 012.18 12c0-5.422 4.398-9.82 9.82-9.82 5.422 0 9.82 4.398 9.82 9.82 0 5.422-4.398 9.82-9.82 9.82z"/></svg>
+          WhatsApp
+        </a>
+        <a id="maShareMail" style="display:flex;align-items:center;gap:6px;padding:10px 16px;background:var(--acc);color:#fff;border-radius:10px;font-size:.72rem;font-weight:700;text-decoration:none;font-family:'Sora',sans-serif;cursor:pointer">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          E-Mail
+        </a>
+        <button id="maShareNative" onclick="nativeShareMA()" style="display:flex;align-items:center;gap:6px;padding:10px 16px;background:var(--sur2);color:var(--tx);border:1.5px solid var(--brd);border-radius:10px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Teilen
+        </button>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('maShareModal').dataset.shareText).then(()=>toast('Zugangsdaten kopiert'))" style="display:flex;align-items:center;gap:6px;padding:10px 16px;background:var(--sur2);color:var(--tx);border:1.5px solid var(--brd);border-radius:10px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Kopieren
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- DOKU-VIEWER -->
 <style>
 .dv-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto}
@@ -1062,11 +1099,37 @@ function agCreateMitarbeiter(){
     if(fachSel) fachSel.value='';
     if(document.getElementById('newMaFachRow')) document.getElementById('newMaFachRow').style.display='none';
     err.textContent='';
-    toast('✅ '+vorname+' '+nachname+' als '+(isAzubi?'Azubi':'Arbeitnehmer')+' angelegt');
+    const appUrl=isAzubi?'https://mohr-app.github.io/ausbilderpro/AzubiPro.html':'https://mohr-app.github.io/ausbilderpro/MitarbeiterPro.html';
+    const shareText='Hallo '+vorname+', du wurdest bei '+(_firma||'AusbilderPro')+' als '+(isAzubi?'Azubi':'Mitarbeiter')+' angelegt.\n\nDeine Zugangsdaten:\nE-Mail: '+email+'\nPasswort: '+pw+'\n\nApp: '+appUrl+'\n\nBitte nach dem ersten Login das Passwort ändern.';
+    showMaShareModal(vorname+' '+nachname, app, appUrl, email, pw, shareText);
   }).catch(e=>{
     const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach'};
     err.textContent='❌ '+(msgs[e.code]||e.message);
   });
+}
+
+let _maShareText='';
+function showMaShareModal(name, app, url, email, pw, shareText){
+  _maShareText=shareText;
+  const modal=document.getElementById('maShareModal');
+  modal.dataset.shareText=shareText;
+  document.getElementById('maShareName').textContent='✅ '+name+' angelegt';
+  document.getElementById('maShareApp').textContent=app;
+  document.getElementById('maShareEmail').textContent=email;
+  document.getElementById('maSharePw').textContent=pw;
+  document.getElementById('maShareUrl').textContent=url;
+  const waText=encodeURIComponent(shareText);
+  document.getElementById('maShareWA').href='https://wa.me/?text='+waText;
+  const mailSubject=encodeURIComponent('Deine Zugangsdaten für '+app);
+  const mailBody=encodeURIComponent(shareText);
+  document.getElementById('maShareMail').href='mailto:'+encodeURIComponent(email)+'?subject='+mailSubject+'&body='+mailBody;
+  modal.style.display='flex';
+  loadAzubis();
+}
+function closeMaShare(){document.getElementById('maShareModal').style.display='none';}
+function nativeShareMA(){
+  if(navigator.share) navigator.share({title:'Zugangsdaten',text:_maShareText}).catch(()=>{});
+  else toast('Teilen nicht verfügbar');
 }
 
 function showDoku(tnId,datum){
