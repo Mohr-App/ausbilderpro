@@ -4977,15 +4977,22 @@ function renderMobKatList(){
   list.innerHTML='';
   const pre=Object.entries(S.kats).filter(([,k])=>k.predefined);
   const cust=Object.entries(S.kats).filter(([,k])=>!k.predefined);
+  let _mobIdx=0;
   function appendKat([id,k]){
     const total=Object.values(k.instances||{}).reduce((s,inst)=>s+Object.values(inst.seats||{}).filter(d=>d&&d.name).length,0);
+    const katCol=_katColors[_mobIdx%_katColors.length];_mobIdx++;
     const row=document.createElement('div');
     row.className='kat-row'+(k.open?' open':'');
+    row.style.borderLeft='3px solid '+katCol;
+    if(!k.open) row.style.background=katCol+'0F';
+    row.style.borderRadius='6px';
+    row.style.margin='2px 6px';
     row.innerHTML='<span class="kat-arr">▶</span><span class="kat-lbl">'+esc(k.label)+'</span>'+(total?'<span class="kat-cnt">'+total+'</span>':'');
     row.addEventListener('click',()=>{ toggleKat(id); renderMobKatList(); });
     list.appendChild(row);
     const ch=document.createElement('div');
     ch.className='kat-ch'+(k.open?' open':'');
+    ch.style.borderLeft='3px solid '+katCol;
     Object.entries(k.instances||{}).sort(([,a],[,b])=>{
       const da=a.sY+'-'+String(a.sM).padStart(2,'0')+'-'+String(a.sD).padStart(2,'0');
       const db2=b.sY+'-'+String(b.sM).padStart(2,'0')+'-'+String(b.sD).padStart(2,'0');
