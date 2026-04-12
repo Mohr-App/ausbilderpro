@@ -114,14 +114,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .hbz-drop-new.hbz-drop-active{border-color:var(--acc);color:var(--acc);background:rgba(59,130,246,.08);}
 .kat-row.hbz-drop-target{background:rgba(59,130,246,.12)!important;border-radius:7px;outline:2px dashed var(--acc);outline-offset:-2px;}
 .hbz-divider{height:1px;background:linear-gradient(90deg,transparent,#e2e8f0,transparent);margin:6px 12px;flex-shrink:0;}
-.kat-row{display:flex;align-items:center;padding:8px 10px 8px 11px;cursor:pointer;transition:background .12s;flex-shrink:0;}
+.kat-row{display:flex;align-items:center;padding:8px 10px 8px 11px;cursor:pointer;transition:background .12s;flex-shrink:0;border-radius:6px;margin:2px 6px;}
 .kat-row:hover{background:#e2e8f0;}
 .kat-drag{font-size:.85rem;color:transparent;cursor:grab;padding:2px 5px 2px 0;flex-shrink:0;transition:color .12s;line-height:1;}
 .kat-row:hover .kat-drag{color:var(--mu);}
 .kat-drag:active{cursor:grabbing;}
 .kat-row.dragging{opacity:.35;}
 .kat-row.drag-over{background:rgba(59,130,246,.12);border-radius:7px;outline:2px dashed var(--acc);}
-.kat-row.open{background:rgba(59,130,246,.04);border:1.5px solid #94a3b8;border-bottom:none;border-radius:8px 8px 0 0;margin:0 6px 0 6px;}
+.kat-row.open{background:rgba(59,130,246,.04);border-top:1.5px solid #94a3b8;border-right:1.5px solid #94a3b8;border-bottom:none;border-radius:8px 8px 0 0;margin:2px 6px 0 6px;}
 .kat-ch{display:none;flex-direction:column;margin:0 6px 4px 6px;background:#f1f5f9;border-radius:0 0 8px 8px;border:1.5px solid #94a3b8;border-top:none;}.kat-row.open .kat-arr{transform:rotate(90deg);}
 .kat-arr{font-size:.58rem;color:var(--mu);transition:transform .17s;margin-right:7px;flex-shrink:0;}
 .kat-lbl{font-size:.82rem;font-weight:700;color:#0f172a;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -1463,6 +1463,7 @@ function autoSelectCurrent(){
 // Helpers
 function gid(){ return 'i'+Date.now()+'_'+Math.random().toString(36).slice(2,5); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+const _katColors=['#2563eb','#059669','#d97706','#7c3aed','#ef4444','#0891b2','#c026d3','#65a30d'];
 function fmtD(d){ if(!d)return''; const[y,m,dy]=d.split('-'); return dy+'.'+m+'.'+y; }
 
 function initDateSelects(){
@@ -1525,15 +1526,18 @@ function renderSidebar(){
   Object.keys(S.kats).forEach(id=>{ if(!S.katOrder.includes(id)) S.katOrder.push(id); });
   S.katOrder=S.katOrder.filter(id=>S.kats[id]);
 
-  S.katOrder.forEach(id=>{
+  S.katOrder.forEach((id,idx)=>{
     const k=S.kats[id];
     const totalStudents=Object.values(k.instances||{}).reduce((s,inst)=>s+Object.values(inst.seats||{}).filter(d=>d&&d.name).length,0);
+    const katCol=_katColors[idx%_katColors.length];
 
     // kat row
     const row=document.createElement('div');
     row.className='kat-row'+(k.open?' open':'');
     row.draggable=true;
     row.dataset.katId=id;
+    row.style.borderLeft='3px solid '+katCol;
+    if(!k.open) row.style.background=katCol+'0F';
     row.innerHTML=
       '<span class="kat-drag" title="Ziehen zum Sortieren">⠿</span>'+
       '<span class="kat-arr">▶</span>'+
@@ -1594,6 +1598,7 @@ function renderSidebar(){
     // instances – sortiert nach Datum absteigend (aktuellster oben), gruppiert nach Jahr
     const ch=document.createElement('div');
     ch.className='kat-ch'+(k.open?' open':'');
+    ch.style.borderLeft='3px solid '+katCol;
     const instEntries=Object.entries(k.instances||{}).sort(([,a],[,b])=>{
       const da=a.sY+'-'+String(a.sM).padStart(2,'0')+'-'+String(a.sD).padStart(2,'0');
       const db=b.sY+'-'+String(b.sM).padStart(2,'0')+'-'+String(b.sD).padStart(2,'0');
