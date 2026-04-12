@@ -1141,10 +1141,27 @@ service cloud.firestore {
             </div>
           </div>
 
+          <!-- CLEANUP TOOL (nur Admin) -->
+          <div class="card scard" id="cleanupCard" style="grid-column:1/-1;background:rgba(239,68,68,.03);border:1px solid rgba(239,68,68,.15);display:none">
+            <div class="scard-hdr" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.scard-arr').textContent=this.nextElementSibling.classList.contains('open')?'▾':'▸'">
+              <div style="font-size:.85rem;font-weight:700;color:#ef4444">Accounts bereinigen</div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span class="scard-arr">▸</span>
+              </div>
+            </div>
+            <div class="scard-body">
+              <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px">Test-Accounts und deren gesamte Daten löschen: globalTN + Sub-Collections (Zeiterfassung, Aufträge, Urlaub, Meldungen, Dokumente) + users-Doc + Kurs-Teilnahmen. Auth-Account muss danach manuell in der Firebase Console gelöscht werden.</div>
+              <div id="cleanupList" style="max-height:300px;overflow-y:auto"><div class="empty">Lädt...</div></div>
+              <div style="display:flex;gap:6px;margin-top:10px">
+                <button class="btn-sm btn-ok" onclick="loadCleanupList()" style="flex:1;font-size:.72rem;padding:8px">Aktualisieren</button>
+                <button class="btn-sm" onclick="executeCleanup()" style="flex:1;font-size:.72rem;padding:8px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#ef4444" id="cleanupExecBtn" disabled>Ausgewählte löschen</button>
+              </div>
+              <div id="cleanupLog" style="margin-top:8px;font-size:.62rem;color:var(--mu);font-family:'JetBrains Mono',monospace;max-height:150px;overflow-y:auto"></div>
+            </div>
+          </div>
+
         </div>
       </div>
-
-      <!-- ADD ARBEITGEBER MODAL -->
       <div class="ov" id="addAGModal">
         <div class="modal" style="max-width:440px">
           <div class="mhd"><div class="mtit" id="addAGModalTit">🏢 Arbeitgeber-Zugang erstellen</div><button class="xcls" onclick="safeClose('addAGModal',closeAddAGModal)">&#10005;</button></div>
@@ -1851,7 +1868,7 @@ function showPage(id){
   if(id==='fortschritt') renderFortschrittPage();
   if(id==='urlaub') renderUrlaubPage();
   if(id==='kursplanung') renderGantt();
-  if(id==='einstellungen'){ loadHVKontakt(); loadAGUsers(); }
+  if(id==='einstellungen'){ loadHVKontakt(); loadAGUsers(); initCleanupCard(); }
   if(id==='agverwaltung'){ loadAgVerwaltung(); }
 }
 
@@ -2650,6 +2667,167 @@ function timeAgo(ts){
   const d=Math.floor(h/24);
   if(d===1) return 'gestern';
   return d+' Tage';
+}
+
+// ── CLEANUP TOOL (nur Admin) ──
+function initCleanupCard(){
+  const card=document.getElementById('cleanupCard');
+  if(!card) return;
+  if(_userRole!=='admin'){card.style.display='none';return;}
+  card.style.display='';
+  loadCleanupList();
+}
+
+function loadCleanupList(){
+  const el=document.getElementById('cleanupList');
+  if(!el) return;
+  el.innerHTML='<div class="empty">Lädt alle Accounts...</div>';
+  // Load all users + all globalTN
+  Promise.all([
+    db.collection('users').get(),
+    db.collection('globalTN').get()
+  ]).then(([usersSnap,tnSnap])=>{
+    const accounts=new Map();
+    // Users collection
+    usersSnap.forEach(doc=>{
+      const d=doc.data();
+      accounts.set(doc.id,{
+        uid:doc.id,
+        name:d.name||d.firma||d.email||doc.id.substring(0,10)+'…',
+        email:d.email||'',
+        role:d.role||'–',
+        lastApp:d.lastApp||'–',
+        lastActive:d.lastActive||0,
+        tnId:null
+      });
+    });
+    // globalTN collection
+    tnSnap.forEach(doc=>{
+      const d=doc.data();
+      const uid=d.uid||'';
+      if(uid&&accounts.has(uid)){
+        accounts.get(uid).tnId=doc.id;
+        accounts.get(uid).tnName=((d.vorname||'')+' '+(d.nachname||'')).trim();
+      } else {
+        // TN without matching user (or different uid)
+        const name=((d.vorname||'')+' '+(d.nachname||'')).trim()||d.email||doc.id;
+        accounts.set('tn_'+doc.id,{
+          uid:d.uid||'',
+          name:name,
+          email:d.email||'',
+          role:d.typ||'azubi',
+          lastApp:'–',lastActive:0,
+          tnId:doc.id,
+          tnName:name
+        });
+      }
+    });
+    if(!accounts.size){el.innerHTML='<div class="empty">Keine Accounts gefunden</div>';return;}
+    const roleColors={admin:'#2563eb',verwaltung:'#2563eb',ausbilder:'#2563eb',azubi:'#10b981',arbeitnehmer:'#d97706',arbeitgeber:'#d97706'};
+    const roleLabels={admin:'Admin',verwaltung:'Verwaltung',ausbilder:'Ausbilder',azubi:'Azubi',arbeitnehmer:'Mitarbeiter',arbeitgeber:'Arbeitgeber'};
+    let html='';
+    [...accounts.entries()].sort((a,b)=>(b[1].lastActive||0)-(a[1].lastActive||0)).forEach(([key,a])=>{
+      const col=roleColors[a.role]||'#94a3b8';
+      const label=roleLabels[a.role]||a.role;
+      const isAdmin=a.role==='admin'||a.role==='verwaltung';
+      const displayName=a.tnName||a.name;
+      html+='<label style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid rgba(0,0,0,.04);cursor:'+(isAdmin?'not-allowed':'pointer')+';opacity:'+(isAdmin?'.5':'1')+'">'
+        +'<input type="checkbox" class="cleanup-cb" value="'+esc(key)+'" data-uid="'+esc(a.uid)+'" data-tnid="'+esc(a.tnId||'')+'"'+(isAdmin?' disabled':'')+' onchange="updateCleanupBtn()" style="accent-color:#ef4444;width:16px;height:16px">'
+        +'<span style="padding:2px 6px;background:'+col+'15;color:'+col+';border-radius:4px;font-size:.52rem;font-weight:700;min-width:60px;text-align:center">'+label+'</span>'
+        +'<span style="flex:1;font-size:.72rem;font-weight:600">'+esc(displayName)+'</span>'
+        +'<span style="font-size:.58rem;color:var(--mu)">'+esc(a.email)+'</span>'
+        +(a.lastActive?'<span style="font-size:.52rem;color:var(--mu);min-width:50px;text-align:right">'+timeAgo(a.lastActive)+'</span>':'')
+        +'</label>';
+    });
+    el.innerHTML=html;
+  }).catch(err=>{el.innerHTML='<div class="empty" style="color:#ef4444">Fehler: '+err.message+'</div>';});
+}
+
+function updateCleanupBtn(){
+  const btn=document.getElementById('cleanupExecBtn');
+  const checked=document.querySelectorAll('.cleanup-cb:checked:not(:disabled)').length;
+  btn.disabled=!checked;
+  btn.textContent=checked?checked+' Account'+(checked>1?'s':'')+' löschen':'Ausgewählte löschen';
+}
+
+async function executeCleanup(){
+  const checks=[...document.querySelectorAll('.cleanup-cb:checked:not(:disabled)')];
+  if(!checks.length) return;
+  const names=checks.map(c=>c.closest('label').querySelector('span:nth-child(3)').textContent).join(', ');
+  if(!confirm('ACHTUNG: Folgende Accounts und ALLE zugehörigen Daten werden unwiderruflich gelöscht:\n\n'+names+'\n\nDies kann NICHT rückgängig gemacht werden!\n\nFortfahren?')) return;
+  if(!confirm('Letzte Warnung: Wirklich '+checks.length+' Account(s) komplett löschen?')) return;
+
+  const log=document.getElementById('cleanupLog');
+  const btn=document.getElementById('cleanupExecBtn');
+  btn.disabled=true;btn.textContent='Lösche...';
+  log.innerHTML='';
+
+  function addLog(msg){log.innerHTML+=msg+'<br>';log.scrollTop=log.scrollHeight;}
+
+  for(const cb of checks){
+    const uid=cb.dataset.uid;
+    const tnId=cb.dataset.tnid;
+    const label=cb.closest('label').querySelector('span:nth-child(3)').textContent;
+    addLog('━━━ '+label+' ━━━');
+
+    // 1. globalTN sub-collections
+    if(tnId){
+      const subColls=['zeiterfassung','auftraege','urlaubsantraege','betriebMeldungen','dokumente'];
+      for(const sub of subColls){
+        try{
+          const snap=await db.collection('globalTN').doc(tnId).collection(sub).get();
+          if(snap.size){
+            const batch=db.batch();
+            snap.forEach(d=>batch.delete(d.ref));
+            await batch.commit();
+            addLog('  ✓ '+sub+': '+snap.size+' Docs gelöscht');
+          }
+        }catch(e){addLog('  ✗ '+sub+': '+e.message);}
+      }
+      // 2. globalTN doc
+      try{
+        await db.collection('globalTN').doc(tnId).delete();
+        addLog('  ✓ globalTN/'+tnId+' gelöscht');
+      }catch(e){addLog('  ✗ globalTN: '+e.message);}
+    }
+
+    // 3. Kurs-Teilnahmen entfernen
+    try{
+      const kursSnap=await db.collection('shared').doc('kurse').collection('list').get();
+      for(const kursDoc of kursSnap.docs){
+        if(!tnId) continue;
+        const tnRef=kursDoc.ref.collection('teilnehmer').doc(tnId);
+        const tnDoc=await tnRef.get();
+        if(tnDoc.exists){
+          await tnRef.delete();
+          addLog('  ✓ Kurs '+kursDoc.id+': TN-Eintrag entfernt');
+        }
+      }
+    }catch(e){addLog('  ✗ Kurse: '+e.message);}
+
+    // 4. users doc + sub-collections
+    if(uid){
+      try{
+        const dataSub=await db.collection('users').doc(uid).collection('data').get();
+        if(dataSub.size){
+          const batch=db.batch();
+          dataSub.forEach(d=>batch.delete(d.ref));
+          await batch.commit();
+          addLog('  ✓ users/data: '+dataSub.size+' Docs gelöscht');
+        }
+        await db.collection('users').doc(uid).delete();
+        addLog('  ✓ users/'+uid.substring(0,8)+'… gelöscht');
+      }catch(e){addLog('  ✗ users: '+e.message);}
+    }
+
+    addLog('  ✅ '+label+' komplett bereinigt');
+  }
+
+  addLog('');
+  addLog('Fertig! Auth-Accounts ggf. in Firebase Console → Authentication löschen.');
+  loadCleanupList();
+  renderSbAusbTree();
+  renderSbTnTree();
 }
 
 let _chartKursStatus=null, _chartBeruf=null;
