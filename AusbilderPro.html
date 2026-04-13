@@ -1342,6 +1342,7 @@ let dpKatId=null;
 // Storage
 let _changeCount = 0;
 let _lastExportCount = 0;
+let _driveToken = null;
 let _saveTimer = null;
 let _autoExportTimer = null;
 
@@ -1415,6 +1416,16 @@ function showToast(type){
 }
 function closeToast(){ document.getElementById('toast')?.classList.remove('show'); }
 function toastExport(){ closeToast(); _lastExportCount=_changeCount; doExport(); }
+function toast(msg){
+  const existing=document.getElementById('simpleToast');
+  if(existing) existing.remove();
+  const d=document.createElement('div');d.id='simpleToast';
+  d.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;background:#1e293b;color:#fff;padding:10px 20px;border-radius:10px;font-size:.78rem;font-weight:600;font-family:Sora,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.2);pointer-events:none;opacity:0;transition:opacity .2s';
+  d.textContent=msg;
+  document.body.appendChild(d);
+  requestAnimationFrame(()=>{d.style.opacity='1';});
+  setTimeout(()=>{d.style.opacity='0';setTimeout(()=>d.remove(),300);},2500);
+}
 function hydrate(){
   const r=localStorage.getItem('ap_v1');
   if(r) S=JSON.parse(r);
