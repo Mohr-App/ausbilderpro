@@ -2549,9 +2549,31 @@ function loadKurse(){
       html+='<div class="kurs-card" onclick="showKursDetail(\''+highlight.id+'\')">';
       html+='<div class="kurs-name">'+esc(highlight.name||highlight.lehrgangsart||'Lehrgang')+'</div>';
       html+='<div class="kurs-dates">'+fmtDE(highlight.von)+' – '+fmtDE(highlight.bis)+'</div>';
-      html+='<div class="kurs-ausb">'+(highlight.ausbilderName?'Ausbilder: '+esc(highlight.ausbilderName):'')+'</div>';
       if(isAktiv) html+='<div class="kurs-countdown kurs-status-laufend">● Aktuell laufend</div>';
       else if(daysUntil>0) html+='<div class="kurs-countdown kurs-status-geplant">Startet in '+daysUntil+' Tag'+(daysUntil>1?'en':'')+'</div>';
+      // Ausbilder Kontakt direkt anzeigen
+      if(highlight.ausbilderName){
+        html+='<div onclick="event.stopPropagation()" style="margin-top:10px;padding:10px 12px;background:rgba(59,130,246,.04);border:1.5px solid rgba(59,130,246,.15);border-radius:10px">';
+        html+='<div style="font-size:.68rem;font-weight:700;color:var(--mu);margin-bottom:6px">Dein Ausbilder</div>';
+        html+='<div style="font-size:.82rem;font-weight:700;margin-bottom:4px">'+esc(highlight.ausbilderName)+'</div>';
+        if(highlight.ausbilderTel||highlight.ausbilderEmail){
+          html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+          if(highlight.ausbilderTel){
+            html+='<a href="tel:'+esc(highlight.ausbilderTel)+'" style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.25);border-radius:8px;text-decoration:none;color:#059669;font-size:.72rem;font-weight:700;font-family:Sora,sans-serif">'
+              +'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
+              +esc(highlight.ausbilderTel)+'</a>';
+          }
+          if(highlight.ausbilderEmail){
+            html+='<a href="mailto:'+esc(highlight.ausbilderEmail)+'" style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(59,130,246,.08);border:1.5px solid rgba(59,130,246,.2);border-radius:8px;text-decoration:none;color:var(--acc);font-size:.72rem;font-weight:700;font-family:Sora,sans-serif">'
+              +'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>'
+              +'E-Mail</a>';
+          }
+          html+='</div>';
+        }
+        html+='</div>';
+      }
+      // Clickable hint
+      html+='<div style="margin-top:10px;text-align:center;font-size:.65rem;color:var(--mu);opacity:.6">Antippen für alle Details (Standort, Werkzeug, Unterlagen…) →</div>';
       if(highlight._tnDoc&&highlight._tnDoc.werkzeugStatus==='fehlt'){
         html+='<div style="margin-top:6px;padding:6px 10px;background:rgba(239,68,68,.06);border:2px solid rgba(239,68,68,.25);border-radius:7px;font-size:.72rem;color:#dc2626;font-weight:700">🔧 Werkzeug unvollständig'+(highlight._tnDoc.werkzeugFehlt?' – fehlt: '+esc(highlight._tnDoc.werkzeugFehlt):'')+'</div>';
       }
