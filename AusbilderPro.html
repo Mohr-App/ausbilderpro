@@ -6093,7 +6093,10 @@ try{
       // 2. Ausbilder-Berechtigung prüfen: E-Mail in shared/kursSettings/ausbilder?
       return checkAusbilderAccess(email).then(allowed=>{
         if(allowed){
-          _db.collection('users').doc(_fbUid).set({email: user.email, lastActive:Date.now(), lastApp:'AusbilderPro'}, {merge:true}).catch(()=>{});
+          _db.collection('users').doc(_fbUid).set({email: user.email, lastActive:Date.now(), lastApp:'AusbilderPro', sessionStart:Date.now()}, {merge:true}).catch(()=>{});
+          if(!window._heartbeat) window._heartbeat=setInterval(()=>{
+            if(_fbUid&&_db) _db.collection('users').doc(_fbUid).set({lastActive:Date.now()},{merge:true}).catch(()=>{});
+          },60000);
           document.getElementById('pwScreen').style.display='none';
           document.getElementById('noAccessScreen').style.display='none';
           document.getElementById('fbLogoutBtn').style.display='';
