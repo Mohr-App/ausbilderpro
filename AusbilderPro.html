@@ -5347,7 +5347,10 @@ function loadPool(){
         const rows3=getRows(inst3);
         rows3.forEach(r=>r.seats.forEach(sid=>{
           const lbl=(inst3.seatLabels&&inst3.seatLabels[sid]!=null&&inst3.seatLabels[sid]!=='')?String(inst3.seatLabels[sid]):null;
-          if(lbl) labelToSeatId[lbl]=sid;
+          if(lbl){
+            labelToSeatId[lbl]=sid;
+            labelToSeatId[lbl.replace(/\./g,'')]=sid;
+          }
         }));
         let autoPlaced=0;
         const autoPlaceBatch=_db?_db.batch():null;
@@ -5355,8 +5358,8 @@ function loadPool(){
           if(!t.wunschSitzplatz) return;
           if(placedTnIds.has(t.id)||placedNames.has(normName(t.name))) return;
           if(_autoPlacedIds.has(t.id)) return; // Schon in dieser Session platziert
-          const wunsch=String(t.wunschSitzplatz);
-          const seatId=labelToSeatId[wunsch]||null;
+          const wunsch=String(t.wunschSitzplatz).replace(/\./g,'');
+          const seatId=labelToSeatId[wunsch]||labelToSeatId[t.wunschSitzplatz]||null;
           if(!seatId) return;
           const existing=inst3.seats[seatId];
           if(existing&&existing.name) return;
