@@ -2651,8 +2651,9 @@ function loadActivity(){
       const app=d.lastApp||'–';
       const ago=d.lastActive?timeAgo(d.lastActive):'–';
       const isOnline=d.lastActive&&(now-d.lastActive)<120000;
-      const sessionMin=isOnline&&d.sessionStart?Math.floor((now-d.sessionStart)/60000):0;
+      const sessionMin=d.sessionStart&&d.lastActive?Math.floor(((isOnline?now:d.lastActive)-d.sessionStart)/60000):0;
       const sessionTxt=sessionMin>0?(sessionMin<60?sessionMin+'min':Math.floor(sessionMin/60)+'h '+sessionMin%60+'min'):'';
+      const sessionCol=isOnline?'#22c55e':'#94a3b8';
       const roleColors={admin:'#2563eb',verwaltung:'#2563eb',ausbilder:'#2563eb',azubi:'#10b981',arbeitnehmer:'#d97706',arbeitgeber:'#d97706'};
       const roleLabels={admin:'Admin',verwaltung:'Verwaltung',ausbilder:'Ausbilder',azubi:'Azubi',arbeitnehmer:'Mitarbeiter',arbeitgeber:'Arbeitgeber'};
       const col=roleColors[role]||'#94a3b8';
@@ -2662,7 +2663,7 @@ function loadActivity(){
         +'<span style="padding:2px 8px;background:'+col+'15;color:'+col+';border-radius:4px;font-size:.55rem;font-weight:700;min-width:65px;text-align:center">'+(roleLabels[role]||role)+'</span>'
         +'<span style="flex:1;font-weight:600">'+esc(name)+'</span>'
         +'<span style="color:var(--mu);font-size:.6rem">'+app+'</span>'
-        +(isOnline&&sessionTxt?'<span style="color:#22c55e;font-size:.55rem;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+sessionTxt+'</span>':'')
+        +(sessionTxt?'<span style="color:'+sessionCol+';font-size:.55rem;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+sessionTxt+'</span>':'')
         +'<span style="color:var(--mu);font-size:.6rem;min-width:55px;text-align:right">'+(isOnline?'<span style="color:#22c55e;font-weight:700">online</span>':ago)+'</span>'
         +'</div>';
     });
