@@ -1347,6 +1347,7 @@ let _saveTimer = null;
 let _autoExportTimer = null;
 
 function persist(){
+  if(!_fbUid || (_dataOwner && _dataOwner !== _fbUid)) return; // Schutz: nie fremde Daten speichern
   localStorage.setItem(_lsKey('ap_v1'), JSON.stringify(S));
   _changeCount++;
   showSaveInd();
@@ -6063,6 +6064,7 @@ const _fbCfg={
   appId:"1:937082794250:web:eb99bc41d8f39908df8af3"
 };
 var _fbUid=null; // var statt let: muss vor _lsKey()-Aufrufen verfügbar sein (TDZ)
+var _dataOwner=null; // UID des Users dessen Daten in S geladen sind
 let _auth=null,_db=null,_st=null,_syncTimer=null,_isAdmin=false;
 function _lsKey(base){return _fbUid ? base+'_'+_fbUid : base;}
 let _demoMode=false;
@@ -6083,6 +6085,7 @@ try{
   _auth.onAuthStateChanged(user=>{
   if(user){
     _fbUid=user.uid;
+    _dataOwner=null; // Reset bis Daten geladen sind
     // State für neuen User zurücksetzen (localStorage ist jetzt UID-spezifisch)
     S={kats:{},katOrder:[],curKat:null,curInst:null};
     _trash=[];
@@ -6215,6 +6218,7 @@ function fbErrMsg(e){
 // Cloud Save (debounced)
 function fbSave(){
   if(!_fbUid)return;
+  if(_dataOwner && _dataOwner !== _fbUid) return; // SCHUTZ: nie Daten eines anderen Users speichern
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>{
     const ci=document.getElementById('cloudInd');
@@ -6280,8 +6284,10 @@ function fbLoadData(){
           S.katOrder=S.katOrder.filter(id=>S.kats[id]);
           fixSelection();
           localStorage.setItem(_lsKey('ap_v1'),JSON.stringify(S));
+          _dataOwner=_fbUid; // Daten gehören diesem User
         }catch(e){}
       }
+      _dataOwner=_fbUid; // Daten (oder leer) gehören diesem User
       renderAll();
       loadHBZKurse();
       loadBerufeFromFirestore();
@@ -6291,6 +6297,7 @@ function fbLoadData(){
       ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||'');
     })
     .catch(()=>{
+      _dataOwner=_fbUid;
       hydrate(); renderAll();
       loadHBZKurse();
       ci.textContent='☁ Offline';
