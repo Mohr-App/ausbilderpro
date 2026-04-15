@@ -1,0 +1,2407 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>MitarbeiterPro – Zeiterfassung & Betrieb</title>
+<link rel="manifest" href="manifest-ma.json">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MitarbeiterPro">
+<link rel="apple-touch-icon" href="icon-ma-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<style>
+:root{--bg:#ffffff;--sur:#ffffff;--sur2:#f1f5f9;--brd:#e2e8f0;--acc:#10b981;--acc2:#059669;--bad:#ef4444;--tx:#0f172a;--mu:#94a3b8;--warn:#f59e0b;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;min-height:100dvh;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+/* ── LOGIN ── */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;padding:24px;background:linear-gradient(135deg,#f8fafc,#e2e8f0);}
+.login-box{background:#fff;border:1px solid var(--brd);border-radius:20px;padding:36px 28px;width:100%;max-width:340px;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.08);}
+.login-logo{font-size:1.5rem;font-weight:800;text-align:center;margin-bottom:4px;}
+.login-logo span{color:var(--acc);}
+.login-sub{font-size:.7rem;color:var(--mu);text-align:center;font-family:'JetBrains Mono',monospace;margin-bottom:24px;}
+.login-badge{display:inline-block;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--acc);font-size:.58rem;font-family:'JetBrains Mono',monospace;padding:3px 10px;border-radius:20px;margin-bottom:14px;width:100%;text-align:center;}
+.fi{width:100%;background:#fff;border:1.5px solid var(--brd);border-radius:10px;color:var(--tx);font-family:'Sora',sans-serif;font-size:.85rem;padding:11px 14px;outline:none;transition:border .12s;margin-bottom:10px;}
+.fi:focus{border-color:var(--acc);background:#fff;box-shadow:0 0 0 3px rgba(16,185,129,.1);}
+.fl{display:block;font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace;margin-bottom:4px;letter-spacing:.04em;}
+.btn{width:100%;padding:13px;border:none;border-radius:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;font-family:'Sora',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:all .15s;}
+.btn:active{transform:scale(.97);}
+.err{font-size:.72rem;color:var(--bad);text-align:center;min-height:18px;margin:4px 0;}
+/* ── APP SHELL ── */
+.app{display:none;flex-direction:column;min-height:100vh;min-height:100dvh;}
+.app.show{display:flex;}
+/* Header */
+.hdr{background:linear-gradient(135deg,#2563eb,#059669);border-bottom:none;padding:14px 18px;display:flex;align-items:center;gap:12px;flex-shrink:0;box-shadow:0 2px 12px rgba(37,99,235,.15);}
+.hdr-logo{font-size:1rem;font-weight:800;}.hdr-logo span{color:rgba(255,255,255,.8);}
+.hdr-user{margin-left:auto;font-size:.62rem;color:rgba(255,255,255,.7);font-family:'JetBrains Mono',monospace;}
+/* Main scrollable */
+.main{flex:1;overflow-y:auto;padding:16px 16px 90px;-webkit-overflow-scrolling:touch;}
+/* Bottom nav */
+.bnav{position:fixed;bottom:0;left:0;right:0;background:#ffffff;border-top:1px solid var(--brd);display:flex;justify-content:space-around;padding:10px 8px calc(env(safe-area-inset-bottom,0px) + 10px);z-index:100;}
+.bnav-btn{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;color:var(--mu);font-family:'Sora',sans-serif;font-size:.55rem;font-weight:600;cursor:pointer;padding:4px 12px;border-radius:12px;transition:all .15s;flex:1;}
+.bnav-btn .bi{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:0;}
+.bnav-btn .bi svg{width:16px;height:16px;stroke:var(--mu);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.bnav-btn.active{color:var(--acc);}
+.bnav-btn.active .bi{background:rgba(37,99,235,.1);}
+.bnav-btn.active .bi svg{stroke:var(--acc)}
+.stab{padding:8px 16px;border:none;border-radius:20px;background:var(--sur2);color:var(--mu);font-size:.72rem;font-weight:600;font-family:'Sora',sans-serif;cursor:pointer;white-space:nowrap;transition:all .15s;}
+.stab.active{background:linear-gradient(135deg,#2563eb,#059669);color:#fff;}
+.btab{display:none;}.btab.active{display:block;}
+.az-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 2px 6px rgba(239,68,68,.4);animation:pulseBadge 1.5s infinite;}
+@keyframes pulseBadge{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 8px rgba(239,68,68,0)}}
+/* Cards */
+.card{background:#f1f5f9;border:1px solid var(--brd);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.card-title{font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;margin-bottom:10px;}
+/* Course card */
+.kurs-card{background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(52,211,153,.04));border:1.5px solid rgba(16,185,129,.2);border-radius:14px;padding:18px;margin-bottom:12px;cursor:pointer;transition:all .12s;}
+.kurs-card:active{transform:scale(.98);}
+.kurs-name{font-size:1rem;font-weight:800;margin-bottom:4px;}
+.kurs-dates{font-size:.72rem;color:var(--acc);font-family:'JetBrains Mono',monospace;}
+.kurs-ausb{font-size:.68rem;color:var(--mu);margin-top:4px;}
+.kurs-countdown{display:inline-block;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:var(--acc2);font-size:.62rem;font-family:'JetBrains Mono',monospace;padding:3px 10px;border-radius:20px;margin-top:8px;font-weight:700;}
+.kurs-status-laufend{background:rgba(16,185,129,.15);color:#10b981;}
+.kurs-status-geplant{background:rgba(59,130,246,.12);color:#3b82f6;}
+.kurs-status-beendet{background:rgba(156,163,175,.1);color:#9ca3af;}
+/* Doc items */
+.doc-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;margin-bottom:6px;}
+.doc-icon{font-size:1.1rem;flex-shrink:0;}
+.doc-info{flex:1;min-width:0;}
+.doc-name{font-size:.76rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.doc-meta{font-size:.58rem;color:var(--mu);font-family:'JetBrains Mono',monospace;}
+.doc-btn{color:var(--acc);font-size:.65rem;background:none;border:1px solid var(--acc);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600;flex-shrink:0;transition:all .12s;}
+.doc-btn:active{background:var(--acc);color:#fff;}
+.doc-del{background:none;border:none;color:var(--bad);cursor:pointer;font-size:.8rem;padding:2px 6px;flex-shrink:0;}
+/* Upload button */
+.upload-btn{width:100%;padding:12px;border:2px dashed var(--brd);border-radius:10px;background:var(--sur2);color:var(--mu);font-family:'Sora',sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;text-align:center;transition:all .12s;}
+.upload-btn:active{border-color:var(--acc);color:var(--acc);}
+/* Profile */
+.profile-field{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--brd);font-size:.78rem;}
+.pf-label{color:var(--mu);font-family:'JetBrains Mono',monospace;font-size:.68rem;}
+.pf-value{font-weight:600;text-align:right;}
+/* History */
+.hist-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--brd);}
+.hist-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.hist-name{font-size:.78rem;font-weight:600;}
+.hist-dates{font-size:.62rem;color:var(--mu);font-family:'JetBrains Mono',monospace;}
+/* Empty */
+.empty{text-align:center;padding:24px 16px;color:var(--mu);font-size:.78rem;line-height:1.6;}
+/* Page transitions */
+.page{display:none;}.page.active{display:block;}
+/* Toast */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-100px);background:#fff;border:1.5px solid var(--acc);border-radius:12px;padding:10px 18px;font-size:.78rem;font-weight:600;color:var(--acc);z-index:999;transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:0 8px 24px rgba(0,0,0,.1);}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.toast.bad{border-color:var(--bad);color:var(--bad);}
+.hi{font-size:.76rem;line-height:1.65;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.08);color:var(--tx);}
+.help-section{margin-bottom:8px;border:1px solid var(--brd);border-radius:10px;overflow:hidden;background:var(--sur)}.help-section-header{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;user-select:none;transition:background .15s}.help-section-header:active{background:var(--sur2)}.section-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}.section-title{font-size:.82rem;font-weight:700;flex:1}.section-count{font-size:.58rem;color:var(--mu);font-family:'JetBrains Mono',monospace;background:var(--sur2);padding:2px 8px;border-radius:4px}.section-arrow{font-size:.6rem;color:var(--mu);transition:transform .2s}.help-section.open .section-arrow{transform:rotate(180deg)}.help-section-body{display:none;padding:0 16px 14px}.help-section.open .help-section-body{display:block}.help-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.04)}.help-item:last-child{border-bottom:none}.item-dot{width:5px;height:5px;border-radius:50%;background:var(--brd);margin-top:7px;flex-shrink:0}.item-text{font-size:.74rem;line-height:1.65;color:#475569}.item-text b{color:var(--tx);font-weight:700}.help-steps{counter-reset:step}.help-step{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.04)}.help-step:last-child{border-bottom:none}.step-num{counter-increment:step;width:24px;height:24px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;flex-shrink:0;font-family:'JetBrains Mono',monospace}.step-num::before{content:counter(step)}.step-text{font-size:.74rem;line-height:1.65;color:#475569}.step-text b{color:var(--tx);font-weight:700}.tip-banner{margin:12px 0;padding:12px 14px;background:linear-gradient(135deg,rgba(37,99,235,.04),rgba(5,150,105,.04));border:1px solid rgba(37,99,235,.12);border-radius:10px}.tip-banner .tip-title{font-size:.68rem;font-weight:700;color:var(--acc);margin-bottom:6px}.tip-banner .tip-text{font-size:.68rem;color:#64748b;line-height:1.6}.icon-blue{background:rgba(37,99,235,.08);color:#2563eb}.icon-green{background:rgba(16,185,129,.08);color:#059669}.icon-amber{background:rgba(245,158,11,.08);color:#d97706}.icon-purple{background:rgba(139,92,246,.08);color:#7c3aed}.icon-slate{background:rgba(100,116,139,.08);color:#475569}
+.profil-avatar{position:relative;width:68px;height:68px;border-radius:50%;flex-shrink:0;overflow:hidden;border:3px solid rgba(16,185,129,.3);cursor:pointer;transition:all .15s;}
+.profil-avatar:active{transform:scale(.95);}
+.profil-avatar img{width:100%;height:100%;object-fit:cover;}
+.profil-avatar-init{width:100%;height:100%;background:rgba(16,185,129,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:800;color:var(--acc);}
+.profil-avatar-badge{position:absolute;bottom:-2px;right:-2px;width:24px;height:24px;background:var(--acc);border:2px solid var(--sur);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;color:#fff;}
+.profil-photo-hint{font-size:.58rem;color:var(--mu);text-align:center;margin-top:4px;font-family:'JetBrains Mono',monospace;}
+/* Bestätigung */
+.kurs-unconfirmed{border-color:var(--warn)!important;background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(245,158,11,.04))!important;animation:pulseWarn 2s infinite;}
+@keyframes pulseWarn{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.2)}50%{box-shadow:0 0 0 8px rgba(245,158,11,0)}}
+@keyframes pulseRed{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.confirm-btn{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;font-family:'Sora',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;margin-top:10px;transition:all .15s;}
+.confirm-btn:active{transform:scale(.97);}
+</style>
+<script src="https://js-de.sentry-cdn.com/954a236264f49755ae54bc9f69f05762.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<!-- SELF-REGISTRATION (via QR join link) -->
+<div class="login-wrap" id="joinWrap" style="display:none">
+  <div class="login-box" style="max-width:400px">
+    <div class="login-logo">Mitarbeiter<span>Pro</span></div>
+    <div class="login-sub">Lehrgang beitreten</div>
+    <div id="joinKursInfo" style="margin-bottom:12px;padding:10px 14px;background:rgba(16,185,129,.08);border:1.5px solid rgba(16,185,129,.25);border-radius:10px;font-size:.78rem;text-align:center"></div>
+
+    <!-- LOGIN (oben) -->
+    <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px;text-align:center">Bereits ein Konto?</div>
+    <div><label class="fl">E-Mail</label><input class="fi" type="email" id="jLoginEmail" placeholder="deine@email.de" autocomplete="email"></div>
+    <div style="margin-top:6px"><label class="fl">Passwort</label><input class="fi" type="password" id="jLoginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitJoinLogin()"></div>
+    <div class="err" id="jLoginErr"></div>
+    <button class="btn" onclick="submitJoinLogin()" style="margin-top:8px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Anmelden & beitreten">Anmelden & Lehrgang beitreten</button>
+
+    <!-- REGISTRIERUNG (unten) -->
+    <div style="margin-top:14px;border-top:1px solid var(--brd);padding-top:12px">
+      <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px;text-align:center">Noch kein Konto? Jetzt registrieren</div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="jVorname" placeholder="Max"></div>
+        <div style="flex:1"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="jNachname" placeholder="Mustermann"></div>
+      </div>
+      <div style="margin-top:6px"><label class="fl">Betrieb / Ausbildungsfirma <span style="color:#ef4444">*</span></label><input class="fi" id="jFirma" placeholder="Firma GmbH"></div>
+      <div style="margin-top:6px"><label class="fl">Beruf</label><input class="fi" id="jBeruf" placeholder="Elektroniker"></div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <div style="flex:1"><label class="fl">Lehrjahr</label><select class="fi" id="jLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+        <div style="flex:1"><label class="fl">Geburtsdatum</label><input type="date" class="fi" id="jGeburt"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <div style="flex:1"><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jEmail" placeholder="deine@email.de"></div>
+        <div style="flex:1"><label class="fl">Telefon</label><input class="fi" type="tel" id="jTelefon" placeholder="0170..."></div>
+      </div>
+      <div style="margin-top:8px"><label class="fl">Passwort festlegen <span style="color:#ef4444">*</span></label><input class="fi" type="password" id="jPasswort" placeholder="Min. 6 Zeichen" autocomplete="new-password"></div>
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:10px 12px;background:rgba(59,130,246,.04);border:1.5px solid rgba(59,130,246,.15);border-radius:8px;cursor:pointer;user-select:none">
+        <input type="checkbox" id="jDsgvo" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:#10b981">
+        <span style="font-size:.62rem;color:var(--mu);line-height:1.5">Ich habe die <a href="https://ausbilderpro.de/datenschutz.html" target="_blank" style="color:var(--acc);text-decoration:underline" onclick="event.stopPropagation()">Datenschutzerklärung</a> und die <a href="https://ausbilderpro.de/nutzungsbedingungen.html" target="_blank" style="color:var(--acc);text-decoration:underline" onclick="event.stopPropagation()">Nutzungsbedingungen</a> gelesen und stimme der Verarbeitung meiner Daten zu. <span style="color:#ef4444">*</span></span>
+      </label>
+      <div class="err" id="jErr"></div>
+      <button class="btn" onclick="submitJoinRegistration()" style="margin-top:10px;background:linear-gradient(135deg,#059669,#10b981)" title="Registrieren & beitreten">Registrieren & Lehrgang beitreten</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-box">
+    <div class="login-logo">Mitarbeiter<span>Pro</span></div>
+    <div class="login-sub">Dein Lehrgangsportal</div>
+    <div class="login-badge">📚 FÜR AUSZUBILDENDE</div>
+    <div><label class="fl">E-Mail</label><input class="fi" type="email" id="lEmail" placeholder="deine@email.de" autocomplete="email"></div>
+    <div><label class="fl">Passwort</label><input class="fi" type="password" id="lPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="err" id="lErr"></div>
+    <button class="btn" onclick="doLogin()" title="Anmelden">Anmelden</button>
+    <button class="btn" title="Passwort vergessen" onclick="doReset()" style="background:var(--sur2);box-shadow:none;color:var(--mu);font-size:.7rem;padding:9px;margin-top:6px">Passwort vergessen</button>
+    <div style="margin-top:16px;text-align:center;border-top:1px solid var(--brd);padding-top:10px;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">by <span style="color:var(--tx);font-weight:600">Stefan Mohr</span></div>
+  </div>
+</div>
+
+
+<!-- KRANKMELDUNG BESTÄTIGUNG -->
+<div id="krankOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9998;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:400px;width:100%;background:var(--sur);border:2px solid rgba(239,68,68,.3);border-radius:16px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.4)">
+    <div style="font-size:1.1rem;font-weight:800;color:#ef4444;margin-bottom:10px">🤒 Krankmeldung</div>
+    <div style="font-size:.78rem;color:var(--tx);line-height:1.7;margin-bottom:12px">Dein <b>Ausbilder</b> und dein <b>Arbeitgeber</b> werden über deine Krankmeldung automatisch informiert.</div>
+    <div style="padding:12px;background:rgba(239,68,68,.06);border:2px solid rgba(239,68,68,.2);border-radius:10px;margin-bottom:14px">
+      <div style="font-size:.82rem;font-weight:700;color:#b91c1c;line-height:1.6">⚠️ Wichtig: Du bist verpflichtet, dich zusätzlich persönlich bei deinem Ausbildungsbetrieb krank zu melden!</div>
+      <div style="font-size:.7rem;color:#6B7280;margin-top:6px;line-height:1.5">Die Meldung über diese App ersetzt <b>nicht</b> deine persönliche Krankmeldung beim Betrieb (telefonisch oder per E-Mail).</div>
+    </div>
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(239,68,68,.04);border:1.5px solid rgba(239,68,68,.15);border-radius:10px;cursor:pointer;user-select:none;margin-bottom:14px">
+      <input type="checkbox" id="krankCheck" style="margin-top:2px;width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:#ef4444">
+      <span style="font-size:.72rem;color:var(--tx);line-height:1.6">Ich habe verstanden und werde mich <b>persönlich bei meinem Ausbildungsbetrieb</b> krank melden.</span>
+    </label>
+    <div style="display:flex;gap:8px">
+      <button title="Abbrechen" onclick="document.getElementById('krankOverlay').style.display='none'" style="flex:1;padding:12px;background:var(--sur2);color:var(--tx);border:1.5px solid var(--brd);border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">Abbrechen</button>
+      <button title="🤒 Krank melden" onclick="confirmKrankmeldung()" style="flex:1;padding:12px;background:#ef4444;color:#fff;border:none;border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">🤒 Krank melden</button>
+    </div>
+    <div class="err" id="krankErr" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<!-- DSGVO CONSENT OVERLAY -->
+<div id="dsgvoOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:400px;width:100%;background:var(--sur);border:2px solid var(--brd);border-radius:16px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.4)">
+    <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:6px">📋 Datenschutz & Nutzungsbedingungen</div>
+    <div style="font-size:.75rem;color:var(--mu);line-height:1.6;margin-bottom:14px">Um MitarbeiterPro weiter nutzen zu können, bestätige bitte die folgenden Bedingungen. Deine Daten werden ausschließlich zur Verwaltung deiner Ausbildungslehrgänge verwendet.</div>
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(59,130,246,.04);border:1.5px solid rgba(59,130,246,.15);border-radius:10px;cursor:pointer;user-select:none;margin-bottom:12px">
+      <input type="checkbox" id="dsgvoConsentCheck" style="margin-top:2px;width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:#10b981">
+      <span style="font-size:.68rem;color:var(--mu);line-height:1.6">Ich habe die <a href="https://ausbilderpro.de/datenschutz.html" target="_blank" style="color:var(--acc);text-decoration:underline" onclick="event.stopPropagation()">Datenschutzerklärung</a> und die <a href="https://ausbilderpro.de/nutzungsbedingungen.html" target="_blank" style="color:var(--acc);text-decoration:underline" onclick="event.stopPropagation()">Nutzungsbedingungen</a> gelesen und stimme der Verarbeitung meiner Daten zu.</span>
+    </label>
+    <button title="✓ Bestätigen & weiter" onclick="submitDsgvoConsent()" style="width:100%;padding:12px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✓ Bestätigen & weiter</button>
+    <div class="err" id="dsgvoErr" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="hdr">
+    <div class="hdr-logo">Mitarbeiter<span>Pro</span></div>
+    <div class="hdr-user" id="hdrUser">—</div>
+  </div>
+
+  <div class="main" id="mainArea">
+    <!-- HOME -->
+    <div class="page active" id="page-home">
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:4px" id="greetName">Hallo!</div>
+      <div style="font-size:.68rem;color:var(--mu);font-family:'JetBrains Mono',monospace;margin-bottom:16px" id="greetDate"></div>
+      <div id="notifBanner"></div>
+      <!-- Kanal-Karten -->
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+        <button onclick="showPage('betrieb')" style="width:100%;padding:20px;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(16,185,129,.02));border:1.5px solid rgba(16,185,129,.2);border-radius:16px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:14px;font-family:'Sora',sans-serif;color:var(--tx)" title="Mein Betrieb">
+          <span style="font-size:2rem">🏭</span>
+          <div>
+            <div style="font-size:.95rem;font-weight:800">Mein Betrieb</div>
+            <div style="font-size:.65rem;color:var(--mu);margin-top:2px">Zeiten · Aufträge · Urlaub · Meldungen</div>
+          </div>
+          <span style="margin-left:auto;font-size:1.2rem;color:var(--mu)">→</span>
+        </button>
+      </div>
+      <!-- Kontakt -->
+      <div class="card" style="margin-top:8px">
+        <div class="card-title">📞 Kontakt Verwaltung</div>
+        <div id="hvKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
+      </div>
+    </div>
+
+    <!-- DOKUMENTE -->
+    <div class="page" id="page-docs">
+      <div style="font-size:1rem;font-weight:800;margin-bottom:14px">📁 Dokumente</div>
+      <div class="card">
+        <div class="card-title">📋 Kursunterlagen</div>
+        <div id="docsKurs"><div class="empty">Kursunterlagen erscheinen hier wenn du einem Kurs zugewiesen bist.</div></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div class="card-title" style="margin-bottom:0">🏭 Vom Betrieb</div>
+          <label style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600">📤 An Betrieb senden<input type="file" id="azSendToAGIn" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="azSendToAG(event)"></label>
+        </div>
+        <div id="docsAG" style="margin-top:6px"><div class="empty">Keine Dokumente vom Betrieb</div></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div class="card-title" style="margin-bottom:0">📎 Meine Dokumente</div></div>
+        <button class="upload-btn" onclick="myDocsUpload()" title="Dokument hochladen">📁 Dokument hochladen</button>
+        <input type="file" id="myDocsFileIn" style="display:none" onchange="myDocsHandleUpload(event)" multiple>
+        <div id="docsMy" style="margin-top:10px"><div class="empty">Noch keine eigenen Dokumente</div></div>
+      </div>
+    </div>
+
+    <!-- PROFIL -->
+    <div class="page" id="page-profil">
+      <div style="font-size:1rem;font-weight:800;margin-bottom:14px">👤 Mein Profil</div>
+      <input type="file" id="photoFileIn" accept="image/*" style="display:none" onchange="uploadProfilPhoto(event)">
+      <input type="file" id="photoCamIn" accept="image/*" capture="user" style="display:none" onchange="uploadProfilPhoto(event)">
+      <div class="card" id="profilCard"><div class="empty">Lädt…</div></div>
+      <div class="card">
+        <div class="card-title">🔑 Passwort ändern</div>
+        <div><label class="fl">Neues Passwort</label><input class="fi" type="password" id="pwNew" placeholder="Min. 6 Zeichen"></div>
+        <div><label class="fl">Wiederholen</label><input class="fi" type="password" id="pwNew2" placeholder="Nochmal eingeben" onkeydown="if(event.key==='Enter')changePw()"></div>
+        <div class="err" id="pwErr"></div>
+        <button class="btn" onclick="changePw()" style="margin-top:4px" title="Passwort ändern">Passwort ändern</button>
+      </div>
+      <div class="card">
+        <div class="card-title">🏖 Mein Urlaub</div>
+        <div id="myUrlaubAzubi"><div class="empty">Lädt…</div></div>
+        <div id="azubiUrlaubForm" style="display:none;margin-top:8px;padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px">
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <div style="flex:1"><label class="fl">Von</label><input class="fi" type="date" id="azUrlVon" style="font-size:.76rem"></div>
+            <div style="flex:1"><label class="fl">Bis</label><input class="fi" type="date" id="azUrlBis" style="font-size:.76rem"></div>
+          </div>
+          <div><label class="fl">Grund (optional)</label><input class="fi" id="azUrlLabel" placeholder="z.B. Betriebsurlaub" style="font-size:.76rem"></div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="btn" title="Abbrechen" onclick="document.getElementById('azubiUrlaubForm').style.display='none'" style="flex:1;font-size:.72rem;padding:8px;background:var(--sur2);color:var(--mu)">Abbrechen</button>
+            <button class="btn" onclick="saveAzubiUrlaub()" style="flex:1;font-size:.72rem;padding:8px" title="Urlaub speichern">✓ Speichern</button>
+          </div>
+        </div>
+        <button class="btn" title="+ Urlaub eintragen" onclick="showAzubiUrlaubForm()" style="background:var(--sur2);color:var(--acc);box-shadow:none;font-size:.72rem;padding:8px;margin-top:6px">+ Urlaub eintragen</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📅 Kurshistorie</div>
+        <div id="profilHist"><div class="empty">Keine Historie</div></div>
+      </div>
+      <button class="btn" title="Abmelden" onclick="doLogout()" style="background:var(--sur2);color:var(--bad);box-shadow:none;margin-top:8px">Abmelden</button>
+    </div>
+
+    <!-- BETRIEB -->
+    <div class="page" id="page-betrieb">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="card-icon green" style="width:36px;height:36px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+        <div style="font-size:1.1rem;font-weight:800">Mein Betrieb</div>
+      </div>
+      <!-- AG Hinweis -->
+      <div id="agHintBanner" style="display:none">
+        <div style="text-align:center;padding:30px 16px">
+          <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(5,150,105,.1));display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <div style="font-size:1rem;font-weight:800;color:var(--tx);margin-bottom:6px">Betrieb noch nicht verbunden</div>
+          <div style="font-size:.74rem;color:#475569;line-height:1.7;margin-bottom:20px;max-width:300px;margin-left:auto;margin-right:auto">Zeiterfassung, Aufträge, Urlaub und Meldungen stehen dir zur Verfügung, sobald dein Arbeitgeber ebenfalls die App nutzt.</div>
+          <div style="font-size:.72rem;font-weight:700;color:var(--tx);margin-bottom:10px">Teile diesen Link mit deinem Chef:</div>
+          <div style="display:flex;gap:6px;align-items:center;max-width:360px;margin:0 auto;margin-bottom:12px">
+            <input readonly value="ausbilderpro.de/ArbeitgeberPro.html" style="flex:1;padding:10px 12px;border:1.5px solid var(--brd);border-radius:8px;font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--tx);background:var(--sur2)" title="Text markieren" onclick="this.select()">
+            <button title="In Zwischenablage kopieren" onclick="navigator.clipboard.writeText('https://ausbilderpro.de/ArbeitgeberPro.html').then(()=>toast('Link kopiert'));this.textContent='Kopiert!';setTimeout(()=>this.textContent='Kopieren',2000)" style="padding:10px 16px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;border:none;border-radius:8px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;white-space:nowrap">Kopieren</button>
+          </div>
+          <button onclick="if(navigator.share){navigator.share({title:'AusbilderPro für Betriebe',text:'Zeiterfassung, Aufträge und mehr für den Betrieb. Kostenlos registrieren:',url:'https://ausbilderpro.de/ArbeitgeberPro.html'})}else{toast('Teilen nicht verfügbar')}" style="display:flex;align-items:center;gap:8px;padding:12px 24px;background:var(--sur2);color:var(--tx);border:1.5px solid var(--brd);border-radius:10px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;margin:0 auto" title="Teilen">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Link teilen
+          </button>
+          <div style="font-size:.6rem;color:var(--mu);margin-top:14px">Dein Arbeitgeber kann sich kostenlos registrieren und wird dann freigeschaltet.</div>
+        </div>
+      </div>
+      <div id="betriebContent">
+      <!-- Sub-Tabs -->
+      <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="betriebTabs">
+        <button class="stab active" onclick="showBetriebTab('zeiten')" title="Zeiten anzeigen">Zeiten</button>
+        <button class="stab" onclick="showBetriebTab('baustellen')" title="Aufträge anzeigen">Aufträge</button>
+        <button class="stab" onclick="showBetriebTab('urlaub')" title="Urlaub anzeigen">Urlaub</button>
+        <button class="stab" onclick="showBetriebTab('meldung')" title="Meldungen anzeigen">Meldungen</button>
+      </div>
+      <!-- Meldung an AG -->
+      <div class="btab" id="btab-meldung">
+        <div class="card">
+          <div class="card-title">Meldung an den Betrieb</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button onclick="sendBetriebMeldung('krank')" style="width:100%;padding:14px;background:rgba(239,68,68,.08);border:2px solid rgba(239,68,68,.25);border-radius:12px;font-size:.88rem;font-weight:700;color:#ef4444;cursor:pointer;font-family:'Sora',sans-serif;text-align:left;display:flex;align-items:center;gap:10px" title="Krankmeldung senden">🤒 Ich bin heute krank</button>
+            <button onclick="sendBetriebMeldung('spaeter')" style="width:100%;padding:14px;background:rgba(245,158,11,.08);border:2px solid rgba(245,158,11,.25);border-radius:12px;font-size:.88rem;font-weight:700;color:#d97706;cursor:pointer;font-family:'Sora',sans-serif;text-align:left;display:flex;align-items:center;gap:10px" title="Meldung: Komme später">🕐 Ich komme heute später</button>
+            <button onclick="sendBetriebMeldung('frueher')" style="width:100%;padding:14px;background:rgba(99,102,241,.08);border:2px solid rgba(99,102,241,.25);border-radius:12px;font-size:.88rem;font-weight:700;color:#6366f1;cursor:pointer;font-family:'Sora',sans-serif;text-align:left;display:flex;align-items:center;gap:10px" title="Meldung: Gehe früher">🚶 Ich gehe heute früher</button>
+          </div>
+          <div style="margin-top:10px">
+            <input class="fi" id="betriebMeldungText" placeholder="Freitext-Nachricht an den Betrieb…" style="font-size:.78rem">
+            <button title="Nachricht an Betrieb senden" onclick="sendBetriebMeldung('text')" class="btn" style="width:100%;font-size:.78rem;padding:10px;margin-top:4px">💬 Nachricht senden</button>
+          </div>
+          <div class="err" id="betriebMeldErr" style="margin-top:4px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Meine Meldungen</div>
+          <div id="betriebMeldListe"><div class="empty">Keine Meldungen</div></div>
+        </div>
+      </div>
+      <!-- Zeiten -->
+      <div class="btab active" id="btab-zeiten">
+        <div class="card" id="zeitStempelCard">
+          <div style="text-align:center;margin-bottom:12px">
+            <div style="font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace" id="zeitDatumHeute"></div>
+            <div style="font-size:2.5rem;font-weight:800;font-family:'JetBrains Mono',monospace;margin:8px 0" id="zeitUhr">--:--</div>
+            <div id="zeitStatus" style="font-size:.75rem;color:var(--mu)">Nicht eingestempelt</div>
+          </div>
+          <button id="zeitBtn" style="width:100%;padding:16px;border:none;border-radius:14px;font-size:1rem;font-weight:800;cursor:pointer;font-family:'Sora',sans-serif;background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.3);position:relative;overflow:hidden;user-select:none;-webkit-user-select:none" title="1 Sekunde gedrückt halten zum Stempeln"><span id="zeitBtnBar" style="position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.25);border-radius:14px;transition:none;pointer-events:none"></span><span id="zeitBtnText" style="position:relative">▶ Einstempeln</span></button>
+          <div style="text-align:center;font-size:.58rem;color:var(--mu);margin-top:4px">1 Sekunde gedrückt halten</div>
+          <div id="zeitPauseRow" style="display:none;margin-top:8px">
+            <button onclick="zeitPause()" id="zeitPauseBtn" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;background:rgba(245,158,11,.15);color:#d97706;border:1.5px solid rgba(245,158,11,.3)" title="Pause">⏸ Pause starten</button>
+          </div>
+        </div>
+        <!-- Wochenarbeitszeit (vom AG festgelegt) -->
+        <div class="card" id="azPlanCard">
+          <div class="card-title" style="margin-bottom:6px">⏱ Wochenarbeitszeit</div>
+          <div id="azPlanDisplay" style="font-size:.72rem;color:var(--mu)">Lädt…</div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 Heute</div>
+          <div id="zeitHeute"><div class="empty">Noch keine Einträge</div></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div class="card-title" style="margin:0">📅 Zeitkonto</div>
+            <select id="zeitMonat" onchange="loadZeitkonto()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+          </div>
+          <div id="zeitKonto"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✏ Zeit nachtragen</div>
+          <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Vergessen einzustempeln? Trage die Zeit manuell nach – dein Betrieb muss den Eintrag bestätigen.</div>
+          <div><label class="fl">Datum</label><input class="fi" type="date" id="zeitNachDatum" style="font-size:.76rem"></div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <div style="flex:1"><label class="fl">Eingang</label><input class="fi" type="time" id="zeitNachEin" style="font-size:.76rem"></div>
+            <div style="flex:1"><label class="fl">Ausgang</label><input class="fi" type="time" id="zeitNachAus" style="font-size:.76rem"></div>
+          </div>
+          <div><label class="fl">Bemerkung (optional)</label><input class="fi" id="zeitNachBem" placeholder="z.B. Stempeln vergessen" style="font-size:.76rem"></div>
+          <button class="btn" onclick="zeitNachtragen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px" title="Zeit nachtragen">✏ Nachtragen (AG-Bestätigung nötig)</button>
+          <div class="err" id="zeitNachErr" style="margin-top:4px"></div>
+        </div>
+      </div>
+      <!-- Urlaub -->
+      <div class="btab" id="btab-urlaub">
+        <div class="card">
+          <div class="card-title">📅 Jahresübersicht</div>
+          <div id="jahresUebersicht"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">+ Abwesenheit beantragen</div>
+          <div><label class="fl">Art</label><select class="fi" id="urlArt" style="font-size:.76rem">
+            <option value="urlaub">🏖 Urlaub</option>
+            <option value="ueberstunden">⏱ Überstundenabbau</option>
+          </select></div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <div style="flex:1"><label class="fl">Von</label><input class="fi" type="date" id="urlVon" style="font-size:.76rem"></div>
+            <div style="flex:1"><label class="fl">Bis</label><input class="fi" type="date" id="urlBis" style="font-size:.76rem"></div>
+          </div>
+          <div><label class="fl">Bemerkung (optional)</label><input class="fi" id="urlGrund" placeholder="z.B. Familienurlaub" style="font-size:.76rem"></div>
+          <button class="btn" title="📨 Antrag einreichen" onclick="urlaubBeantragen()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px">📨 Antrag einreichen</button>
+          <div class="err" id="urlErr" style="margin-top:4px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Meine Anträge</div>
+          <div id="urlaubAntraege"><div class="empty">Keine Anträge</div></div>
+        </div>
+      </div>
+      <!-- Aufträge -->
+      <div class="btab" id="btab-baustellen">
+        <div class="card">
+          <div class="card-title">+ Eigenen Auftrag anlegen</div>
+          <div><label class="fl">Kunde</label><input class="fi" id="selfAufKunde" list="kundenList" placeholder="z.B. Familie Müller" style="font-size:.76rem" onchange="autoFillAdresse(this.value)"><datalist id="kundenList"></datalist></div>
+          <div><label class="fl">Adresse</label><input class="fi" id="selfAufAdresse" list="adressenList" placeholder="Straße, PLZ Ort" style="font-size:.76rem"><datalist id="adressenList"></datalist></div>
+          <div><label class="fl">Beschreibung</label><input class="fi" id="selfAufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.76rem"></div>
+          <button class="btn" title="📋 Auftrag anlegen" onclick="eigenenAuftragErstellen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px">📋 Auftrag anlegen</button>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Offene Aufträge</div>
+          <div id="auftraegeOffen"><div class="empty">Keine offenen Aufträge</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✅ Erledigte Aufträge</div>
+          <div id="auftraegeErledigt"><div class="empty">Keine erledigten Aufträge</div></div>
+        </div>
+      </div>
+      </div><!-- /betriebContent -->
+    </div>
+
+    <!-- MEHR -->
+    <div class="page" id="page-mehr">
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:14px">⚙ Mehr</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button class="card" onclick="showPage('profil')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Profil"><span style="font-size:1.4rem">👤</span><div><div style="font-weight:700;font-size:.85rem">Mein Profil</div><div style="font-size:.65rem;color:var(--mu)">Name, Kontakt, Passwort</div></div></button>
+        <button class="card" onclick="showPage('docs')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Dokumente"><span style="font-size:1.4rem">📁</span><div><div style="font-weight:700;font-size:.85rem">Dokumente</div><div style="font-size:.65rem;color:var(--mu)">Kursunterlagen, Betrieb, eigene Dateien</div></div></button>
+        <button class="card" onclick="showPage('hilfe')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Hilfe"><span style="font-size:1.4rem">❓</span><div><div style="font-weight:700;font-size:.85rem">Hilfe</div><div style="font-size:.65rem;color:var(--mu)">Anleitung & Tipps</div></div></button>
+        <button title="Abmelden" onclick="doLogout()" style="margin-top:8px;width:100%;padding:12px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Abmelden</button>
+      </div>
+    </div>
+
+    <!-- HILFE -->
+    <div class="page" id="page-hilfe">
+      <div style="text-align:center;padding:8px 0 16px">
+        <div style="font-size:1.4rem;font-weight:800">Mitarbeiter<span style="color:var(--acc)">Pro</span></div>
+        <div style="font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace">Zeiterfassung & Betrieb</div>
+        <div style="font-size:.58rem;color:var(--mu);margin-top:6px">by Stefan Mohr</div>
+      </div>
+      <div class="help-section open"><div class="help-section-header" onclick="this.parentElement.classList.toggle('open')"><div class="section-icon icon-blue">🚀</div><div class="section-title">Erste Schritte</div><span class="section-arrow">▾</span></div><div class="help-section-body"><div class="help-steps"><div class="help-step"><div class="step-num"></div><div class="step-text"><b>Zugangsdaten</b> – Du erhältst E-Mail und Passwort von deinem Arbeitgeber.</div></div><div class="help-step"><div class="step-num"></div><div class="step-text"><b>Anmelden</b> – Link öffnen, Zugangsdaten eingeben.</div></div><div class="help-step"><div class="step-num"></div><div class="step-text"><b>App installieren</b> – iPhone: Teilen → „Zum Home-Bildschirm". Android: Menü → „App installieren".</div></div><div class="help-step"><div class="step-num"></div><div class="step-text"><b>Passwort ändern</b> – Unter Mehr sofort ein eigenes Passwort setzen.</div></div></div></div></div>
+      <div class="help-section"><div class="help-section-header" onclick="this.parentElement.classList.toggle('open')"><div class="section-icon icon-green">⏱</div><div class="section-title">Zeiterfassung</div><span class="section-count">9</span><span class="section-arrow">▾</span></div><div class="help-section-body"><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Einstempeln</b> – Tippe auf den grünen Button. Dein GPS-Standort wird automatisch erfasst.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Pause</b> – Pause starten und beenden. Nach 6 Stunden erscheint eine gesetzliche Erinnerung gemäß §4 ArbZG.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Ausstempeln</b> – GPS wird erneut erfasst. Bei mehr als 10 Stunden pro Tag erscheint eine Warnung.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Geofencing</b> – Wenn dein Betrieb einen Arbeitsort festgelegt hat, kannst du nur innerhalb des Radius stempeln.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Gleitzeit</b> – Bei hinterlegter Kernzeit wirst du gewarnt, wenn du außerhalb der Zeiten stempelst.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Zeitkonto</b> – Monatsansicht mit Soll, Ist und Differenz. Feiertage, Krank- und Urlaubstage werden automatisch erkannt.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Wochensicht</b> – Kalenderwochen-Übersicht mit farbigen Fortschrittsbalken.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Überstundenkonto</b> – Kumulativer Jahressaldo über alle Monate hinweg.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Zeit nachtragen</b> – Vergessen zu stempeln? Manuell nachtragen – dein Chef muss den Eintrag bestätigen.</div></div></div></div>
+      <div class="help-section"><div class="help-section-header" onclick="this.parentElement.classList.toggle('open')"><div class="section-icon icon-amber">📋</div><div class="section-title">Aufträge</div><span class="section-count">6</span><span class="section-arrow">▾</span></div><div class="help-section-body"><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Aufträge erhalten</b> – Dein Chef weist dir Aufträge zu mit Kunde, Adresse und Beschreibung.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Navigation</b> – Tippe auf die Adresse, um Google Maps zur Navigation zu öffnen.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Auftrag starten</b> – Markiere den Auftrag als „In Arbeit".</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Auftrag erledigen</b> – Tätigkeit beschreiben, Stundenaufwand eintragen, Material auswählen, Fotos machen und Kundenunterschrift einholen.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Material-Vorschläge</b> – Bereits verwendete Materialien werden gespeichert und beim nächsten Mal vorgeschlagen.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Eigene Aufträge</b> – Du kannst auch selbst Aufträge anlegen.</div></div></div></div>
+      <div class="help-section"><div class="help-section-header" onclick="this.parentElement.classList.toggle('open')"><div class="section-icon icon-purple">🏖</div><div class="section-title">Urlaub & Krankmeldung</div><span class="section-count">2</span><span class="section-arrow">▾</span></div><div class="help-section-body"><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Urlaub beantragen</b> – Zeitraum wählen, dein Chef genehmigt den Antrag.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Krankmeldung</b> – Über den Meldungen-Tab. Dein Chef wird sofort informiert.</div></div></div></div>
+      <div class="tip-banner"><div class="tip-title">Gut zu wissen</div><div class="tip-text">Beim ersten Login sofort das Passwort ändern. Die App braucht eine Internetverbindung. Bei Problemen den Arbeitgeber kontaktieren.</div></div>
+      <div style="text-align:center;padding:12px 0;font-size:.58rem;color:var(--mu)">AusbilderPro Suite · ausbilderpro.de</div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bnav">
+    <button class="bnav-btn active" id="nav-home" onclick="showPage('home')" title="Startseite"><span class="bi"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>Home</button>
+    <button class="bnav-btn" id="nav-betrieb" onclick="showPage('betrieb')" title="Mein Betrieb"><span class="bi"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>Betrieb</button>
+    <button class="bnav-btn" id="nav-mehr" onclick="showPage('mehr')" title="Mehr"><span class="bi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>Mehr</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- AUSSTEMPEL-MODAL -->
+<style>
+.as-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto}
+.as-overlay.open{display:flex}
+.as-box{background:#fff;border-radius:16px;width:100%;max-width:420px;padding:24px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.as-title{font-size:1rem;font-weight:800;margin-bottom:16px;text-align:center}
+.as-section{margin-bottom:16px}
+.as-label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.sig-canvas{width:100%;height:160px;border:2px solid #e2e8f0;border-radius:10px;touch-action:none;cursor:crosshair;background:#fafbfc}
+.sig-actions{display:flex;gap:8px;margin-top:6px}
+.sig-actions button{flex:1;padding:8px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;font-size:.72rem;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif}
+.photo-grid{display:flex;gap:8px;flex-wrap:wrap}
+.photo-thumb{width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid #e2e8f0}
+.photo-add{width:80px;height:80px;border:2px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#94a3b8;cursor:pointer;background:#f8fafc}
+.photo-add:hover{border-color:#2563eb;color:#2563eb}
+.photo-wrap{position:relative;display:inline-block}
+.photo-del{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:.65rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.as-btns{display:flex;gap:10px;margin-top:20px}
+.as-btns button{flex:1;padding:14px;border:none;border-radius:12px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif}
+.as-cancel{background:#f1f5f9;color:#64748b}
+.as-confirm{background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;box-shadow:0 4px 16px rgba(239,68,68,.3)}
+.mat-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.mat-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:6px;font-size:.68rem;font-weight:600;color:#2563eb}
+.mat-tag button{background:none;border:none;color:#ef4444;cursor:pointer;font-size:.7rem;padding:0}
+</style>
+<div class="as-overlay" id="asModal">
+  <div class="as-box">
+    <div class="as-title" id="asTitle">⏹ Ausstempeln</div>
+    <div id="asZeit" style="text-align:center;font-size:.85rem;color:#64748b;margin-bottom:16px"></div>
+    <div class="as-section" id="asWorkSection">
+      <div class="as-label">🔧 Was wurde gemacht?</div>
+      <textarea id="asTaetigkeit" rows="2" style="width:100%;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-family:'Sora',sans-serif;resize:vertical" placeholder="z.B. Steckdosen installiert, Leitungen verlegt"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="flex:1">
+          <div class="as-label">⏱ Stundenaufwand</div>
+          <input type="number" id="asStunden" min="0" step="0.5" placeholder="z.B. 3.5" style="width:100%;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-family:'JetBrains Mono',monospace">
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <div class="as-label">🧱 Material</div>
+        <div style="display:flex;gap:4px">
+          <input type="text" id="asMatInput" list="asMatList" placeholder="z.B. NYM 3x1.5" style="flex:1;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.76rem;font-family:'Sora',sans-serif">
+          <datalist id="asMatList"></datalist>
+          <button onclick="asAddMat()" style="padding:8px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer">+</button>
+        </div>
+        <div class="mat-tags" id="asMatTags"></div>
+      </div>
+    </div>
+    <div class="as-section" id="asPhotoSection">
+      <div class="as-label">📸 Fotodokumentation (optional, max. 3)</div>
+      <div class="photo-grid" id="asPhotos">
+        <label class="photo-add" id="asPhotoAdd">📷<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="asAddPhotos(this.files)"></label>
+      </div>
+    </div>
+    <div class="as-section" id="asSigSection">
+      <div class="as-label">✍ Kundenunterschrift (optional)</div>
+      <canvas class="sig-canvas" id="sigCanvas"></canvas>
+      <div class="sig-actions">
+        <button onclick="sigClear()" title="Unterschrift löschen">🗑 Löschen</button>
+        <button onclick="sigUndo()" title="Rückgängig">↩ Rückgängig</button>
+      </div>
+    </div>
+    <div class="as-btns">
+      <button class="as-cancel" onclick="asClose()" title="Abbrechen">Abbrechen</button>
+      <button class="as-confirm" onclick="asConfirm()" title="Bestätigen">⏹ Ausstempeln</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Firebase ──
+const _fbCfg={
+  apiKey:"AIzaSyCI5hJLj22FTiAJoVIPis7VhoQqJiMLAZQ",
+  authDomain:"ausbilderpro.firebaseapp.com",
+  projectId:"ausbilderpro",
+  storageBucket:"ausbilderpro.firebasestorage.app",
+  messagingSenderId:"937082794250",
+  appId:"1:937082794250:web:eb99bc41d8f39908df8af3"
+};
+firebase.initializeApp(_fbCfg);
+const auth=firebase.auth();
+const db=firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
+const st=firebase.storage();
+let _uid=null, _email=null, _tnId=null, _tnData=null;
+
+// ISO → deutsch
+function fmtDE(d){ if(!d||d.length<10) return d||'?'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Auth ──
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
+auth.onAuthStateChanged(u=>{
+  if(u){
+    _uid=u.uid;
+    _email=u.email.toLowerCase();
+    // Prüfe ob TN existiert
+    findTN(_email).then(found=>{
+      if(found){
+        document.getElementById('loginWrap').style.display='none';
+        document.getElementById('joinWrap').style.display='none';
+        document.getElementById('app').classList.add('show');
+        document.getElementById('hdrUser').textContent=_email.split('@')[0];
+        loadData();
+      } else {
+        auth.signOut();
+        showErr('Kein Teilnehmer-Konto für diese E-Mail gefunden.\nBitte kontaktiere die Verwaltung.');
+      }
+    });
+  } else {
+    _uid=null; _tnId=null; _tnData=null;
+    {
+      document.getElementById('loginWrap').style.display='flex';
+    }
+    document.getElementById('app').classList.remove('show');
+  }
+});
+
+function findTN(email){
+  return db.collection('globalTN').where('email','==',email).limit(1).get()
+    .then(snap=>{
+      if(snap.empty) return false;
+      _tnId=snap.docs[0].id;
+      _tnData=snap.docs[0].data();
+      return true;
+    }).catch(()=>false);
+}
+
+function doLogin(){
+  const e=document.getElementById('lEmail').value.trim();
+  const p=document.getElementById('lPass').value;
+  if(!e||!p){showErr('Bitte E-Mail und Passwort eingeben');return;}
+  showErr('');
+  auth.signInWithEmailAndPassword(e,p)
+    .catch(err=>{
+      const map={'auth/user-not-found':'E-Mail oder Passwort falsch','auth/wrong-password':'E-Mail oder Passwort falsch','auth/invalid-credential':'E-Mail oder Passwort falsch','auth/invalid-email':'Ungültige E-Mail','auth/too-many-requests':'Zu viele Versuche – kurz warten'};
+      showErr(map[err.code]||err.message);
+    });
+}
+function doReset(){
+  const e=document.getElementById('lEmail').value.trim();
+  if(!e){showErr('Bitte zuerst E-Mail eingeben');return;}
+  auth.sendPasswordResetEmail(e)
+    .then(()=>{document.getElementById('lErr').style.color='var(--acc)';showErr('✓ Reset-Mail gesendet');})
+    .catch(()=>showErr('Fehler beim Senden'));
+}
+function doLogout(){ if(confirm('Wirklich abmelden?')) auth.signOut(); }
+function showErr(m){ const el=document.getElementById('lErr'); el.style.color='var(--bad)'; el.textContent=m; }
+
+// ── Navigation ──
+// History management for back button
+let _navFromPop=false, _curPage='home';
+history.replaceState({page:'home'},'');
+window.addEventListener('popstate',e=>{
+  if(e.state&&e.state.page){_navFromPop=true;showPage(e.state.page);}
+  else{_navFromPop=true;showPage('home');history.replaceState({page:'home'},'');}
+});
+function showPage(id){
+  if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
+  _curPage=id; _navFromPop=false;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
+  const navMap={'docs':'mehr','profil':'mehr','hilfe':'mehr'};
+  const navId=navMap[id]||id;
+  const nb=document.getElementById('nav-'+navId);
+  if(nb) nb.classList.add('active');
+  if(id==='docs') loadDocs();
+  if(id==='profil'){ loadProfil(); loadAzubiUrlaub(); }
+  if(id==='betrieb') initBetrieb();
+}
+
+// ── Load Data ──
+function loadData(){
+  // Activity tracking
+  if(_uid) db.collection('users').doc(_uid).set({lastActive:Date.now(),lastApp:'MitarbeiterPro',email:_email||'',role:'arbeitnehmer',sessionStart:Date.now()},{merge:true}).catch(()=>{});
+  if(!window._heartbeat) window._heartbeat=setInterval(()=>{
+    if(_uid) db.collection('users').doc(_uid).set({lastActive:Date.now()},{merge:true}).catch(()=>{});
+  },60000);
+  // Greet
+  const name=(_tnData?.vorname||'')+((_tnData?.nachname)?' '+_tnData.nachname:'');
+  document.getElementById('greetName').textContent='Hallo, '+(name.trim()||'Azubi')+'!';
+  const now=new Date();
+  document.getElementById('greetDate').textContent=now.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // Benachrichtigungen prüfen
+  checkBenachrichtigungen();
+
+  // Lade zugewiesene Kurse
+  loadHVKontakt();
+  checkDsgvoConsent();
+  checkAzubiBadges();
+
+}
+
+// ═══════════════════════════════════
+// BETRIEB-KANAL
+// ═══════════════════════════════════
+let _betriebInit=false;
+function initBetrieb(){
+  const agBanner=document.getElementById('agHintBanner');
+  const agContent=document.getElementById('betriebContent');
+  const hasAG=_tnData&&(_tnData.arbeitgeberId||_tnData.betriebId||_tnData.arbeitszeitPlan);
+  if(agBanner) agBanner.style.display=hasAG?'none':'block';
+  if(agContent) agContent.style.display=hasAG?'block':'none';
+  if(!_betriebInit){
+    _betriebInit=true;
+    loadBetriebMeldungen();
+  }
+  checkAzubiBadges();
+  // Aktuellen Sub-Tab initialisieren
+  const active=document.querySelector('.btab.active');
+  if(active&&active.id==='btab-zeiten') initZeiten();
+  if(active&&active.id==='btab-urlaub') initUrlaub();
+  if(active&&active.id==='btab-baustellen') loadAuftraege();
+  if(active&&active.id==='btab-meldung') loadBetriebMeldungen();
+  // Default: Zeiten initialisieren
+  if(!active||active.id==='btab-zeiten') initZeiten();
+}
+
+function checkAzubiBadges(){
+  if(!_tnId||!db) return;
+  let zeitCount=0, urlaubCount=0, meldCount=0;
+  const p1=db.collection('globalTN').doc(_tnId).collection('zeiterfassung')
+    .where('manuell','==',true).where('agBestaetigt','==',false).get()
+    .then(s=>{zeitCount=s.size;}).catch(()=>{});
+  const p2=db.collection('globalTN').doc(_tnId).collection('urlaubsantraege')
+    .where('status','==','beantragt').get()
+    .then(s=>{urlaubCount=s.size;}).catch(()=>{});
+  const p3=db.collection('globalTN').doc(_tnId).collection('betriebMeldungen')
+    .where('gelesen','==',false).get()
+    .then(s=>{meldCount=s.size;}).catch(()=>{});
+  Promise.all([p1,p2,p3]).then(()=>{
+    const total=zeitCount+urlaubCount+meldCount;
+    // Betrieb bottom-tab badge
+    setAzBadge('nav-betrieb', total);
+    // Sub-tab badges
+    const tabs=document.querySelectorAll('#betriebTabs .stab');
+    tabs.forEach(t=>{
+      const old=t.querySelector('.az-badge');if(old)old.remove();
+      let count=0;
+      if(t.textContent.includes('Zeiten')) count=zeitCount;
+      else if(t.textContent.includes('Urlaub')) count=urlaubCount;
+      else if(t.textContent.includes('Meldungen')) count=meldCount;
+      if(count>0){
+        t.style.position='relative';
+        const b=document.createElement('span');b.className='az-badge';
+        b.textContent=count;
+        t.appendChild(b);
+      }
+    });
+  });
+}
+function setAzBadge(elId, count){
+  const el=document.getElementById(elId);
+  if(!el) return;
+  let badge=el.querySelector('.az-badge');
+  if(count>0){
+    if(!badge){badge=document.createElement('span');badge.className='az-badge';el.style.position='relative';el.appendChild(badge);}
+    badge.textContent=count;
+  } else if(badge) badge.remove();
+}
+
+function showBetriebTab(tab){
+  document.querySelectorAll('.btab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.stab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('btab-'+tab).classList.add('active');
+  event.target.classList.add('active');
+  if(tab==='zeiten') initZeiten();
+  if(tab==='urlaub') initUrlaub();
+  if(tab==='baustellen') loadAuftraege();
+  if(tab==='meldung') loadBetriebMeldungen();
+}
+
+function sendBetriebMeldung(type){
+  if(!_tnId||!db) return;
+  const msgs={'krank':'🤒 Ich bin heute krank','spaeter':'🕐 Ich komme heute später','frueher':'🚶 Ich gehe heute früher'};
+  let text=msgs[type]||'';
+  if(type==='text'){
+    const inp=document.getElementById('betriebMeldungText');
+    text=(inp?.value||'').trim();
+    if(!text){document.getElementById('betriebMeldErr').textContent='Bitte Nachricht eingeben';return;}
+  }
+  // Krankmeldung: Overlay mit AG-Hinweis
+  if(type==='krank'){
+    _pendingBetriebMeld={type,text};
+    document.getElementById('krankOverlay').style.display='flex';
+    document.getElementById('krankCheck').checked=false;
+    return;
+  }
+  // Bestätigung für andere
+  if(type!=='text'){
+    const labels={'spaeter':'Meldung "Komme später" an den Betrieb senden?','frueher':'Meldung "Gehe früher" an den Betrieb senden?'};
+    if(!confirm(labels[type]||'Meldung senden?')) return;
+  }
+  _doSendBetriebMeldung(type, text);
+}
+let _pendingBetriebMeld=null;
+
+function _doSendBetriebMeldung(type, text){
+  const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Azubi';
+  const firma=_tnData?.firma||'';
+  db.collection('globalTN').doc(_tnId).collection('betriebMeldungen').add({
+    type, text, name, firma,
+    tnId: _tnId,
+    zeit: new Date().toISOString(),
+    datum: localDate(),
+    gelesen: false
+  }).then(()=>{
+    toast('✓ Meldung an Betrieb gesendet');
+    if(type==='text'){const inp=document.getElementById('betriebMeldungText');if(inp)inp.value='';}
+    loadBetriebMeldungen();
+  }).catch(err=>{document.getElementById('betriebMeldErr').textContent='Fehler: '+err.message;});
+}
+
+function loadBetriebMeldungen(){
+  const el=document.getElementById('betriebMeldListe');
+  if(!el||!_tnId||!db) return;
+  db.collection('globalTN').doc(_tnId).collection('betriebMeldungen')
+    .orderBy('zeit','desc').limit(10).get().then(snap=>{
+      if(snap.empty){el.innerHTML='<div class="empty">Keine Meldungen</div>';return;}
+      const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
+      let html='';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const zeit=d.zeit?new Date(d.zeit).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+        const statusCol=d.gelesen?'var(--mu)':'var(--acc)';
+        html+='<div style="padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:8px">'
+          +'<span style="font-size:.9rem">'+(icons[d.type]||'💬')+'</span>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:600;color:var(--tx)">'+esc(d.text)+'</div>'
+          +'<div style="font-size:.55rem;color:var(--mu)">'+zeit+(d.gelesen?' · ✓ gelesen':'')+'</div></div>'
+          +'</div>';
+      });
+      el.innerHTML=html;
+    }).catch(()=>{});
+}
+
+// ═══════════════════════════════════
+// ZEITERFASSUNG
+// ═══════════════════════════════════
+let _zeitState='aus'; // 'aus'|'ein'|'pause'
+let _zeitHeute=null;
+let _zeitTimer=null;
+
+let _azPlan=null;
+function initZeiten(){
+  if(_zeitTimer) clearInterval(_zeitTimer);
+  _zeitTimer=setInterval(()=>{
+    const n=new Date();
+    const el=document.getElementById('zeitUhr');
+    if(el) el.textContent=n.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  },1000);
+  const hEl=document.getElementById('zeitDatumHeute');
+  if(hEl) hEl.textContent=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  fillMonatSelect('zeitMonat');
+  loadAzPlan();
+  loadZeitHeute();
+  loadZeitkonto();
+}
+
+function loadAzPlan(){
+  if(!_tnId||!db) return;
+  db.collection('globalTN').doc(_tnId).get().then(doc=>{
+    _azPlan=doc.exists&&doc.data().arbeitszeitPlan?doc.data().arbeitszeitPlan:null;
+    renderAzPlan();
+  }).catch(()=>{});
+}
+function renderAzPlan(){
+  const el=document.getElementById('azPlanDisplay');
+  if(!el) return;
+  if(!_azPlan){
+    el.innerHTML='<span style="color:var(--warn)">⚠ Noch nicht konfiguriert – wird vom Betrieb festgelegt.</span>';
+    return;
+  }
+  const tage=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const keys=['mo','di','mi','do','fr','sa','so'];
+  let woche=0;
+  const parts=[];
+  tage.forEach((t,i)=>{
+    const h=_azPlan[keys[i]]||0; woche+=h;
+    if(h>0) parts.push('<span style="font-weight:700">'+t+'</span> '+h+'h');
+  });
+  el.innerHTML=parts.join(' · ')+'<span style="margin-left:8px;font-weight:800;color:var(--acc)">= '+woche+'h/Woche</span>';
+}
+function getSollMin(dateStr){
+  if(!_azPlan) return 0;
+  const dow=new Date(dateStr+'T12:00').getDay();
+  const map={0:'so',1:'mo',2:'di',3:'mi',4:'do',5:'fr',6:'sa'};
+  const key=map[dow];
+  return key?(_azPlan[key]||0)*60:0;
+}
+
+function loadZeitHeute(){
+  if(!_tnId||!db) return;
+  const today=localDate();
+  db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today).get().then(doc=>{
+    _zeitHeute=doc.exists?doc.data():null;
+    renderZeitHeute();
+    updateZeitBtn();
+  }).catch(()=>{});
+}
+
+function updateZeitBtn(){
+  const btn=document.getElementById('zeitBtn');
+  const status=document.getElementById('zeitStatus');
+  const pauseRow=document.getElementById('zeitPauseRow');
+  const pauseBtn=document.getElementById('zeitPauseBtn');
+  if(!btn) return;
+  const bar=document.getElementById('zeitBtnBar');if(bar) bar.style.width='0';
+  if(!_zeitHeute||!_zeitHeute.eingang||_zeitHeute.ausgang){
+    _zeitState='aus';
+    document.getElementById('zeitBtnText').textContent='▶ Einstempeln';
+    btn.style.background='linear-gradient(135deg,#059669,#10b981)';
+    status.textContent=_zeitHeute?.ausgang?'✓ Feierabend – '+_zeitHeute.eingang+' bis '+_zeitHeute.ausgang:'Nicht eingestempelt';
+    pauseRow.style.display='none';
+  } else if(_zeitHeute.eingang&&!_zeitHeute.ausgang){
+    const pLog=_zeitHeute.pauseLog||[];
+    const offenePause=pLog.find(p=>p.start&&!p.ende);
+    if(offenePause){
+      _zeitState='pause';
+      document.getElementById('zeitBtnText').textContent='⏸ In Pause seit '+offenePause.start;
+      btn.style.background='linear-gradient(135deg,#d97706,#f59e0b)';
+      status.textContent='Eingestempelt seit '+_zeitHeute.eingang+' – Pause läuft';
+      pauseRow.style.display='';
+      pauseBtn.textContent='▶ Pause beenden';
+      pauseBtn.style.background='rgba(16,185,129,.15)';pauseBtn.style.color='#059669';pauseBtn.style.borderColor='rgba(16,185,129,.3)';
+    } else {
+      _zeitState='ein';
+      document.getElementById('zeitBtnText').textContent='⏹ Ausstempeln';
+      btn.style.background='linear-gradient(135deg,#dc2626,#ef4444)';
+      status.textContent='Eingestempelt seit '+_zeitHeute.eingang;
+      pauseRow.style.display='';
+      pauseBtn.textContent='⏸ Pause starten';
+      pauseBtn.style.background='rgba(245,158,11,.15)';pauseBtn.style.color='#d97706';pauseBtn.style.borderColor='rgba(245,158,11,.3)';
+    }
+  }
+  checkPauseErinnerung();
+}
+
+function checkPauseErinnerung(){
+  const banner=document.getElementById('pauseWarning');
+  const banner10=document.getElementById('ueberstundenWarning');
+  if(!_zeitHeute||!_zeitHeute.eingang||_zeitHeute.ausgang){
+    if(banner)banner.style.display='none';
+    if(banner10)banner10.style.display='none';
+    return;
+  }
+  const pLog=_zeitHeute.pauseLog||[];
+  const hatPause=pLog.some(p=>p.start&&p.ende);
+  const [h,m]=_zeitHeute.eingang.split(':').map(Number);
+  const eingangMin=h*60+m;
+  const jetztMin=new Date().getHours()*60+new Date().getMinutes();
+  const arbeitsMin=jetztMin-eingangMin;
+  if(arbeitsMin>=360&&!hatPause){
+    if(!banner){
+      const el=document.createElement('div');el.id='pauseWarning';
+      el.style.cssText='padding:10px 14px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.25);border-radius:10px;margin-top:8px;font-size:.72rem;color:#dc2626;font-weight:600';
+      el.textContent='⚠ Gesetzliche Pause: Nach 6 Stunden Arbeitszeit ist eine Pause von mind. 30 Minuten vorgeschrieben (§4 ArbZG).';
+      document.getElementById('zeitBtn')?.parentElement?.appendChild(el);
+    } else banner.style.display='';
+  } else {if(banner)banner.style.display='none';}
+  if(arbeitsMin>=600){
+    if(!banner10){
+      const el=document.createElement('div');el.id='ueberstundenWarning';
+      el.style.cssText='padding:10px 14px;background:rgba(220,38,38,.1);border:1.5px solid rgba(220,38,38,.35);border-radius:10px;margin-top:8px;font-size:.72rem;color:#dc2626;font-weight:600';
+      el.textContent='🚨 Maximale Arbeitszeit: 10 Stunden pro Tag dürfen nicht überschritten werden (§3 ArbZG).';
+      document.getElementById('zeitBtn')?.parentElement?.appendChild(el);
+    } else banner10.style.display='';
+  } else {if(banner10)banner10.style.display='none';}
+}
+
+// ── GPS Helper ──
+function getGPS(){
+  return new Promise(resolve=>{
+    if(!navigator.geolocation){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(
+      pos=>resolve({lat:Math.round(pos.coords.latitude*1e6)/1e6,lng:Math.round(pos.coords.longitude*1e6)/1e6,acc:Math.round(pos.coords.accuracy)}),
+      ()=>resolve(null),
+      {enableHighAccuracy:true,timeout:8000,maximumAge:60000}
+    );
+  });
+}
+
+function checkGeofence(gps){
+  if(!_tnData?.geofence||!gps) return true;
+  const geo=_tnData.geofence;
+  const R=6371000;
+  const dLat=(gps.lat-geo.lat)*Math.PI/180;
+  const dLng=(gps.lng-geo.lng)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(geo.lat*Math.PI/180)*Math.cos(gps.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  const dist=R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  if(dist>geo.radius){
+    toast('📍 Zu weit vom Arbeitsort entfernt ('+Math.round(dist)+'m, max '+geo.radius+'m)','bad');
+    return false;
+  }
+  return true;
+}
+
+function checkGleitzeit(jetzt, typ){
+  const plan=_tnData?.arbeitszeitPlan;
+  if(!plan) return;
+  const [h,m]=jetzt.split(':').map(Number);
+  const jetztMin=h*60+m;
+  if(plan.rahmenVon&&plan.rahmenBis){
+    const [rv1,rv2]=plan.rahmenVon.split(':').map(Number);
+    const [rb1,rb2]=plan.rahmenBis.split(':').map(Number);
+    const rahmenVonMin=rv1*60+rv2, rahmenBisMin=rb1*60+rb2;
+    if(jetztMin<rahmenVonMin||jetztMin>rahmenBisMin){
+      toast('⚠ Außerhalb der Rahmenzeit ('+plan.rahmenVon+'–'+plan.rahmenBis+')','bad');
+    }
+  }
+  if(plan.kernVon&&plan.kernBis){
+    const [kv1,kv2]=plan.kernVon.split(':').map(Number);
+    const [kb1,kb2]=plan.kernBis.split(':').map(Number);
+    const kernVonMin=kv1*60+kv2, kernBisMin=kb1*60+kb2;
+    if(typ==='ein'&&jetztMin>kernVonMin+15){
+      toast('⚠ Kernzeit beginnt um '+plan.kernVon+' – du bist '+(jetztMin-kernVonMin)+' Minuten zu spät','bad');
+    }
+    if(typ==='aus'&&jetztMin<kernBisMin){
+      toast('⚠ Kernzeit endet um '+plan.kernBis+' – noch '+(kernBisMin-jetztMin)+' Minuten','bad');
+    }
+  }
+}
+
+// ── Long-Press Stempel-Button (1 Sekunde halten) ──
+(function(){
+  let _holdTimer=null,_holdStart=0,_holdAF=null;
+  function startHold(){
+    if(_holdTimer) return;
+    _holdStart=Date.now();
+    const bar=document.getElementById('zeitBtnBar');
+    if(bar) bar.style.width='0';
+    function animate(){
+      const elapsed=Date.now()-_holdStart;
+      const pct=Math.min(elapsed/1000,1);
+      if(bar) bar.style.width=(pct*100)+'%';
+      if(pct>=1){
+        cancelHold(true);
+        if(navigator.vibrate) navigator.vibrate(30);
+        zeitStempeln();
+        return;
+      }
+      _holdAF=requestAnimationFrame(animate);
+    }
+    _holdAF=requestAnimationFrame(animate);
+    _holdTimer=true;
+  }
+  function cancelHold(completed){
+    _holdTimer=null;
+    if(_holdAF){cancelAnimationFrame(_holdAF);_holdAF=null;}
+    if(!completed){
+      const bar=document.getElementById('zeitBtnBar');
+      if(bar) bar.style.width='0';
+    }
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    const btn=document.getElementById('zeitBtn');
+    if(!btn) return;
+    btn.addEventListener('touchstart',function(e){e.preventDefault();startHold();},{passive:false});
+    btn.addEventListener('touchend',function(){cancelHold();});
+    btn.addEventListener('touchcancel',function(){cancelHold();});
+    btn.addEventListener('mousedown',function(e){if(e.button===0)startHold();});
+    btn.addEventListener('mouseup',function(){cancelHold();});
+    btn.addEventListener('mouseleave',function(){cancelHold();});
+  });
+})();
+
+function zeitStempeln(){
+  if(!_tnId||!db) return;
+  const today=localDate();
+  const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
+  if(_zeitState==='aus'){
+    if(_zeitHeute&&_zeitHeute.ausgang){if(!confirm('Bereits ausgestempelt. Neuen Tag starten?'))return;}
+    getGPS().then(gps=>{
+      if(!checkGeofence(gps)) return;
+      checkGleitzeit(jetzt,'ein');
+      const data={eingang:jetzt,pauseLog:[],datum:today};
+      if(gps) data.gpsEingang=gps;
+      ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
+    });
+  } else if(_zeitState==='ein'||_zeitState==='pause'){
+    checkGleitzeit(jetzt,'aus');
+    const pLog=(_zeitHeute?.pauseLog||[]).map(p=>p.start&&!p.ende?{...p,ende:jetzt}:p);
+    const pauseMin=calcPauseMinuten(pLog);
+    const istMin=calcIstMinuten(_zeitHeute.eingang,jetzt,pauseMin);
+    const update={ausgang:jetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin};
+    getGPS().then(gps=>{
+      if(!checkGeofence(gps)) return;
+      if(gps) update.gpsAusgang=gps;
+      ref.update(update).then(()=>{loadZeitHeute();toast('⏹ Ausgestempelt um '+jetzt);});
+    });
+  }
+}
+
+let _asJetzt='',_asPhotos=[];
+function asClose(){document.getElementById('asModal').classList.remove('open');}
+function asConfirm(){
+  if(!_auftragId) return;
+  const ref=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_auftragId);
+  const update={status:'erledigt',erledigtAm:Date.now()};
+  const taet=document.getElementById('asTaetigkeit').value.trim();
+  const std=parseFloat(document.getElementById('asStunden').value);
+  if(taet) update.taetigkeit=taet;
+  if(std>0) update.stunden=std;
+  if(_asMaterialien.length) update.material=_asMaterialien;
+  toast('Wird gespeichert…');
+
+  const uploads=[];
+  _asPhotos.forEach((b64,i)=>{
+    const blob=b64toBlob(b64);
+    const path='betriebe/'+_tnId+'/auftraege/'+_auftragId+'/foto_'+i+'.jpg';
+    uploads.push(st.ref(path).put(blob,{contentType:'image/jpeg'}).then(()=>st.ref(path).getDownloadURL()));
+  });
+  const sigData=sigGetData();
+  let sigUpload=null;
+  if(sigData){
+    const sigBlob=b64toBlob(sigData);
+    const sigPath='betriebe/'+_tnId+'/auftraege/'+_auftragId+'/unterschrift.png';
+    sigUpload=st.ref(sigPath).put(sigBlob,{contentType:'image/png'}).then(()=>st.ref(sigPath).getDownloadURL());
+  }
+
+  Promise.all([Promise.all(uploads), sigUpload||Promise.resolve(null), getGPS()]).then(([fotoUrls,sigUrl,gps])=>{
+    if(fotoUrls.length) update.fotos=fotoUrls;
+    if(sigUrl) update.unterschrift=sigUrl;
+    if(gps) update.gpsErledigt=gps;
+    ref.update(update).then(()=>{
+      saveMaterialien();
+      asClose();_auftragId=null;
+      toast('Auftrag erledigt');
+    });
+  }).catch(e=>{toast('Fehler: '+e.message,'bad');});
+}
+
+function b64toBlob(b64){
+  const parts=b64.split(',');
+  const mime=parts[0].match(/:(.*?);/)[1];
+  const raw=atob(parts[1]);
+  const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+function asAddPhotos(files){
+  const grid=document.getElementById('asPhotos');
+  const addBtn=document.getElementById('asPhotoAdd');
+  Array.from(files).forEach(file=>{
+    if(_asPhotos.length>=3){toast('Max. 3 Fotos','bad');return;}
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const maxW=600;let w=img.width,h=img.height;
+        if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
+        const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        const b64=cv.toDataURL('image/jpeg',0.3);
+        _asPhotos.push(b64);
+        const wrap=document.createElement('div');wrap.className='photo-wrap';
+        const idx=_asPhotos.length-1;
+        wrap.innerHTML='<img class="photo-thumb" src="'+b64+'"><button class="photo-del" onclick="asDelPhoto('+idx+',this.parentElement)" title="Foto entfernen">✕</button>';
+        grid.insertBefore(wrap,addBtn);
+        if(_asPhotos.length>=3) addBtn.style.display='none';
+      };img.src=e.target.result;
+    };reader.readAsDataURL(file);
+  });
+}
+function asDelPhoto(idx,wrap){
+  _asPhotos.splice(idx,1);wrap.remove();
+  document.getElementById('asPhotoAdd').style.display='';
+  document.querySelectorAll('#asPhotos .photo-wrap').forEach((w,i)=>{
+    w.querySelector('.photo-del').setAttribute('onclick','asDelPhoto('+i+',this.parentElement)');
+  });
+}
+let _sigCanvas,_sigCtx,_sigDrawing=false,_sigPaths=[],_sigCurPath=[];
+function sigInit(){
+  _sigCanvas=document.getElementById('sigCanvas');_sigCtx=_sigCanvas.getContext('2d');
+  const r=_sigCanvas.getBoundingClientRect();
+  _sigCanvas.width=r.width*2;_sigCanvas.height=r.height*2;_sigCtx.scale(2,2);
+  _sigCtx.strokeStyle='#0f172a';_sigCtx.lineWidth=2;_sigCtx.lineCap='round';_sigCtx.lineJoin='round';
+  _sigPaths=[];_sigCurPath=[];
+  _sigCanvas.onpointerdown=e=>{e.preventDefault();_sigDrawing=true;_sigCurPath=[];const p=sigPos(e);_sigCurPath.push(p);_sigCtx.beginPath();_sigCtx.moveTo(p.x,p.y);};
+  _sigCanvas.onpointermove=e=>{if(!_sigDrawing)return;e.preventDefault();const p=sigPos(e);_sigCurPath.push(p);_sigCtx.lineTo(p.x,p.y);_sigCtx.stroke();};
+  _sigCanvas.onpointerup=_sigCanvas.onpointerleave=e=>{if(_sigDrawing){_sigDrawing=false;if(_sigCurPath.length>1)_sigPaths.push([..._sigCurPath]);_sigCurPath=[];}};
+}
+function sigPos(e){const r=_sigCanvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+function sigClear(){_sigPaths=[];_sigCurPath=[];if(_sigCtx)_sigCtx.clearRect(0,0,_sigCanvas.width,_sigCanvas.height);}
+function sigUndo(){_sigPaths.pop();sigRedraw();}
+function sigRedraw(){_sigCtx.clearRect(0,0,_sigCanvas.width,_sigCanvas.height);_sigPaths.forEach(path=>{if(path.length<2)return;_sigCtx.beginPath();_sigCtx.moveTo(path[0].x,path[0].y);for(let i=1;i<path.length;i++)_sigCtx.lineTo(path[i].x,path[i].y);_sigCtx.stroke();});}
+function sigGetData(){
+  if(!_sigPaths.length)return null;
+  const cv=document.createElement('canvas');cv.width=400;cv.height=160;
+  const ctx=cv.getContext('2d');
+  const sx=400/(_sigCanvas.width/2),sy=160/(_sigCanvas.height/2);
+  ctx.strokeStyle='#0f172a';ctx.lineWidth=1.5;ctx.lineCap='round';ctx.lineJoin='round';
+  _sigPaths.forEach(path=>{if(path.length<2)return;ctx.beginPath();ctx.moveTo(path[0].x*sx,path[0].y*sy);for(let i=1;i<path.length;i++)ctx.lineTo(path[i].x*sx,path[i].y*sy);ctx.stroke();});
+  return cv.toDataURL('image/png',0.8);
+}
+
+function zeitPause(){
+  if(!_tnId||!db||!_zeitHeute) return;
+  const today=localDate();
+  const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
+  const pLog=(_zeitHeute.pauseLog||[]).slice();
+  if(_zeitState==='ein'){
+    pLog.push({start:jetzt,ende:null});
+    ref.update({pauseLog:pLog}).then(()=>{loadZeitHeute();toast('⏸ Pause gestartet');});
+  } else if(_zeitState==='pause'){
+    const idx=pLog.findIndex(p=>p.start&&!p.ende);
+    if(idx>=0) pLog[idx].ende=jetzt;
+    ref.update({pauseLog:pLog}).then(()=>{loadZeitHeute();toast('▶ Pause beendet');});
+  }
+}
+
+function calcPauseMinuten(pLog){
+  let total=0;
+  (pLog||[]).forEach(p=>{
+    if(p.start&&p.ende) total+=timeToMin(p.ende)-timeToMin(p.start);
+  });
+  return Math.max(0,total);
+}
+function calcIstMinuten(ein,aus,pause){
+  return Math.max(0,timeToMin(aus)-timeToMin(ein)-(pause||0));
+}
+function timeToMin(t){
+  const p=(t||'0:0').split(':');
+  return parseInt(p[0])*60+parseInt(p[1]||0);
+}
+function minToStr(m){
+  const h=Math.floor(Math.abs(m)/60);
+  const min=Math.abs(m)%60;
+  return (m<0?'-':'')+h+'h '+String(min).padStart(2,'0')+'m';
+}
+
+function renderZeitHeute(){
+  const el=document.getElementById('zeitHeute');
+  if(!el) return;
+  if(!_zeitHeute||!_zeitHeute.eingang){el.innerHTML='<div class="empty">Noch nicht eingestempelt</div>';return;}
+  let html='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--brd)">'
+    +'<span style="font-size:.78rem;font-weight:700;color:var(--acc)">▶ '+_zeitHeute.eingang+'</span>';
+  if(_zeitHeute.ausgang) html+='<span style="font-size:.78rem;font-weight:700;color:#ef4444">⏹ '+_zeitHeute.ausgang+'</span>';
+  else html+='<span style="font-size:.7rem;color:var(--mu)">läuft…</span>';
+  html+='</div>';
+  const pLog=_zeitHeute.pauseLog||[];
+  if(pLog.length){
+    html+='<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Pausen: ';
+    html+=pLog.map(p=>p.start+(p.ende?' – '+p.ende:' – …')).join(', ');
+    html+=' ('+calcPauseMinuten(pLog)+' min)</div>';
+  }
+  if(_zeitHeute.ausgang){
+    const ist=_zeitHeute.istMinuten||calcIstMinuten(_zeitHeute.eingang,_zeitHeute.ausgang,calcPauseMinuten(pLog));
+    html+='<div style="font-size:.82rem;font-weight:700;color:var(--tx);margin-top:8px">Arbeitszeit: '+minToStr(ist)+'</div>';
+  }
+  el.innerHTML=html;
+}
+
+function loadZeitkonto(){
+  const el=document.getElementById('zeitKonto');
+  if(!el||!_tnId||!db) return;
+  const sel=document.getElementById('zeitMonat');
+  const ym=sel?sel.value:localYM();
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  // Parallel: Zeiterfassung + Krankmeldungen + Urlaub
+  const p1=db.collection('globalTN').doc(_tnId).collection('zeiterfassung')
+    .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
+    .orderBy('datum').get();
+  const p2=db.collection('globalTN').doc(_tnId).collection('betriebMeldungen')
+    .where('type','==','krank').get();
+  const p3=db.collection('globalTN').doc(_tnId).collection('urlaubsantraege')
+    .where('status','==','genehmigt').get();
+  Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlaubSnap])=>{
+    // Krank-Tage sammeln
+    const krankDates=new Set();
+    krankSnap.forEach(doc=>{const d=doc.data();if(d.datum&&d.datum.startsWith(ym)) krankDates.add(d.datum);});
+    // Urlaub-Tage sammeln (alle Tage im Bereich expandieren)
+    const urlaubDates=new Set();
+    urlaubSnap.forEach(doc=>{
+      const d=doc.data();
+      if(!d.von||!d.bis) return;
+      const start=new Date(d.von+'T12:00'), end=new Date(d.bis+'T12:00');
+      for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){
+        const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+        if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6) urlaubDates.add(ds);
+      }
+    });
+    // Zeiterfassung-Map
+    const zeitMap={};
+    zeitSnap.forEach(doc=>{zeitMap[doc.data().datum]=doc.data();});
+    // Alle Tage des Monats (inkl. Sa/So wenn konfiguriert)
+    const allDays=[];
+    const mStart=new Date(ym+'-01T12:00');
+    const mEnd=new Date(mStart.getFullYear(),mStart.getMonth()+1,0);
+    for(let dt=new Date(mStart);dt<=mEnd;dt.setDate(dt.getDate()+1)){
+      const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+      const today=localDate();
+      if(ds>today) continue;
+      allDays.push(ds);
+    }
+    if(!allDays.length&&zeitSnap.empty){el.innerHTML='<div class="empty">Keine Einträge in diesem Monat</div>';return;}
+    const [jy]=ym.split('-').map(Number);
+    const feiertage=getNRWFeiertage(jy);
+    let totalIst=0,totalSoll=0,tage=0,feiertagCount=0;
+    let html='';
+    if(_azPlan){
+      html+='<div style="display:flex;justify-content:space-between;font-size:.58rem;color:var(--mu);padding:2px 0;border-bottom:1px solid var(--brd);margin-bottom:4px;font-weight:700"><span style="flex:2">Tag</span><span style="flex:2;text-align:center">Zeit</span><span style="flex:1;text-align:right">Ist</span><span style="flex:1;text-align:right">Soll</span><span style="flex:1;text-align:right">+/-</span></div>';
+    }
+    allDays.forEach(ds=>{
+      const zeit=zeitMap[ds];
+      const isKrank=krankDates.has(ds);
+      const isUrlaub=urlaubDates.has(ds);
+      const isFeiertag=!!feiertage[ds];
+      const ist=zeit?.istMinuten||0;
+      const sollRaw=getSollMin(ds);
+      const soll=(isKrank||isUrlaub||isFeiertag)?0:sollRaw;
+      if(!sollRaw&&!zeit&&!isKrank&&!isUrlaub&&!isFeiertag) return;
+      if(isFeiertag) feiertagCount++;
+      const diff=ist-soll;
+      totalIst+=ist;totalSoll+=soll;
+      if(zeit?.ausgang) tage++;
+      const datDE=new Date(ds+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+      const manuell=zeit?.manuell?'<span style="font-size:.45rem;color:#d97706;font-weight:700">✎</span>':'';
+      const isFrei=isKrank||isUrlaub||isFeiertag;
+      let statusTag='';
+      if(isFeiertag) statusTag='<span style="font-size:.55rem;padding:1px 6px;background:rgba(139,92,246,.12);color:#7c3aed;border-radius:4px;font-weight:700;margin-left:4px">🎌 '+feiertage[ds]+'</span>';
+      else if(isKrank) statusTag='<span style="font-size:.55rem;padding:1px 6px;background:rgba(239,68,68,.15);color:#ef4444;border-radius:4px;font-weight:700;margin-left:4px">🤒 Krank</span>';
+      else if(isUrlaub) statusTag='<span style="font-size:.55rem;padding:1px 6px;background:rgba(16,185,129,.15);color:#059669;border-radius:4px;font-weight:700;margin-left:4px">🏖 Urlaub</span>';
+      if(_azPlan){
+        const diffCol=isFrei?'var(--mu)':diff>=0?'#059669':'#ef4444';
+        const zeitText=zeit?(zeit.eingang+(zeit.ausgang?' – '+zeit.ausgang:'…')):(isFrei?'—':'<span style="color:#ef4444;font-size:.55rem">nicht erfasst</span>');
+        html+='<div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.68rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
+          +'<span style="flex:2;color:var(--mu)">'+datDE+manuell+statusTag+'</span>'
+          +'<span style="flex:2;text-align:center">'+zeitText+'</span>'
+          +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(zeit?.ausgang?minToStr(ist):(isFrei?'—':''))+'</span>'
+          +'<span style="flex:1;text-align:right;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':minToStr(sollRaw))+'</span>'
+          +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':(zeit?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span>'
+          +'</div>';
+      } else if(zeit) {
+        html+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.72rem">'
+          +'<span style="color:var(--mu)">'+datDE+manuell+statusTag+'</span>'
+          +'<span>'+zeit.eingang+(zeit.ausgang?' – '+zeit.ausgang:'')+'</span>'
+          +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(zeit.ausgang?minToStr(ist):'…')+'</span></div>';
+      } else if(isFrei){
+        html+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.72rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
+          +'<span style="color:var(--mu)">'+datDE+statusTag+'</span>'
+          +'<span>—</span><span>—</span></div>';
+      }
+    });
+    const totalDiff=totalIst-totalSoll;
+    const diffCol=totalDiff>=0?'#059669':'#ef4444';
+    html+='<div style="margin-top:10px;padding:10px;background:var(--sur2);border-radius:8px">';
+    if(_azPlan){
+      html+='<div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:3px"><span>🤒 Krank-Tage</span><span style="font-weight:700">'+krankDates.size+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:3px"><span>🏖 Urlaub-Tage</span><span style="font-weight:700">'+urlaubDates.size+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:3px"><span>🎌 Feiertage</span><span style="font-weight:700">'+feiertagCount+'</span></div>'
+        +'<div style="border-top:1px solid var(--brd);margin:6px 0"></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:3px"><span>Ist ('+tage+' Tage)</span><span style="font-weight:800;font-family:\'JetBrains Mono\',monospace">'+minToStr(totalIst)+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:3px"><span>Soll (ohne Krank/Urlaub/Feiertage)</span><span style="font-weight:700;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+minToStr(totalSoll)+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.85rem;padding-top:6px;border-top:1px solid var(--brd)"><span style="font-weight:800">'+(totalDiff>=0?'📈 Überstunden':'📉 Fehlstunden')+'</span><span style="font-weight:800;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace;font-size:.95rem">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</span></div>';
+    } else {
+      html+='<div style="display:flex;justify-content:space-between"><span style="font-size:.78rem;font-weight:700">Gesamt ('+tage+' Tage)</span><span style="font-size:.85rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+minToStr(totalIst)+'</span></div>';
+    }
+    html+='</div>';
+    // 48h/Woche Warnung
+    const weekMap={};
+    allDays.forEach(ds=>{
+      const d=new Date(ds+'T12:00');
+      const jan4=new Date(d.getFullYear(),0,4);
+      const dayOfYear=Math.floor((d-new Date(d.getFullYear(),0,1))/86400000)+1;
+      const kw=Math.ceil((dayOfYear+jan4.getDay())/7);
+      const key='KW'+kw;
+      if(!weekMap[key]) weekMap[key]=0;
+      weekMap[key]+=(zeitMap[ds]?.istMinuten||0);
+    });
+    const overWeeks=Object.entries(weekMap).filter(([k,v])=>v>2880);
+    if(overWeeks.length){
+      html+='<div style="margin-top:8px;padding:10px;background:rgba(220,38,38,.08);border:1.5px solid rgba(220,38,38,.25);border-radius:8px;font-size:.72rem;color:#dc2626;font-weight:600">🚨 Wochenarbeitszeit überschritten (max. 48h/Woche §3 ArbZG): '+overWeeks.map(([k,v])=>k+': '+minToStr(v)).join(', ')+'</div>';
+    }
+    // Wochensicht
+    if(Object.keys(weekMap).length>1){
+      html+='<div style="margin-top:10px;padding:10px;background:var(--sur2);border-radius:8px">'
+        +'<div style="font-size:.68rem;font-weight:800;color:var(--mu);margin-bottom:6px">📊 WOCHENÜBERSICHT</div>';
+      Object.entries(weekMap).sort((a,b)=>parseInt(a[0].replace('KW',''))-parseInt(b[0].replace('KW',''))).forEach(([kw,min])=>{
+        const pct=_azPlan?Math.round(min/((_azPlan.mo+_azPlan.di+_azPlan.mi+_azPlan.do+_azPlan.fr+(_azPlan.sa||0)+(_azPlan.so||0))*60)*100):0;
+        const col=min>2880?'#dc2626':min>2400?'#d97706':'#059669';
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:.7rem">'
+          +'<span style="min-width:36px;font-weight:700;color:var(--mu)">'+kw+'</span>'
+          +'<div style="flex:1;height:6px;background:var(--brd);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+Math.min(pct,100)+'%;background:'+col+';border-radius:3px"></div></div>'
+          +'<span style="min-width:50px;text-align:right;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:'+col+'">'+minToStr(min)+'</span>'
+          +'</div>';
+      });
+      html+='</div>';
+    }
+    // Kumulatives Überstundenkonto
+    if(_azPlan){
+      html+='<div id="ueberKonto" style="margin-top:10px;padding:10px;background:linear-gradient(135deg,rgba(99,102,241,.06),rgba(139,92,246,.06));border:1.5px solid rgba(99,102,241,.15);border-radius:8px">'
+        +'<div style="font-size:.68rem;font-weight:800;color:#6366f1;margin-bottom:4px">📊 ÜBERSTUNDENKONTO (Jahressaldo)</div>'
+        +'<div id="ueberKontoContent" style="font-size:.72rem;color:var(--mu)">Berechne…</div></div>';
+    }
+    el.innerHTML=html;
+    if(_azPlan) loadUeberKonto(ym);
+  }).catch(err=>{el.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
+}
+
+function loadUeberKonto(currentYm){
+  if(!_tnId||!db||!_azPlan) return;
+  const year=currentYm.split('-')[0];
+  db.collection('globalTN').doc(_tnId).collection('zeiterfassung')
+    .where('datum','>=',year+'-01-01').where('datum','<=',year+'-12-31')
+    .get().then(snap=>{
+    const feiertage=getNRWFeiertage(parseInt(year));
+    const monatsDiff={};
+    snap.forEach(doc=>{
+      const d=doc.data();
+      if(!d.datum||d.datum.startsWith('abschluss')) return;
+      const ym=d.datum.substring(0,7);
+      if(!monatsDiff[ym]) monatsDiff[ym]={ist:0,soll:0};
+      monatsDiff[ym].ist+=(d.istMinuten||0);
+      const isFT=!!feiertage[d.datum];
+      const dow=new Date(d.datum+'T12:00').getDay();
+      const isWE=dow===0||dow===6;
+      if(!isFT&&!isWE){
+        const map={0:'so',1:'mo',2:'di',3:'mi',4:'do',5:'fr',6:'sa'};
+        const key=map[dow];
+        monatsDiff[ym].soll+=((_azPlan[key]||0)*60);
+      }
+    });
+    const monate=Object.keys(monatsDiff).sort();
+    let cumDiff=0;
+    let rows='';
+    monate.forEach(ym=>{
+      const md=monatsDiff[ym];
+      const diff=md.ist-md.soll;
+      cumDiff+=diff;
+      const isCurrent=ym===currentYm;
+      const col=diff>=0?'#059669':'#ef4444';
+      const cumCol=cumDiff>=0?'#059669':'#ef4444';
+      rows+='<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.68rem'+(isCurrent?';font-weight:700':'')+'">'
+        +'<span style="min-width:55px;color:var(--mu)">'+ym+'</span>'
+        +'<span style="min-width:50px;text-align:right;font-family:\'JetBrains Mono\',monospace;color:'+col+'">'+(diff>=0?'+':'')+minToStr(diff)+'</span>'
+        +'<span style="flex:1;text-align:right;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:'+cumCol+'">Σ '+(cumDiff>=0?'+':'')+minToStr(cumDiff)+'</span>'
+        +'</div>';
+    });
+    const el=document.getElementById('ueberKontoContent');
+    if(!el) return;
+    const cumCol=cumDiff>=0?'#059669':'#ef4444';
+    el.innerHTML=rows
+      +'<div style="border-top:1.5px solid rgba(99,102,241,.2);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:.85rem">'
+      +'<span style="font-weight:800;color:#6366f1">'+(cumDiff>=0?'📈 Guthaben':'📉 Fehlstunden')+'</span>'
+      +'<span style="font-weight:900;font-family:\'JetBrains Mono\',monospace;color:'+cumCol+';font-size:.95rem">'+(cumDiff>=0?'+':'')+minToStr(cumDiff)+'</span></div>';
+  }).catch(()=>{});
+}
+
+// ═══════════════════════════════════
+function zeitNachtragen(){
+  const datum=document.getElementById('zeitNachDatum').value;
+  const ein=document.getElementById('zeitNachEin').value;
+  const aus=document.getElementById('zeitNachAus').value;
+  const bem=document.getElementById('zeitNachBem').value.trim();
+  const err=document.getElementById('zeitNachErr');
+  err.textContent='';
+  if(!datum||!ein||!aus){err.textContent='Bitte Datum, Eingang und Ausgang eingeben';return;}
+  if(aus<=ein){err.textContent='Ausgang muss nach Eingang liegen';return;}
+  const istMin=timeToMin(aus)-timeToMin(ein);
+  if(!confirm('Zeit nachtragen?\n\n'+datum+': '+ein+' – '+aus+' ('+minToStr(istMin)+')\n\nDein Betrieb muss diesen Eintrag bestätigen.')) return;
+  db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(datum).set({
+    datum, eingang:ein, ausgang:aus, pauseLog:[], pauseMinuten:0, istMinuten:istMin,
+    manuell:true, agBestaetigt:false,
+    bemerkung:bem,
+    nachgetragenAm:Date.now(),
+    historie:firebase.firestore.FieldValue.arrayUnion({aktion:'nachgetragen',von:_email||'Mitarbeiter',am:Date.now(),eingang:ein,ausgang:aus})
+  },{merge:true}).then(()=>{
+    document.getElementById('zeitNachDatum').value='';
+    document.getElementById('zeitNachEin').value='';
+    document.getElementById('zeitNachAus').value='';
+    document.getElementById('zeitNachBem').value='';
+    toast('✏ Zeit nachgetragen – wartet auf AG-Bestätigung');
+    loadZeitHeute();loadZeitkonto();
+  }).catch(e=>{err.textContent='Fehler: '+e.message;});
+}
+
+// URLAUB
+// ═══════════════════════════════════
+function initUrlaub(){
+  loadJahresUebersicht();
+  loadUrlaubAntraege();
+}
+
+function loadJahresUebersicht(){
+  const el=document.getElementById('jahresUebersicht');
+  if(!el||!_tnId||!db) return;
+  const year=new Date().getFullYear();
+  // Parallel laden: Urlaubsanträge, Krankmeldungen
+  const p1=db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').get();
+  const p2=db.collection('globalTN').doc(_tnId).collection('betriebMeldungen')
+    .where('type','==','krank').get();
+  Promise.all([p1,p2]).then(([urlSnap, krankSnap])=>{
+    let urlaubTage=0, ueberTage=0, urlaubGen=0, ueberGen=0, beantragt=0;
+    urlSnap.forEach(doc=>{
+      const d=doc.data();
+      const tage=d.tage||0;
+      const art=d.art||'urlaub';
+      if(d.status==='genehmigt'){
+        if(art==='ueberstunden'){ueberGen++;ueberTage+=tage;}
+        else {urlaubGen++;urlaubTage+=tage;}
+      }
+      if(d.status==='beantragt') beantragt++;
+    });
+    // Kranktage: unique Tage zählen
+    const krankDates=new Set();
+    krankSnap.forEach(doc=>{
+      const d=doc.data();
+      if(d.datum) krankDates.add(d.datum);
+    });
+    const krankTage=krankDates.size;
+    el.innerHTML='<div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">'+year+'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:10px;text-align:center">'
+      +'<div style="font-size:1.4rem;font-weight:800;color:#ef4444">'+krankTage+'</div><div style="font-size:.55rem;color:var(--mu)">Krank-Tage</div></div>'
+      +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;text-align:center">'
+      +'<div style="font-size:1.4rem;font-weight:800;color:#059669">'+urlaubTage+'</div><div style="font-size:.55rem;color:var(--mu)">Urlaub ('+urlaubGen+' gen.)</div></div>'
+      +'<div style="flex:1;min-width:80px;padding:10px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:10px;text-align:center">'
+      +'<div style="font-size:1.4rem;font-weight:800;color:#6366f1">'+ueberTage+'</div><div style="font-size:.55rem;color:var(--mu)">Überstunden ('+ueberGen+' gen.)</div></div>'
+      +'</div>'
+      +(beantragt?'<div style="margin-top:8px;font-size:.65rem;color:#d97706;font-weight:600">⏳ '+beantragt+' Antrag'+(beantragt>1?'e':'')+' offen</div>':'');
+  }).catch(()=>{el.innerHTML='<div class="empty">Fehler beim Laden</div>';});
+}
+
+function urlaubBeantragen(){
+  const art=document.getElementById('urlArt').value;
+  const von=document.getElementById('urlVon').value;
+  const bis=document.getElementById('urlBis').value;
+  const grund=document.getElementById('urlGrund').value.trim();
+  const err=document.getElementById('urlErr');
+  err.textContent='';
+  if(!von||!bis){err.textContent='Bitte Von und Bis ausfüllen';return;}
+  if(bis<von){err.textContent='Bis-Datum muss nach Von liegen';return;}
+  let tage=0;
+  const d=new Date(von);
+  const end=new Date(bis);
+  while(d<=end){
+    const dow=d.getDay();
+    if(dow!==0&&dow!==6) tage++;
+    d.setDate(d.getDate()+1);
+  }
+  const artLabel=art==='ueberstunden'?'Überstundenabbau':'Urlaub';
+  if(!confirm(artLabel+' beantragen?\n\n'+von+' bis '+bis+' ('+tage+' Arbeitstage)'+(grund?'\nBemerkung: '+grund:''))) return;
+  db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').add({
+    von, bis, tage, grund, art, status:'beantragt', beantragAm:Date.now(),
+    tnName:((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim(),
+    firma:_tnData?.firma||''
+  }).then(()=>{
+    document.getElementById('urlVon').value='';
+    document.getElementById('urlBis').value='';
+    document.getElementById('urlGrund').value='';
+    toast('📨 '+artLabel+'-Antrag eingereicht ✓');
+    loadJahresUebersicht();
+    loadUrlaubAntraege();
+    checkAzubiBadges();
+  }).catch(err2=>{err.textContent='Fehler: '+err2.message;});
+}
+
+function loadUrlaubAntraege(){
+  const el=document.getElementById('urlaubAntraege');
+  if(!el||!_tnId||!db) return;
+  db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').orderBy('beantragAm','desc').limit(20).get().then(snap=>{
+    if(snap.empty){el.innerHTML='<div class="empty">Keine Anträge</div>';return;}
+    let html='';
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const statusCol=d.status==='genehmigt'?'#059669':d.status==='abgelehnt'||d.status==='widerrufen'?'#ef4444':'#d97706';
+      const statusIcon=d.status==='genehmigt'?'✅':d.status==='abgelehnt'?'❌':d.status==='widerrufen'?'🗑':'⏳';
+      const artIcon=d.art==='ueberstunden'?'⏱':'🏖';
+      const artLabel=d.art==='ueberstunden'?'Überstundenabbau':'Urlaub';
+      const vonDE=new Date(d.von+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+      const bisDE=new Date(d.bis+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+      html+='<div style="padding:8px;border:1px solid var(--brd);border-radius:8px;margin-bottom:4px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="font-size:.78rem;font-weight:700">'+artIcon+' '+vonDE+' – '+bisDE+'</span>'
+        +'<span style="font-size:.65rem;font-weight:700;color:'+statusCol+';padding:2px 8px;background:'+statusCol+'15;border-radius:4px">'+statusIcon+' '+d.status+'</span></div>'
+        +'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">'+artLabel+' · '+d.tage+' Tage'+(d.grund?' · '+esc(d.grund):'')+'</div>'
+        +'</div>';
+    });
+    el.innerHTML=html;
+  }).catch(()=>{});
+}
+
+// ═══════════════════════════════════
+// AUFTRÄGE
+// ═══════════════════════════════════
+let _auftraege=[];
+function loadAuftraege(){
+  if(!_tnId||!db) return;
+  loadKundenListe();
+  db.collection('globalTN').doc(_tnId).collection('auftraege')
+    .orderBy('erstelltAm','desc').onSnapshot(snap=>{
+      _auftraege=[];
+      snap.forEach(doc=>_auftraege.push({id:doc.id,...doc.data()}));
+      renderAuftraege();
+    },err=>{
+      const el=document.getElementById('auftraegeOffen');
+      if(el) el.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';
+    });
+}
+
+function renderAuftraege(){
+  const offen=_auftraege.filter(a=>a.status==='offen');
+  const inArbeit=_auftraege.filter(a=>a.status==='inArbeit');
+  const erledigt=_auftraege.filter(a=>a.status==='erledigt');
+  const elO=document.getElementById('auftraegeOffen');
+  const elE=document.getElementById('auftraegeErledigt');
+  if(!elO||!elE) return;
+  const aktiv=[...inArbeit,...offen];
+  if(!aktiv.length){elO.innerHTML='<div class="empty">Keine offenen Aufträge</div>';}
+  else{
+    let h='';
+    aktiv.forEach(a=>{
+      const dat=a.erstelltAm?new Date(a.erstelltAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
+      const mapsUrl=a.adresse?'https://maps.google.com/?q='+encodeURIComponent(a.adresse):'';
+      const isRunning=a.status==='inArbeit';
+      const borderCol=isRunning?'rgba(16,185,129,.4)':'rgba(37,99,235,.2)';
+      const bgCol=isRunning?'rgba(16,185,129,.04)':'rgba(37,99,235,.03)';
+      let seit='';
+      if(isRunning&&a.gestartetAm){const min=Math.round((Date.now()-a.gestartetAm)/60000);seit=min<60?min+'min':Math.floor(min/60)+'h '+min%60+'min';}
+      h+='<div style="padding:12px;border:1.5px solid '+borderCol+';border-radius:10px;margin-bottom:8px;background:'+bgCol+'">'
+        +(isRunning?'<div style="font-size:.6rem;font-weight:700;color:#059669;margin-bottom:4px">▶ In Arbeit'+(seit?' seit '+seit:'')+'</div>':'')
+        +'<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="font-size:.9rem;font-weight:800">'+esc(a.kunde||'Ohne Kunde')+'</span>'
+        +'<span style="font-size:.58rem;color:var(--mu)">'+dat+'</span></div>'
+        +(a.adresse?'<a href="'+mapsUrl+'" target="_blank" style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:8px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:8px;text-decoration:none;font-size:.72rem;color:#2563eb;font-weight:600">📍 '+esc(a.adresse)+' <span style="margin-left:auto;font-size:.65rem">→ Maps</span></a>':'')
+        +(a.beschreibung?'<div style="font-size:.78rem;color:var(--tx);margin-top:8px;padding:8px 10px;background:rgba(0,0,0,.02);border-radius:6px;line-height:1.5">'+esc(a.beschreibung)+'</div>':'')
+        +(a.erstelltVon&&a.erstelltVon!=='selbst'?'<div style="font-size:.58rem;color:var(--mu);margin-top:4px">Von: '+esc(a.erstelltVon)+'</div>':'')
+        +(a.frist?'<div style="font-size:.62rem;margin-top:2px;'+(a.frist<localDate()?'color:#dc2626;font-weight:700':'color:#d97706')+'">📅 Frist: '+new Date(a.frist+"T12:00").toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"2-digit"})+(a.frist<localDate()?' ⚠ ÜBERFÄLLIG':'')+'</div>':'')
+        +(isRunning
+          ?'<button title="✅ Auftrag erledigen" onclick="auftragErledigen(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Auftrag erledigen</button>'
+          :'<button title="▶ Auftrag starten" onclick="auftragStarten(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">▶ Auftrag starten</button>')
+        +'</div>';
+    });
+    elO.innerHTML=h;
+  }
+  if(!erledigt.length){elE.innerHTML='<div class="empty">Keine erledigten Aufträge</div>';}
+  else{
+    let h='';
+    erledigt.forEach(a=>{
+      const dat=a.erledigtAm?new Date(a.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+      h+='<div style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;opacity:.7">'
+        +'<div style="display:flex;justify-content:space-between">'
+        +'<span style="font-size:.78rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
+        +'<span style="font-size:.55rem;color:#059669;font-weight:600">✅ '+dat+'</span></div>'
+        +(a.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
+        +(a.taetigkeit?'<div style="font-size:.6rem;color:var(--mu)">🔧 '+esc(a.taetigkeit)+'</div>':'')
+        +((a.fotos||a.unterschrift)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(a.stunden?'⏱ '+a.stunden+'h ':'')+(a.fotos?'📸 '+a.fotos.length+' ':'')+(a.unterschrift?'✍ ':'')+'</div>':'')
+        +'</div>';
+    });
+    elE.innerHTML=h;
+  }
+}
+
+let _auftragId=null;
+let _asMaterialien=[];
+function auftragErledigen(id){
+  _auftragId=id;
+  const a=_auftraege.find(x=>x.id===id);
+  _asPhotos=[];
+  _asMaterialien=[];
+  document.getElementById('asTitle').textContent='✅ Auftrag abschließen';
+  document.getElementById('asZeit').textContent=a?esc(a.kunde||''):'';
+  document.getElementById('asWorkSection').style.display='';
+  document.getElementById('asPhotoSection').style.display='';
+  document.getElementById('asSigSection').style.display='';
+  document.getElementById('asTaetigkeit').value='';
+  document.getElementById('asStunden').value='';
+  document.getElementById('asMatInput').value='';
+  document.getElementById('asMatTags').innerHTML='';
+  document.getElementById('asPhotos').innerHTML='<label class="photo-add" id="asPhotoAdd">📷<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="asAddPhotos(this.files)"></label>';
+  sigClear();
+  loadMatListe();
+  const btn=document.querySelector('.as-confirm');
+  btn.textContent='✅ Auftrag erledigt';
+  btn.style.background='linear-gradient(135deg,#059669,#10b981)';
+  document.getElementById('asModal').classList.add('open');
+  sigInit();
+}
+function loadMatListe(){
+  if(!_tnId||!db) return;
+  db.collection('globalTN').doc(_tnId).get().then(doc=>{
+    const list=(doc.exists&&doc.data().materialListe)||[];
+    const dl=document.getElementById('asMatList');
+    dl.innerHTML='';
+    list.forEach(m=>{dl.innerHTML+='<option value="'+esc(m)+'">';});
+  });
+}
+function asAddMat(){
+  const inp=document.getElementById('asMatInput');
+  const val=inp.value.trim();
+  if(!val||_asMaterialien.includes(val)) return;
+  _asMaterialien.push(val);
+  renderMatTags();
+  inp.value='';inp.focus();
+}
+function asRemoveMat(idx){_asMaterialien.splice(idx,1);renderMatTags();}
+function renderMatTags(){
+  document.getElementById('asMatTags').innerHTML=_asMaterialien.map((m,i)=>'<span class="mat-tag">'+esc(m)+'<button onclick="asRemoveMat('+i+')" title="Entfernen">✕</button></span>').join('');
+}
+function saveMaterialien(){
+  if(!_tnId||!db||!_asMaterialien.length) return;
+  db.collection('globalTN').doc(_tnId).get().then(doc=>{
+    const existing=(doc.exists&&doc.data().materialListe)||[];
+    const merged=[...new Set([...existing,..._asMaterialien])];
+    db.collection('globalTN').doc(_tnId).update({materialListe:merged}).catch(()=>{});
+  });
+}
+
+function eigenenAuftragErstellen(){
+  const kunde=document.getElementById('selfAufKunde').value.trim();
+  const adresse=document.getElementById('selfAufAdresse').value.trim();
+  const beschr=document.getElementById('selfAufBeschr').value.trim();
+  if(!kunde){toast('Bitte Kunde eingeben','bad');return;}
+  db.collection('globalTN').doc(_tnId).collection('auftraege').add({
+    kunde, adresse, beschreibung:beschr,
+    status:'offen', erstelltAm:Date.now(), erstelltVon:'selbst'
+  }).then(()=>{
+    saveKunde(kunde,adresse);
+    document.getElementById('selfAufKunde').value='';
+    document.getElementById('selfAufAdresse').value='';
+    document.getElementById('selfAufBeschr').value='';
+    toast('📋 Auftrag angelegt');
+  });
+}
+
+// Kunden-Adressbuch
+function loadKundenListe(){
+  if(!_tnId||!db) return;
+  db.collection('globalTN').doc(_tnId).get().then(doc=>{
+    const list=(doc.exists&&doc.data().kundenListe)||[];
+    const kDl=document.getElementById('kundenList');
+    const aDl=document.getElementById('adressenList');
+    if(kDl){kDl.innerHTML='';list.forEach(k=>{kDl.innerHTML+='<option value="'+esc(k.kunde)+'">';});}
+    if(aDl){aDl.innerHTML='';[...new Set(list.map(k=>k.adresse).filter(Boolean))].forEach(a=>{aDl.innerHTML+='<option value="'+esc(a)+'">';});}
+    window._kundenCache=list;
+  });
+}
+function autoFillAdresse(kunde){
+  if(!window._kundenCache) return;
+  const match=window._kundenCache.find(k=>k.kunde===kunde);
+  if(match&&match.adresse){document.getElementById('selfAufAdresse').value=match.adresse;}
+}
+function saveKunde(kunde,adresse){
+  if(!_tnId||!db||!kunde) return;
+  db.collection('globalTN').doc(_tnId).get().then(doc=>{
+    const list=(doc.exists&&doc.data().kundenListe)||[];
+    const exists=list.find(k=>k.kunde===kunde);
+    if(exists){if(adresse&&adresse!==exists.adresse){exists.adresse=adresse;}}
+    else{list.push({kunde,adresse:adresse||''});}
+    db.collection('globalTN').doc(_tnId).update({kundenListe:list}).catch(()=>{});
+  });
+}
+
+// Status-Flow
+function auftragStarten(id){
+  db.collection('globalTN').doc(_tnId).collection('auftraege').doc(id).update({
+    status:'inArbeit', gestartetAm:Date.now()
+  }).then(()=>toast('▶ Auftrag gestartet'));
+}
+
+// ═══════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════
+function localDate(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function localYM(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+
+function getNRWFeiertage(year){
+  const a=year%19,b=Math.floor(year/100),c=year%100,d2=Math.floor(b/4),e=b%4;
+  const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d2-g+15)%30;
+  const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),dy=((h+l-7*m+114)%31)+1;
+  const easter=new Date(year,mo-1,dy);
+  const eD=(off)=>{const d=new Date(easter);d.setDate(d.getDate()+off);return localDate(d);};
+  const ft={};
+  ft[year+'-01-01']='Neujahr';ft[eD(-2)]='Karfreitag';ft[eD(1)]='Ostermontag';
+  ft[year+'-05-01']='Tag der Arbeit';ft[eD(39)]='Christi Himmelfahrt';ft[eD(50)]='Pfingstmontag';
+  ft[eD(60)]='Fronleichnam';ft[year+'-10-03']='Tag der Dt. Einheit';ft[year+'-11-01']='Allerheiligen';
+  ft[year+'-12-25']='1. Weihnachtstag';ft[year+'-12-26']='2. Weihnachtstag';
+  return ft;
+}
+
+function fillMonatSelect(id){
+  const sel=document.getElementById(id);
+  if(!sel) return;
+  const now=new Date();
+  sel.innerHTML='';
+  for(let i=0;i<6;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const label=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+    sel.innerHTML+='<option value="'+ym+'"'+(i===0?' selected':'')+'>'+label+'</option>';
+  }
+}
+
+function checkDsgvoConsent(){
+  if(!_tnData||!_tnId) return;
+  if(_tnData.dsgvoZustimmung) return; // Bereits zugestimmt
+  // Overlay anzeigen
+  const ov=document.getElementById('dsgvoOverlay');
+  if(ov) ov.style.display='flex';
+}
+
+function submitDsgvoConsent(){
+  const checked=document.getElementById('dsgvoConsentCheck')?.checked;
+  const errEl=document.getElementById('dsgvoErr');
+  if(!checked){
+    if(errEl){errEl.textContent='Bitte Checkbox anklicken um fortzufahren';}
+    return;
+  }
+  if(!_tnId){if(errEl)errEl.textContent='Nicht angemeldet';return;}
+  const consent={
+    datenschutz: true,
+    nutzungsbedingungen: true,
+    zeitpunkt: new Date().toISOString(),
+    version: '1.0'
+  };
+  db.collection('globalTN').doc(_tnId).update({dsgvoZustimmung:consent}).then(()=>{
+    _tnData.dsgvoZustimmung=consent;
+    document.getElementById('dsgvoOverlay').style.display='none';
+    toast('✓ Zustimmung gespeichert');
+  }).catch(err=>{
+    if(errEl) errEl.textContent='Fehler: '+err.message;
+  });
+}
+
+function loadHVKontakt(){
+  const el=document.getElementById('hvKontakt');
+  if(!el) return;
+  db.collection('shared').doc('kursSettings').get().then(doc=>{
+    const d=doc.exists?doc.data():{};
+    const tel=d.hvTel||'';
+    const email=d.hvEmail||'';
+    const name=d.hvName||'Verwaltung';
+    if(!tel&&!email){ el.innerHTML='<div class="empty">Keine Kontaktdaten hinterlegt</div>'; return; }
+    let html='';
+    if(name) html+='<div style="font-size:.82rem;font-weight:700;margin-bottom:4px">'+esc(name)+'</div>';
+    if(tel){
+      html+='<a href="tel:'+esc(tel)+'" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;text-decoration:none;color:var(--tx)">'
+        +'<span style="font-size:1.2rem">📞</span>'
+        +'<div><div style="font-size:.78rem;font-weight:600">Anrufen</div><div style="font-size:.65rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+esc(tel)+'</div></div></a>';
+    }
+    if(email){
+      html+='<a href="mailto:'+esc(email)+'" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;text-decoration:none;color:var(--tx);margin-top:6px">'
+        +'<span style="font-size:1.2rem">✉️</span>'
+        +'<div><div style="font-size:.78rem;font-weight:600">E-Mail schreiben</div><div style="font-size:.65rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+esc(email)+'</div></div></a>';
+    }
+    el.innerHTML=html;
+  }).catch(()=>{ el.innerHTML='<div class="empty">Kontaktdaten nicht verfügbar</div>'; });
+}
+
+// ── Benachrichtigungen ──
+function checkBenachrichtigungen(){
+  if(!_tnData||!_tnId) return;
+  const today=localDate();
+  const notifs=(_tnData.benachrichtigungen||[]).filter(n=>!n.gelesen);
+  const el=document.getElementById('notifBanner');
+  if(!el) return;
+  if(!notifs.length){ el.innerHTML=''; return; }
+  el.innerHTML=notifs.map((n,i)=>{
+
+    if(n.typ==='kurs_abgebrochen'){
+      if(n.bis&&n.bis<today) return ''; // Nach Kursende nicht mehr als abgebrochen anzeigen
+      return '<div style="padding:12px;background:rgba(239,68,68,.08);border:2px solid rgba(239,68,68,.3);border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:.75rem;font-weight:700;color:#ef4444;margin-bottom:4px">⚠️ Lehrgang abgesagt</div>'
+        +'<div style="font-size:.82rem;font-weight:800">'+esc(n.kursName||'Lehrgang')+'</div>'
+        +'<div style="font-size:.7rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(n.von)+' – '+fmtDE(n.bis)+'</div>'
+        +'<div style="font-size:.68rem;color:var(--mu);margin-top:4px">Dieser Lehrgang wurde von der Verwaltung abgesagt. Bei Fragen nutze die Kontakt-Buttons unten.</div>'
+        +'<button title="✓ Verstanden" onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:9px;border:none;border-radius:8px;background:rgba(239,68,68,.15);color:#ef4444;font-family:\'Sora\',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer">✓ Verstanden</button>'
+        +'</div>';
+    }
+    if(n.typ==='kurs_entfernt'){
+      return '<div style="padding:12px;background:rgba(245,158,11,.08);border:2px solid rgba(245,158,11,.3);border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:.75rem;font-weight:700;color:#f59e0b;margin-bottom:4px">⚠️ Aus Lehrgang entfernt</div>'
+        +'<div style="font-size:.82rem;font-weight:800">'+esc(n.kursName||'Lehrgang')+'</div>'
+        +'<div style="font-size:.7rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(n.von)+' – '+fmtDE(n.bis)+'</div>'
+        +'<div style="font-size:.68rem;color:var(--mu);margin-top:4px">Du wurdest von der Verwaltung aus diesem Lehrgang entfernt. Bei Fragen nutze die Kontakt-Buttons unten.</div>'
+        +'<button title="✓ Verstanden" onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:9px;border:none;border-radius:8px;background:rgba(245,158,11,.15);color:#f59e0b;font-family:\'Sora\',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer">✓ Verstanden</button>'
+        +'</div>';
+    }
+    if(n.typ==='krankmeldung'){
+      return '<div style="padding:14px;background:rgba(239,68,68,.08);border:2.5px solid rgba(239,68,68,.35);border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:.95rem;font-weight:800;color:#ef4444;margin-bottom:8px">🤒 Krankmeldung</div>'
+        +'<div style="font-size:.8rem;color:#1e293b;line-height:1.6;margin-bottom:8px">'+esc(n.text||'')+'</div>'
+        +'<div style="padding:10px;background:rgba(239,68,68,.06);border-radius:8px;font-size:.75rem;color:#b91c1c;font-weight:700;line-height:1.5">📞 Bitte melde dich umgehend persönlich bei deinem Ausbildungsbetrieb!</div>'
+        +'<button title="✓ Zur Kenntnis genommen" onclick="markNotifRead('+i+')" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;background:#ef4444;color:#fff;font-family:\'Sora\',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">✓ Zur Kenntnis genommen</button>'
+        +'</div>';
+    }
+    if(n.typ==='meldung_gelesen'){
+      return '<div style="padding:12px;background:rgba(16,185,129,.08);border:2px solid rgba(16,185,129,.3);border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:.85rem;font-weight:800;color:#059669;margin-bottom:6px">✅ Meldung gelesen</div>'
+        +'<div style="font-size:.78rem;color:#1e293b;line-height:1.6">'+esc(n.text||'')+'</div>'
+        +'<button title="✓ OK" onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:9px;border:none;border-radius:8px;background:rgba(16,185,129,.15);color:#059669;font-family:\'Sora\',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer">✓ OK</button>'
+        +'</div>';
+    }
+    if(n.typ==='kurs_nicht_angetreten'){
+      return '<div style="padding:14px;background:#ef4444;border:3px solid #dc2626;border-radius:12px;margin-bottom:10px;animation:pulseRed 1.5s infinite">'
+        +'<div style="font-size:1rem;font-weight:800;color:#fff;margin-bottom:8px">🚫 Nicht angetreten</div>'
+        +'<div style="font-size:.82rem;color:#fff;line-height:1.6;margin-bottom:8px">'+esc(n.text||'')+'</div>'
+        +'<div style="padding:10px;background:rgba(0,0,0,.15);border-radius:8px;font-size:.75rem;color:#fff;font-weight:600;line-height:1.5">📞 Bitte informiere zeitnah deinen Ausbildungsbetrieb.</div>'
+        +'<button title="✓ Zur Kenntnis genommen" onclick="markNotifRead('+i+')" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;background:#fff;color:#ef4444;font-family:\'Sora\',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">✓ Zur Kenntnis genommen</button>'
+        +'</div>';
+    }
+    if(n.typ==='kurs_wiederholer'){
+      return '<div style="padding:14px;background:#d97706;border:3px solid #b45309;border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:1rem;font-weight:800;color:#fff;margin-bottom:8px">↩ Kurs wird wiederholt</div>'
+        +'<div style="font-size:.82rem;color:#fff;line-height:1.6;margin-bottom:8px">'+esc(n.text||'')+'</div>'
+        +'<div style="padding:10px;background:rgba(0,0,0,.15);border-radius:8px;font-size:.75rem;color:#fff;font-weight:600;line-height:1.5">📞 Bitte informiere deinen Ausbildungsbetrieb.</div>'
+        +'<button title="✓ Zur Kenntnis genommen" onclick="markNotifRead('+i+')" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;background:#fff;color:#d97706;font-family:\'Sora\',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">✓ Zur Kenntnis genommen</button>'
+        +'</div>';
+    }
+
+    if(n.typ==='urlaub_genehmigt'){
+      return '<div style="padding:12px;background:#059669;border:2px solid #047857;border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:.85rem;font-weight:800;color:#fff;margin-bottom:6px">✅ Urlaub genehmigt</div>'
+        +'<div style="font-size:.78rem;color:#fff;line-height:1.6">'+esc(n.text||'Dein Urlaubsantrag wurde genehmigt.')+'</div>'
+        +'<button title="✓ OK" onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:9px;border:none;border-radius:8px;background:#fff;color:#059669;font-family:\'Sora\',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer">✓ OK</button>'
+        +'</div>';
+    }
+    if(n.typ==='urlaub_abgelehnt'){
+      return '<div style="padding:12px;background:#ef4444;border:2px solid #dc2626;border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:.85rem;font-weight:800;color:#fff;margin-bottom:6px">❌ Urlaub abgelehnt</div>'
+        +'<div style="font-size:.78rem;color:#fff;line-height:1.6">'+esc(n.text||'Dein Urlaubsantrag wurde leider abgelehnt.')+'</div>'
+        +'<button title="✓ OK" onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:9px;border:none;border-radius:8px;background:#fff;color:#ef4444;font-family:\'Sora\',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer">✓ OK</button>'
+        +'</div>';
+    }
+    if(n.typ==='urlaub_widerrufen'){
+      return '<div style="padding:14px;background:#ef4444;border:3px solid #dc2626;border-radius:12px;margin-bottom:10px">'
+        +'<div style="font-size:.85rem;font-weight:800;color:#fff;margin-bottom:6px">🗑 Urlaub widerrufen</div>'
+        +'<div style="font-size:.78rem;color:#fff;line-height:1.6">'+esc(n.text||'')+'</div>'
+        +'<button title="✓ Zur Kenntnis genommen" onclick="markNotifRead('+i+')" style="margin-top:8px;width:100%;padding:9px;border:none;border-radius:8px;background:#fff;color:#ef4444;font-family:\'Sora\',sans-serif;font-size:.75rem;font-weight:700;cursor:pointer">✓ Zur Kenntnis genommen</button>'
+        +'</div>';
+    }
+    return '';
+  }).join('');
+}
+
+function markNotifRead(filteredIdx){
+  if(!_tnId||!_tnData) return;
+  const notifs=(_tnData.benachrichtigungen||[]).slice();
+  let matchedNotif=null;
+  let unreadCount=0;
+  for(let i=0;i<notifs.length;i++){
+    if(!notifs[i].gelesen){
+      if(unreadCount===filteredIdx){
+        notifs[i].gelesen=true;
+        notifs[i].gelesenAm=Date.now();
+        matchedNotif=notifs[i];
+        break;
+      }
+      unreadCount++;
+    }
+  }
+
+  if(matchedNotif&&matchedNotif.typ==='kurs_entfernt'){
+    const kursId=matchedNotif.kursId||'';
+    const hist=(_tnData.kursHistory||[]).map(h=>{
+      if(h.kursId===kursId) return {...h, entfernt:true};
+      return h;
+    });
+    // Schritt 1: globalTN updaten (als Admin-ähnliche Felder)
+    db.collection('globalTN').doc(_tnId).update({
+      benachrichtigungen:notifs,
+      
+      pendingRemoval:null,
+      pendingRemovalKurs:null,
+      kursHistory:hist
+    }).then(()=>{
+      // Schritt 2: Aus Kurs-Subcollection entfernen
+      if(kursId){
+        return db.collection('shared').doc('kurse').collection('list').doc(kursId)
+          .collection('teilnehmer').doc(_tnId).delete().catch(()=>{});
+      }
+    }).then(()=>{
+      location.reload();
+    }).catch(err=>{
+      alert('Fehler: '+err.message+'\n\nBitte Firestore-Regeln aktualisieren!\nVerwaltungPro → ⚙ → 📋 Regeln kopieren');
+    });
+  } else {
+    db.collection('globalTN').doc(_tnId).update({benachrichtigungen:notifs})
+      .then(()=>location.reload())
+      .catch(err=>alert('Fehler: '+err.message));
+  }
+}
+
+function renderDocItem(d, canDelete, docId, tnId){
+  const icon=d.type&&d.type.startsWith('image')?'🖼':d.type==='application/pdf'?'📄':'📎';
+  const size=d.size>1024*1024?(d.size/1024/1024).toFixed(1)+' MB':Math.round(d.size/1024)+' KB';
+  const date=new Date(d.ts).toLocaleDateString('de-DE');
+  const uploader=d.uploadedBy?d.uploadedBy.split('@')[0]:'';
+  return '<div class="doc-item">'
+    +'<div class="doc-icon">'+icon+'</div>'
+    +'<div class="doc-info"><div class="doc-name">'+esc(d.name)+'</div>'
+    +'<div class="doc-meta">'+size+' · '+date+(uploader?' · '+esc(uploader):'')+'</div></div>'
+    +'<button class="doc-btn" onclick="window.open(\''+esc(d.url)+'\',\'_blank\')" title="Öffnen">Öffnen</button>'
+    +(canDelete?'<button class="doc-del" onclick="myDocsDelete(\''+docId+'\',\''+esc(d.path)+'\')" title="Löschen">🗑</button>':'')
+    +'</div>';
+}
+
+// ── Dokumente Page ──
+function loadDocs(){
+  loadKursDocs();
+  loadMyDocs();
+}
+
+function loadKursDocs(){}
+
+function loadMyDocs(){
+  const elMy=document.getElementById('docsMy');
+  const elAG=document.getElementById('docsAG');
+  if(!_tnId){ if(elMy)elMy.innerHTML='<div class="empty">Nicht zugeordnet</div>'; return; }
+  if(elMy) elMy.innerHTML='<div class="empty">Lädt…</div>';
+  if(elAG) elAG.innerHTML='<div class="empty">Lädt…</div>';
+  db.collection('globalTN').doc(_tnId).collection('dokumente').orderBy('ts','desc').onSnapshot(snap=>{
+    const myDocs=[], agDocs=[];
+    snap.forEach(doc=>{
+      const d={docId:doc.id,...doc.data()};
+      if(d.vonRolle==='arbeitgeber'||d.fuerRolle==='arbeitgeber') agDocs.push(d);
+      else myDocs.push(d);
+    });
+    // Meine Dokumente
+    if(elMy){
+      if(!myDocs.length){ elMy.innerHTML='<div class="empty">Noch keine eigenen Dokumente</div>'; }
+      else{
+        elMy.innerHTML='';
+        myDocs.forEach(d=>{
+          const canDel=d.uploadedByUid===_uid;
+          elMy.innerHTML+=renderDocItem(d, canDel, d.docId, _tnId);
+        });
+      }
+    }
+    // Vom Betrieb / An Betrieb
+    if(elAG){
+      if(!agDocs.length){ elAG.innerHTML='<div class="empty">Noch kein Dokumentenaustausch mit dem Betrieb</div>'; }
+      else{
+        elAG.innerHTML='';
+        agDocs.forEach(d=>{
+          const icon=((d.fileName||d.name||'').match(/\.pdf$/i))?'📕':((d.fileName||d.name||'').match(/\.(jpg|jpeg|png)$/i))?'🖼':'📄';
+          const date=new Date(d.ts).toLocaleDateString('de-DE');
+          const isFromAG=d.vonRolle==='arbeitgeber';
+          const dirLabel=isFromAG?'<span style="color:var(--acc);font-weight:700">← vom Betrieb</span>':'<span style="color:#16a34a;font-weight:700">→ an Betrieb gesendet</span>';
+          const canDel=!isFromAG;
+          elAG.innerHTML+='<div class="doc-item">'
+            +'<div class="doc-icon">'+icon+'</div>'
+            +'<div class="doc-info"><div class="doc-name">'+esc(d.fileName||d.name||'Dokument')+'</div>'
+            +'<div class="doc-meta">'+dirLabel+' · '+date+'</div></div>'
+            +'<button class="doc-btn" onclick="azDownloadAGDoc(\''+d.docId+'\')" title="Öffnen">💾</button>'
+            +(canDel?'<button class="doc-del" onclick="azDeleteAGDoc(\''+d.docId+'\')" title="Löschen">🗑</button>':'')
+            +'</div>';
+        });
+      }
+    }
+  },()=>{if(elMy)elMy.innerHTML='<div class="empty" style="color:var(--bad)">Fehler</div>';});
+}
+
+function azDownloadAGDoc(docId){
+  db.collection('globalTN').doc(_tnId).collection('dokumente').doc(docId).get().then(doc=>{
+    if(!doc.exists) return;
+    const d=doc.data();
+    const a=document.createElement('a');
+    a.href=d.data||d.url;
+    a.download=d.fileName||d.name||'dokument';
+    a.click();
+  }).catch(err=>toast('Fehler','bad'));
+}
+
+function azDeleteAGDoc(docId){
+  if(!confirm('Dokument löschen?')) return;
+  db.collection('globalTN').doc(_tnId).collection('dokumente').doc(docId).delete()
+    .then(()=>toast('Gelöscht')).catch(()=>toast('Fehler','bad'));
+}
+
+function azSendToAG(e){
+  const file=e.target.files[0];
+  e.target.value='';
+  if(!file||!_tnId) return;
+  if(file.size>2*1024*1024){toast('Max. 2 MB','bad');return;}
+  toast('⬆ Wird gesendet…');
+  const reader=new FileReader();
+  reader.onload=function(){
+    db.collection('globalTN').doc(_tnId).collection('dokumente').add({
+      fileName:file.name,
+      fileType:file.type,
+      fileSize:file.size,
+      data:reader.result,
+      vonRolle:'azubi',
+      fuerRolle:'arbeitgeber',
+      vonEmail:_email||'',
+      ts:Date.now()
+    }).then(()=>{toast('📄 An Betrieb gesendet ✓');}).catch(err=>toast('Fehler: '+err.message,'bad'));
+  };
+  reader.readAsDataURL(file);
+}
+
+function myDocsUpload(){ document.getElementById('myDocsFileIn').click(); }
+
+function myDocsHandleUpload(e){
+  const files=e.target.files;
+  if(!files.length||!_tnId) return;
+  e.target.value='';
+  Array.from(files).forEach(file=>{
+    if(file.size>20*1024*1024){ toast('Datei zu groß (max 20 MB)','bad'); return; }
+    const path='shared/tn/'+_tnId+'/docs/'+Date.now()+'_'+file.name;
+    toast('⬆ '+file.name+'…');
+    st.ref(path).put(file).then(()=>st.ref(path).getDownloadURL()).then(url=>{
+      return db.collection('globalTN').doc(_tnId).collection('dokumente').add({
+        name:file.name, url, path, size:file.size, type:file.type, ts:Date.now(),
+        uploadedBy:_email, uploadedByUid:_uid, vonRolle:'azubi'
+      });
+    }).then(()=>{ toast('✓ Hochgeladen'); loadMyDocs(); })
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+  });
+}
+
+function myDocsDelete(docId, storagePath){
+  if(!confirm('Dokument löschen?')) return;
+  st.ref(storagePath).delete().catch(()=>{});
+  db.collection('globalTN').doc(_tnId).collection('dokumente').doc(docId).delete()
+    .then(()=>{ toast('Gelöscht'); loadMyDocs(); })
+    .catch(err=>toast('Fehler','bad'));
+}
+
+// ── Profil ──
+function loadProfil(){
+  const el=document.getElementById('profilCard');
+  if(!_tnData){ el.innerHTML='<div class="empty">Keine Daten</div>'; return; }
+  const t=_tnData;
+  const initials=esc(((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase());
+  const photoHtml=t.photoUrl
+    ?'<img src="'+esc(t.photoUrl)+'" alt="Foto">'
+    :'<div class="profil-avatar-init">'+initials+'</div>';
+  el.innerHTML=
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">'
+    +'<div>'
+    +'<div class="profil-avatar" onclick="document.getElementById(\'photoCamIn\').click()" title="Foto aufnehmen">'
+    +photoHtml
+    +'<div class="profil-avatar-badge">📷</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:4px;margin-top:6px">'
+    +'<button title="📷 Kamera" onclick="document.getElementById(\'photoCamIn\').click()" style="flex:1;background:var(--acc);color:#fff;border:none;border-radius:6px;padding:5px 4px;font-size:.55rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📷 Kamera</button>'
+    +'<button title="📁 Galerie" onclick="document.getElementById(\'photoFileIn\').click()" style="flex:1;background:var(--sur2);color:var(--mu);border:1px solid var(--brd);border-radius:6px;padding:5px 4px;font-size:.55rem;cursor:pointer;font-family:\'Sora\',sans-serif">📁 Galerie</button>'
+    +'</div>'
+    +'</div>'
+    +'<div><div style="font-size:1rem;font-weight:800">'+esc((t.vorname||'')+' '+(t.nachname||''))+'</div>'
+    +'<div style="font-size:.68rem;color:var(--mu)">'+esc(_email)+'</div></div></div>'
+    +'<div style="font-size:.55rem;color:var(--warn);margin:-6px 0 10px;padding:6px 10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px">ℹ Dein Profilbild ist auch für den Ausbilder auf der Sitzplankarte sichtbar.</div>'
+    +'<div class="profile-field"><span class="pf-label">Beruf</span><span class="pf-value">'+esc(t.beruf||'–')+'</span></div>'
+    +'<div class="profile-field"><span class="pf-label">Betrieb</span><span class="pf-value">'+esc(t.firma||'–')+'</span></div>'
+    +'<div class="profile-field"><span class="pf-label">Lehrjahr</span><span class="pf-value">'+(t.ausbjahr?t.ausbjahr+'. Jahr':'–')+'</span></div>'
+    +'<div style="margin-top:14px;padding:14px;background:rgba(59,130,246,.04);border:2px solid rgba(59,130,246,.15);border-radius:10px">'
+    +'<div style="font-size:.7rem;font-weight:800;color:var(--acc);margin-bottom:8px">📞 Kontaktdaten</div>'
+    +'<div style="font-size:.55rem;color:var(--mu);margin-bottom:8px">Deine Kontaktdaten sind für Ausbilder und Verwaltung sichtbar.</div>'
+    +'<div class="fg" style="margin-bottom:6px"><label class="fl" style="font-size:.65rem">📧 E-Mail</label><input class="fi" id="azubiEmail" value="'+esc(t.kontaktEmail||'')+'" placeholder="deine@email.de" style="font-size:.8rem"></div>'
+    +'<div class="fg" style="margin-bottom:8px"><label class="fl" style="font-size:.65rem">📱 Telefon</label><input class="fi" id="azubiTelefon" value="'+esc(t.kontaktTelefon||'')+'" placeholder="0170 1234567" type="tel" style="font-size:.8rem"></div>'
+    +'<button title="💾 Speichern" onclick="saveAzubiKontakt()" style="width:100%;padding:10px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">💾 Speichern</button>'
+    +'</div>'
+    +'<div id="profilPhotoStatus"></div>';
+
+  // Historie
+  const histEl=document.getElementById('profilHist');
+  const hist=(t.kursHistory||[]).slice().sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
+  if(!hist.length){ histEl.innerHTML='<div class="empty">Noch keine Kurshistorie</div>'; return; }
+  histEl.innerHTML=hist.map(h=>{
+    const isAkt=false;
+    return '<div class="hist-item">'
+      +'<div class="hist-dot" style="background:'+(isAkt?'#10b981':'var(--brd)')+'"></div>'
+      +'<div style="flex:1"><div class="hist-name">'+esc(h.kursName||h.kursId)+'</div>'
+      +'<div class="hist-dates">'+fmtDE(h.von)+' – '+fmtDE(h.bis)+'</div></div>'
+      +(isAkt?'<span style="font-size:.6rem;color:var(--acc);font-weight:700">Aktuell</span>':'')
+      +'</div>';
+  }).join('');
+}
+
+function saveAzubiKontakt(){
+  if(!_tnId){toast('Nicht angemeldet','bad');return;}
+  const email=(document.getElementById('azubiEmail')?.value||'').trim();
+  const telefon=(document.getElementById('azubiTelefon')?.value||'').trim();
+  db.collection('globalTN').doc(_tnId).update({kontaktEmail:email, kontaktTelefon:telefon})
+    .then(()=>{
+      _tnData.kontaktEmail=email;
+      _tnData.kontaktTelefon=telefon;
+      toast('✓ Gespeichert');
+    })
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function uploadProfilPhoto(e){
+  const file=e.target.files[0];
+  if(!file||!_tnId) return;
+  e.target.value='';
+  if(!file.type.startsWith('image/')){toast('Bitte ein Bild auswählen','bad');return;}
+  if(file.size>5*1024*1024){toast('Bild zu groß (max 5 MB)','bad');return;}
+
+  const statusEl=document.getElementById('profilPhotoStatus');
+  if(statusEl) statusEl.innerHTML='<div style="font-size:.72rem;color:var(--mu);text-align:center;padding:8px">⬆ Foto wird hochgeladen…</div>';
+
+  // Bild komprimieren via Canvas
+  const img=new Image();
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    img.onload=function(){
+      const canvas=document.createElement('canvas');
+      const maxW=400, maxH=400;
+      let w=img.width, h=img.height;
+      if(w>maxW){h=h*(maxW/w);w=maxW;}
+      if(h>maxH){w=w*(maxH/h);h=maxH;}
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      canvas.toBlob(blob=>{
+        const path='shared/tn/'+_tnId+'/photo.jpg';
+        st.ref(path).put(blob,{contentType:'image/jpeg'}).then(()=>st.ref(path).getDownloadURL()).then(url=>{
+          return db.collection('globalTN').doc(_tnId).update({photoUrl:url});
+        }).then(()=>{
+          return db.collection('globalTN').doc(_tnId).get();
+        }).then(doc=>{
+          if(doc.exists) _tnData=doc.data();
+          toast('✓ Profilbild gespeichert');
+          loadProfil();
+        }).catch(err=>{
+          toast('Fehler: '+err.message,'bad');
+          if(statusEl) statusEl.innerHTML='';
+        });
+      },'image/jpeg',0.85);
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function changePw(){
+  const pw=document.getElementById('pwNew').value;
+  const pw2=document.getElementById('pwNew2').value;
+  const errEl=document.getElementById('pwErr');
+  errEl.textContent='';
+  if(!pw||pw.length<6){errEl.textContent='Mindestens 6 Zeichen';return;}
+  if(pw!==pw2){errEl.textContent='Passwörter stimmen nicht überein';return;}
+  auth.currentUser.updatePassword(pw)
+    .then(()=>{
+      document.getElementById('pwNew').value='';
+      document.getElementById('pwNew2').value='';
+      errEl.style.color='var(--acc)';
+      errEl.textContent='✓ Passwort geändert';
+    })
+    .catch(err=>{
+      errEl.style.color='var(--bad)';
+      if(err.code==='auth/requires-recent-login') errEl.textContent='Bitte neu anmelden und dann erneut versuchen';
+      else errEl.textContent=err.message;
+    });
+}
+
+// ── Mein Urlaub (Azubi) ──
+function loadAzubiUrlaub(){
+  const el=document.getElementById('myUrlaubAzubi');
+  if(!el||!_tnData) return;
+  const urlaub=(_tnData.urlaub||[]).sort((a,b)=>(a.von||'')>(b.von||'')?1:-1);
+  const today=localDate();
+  if(!urlaub.length){ el.innerHTML='<div class="empty">Kein Urlaub eingetragen</div>'; return; }
+  el.innerHTML=urlaub.map((u,i)=>{
+    const past=u.bis&&u.bis<today;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px;background:rgba(16,185,129,.04);border:1px solid rgba(16,185,129,.15);border-radius:8px;margin-bottom:5px;opacity:'+(past?'.5':'1')+'">'
+      +'<span style="font-size:1rem">🏖</span>'
+      +'<div style="flex:1;font-size:.74rem"><b>'+fmtDE(u.von)+' – '+fmtDE(u.bis)+'</b>'+(u.label?' · '+esc(u.label):'')+'</div>'
+      +'<button onclick="deleteAzubiUrlaub('+i+')" style="background:none;border:none;color:var(--bad);cursor:pointer;font-size:.7rem;padding:2px 6px">✕</button>'
+      +'</div>';
+  }).join('');
+}
+
+function showAzubiUrlaubForm(){
+  document.getElementById('azubiUrlaubForm').style.display='';
+  const today=localDate();
+  if(!document.getElementById('azUrlVon').value) document.getElementById('azUrlVon').value=today;
+  if(!document.getElementById('azUrlBis').value) document.getElementById('azUrlBis').value=today;
+}
+
+function saveAzubiUrlaub(){
+  const von=document.getElementById('azUrlVon')?.value;
+  const bis=document.getElementById('azUrlBis')?.value;
+  const label=(document.getElementById('azUrlLabel')?.value||'').trim();
+  if(!von||!bis){toast('Von und Bis eingeben','bad');return;}
+  if(bis<von){toast('Bis muss nach Von liegen','bad');return;}
+  if(!_tnId){toast('Fehler','bad');return;}
+  const urlaub=_tnData.urlaub||[];
+  urlaub.push({von,bis,label,ts:Date.now()});
+  db.collection('globalTN').doc(_tnId).update({urlaub})
+    .then(()=>{
+      _tnData.urlaub=urlaub;
+      // Log
+      db.collection('shared').doc('urlaubLog').collection('entries').add({
+        name:(_tnData.vorname||'')+' '+(_tnData.nachname||''),typ:'azubi',aktion:'hinzugefügt',von,bis,ts:Date.now(),von_email:_email||''
+      }).catch(()=>{});
+      document.getElementById('azubiUrlaubForm').style.display='none';
+      document.getElementById('azUrlVon').value='';
+      document.getElementById('azUrlBis').value='';
+      document.getElementById('azUrlLabel').value='';
+      toast('✓ Urlaub gespeichert');
+      loadAzubiUrlaub();
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function deleteAzubiUrlaub(idx){
+  if(!confirm('Urlaub entfernen?')) return;
+  if(!_tnId) return;
+  const urlaub=(_tnData.urlaub||[]).slice();
+  const removed=urlaub.splice(idx,1)[0];
+  db.collection('globalTN').doc(_tnId).update({urlaub})
+    .then(()=>{
+      _tnData.urlaub=urlaub;
+      if(removed) db.collection('shared').doc('urlaubLog').collection('entries').add({
+        name:(_tnData.vorname||'')+' '+(_tnData.nachname||''),typ:'azubi',aktion:'gelöscht',von:removed.von,bis:removed.bis,ts:Date.now(),von_email:_email||''
+      }).catch(()=>{});
+      toast('Urlaub entfernt');
+      loadAzubiUrlaub();
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// ── Toast ──
+let _toastTimer;
+function toast(msg, type){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className='toast'+(type==='bad'?' bad':'')+' show';
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ── Service Worker ──
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw-ma.js')
+      .then(()=>console.log('MitarbeiterPro SW registriert'))
+      .catch(e=>console.warn('SW:',e));
+  });
+}
+
+// ── PWA Install Prompt ──
+
+// ── Install Banner ──
+let _installPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  _installPrompt=e;
+  showInstallBanner();
+});
+
+function isStandalone(){
+  return window.matchMedia('(display-mode:standalone)').matches||navigator.standalone;
+}
+
+function showInstallBanner(){
+  if(isStandalone()) return;
+  if(document.getElementById('installBanner')) return;
+  const visits=parseInt(localStorage.getItem('ma_install_visits')||'0')+1;
+  localStorage.setItem('ma_install_visits',visits);
+  if(visits>5&&localStorage.getItem('ma_install_big_dismissed')) { showInstallReminder(); return; }
+  const banner=document.createElement('div');
+  banner.id='installBanner';
+  banner.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:16px;background:linear-gradient(135deg,#1e293b,#334155);color:#fff;font-family:"Sora",sans-serif;box-shadow:0 -4px 24px rgba(0,0,0,.3)';
+  banner.innerHTML=
+    '<div style="display:flex;align-items:center;gap:12px;max-width:500px;margin:0 auto">'
+    +'<div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#2563eb,#059669);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>'
+    +'<div style="flex:1">'
+    +'<div style="font-size:.88rem;font-weight:800">MitarbeiterPro installieren</div>'
+    +'<div style="font-size:.66rem;opacity:.7;margin-top:2px">Schneller Zugriff vom Startbildschirm</div>'
+    +'</div>'
+    +'<button onclick="doInstall()" style="padding:10px 18px;border:none;border-radius:10px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;font-family:Sora,sans-serif;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0" title="App installieren">Installieren</button>'
+    +'<button onclick="dismissInstallBig()" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:1.2rem;cursor:pointer;padding:4px;flex-shrink:0" title="Schließen">✕</button>'
+    +'</div>';
+  document.body.appendChild(banner);
+}
+
+function showInstallReminder(){
+  if(isStandalone()) return;
+  if(document.getElementById('installReminder')) return;
+  if(sessionStorage.getItem('ma_reminder_dismissed')) return;
+  const r=document.createElement('div');
+  r.id='installReminder';
+  r.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9998;padding:8px 14px;background:#1e293b;color:#fff;font-family:"Sora",sans-serif;font-size:.68rem;display:flex;align-items:center;justify-content:center;gap:10px';
+  r.innerHTML='<span style="opacity:.7">MitarbeiterPro noch nicht installiert</span>'
+    +'<button onclick="doInstall()" style="padding:4px 12px;border:none;border-radius:6px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;font-family:Sora,sans-serif;font-size:.65rem;font-weight:700;cursor:pointer" title="App installieren">Jetzt installieren</button>'
+    +'<button title="Schließen" onclick="this.parentElement.remove();sessionStorage.setItem(\'ma_reminder_dismissed\',\'1\')" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:.9rem;cursor:pointer;padding:2px;margin-left:4px">✕</button>';
+  document.body.appendChild(r);
+}
+
+function doInstall(){
+  if(_installPrompt){
+    _installPrompt.prompt();
+    _installPrompt.userChoice.then(r=>{
+      if(r.outcome==='accepted'){if(typeof toast==='function')toast('App wird installiert!');}
+      _installPrompt=null;
+      const b=document.getElementById('installBanner');if(b)b.remove();
+      const rm=document.getElementById('installReminder');if(rm)rm.remove();
+    });
+  } else {
+    // iOS fallback
+    const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+    if(isIOS){
+      alert('Tippe auf das Teilen-Symbol (⬆) unten in Safari,\ndann auf „Zum Home-Bildschirm".');
+    } else {
+      alert('Öffne das Browser-Menü (⋮) und tippe auf\n„App installieren" oder „Zum Startbildschirm hinzufügen".');
+    }
+  }
+}
+
+function dismissInstallBig(){
+  const b=document.getElementById('installBanner');if(b)b.remove();
+  localStorage.setItem('ma_install_big_dismissed','1');
+}
+
+window.addEventListener('load',()=>{
+  if(isStandalone()) return;
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  if(isIOS&&!_installPrompt){
+    setTimeout(showInstallBanner,2000);
+  }
+  // Reminder für wiederkehrende Browser-Besucher
+  const visits=parseInt(localStorage.getItem('ma_install_visits')||'0');
+  if(visits>5&&localStorage.getItem('ma_install_big_dismissed')){
+    setTimeout(showInstallReminder,1500);
+  }
+});
+
+</script>
+</body>
+</html>

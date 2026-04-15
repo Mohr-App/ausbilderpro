@@ -1,0 +1,2344 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>AusbilderPro – VerwaltungPro – AzubiPro</title>
+<link rel="manifest" href="manifest-ag.json">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ArbeitgeberPro">
+<link rel="apple-touch-icon" href="icon-ag-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root{--bg:#ffffff;--sur:#ffffff;--sur2:#f1f5f9;--brd:#e2e8f0;--tx:#0f172a;--mu:#94a3b8;--acc:#2563eb;--acc2:#1d4ed8;--ok:#059669;--bad:#dc2626;--warn:#d97706;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;-webkit-font-smoothing:antialiased;}
+#loginWrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(135deg,#f8fafc,#e2e8f0);}
+.login-box{background:#fff;border:1px solid var(--brd);border-radius:20px;padding:40px 36px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.08);display:flex;flex-direction:column;align-items:stretch;}
+.login-logo{font-size:1.4rem;font-weight:800;text-align:center;margin-bottom:4px;color:var(--tx);}
+.login-logo span{color:var(--acc)}
+.login-sub{font-size:.72rem;color:var(--mu);text-align:center;font-family:'JetBrains Mono',monospace;margin-bottom:28px;}
+.fi{width:100%;background:#fff;border:1.5px solid var(--brd);border-radius:10px;padding:11px 14px;color:var(--tx);font-family:'Sora',sans-serif;font-size:.85rem;outline:none;transition:all .15s;}
+.fi:focus{border-color:var(--acc);background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+.fg{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.fl{font-size:.72rem;color:#64748b;font-weight:600;}
+.btn{width:100%;padding:12px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:10px;color:#fff;font-family:'Sora',sans-serif;font-size:.87rem;font-weight:700;cursor:pointer;transition:all .15s;box-shadow:0 2px 8px rgba(37,99,235,.2);}
+.btn:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(37,99,235,.3);}
+.err{color:var(--bad);font-size:.72rem;text-align:center;min-height:18px;}
+.hdr{display:flex;align-items:center;gap:14px;padding:0 20px;height:56px;background:linear-gradient(135deg,#2563eb,#059669);border-bottom:none;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(37,99,235,.15);}
+.hdr-logo{font-size:1rem;font-weight:800;color:#fff;}.hdr-logo span{color:rgba(255,255,255,.8);}
+.hdr-firma{font-size:.72rem;color:rgba(255,255,255,.7);font-family:'JetBrains Mono',monospace;margin-left:auto;}
+.hdr-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:8px;color:#fff;font-family:'Sora',sans-serif;font-size:.72rem;padding:6px 12px;cursor:pointer;transition:all .12s;}
+.hdr-btn:hover{border-color:var(--acc);color:var(--acc);background:rgba(37,99,235,.04);}
+.main{padding:20px;max-width:900px;margin:0 auto;}
+.page-title{font-size:1.3rem;font-weight:800;margin-bottom:4px;color:var(--tx);}
+.page-sub{font-size:.72rem;color:var(--mu);margin-bottom:18px;}
+.card{background:#f1f5f9;border:1px solid var(--brd);border-radius:14px;padding:18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:border-color .12s;}
+.card:hover{border-color:#cbd5e1;}
+.card-title{font-size:.82rem;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px;color:var(--tx);}
+.help-section{margin-bottom:8px;border:1px solid var(--brd);border-radius:10px;overflow:hidden;background:var(--sur)}.help-section-header{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;user-select:none;transition:background .15s}.help-section-header:active{background:var(--sur2)}.section-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}.section-title{font-size:.82rem;font-weight:700;flex:1}.section-count{font-size:.58rem;color:var(--mu);font-family:'JetBrains Mono',monospace;background:var(--sur2);padding:2px 8px;border-radius:4px}.section-arrow{font-size:.6rem;color:var(--mu);transition:transform .2s}.help-section.open .section-arrow{transform:rotate(180deg)}.help-section-body{display:none;padding:0 16px 14px}.help-section.open .help-section-body{display:block}.help-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.04)}.help-item:last-child{border-bottom:none}.item-dot{width:5px;height:5px;border-radius:50%;background:var(--brd);margin-top:7px;flex-shrink:0}.item-text{font-size:.74rem;line-height:1.65;color:#475569}.item-text b{color:var(--tx);font-weight:700}.tip-banner{margin:12px 0;padding:12px 14px;background:linear-gradient(135deg,rgba(37,99,235,.04),rgba(5,150,105,.04));border:1px solid rgba(37,99,235,.12);border-radius:10px}.tip-banner .tip-title{font-size:.68rem;font-weight:700;color:var(--acc);margin-bottom:6px}.tip-banner .tip-text{font-size:.68rem;color:#64748b;line-height:1.6}.icon-blue{background:rgba(37,99,235,.08);color:#2563eb}.icon-green{background:rgba(16,185,129,.08);color:#059669}.icon-amber{background:rgba(245,158,11,.08);color:#d97706}.icon-purple{background:rgba(139,92,246,.08);color:#7c3aed}.icon-slate{background:rgba(100,116,139,.08);color:#475569}
+.card-icon{border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.card-icon.blue{background:rgba(37,99,235,.08);color:#2563eb}.card-icon.green{background:rgba(16,185,129,.08);color:#059669}.card-icon.amber{background:rgba(245,158,11,.08);color:#d97706}.card-icon.slate{background:rgba(100,116,139,.08);color:#475569}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;}
+.stat-card{background:#f1f5f9;border:1px solid var(--brd);border-radius:14px;padding:16px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.stat-num{font-size:1.8rem;font-weight:800;color:var(--acc);font-family:'JetBrains Mono',monospace;}
+.stat-label{font-size:.65rem;color:var(--mu);font-weight:600;margin-top:2px;}
+.azubi-card{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fff;border:1px solid var(--brd);border-radius:12px;margin-bottom:8px;transition:all .12s;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.azubi-card:hover{border-color:var(--acc);box-shadow:0 2px 8px rgba(37,99,235,.1);}
+.azubi-card.expanded{border-color:var(--acc);background:rgba(37,99,235,.02);}
+.azubi-av{width:40px;height:40px;border-radius:50%;background:rgba(37,99,235,.06);border:2px solid rgba(37,99,235,.15);display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;color:var(--acc);flex-shrink:0;overflow:hidden;}
+.azubi-av img{width:100%;height:100%;object-fit:cover;}
+.azubi-info{flex:1;min-width:0;}
+.azubi-name{font-size:.88rem;font-weight:700;color:var(--tx);}
+.azubi-sub{font-size:.68rem;color:var(--mu);}
+.azubi-badge{font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:6px;font-family:'JetBrains Mono',monospace;}
+.kurs-box{background:var(--sur2);border:1px solid var(--brd);border-radius:10px;padding:14px;margin-top:10px;}
+.kurs-name{font-size:.85rem;font-weight:800;margin-bottom:4px;color:var(--tx);}
+.kurs-meta{font-size:.68rem;color:var(--mu);font-family:'JetBrains Mono',monospace;margin-bottom:8px;}
+.kurs-field{display:flex;align-items:baseline;gap:8px;padding:4px 0;font-size:.75rem;}
+.kurs-field-label{color:var(--mu);font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;min-width:80px;font-family:'JetBrains Mono',monospace;}
+.att-bar{display:flex;gap:2px;margin:8px 0;height:18px;border-radius:6px;overflow:hidden;}
+.att-seg{min-width:2px;}
+.att-summary{font-size:.65rem;font-family:'JetBrains Mono',monospace;color:var(--mu);display:flex;gap:10px;flex-wrap:wrap;}
+.att-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;}
+.toast{position:fixed;bottom:20px;right:20px;background:#fff;border:1.5px solid var(--ok);border-radius:12px;padding:12px 18px;font-size:.8rem;font-weight:600;color:var(--ok);z-index:999;transform:translateY(60px);opacity:0;transition:all .25s;box-shadow:0 8px 24px rgba(0,0,0,.1);}
+.toast.show{transform:none;opacity:1;}.toast.bad{border-color:var(--bad);color:var(--bad);}
+.empty{color:var(--mu);font-size:.78rem;text-align:center;padding:30px 12px;font-family:'JetBrains Mono',monospace;}
+.copyright{position:fixed;bottom:8px;right:12px;font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--mu);opacity:.3;}
+@media(max-width:600px){.stat-row{grid-template-columns:1fr;}.hdr{padding:0 12px;gap:8px;}.hdr-logo{font-size:.88rem;}.main{padding:14px 10px;}}
+@keyframes pulseRed{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+.bnav{position:fixed;bottom:0;left:0;right:0;background:#ffffff;border-top:1px solid var(--brd);display:flex;justify-content:space-around;padding:10px 8px calc(env(safe-area-inset-bottom,0px) + 10px);z-index:100;}
+.bnav-btn{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;color:var(--mu);font-family:'Sora',sans-serif;font-size:.55rem;font-weight:600;cursor:pointer;padding:4px 12px;border-radius:12px;transition:all .15s;flex:1;}
+.bnav-btn .bi{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:0;}.bnav-btn .bi svg{width:16px;height:16px;stroke:var(--mu);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.bnav-btn.active{color:var(--acc);}.bnav-btn.active .bi{background:rgba(37,99,235,.1);}.bnav-btn.active .bi svg{stroke:var(--acc)}
+.agpage{display:none;}.agpage.active{display:block;}
+.stab{padding:8px 16px;border:none;border-radius:20px;background:var(--sur2);color:var(--mu);font-size:.72rem;font-weight:600;font-family:'Sora',sans-serif;cursor:pointer;white-space:nowrap;transition:all .15s;}
+.stab.active{background:linear-gradient(135deg,#2563eb,#059669);color:#fff;}
+.abtab{display:none;}.abtab.active{display:block;}
+.ag-badge{position:absolute;top:2px;right:8px;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 2px 6px rgba(239,68,68,.4);animation:pulseRed 1.5s infinite;}
+</style>
+<script src="https://js-de.sentry-cdn.com/954a236264f49755ae54bc9f69f05762.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="loginWrap">
+  <div class="login-box" id="loginForm">
+    <div class="login-logo">Arbeitgeber<span>Pro</span></div>
+    <div class="login-sub">Ausbildungsportal für Betriebe</div>
+    <div class="fg"><label class="fl">E-Mail</label><input class="fi" type="email" id="lEmail" placeholder="name@firma.de"></div>
+    <div class="fg"><label class="fl">Passwort</label><input class="fi" type="password" id="lPw" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="err" id="lErr"></div>
+    <button class="btn" onclick="doLogin()" style="margin-top:8px" title="Anmelden">Anmelden</button>
+    <button class="btn" title="Passwort vergessen" onclick="doReset()" style="background:#fff;border:1px solid var(--brd);box-shadow:none;color:var(--mu);font-size:.72rem;padding:8px;margin-top:6px">Passwort vergessen</button>
+    <div style="border-top:1px solid var(--brd);margin-top:14px;padding-top:14px;text-align:center">
+      <div style="font-size:.65rem;color:var(--mu);margin-bottom:6px">Noch kein Konto?</div>
+      <button class="btn" title="🏭 Als Betrieb registrieren" onclick="showRegForm()" style="background:linear-gradient(135deg,#059669,#10b981);font-size:.78rem;padding:10px;width:100%">🏭 Als Betrieb registrieren</button>
+    </div>
+  </div>
+  <div class="login-box" id="regForm" style="display:none">
+    <div class="login-logo">Arbeitgeber<span>Pro</span></div>
+    <div class="login-sub">Betrieb registrieren</div>
+    <div class="fg"><label class="fl">Firmenname *</label><input class="fi" id="rFirma" placeholder="z.B. Elektro-Service Müller"></div>
+    <div style="display:flex;gap:6px">
+      <div class="fg" style="flex:1"><label class="fl">Vorname *</label><input class="fi" id="rVorname" placeholder="Max"></div>
+      <div class="fg" style="flex:1"><label class="fl">Nachname *</label><input class="fi" id="rNachname" placeholder="Müller"></div>
+    </div>
+    <div class="fg"><label class="fl">E-Mail *</label><input class="fi" type="email" id="rEmail" placeholder="name@firma.de"></div>
+    <div class="fg"><label class="fl">Telefon (optional)</label><input class="fi" type="tel" id="rTel" placeholder="0228 123456"></div>
+    <div class="fg"><label class="fl">Passwort * (min. 6 Zeichen)</label><input class="fi" type="password" id="rPw" placeholder="••••••••"></div>
+    <div class="err" id="rErr"></div>
+    <button class="btn" onclick="doRegister()" style="margin-top:8px;background:linear-gradient(135deg,#059669,#10b981)" title="Registrieren">🏭 Registrieren</button>
+    <button class="btn" title="← Zurück zum Login" onclick="showLoginForm()" style="background:#fff;border:1px solid var(--brd);box-shadow:none;color:var(--mu);font-size:.72rem;padding:8px;margin-top:6px">← Zurück zum Login</button>
+  </div>
+  <div class="login-box" id="pendingScreen" style="display:none;text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:12px">⏳</div>
+    <div class="login-logo">Arbeitgeber<span>Pro</span></div>
+    <div style="font-size:.85rem;font-weight:700;color:var(--tx);margin:14px 0 8px">Registrierung eingegangen!</div>
+    <div style="font-size:.75rem;color:var(--mu);line-height:1.6;margin-bottom:16px">Ihr Konto wird geprüft und freigeschaltet. Sie erhalten eine Benachrichtigung sobald der Zugang aktiv ist.</div>
+    <div style="padding:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:10px;font-size:.7rem;color:#d97706;font-weight:600">Status: Warten auf Freischaltung</div>
+    <button class="btn" title="Abmelden" onclick="doLogout()" style="background:#fff;border:1px solid var(--brd);box-shadow:none;color:var(--mu);font-size:.72rem;padding:8px;margin-top:14px">Abmelden</button>
+  </div>
+</div>
+<div id="appWrap" style="display:none">
+  <div class="hdr">
+    <div class="hdr-logo">Arbeitgeber<span>Pro</span></div>
+    <div class="hdr-firma" id="hdrFirma"></div>
+    <button class="hdr-btn" onclick="doLogout()" title="Aktion">⎋ Abmelden</button>
+  </div>
+  <div class="main" style="padding-bottom:80px">
+    <!-- BETRIEB (default/active) -->
+    <div class="agpage active" id="agpage-betrieb">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="card-icon green" style="width:36px;height:36px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+        <div style="font-size:1.1rem;font-weight:800">Betrieb</div>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto" id="agBetriebTabs">
+        <button class="stab active" title="Zeiten" onclick="showAgBetriebTab('zeiten')">Zeiten</button>
+        <button class="stab" title="Aufträge" onclick="showAgBetriebTab('baustellen')">Aufträge</button>
+        <button class="stab" title="Urlaub" onclick="showAgBetriebTab('urlaub')">Urlaub</button>
+        <button class="stab" title="Meldungen" onclick="showAgBetriebTab('meldungen')">Meldungen</button>
+      </div>
+      <!-- AG: Zeiten -->
+      <div class="abtab active" id="abtab-zeiten">
+        <div class="card">
+          <div class="card-title">⏱ Arbeitszeiten festlegen</div>
+          <div><label class="fl">Mitarbeiter / Azubi</label><select class="fi" id="agPlanAzubi" onchange="loadAgPlanForAzubi()" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
+          <div id="agPlanCurrent" style="font-size:.72rem;color:var(--mu);margin-bottom:6px"></div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <div style="flex:1;min-width:42px;text-align:center"><label class="fl">Mo</label><input class="fi" type="number" id="agPlanMo" min="0" max="12" step="0.5" value="8" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+            <div style="flex:1;min-width:42px;text-align:center"><label class="fl">Di</label><input class="fi" type="number" id="agPlanDi" min="0" max="12" step="0.5" value="8" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+            <div style="flex:1;min-width:42px;text-align:center"><label class="fl">Mi</label><input class="fi" type="number" id="agPlanMi" min="0" max="12" step="0.5" value="8" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+            <div style="flex:1;min-width:42px;text-align:center"><label class="fl">Do</label><input class="fi" type="number" id="agPlanDo" min="0" max="12" step="0.5" value="8" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+            <div style="flex:1;min-width:42px;text-align:center"><label class="fl">Fr</label><input class="fi" type="number" id="agPlanFr" min="0" max="12" step="0.5" value="6" style="font-size:.74rem;text-align:center;padding:6px 4px"></div>
+            <div style="flex:1;min-width:42px;text-align:center"><label class="fl" style="color:#d97706">Sa</label><input class="fi" type="number" id="agPlanSa" min="0" max="12" step="0.5" value="0" style="font-size:.74rem;text-align:center;padding:6px 4px;border-color:rgba(217,119,6,.3)"></div>
+            <div style="flex:1;min-width:42px;text-align:center"><label class="fl" style="color:#d97706">So</label><input class="fi" type="number" id="agPlanSo" min="0" max="12" step="0.5" value="0" style="font-size:.74rem;text-align:center;padding:6px 4px;border-color:rgba(217,119,6,.3)"></div>
+          </div>
+          <div style="margin-top:8px;padding:8px;background:var(--sur2);border-radius:8px">
+            <div style="font-size:.68rem;font-weight:700;color:var(--mu);margin-bottom:6px">🕐 Gleitzeit (optional)</div>
+            <div style="display:flex;gap:6px;margin-bottom:4px">
+              <div style="flex:1"><label class="fl">Kernzeit von</label><input class="fi" type="time" id="agPlanKernVon" style="font-size:.74rem;padding:6px"></div>
+              <div style="flex:1"><label class="fl">Kernzeit bis</label><input class="fi" type="time" id="agPlanKernBis" style="font-size:.74rem;padding:6px"></div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <div style="flex:1"><label class="fl">Rahmenzeit von</label><input class="fi" type="time" id="agPlanRahmenVon" value="06:00" style="font-size:.74rem;padding:6px"></div>
+              <div style="flex:1"><label class="fl">Rahmenzeit bis</label><input class="fi" type="time" id="agPlanRahmenBis" value="20:00" style="font-size:.74rem;padding:6px"></div>
+            </div>
+            <div style="font-size:.58rem;color:var(--mu);margin-top:4px">Kernzeit = Anwesenheitspflicht · Rahmenzeit = erlaubtes Zeitfenster</div>
+          </div>
+          <button class="btn" title="✓ Arbeitszeit speichern" onclick="saveAgPlan()" style="margin-top:6px;width:100%;font-size:.75rem;padding:8px">✓ Arbeitszeit speichern</button>
+          <div class="err" id="agPlanErr" style="margin-top:4px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📍 Geofencing (Standort-Kontrolle)</div>
+          <div style="font-size:.62rem;color:var(--mu);margin-bottom:6px">Stempeln nur innerhalb des definierten Radius möglich.</div>
+          <div><label class="fl">Mitarbeiter / Azubi</label><select class="fi" id="geoAzubi" onchange="loadGeoForAzubi()" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
+          <div id="geoCurrent" style="font-size:.68rem;color:var(--mu);margin:6px 0"></div>
+          <div style="display:flex;gap:4px">
+            <button class="btn" title="📍 Meinen Standort setzen" onclick="setGeoHere()" style="flex:2;font-size:.72rem;padding:8px">📍 Meinen Standort setzen</button>
+            <button title="✗ Aus" onclick="clearGeo()" style="flex:1;padding:8px;background:#fff;border:1.5px solid #ef4444;border-radius:8px;color:#ef4444;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✗ Aus</button>
+          </div>
+          <div style="margin-top:6px">
+            <label class="fl">Radius: <span id="geoRadiusVal">200</span>m</label>
+            <input type="range" id="geoRadius" min="50" max="1000" step="50" value="200" oninput="document.getElementById('geoRadiusVal').textContent=this.value" style="width:100%">
+          </div>
+        </div>
+        <div class="card" style="border:2px solid rgba(16,185,129,.25)">
+          <div class="card-title">📡 Heute – Live</div>
+          <div id="agZeitLive"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div class="card-title" style="margin:0">⏱ Monatsübersicht</div>
+            <div style="display:flex;gap:4px;align-items:center">
+              <button title="📊 DATEV" onclick="exportDATEV()" style="padding:4px 10px;background:#fff;border:1.5px solid #6366f1;border-radius:6px;color:#6366f1;font-size:.58rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📊 DATEV</button>
+              <select id="agZeitMonat" onchange="loadAgZeiten()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+            </div>
+          </div>
+          <div id="agZeitenListe"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✏ Zeit nachtragen (als AG)</div>
+          <div><label class="fl">Mitarbeiter / Azubi</label><select class="fi" id="agNachAzubi" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
+          <div><label class="fl">Datum</label><input class="fi" type="date" id="agNachDatum" style="font-size:.76rem"></div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <div style="flex:1"><label class="fl">Eingang</label><input class="fi" type="time" id="agNachEin" style="font-size:.76rem"></div>
+            <div style="flex:1"><label class="fl">Ausgang</label><input class="fi" type="time" id="agNachAus" style="font-size:.76rem"></div>
+          </div>
+          <button class="btn" title="✏ Nachtragen" onclick="agZeitNachtragen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px">✏ Nachtragen</button>
+          <div class="err" id="agNachErr" style="margin-top:4px"></div>
+        </div>
+      </div>
+      <!-- AG: Aufträge -->
+      <div class="abtab" id="abtab-baustellen">
+        <div class="card">
+          <div class="card-title">+ Neuen Auftrag erstellen</div>
+          <div><label class="fl">Kunde</label><input class="fi" id="aufKunde" placeholder="z.B. Familie Müller" style="font-size:.76rem"></div>
+          <div><label class="fl">Adresse</label><input class="fi" id="aufAdresse" placeholder="Straße, PLZ Ort" style="font-size:.76rem"></div>
+          <div><label class="fl">Beschreibung</label><input class="fi" id="aufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.76rem"></div>
+          <div><label class="fl">Frist (optional)</label><input class="fi" type="date" id="aufFrist" style="font-size:.76rem"></div>
+          <div><label class="fl">Zuweisen an</label><select class="fi" id="aufMa" multiple style="font-size:.76rem;min-height:60px"><option value="" disabled>Bitte wählen (Mehrfach möglich)…</option></select></div>
+          <button class="btn" title="📋 Auftrag erstellen" onclick="agAuftragErstellen()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px">📋 Auftrag erstellen</button>
+          <div class="err" id="aufErr" style="margin-top:4px"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Offene Aufträge</div>
+          <div id="agAufOffen"><div class="empty">Keine offenen Aufträge</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✅ Erledigte Aufträge</div>
+          <div id="agAufErledigt"><div class="empty">Keine erledigten Aufträge</div></div>
+        </div>
+      </div>
+      <!-- AG: Urlaub -->
+      <div class="abtab" id="abtab-urlaub">
+        <div class="card">
+          <div class="card-title">📅 Jahresübersicht</div>
+          <div id="agJahresUebersicht"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🏖 Offene Anträge</div>
+          <div id="agUrlaubOffen"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Alle Anträge</div>
+          <div id="agUrlaubAlle"><div class="empty">Lädt…</div></div>
+        </div>
+      </div>
+      <!-- AG: Meldungen -->
+      <div class="abtab" id="abtab-meldungen">
+        <div class="card">
+          <div class="card-title">💬 Meldungen der Azubis</div>
+          <div id="agMeldListe"><div class="empty">Lädt…</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AZUBIS KONTAKT -->
+    <div class="agpage" id="agpage-azubis">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="card-icon blue" style="width:36px;height:36px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div style="font-size:1.1rem;font-weight:800">Meine Mitarbeiter</div>
+      </div>
+      <div class="card">
+        <div class="card-title">+ Mitarbeiter / Azubi hinzufügen</div>
+        <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Erstellt einen Zugang für MitarbeiterPro oder AzubiPro.</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <button id="typBtnAn" title="👤 Arbeitnehmer" onclick="setMaTyp('arbeitnehmer')" style="flex:1;padding:10px;border:2px solid #2563eb;border-radius:8px;background:rgba(37,99,235,.08);color:#2563eb;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">👤 Arbeitnehmer</button>
+          <button id="typBtnAz" title="🎓 Azubi" onclick="setMaTyp('azubi')" style="flex:1;padding:10px;border:2px solid var(--brd);border-radius:8px;background:#fff;color:var(--mu);font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">🎓 Azubi</button>
+        </div>
+        <div id="berufRow" style="display:none;margin-bottom:6px">
+          <div><label class="fl">Berufsgruppe</label><select class="fi" id="newMaBerufGruppe" onchange="agFillFachrichtungen()" style="font-size:.76rem"><option value="">– Beruf wählen –</option></select></div>
+          <div id="newMaFachRow" style="display:none;margin-top:4px"><label class="fl">Fachrichtung</label><select class="fi" id="newMaFachrichtung" style="font-size:.76rem"><option value="">– erst Beruf wählen –</option></select></div>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <div style="flex:1"><label class="fl">Vorname</label><input class="fi" id="newMaVorname" style="font-size:.76rem"></div>
+          <div style="flex:1"><label class="fl">Nachname</label><input class="fi" id="newMaNachname" style="font-size:.76rem"></div>
+        </div>
+        <div><label class="fl">E-Mail</label><input class="fi" type="email" id="newMaEmail" style="font-size:.76rem"></div>
+        <div><label class="fl">Passwort (min. 6 Zeichen)</label><input class="fi" type="text" id="newMaPw" style="font-size:.76rem" placeholder="Wird dem Mitarbeiter mitgeteilt"></div>
+        <button class="btn" title="👤+ Arbeitnehmer anlegen" onclick="agCreateMitarbeiter()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px" id="createMaBtn">👤+ Arbeitnehmer anlegen</button>
+        <div class="err" id="newMaErr" style="margin-top:4px"></div>
+      </div>
+      <div id="agAzubiKontakte"><div class="empty">Lädt…</div></div>
+    </div>
+
+    <!-- ÜBL -->
+    <div class="agpage" id="agpage-uebl">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="card-icon amber" style="width:36px;height:36px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+        <div style="font-size:1.1rem;font-weight:800">ÜBL-Kurse</div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Auszubildende</div></div>
+        <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Lehrgängen</div></div>
+        <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
+      </div>
+      <div id="agNotifBanner"></div>
+      <div class="card">
+        <div class="card-title">👥 Ihre Auszubildenden</div>
+        <div id="azubiList"><div class="empty">Lädt…</div></div>
+      </div>
+    </div>
+
+    <!-- HOME / INFO -->
+    <div class="agpage" id="agpage-home">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="card-icon slate" style="width:36px;height:36px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+        <div style="font-size:1.1rem;font-weight:800">Informationen</div>
+      </div>
+      <div class="page-title" id="welcomeTitle">Willkommen</div>
+      <div class="page-sub" id="welcomeSub"></div>
+      <div class="card">
+        <div class="card-title">📞 Kontakt Verwaltung</div>
+        <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📍 Arbeitsort (Geofencing)</div>
+        <div style="font-size:.68rem;color:var(--mu);margin-bottom:8px">Stempeln ist nur innerhalb des definierten Radius möglich. Mitarbeiter werden gewarnt wenn sie sich außerhalb befinden.</div>
+        <div id="geoStatus" style="font-size:.72rem;margin-bottom:8px"><div class="empty">Lädt…</div></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" title="📍 Aktuellen Standort setzen" onclick="setGeofence()" style="flex:1;font-size:.72rem;padding:8px">📍 Aktuellen Standort setzen</button>
+          <select id="geoRadius" onchange="updateGeoRadius()" style="padding:8px;border:1.5px solid var(--brd);border-radius:8px;font-size:.72rem;font-family:'Sora',sans-serif">
+            <option value="100">100m</option>
+            <option value="250">250m</option>
+            <option value="500" selected>500m</option>
+            <option value="1000">1km</option>
+            <option value="2000">2km</option>
+            <option value="0">Deaktiviert</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📱 App installieren</div>
+        <div style="font-size:.75rem;color:var(--mu);line-height:1.6">
+          <b>iPhone:</b> Safari → Teilen → „Zum Home-Bildschirm"<br>
+          <b>Android:</b> Chrome → Menü → „App installieren"
+        </div>
+      </div>
+      <div style="font-size:.82rem;font-weight:800;margin-bottom:10px">❓ Anleitung</div>
+      <div class="help-section"><div class="help-section-header" onclick="this.parentElement.classList.toggle('open')"><div class="section-icon icon-slate">👥</div><div class="section-title">Mitarbeiter</div><span class="section-count">2</span><span class="section-arrow">▾</span></div><div class="help-section-body"><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Azubi oder Arbeitnehmer anlegen</b> – Typ wählen, Name, E-Mail, Passwort vergeben. Azubis loggen sich in AzubiPro ein, Arbeitnehmer in MitarbeiterPro.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Berufsgruppe und Fachrichtung</b> – Bei Azubis den Beruf und die Fachrichtung auswählen.</div></div></div></div>
+      <div class="help-section"><div class="help-section-header" onclick="this.parentElement.classList.toggle('open')"><div class="section-icon icon-green">⏱</div><div class="section-title">Zeiterfassung</div><span class="section-count">8</span><span class="section-arrow">▾</span></div><div class="help-section-body"><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Arbeitszeiten festlegen</b> – Soll-Stunden pro Wochentag definieren. Optional Kernzeit und Rahmenzeit für Gleitzeit.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Monatsübersicht</b> – Alle Mitarbeiter auf einen Blick mit Eingang, Ausgang, Ist/Soll und Differenz.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Feiertage</b> – NRW-Feiertage werden automatisch erkannt. An Feiertagen ist das Soll gleich null.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Nachtragen bestätigen</b> – Wenn ein Mitarbeiter Zeit nachträgt, musst du den Eintrag bestätigen.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Korrektur</b> – Du kannst Zeiten direkt korrigieren. Alle Änderungen werden protokolliert.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Monatsabschluss</b> – Monat abschließen, danach sind keine Änderungen mehr möglich.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>PDF und CSV</b> – Stundenzettel als PDF oder CSV pro Mitarbeiter und Monat exportieren.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>DATEV-Export</b> – Sammel-CSV aller Mitarbeiter pro Monat für das Lohnbüro.</div></div></div></div>
+      <div class="help-section"><div class="help-section-header" onclick="this.parentElement.classList.toggle('open')"><div class="section-icon icon-amber">📋</div><div class="section-title">Aufträge</div><span class="section-count">5</span><span class="section-arrow">▾</span></div><div class="help-section-body"><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Auftrag erstellen</b> – Kunde, Adresse, Beschreibung und Frist angeben. Mehrere Mitarbeiter gleichzeitig zuweisen.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Status verfolgen</b> – Offen, In Arbeit, Erledigt. Du siehst live wer wo arbeitet.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Erledigte ansehen</b> – Tippe auf einen erledigten Auftrag für Tätigkeit, Stunden, Material, Fotos, Unterschrift und GPS.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Nacharbeit</b> – Auftrag wiedereröffnen wenn etwas nachgebessert werden muss.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>PDF Protokoll</b> – Auftragsprotokoll mit allen Details als PDF exportieren.</div></div></div></div>
+      <div class="help-section"><div class="help-section-header" onclick="this.parentElement.classList.toggle('open')"><div class="section-icon icon-blue">📍</div><div class="section-title">Geofencing</div><span class="section-count">3</span><span class="section-arrow">▾</span></div><div class="help-section-body"><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Arbeitsort setzen</b> – Deinen aktuellen Standort als Firmenstandort festlegen.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Radius wählen</b> – 100 Meter bis 2 Kilometer. Mitarbeiter können nur innerhalb stempeln.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Deaktivieren</b> – Radius auf „Deaktiviert" setzen, dann ist Stempeln überall möglich.</div></div></div></div>
+    </div>
+  </div>
+  <!-- Bottom Nav -->
+  <div class="bnav">
+    <button class="bnav-btn active" id="agnav-betrieb" onclick="showAgPage('betrieb')"><span class="bi"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>Betrieb</button>
+    <button class="bnav-btn" id="agnav-azubis" onclick="showAgPage('azubis')"><span class="bi"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>Mitarbeiter</button>
+    <button class="bnav-btn" id="agnav-uebl" onclick="showAgPage('uebl')"><span class="bi"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span>ÜBL</button>
+    <button class="bnav-btn" id="agnav-home" onclick="showAgPage('home')"><span class="bi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>Info</button>
+  </div>
+  <div class="toast" id="toast"></div>
+<!-- MA Share Modal -->
+<div id="maShareModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
+    <div style="padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:.95rem;font-weight:800;color:#059669" id="maShareName">Mitarbeiter angelegt</div>
+      <button onclick="closeMaShare()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--mu);padding:4px" title="Schließen">✕</button>
+    </div>
+    <div style="padding:16px 20px">
+      <div style="background:var(--sur2);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:14px;font-family:'JetBrains Mono',monospace;font-size:.68rem;line-height:1.8">
+        <div>App: <span id="maShareApp" style="font-weight:700;color:var(--acc)"></span></div>
+        <div>E-Mail: <span id="maShareEmail" style="font-weight:700"></span></div>
+        <div>Passwort: <span id="maSharePw" style="font-weight:700"></span></div>
+        <div>Link: <span id="maShareUrl" style="font-weight:700;color:var(--acc);word-break:break-all"></span></div>
+      </div>
+      <div style="font-size:.68rem;font-weight:700;color:var(--tx);margin-bottom:8px">Zugangsdaten an den Mitarbeiter senden:</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="nativeShareMA()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;border:none;border-radius:10px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif" title="Teilen">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Teilen
+        </button>
+        <button title="In Zwischenablage kopieren" onclick="navigator.clipboard.writeText(document.getElementById('maShareModal').dataset.shareText).then(()=>toast('Zugangsdaten kopiert'))" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:var(--sur2);color:var(--tx);border:1.5px solid var(--brd);border-radius:10px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Kopieren
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- DOKU-VIEWER -->
+<style>
+.dv-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto}
+.dv-overlay.open{display:flex}
+.dv-box{background:#fff;border-radius:16px;width:100%;max-width:460px;padding:24px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.dv-title{font-size:1rem;font-weight:800;margin-bottom:16px;text-align:center}
+.dv-section{margin-bottom:16px}
+.dv-label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.dv-photos{display:flex;gap:8px;flex-wrap:wrap}
+.dv-photos img{width:100%;max-width:200px;border-radius:10px;border:2px solid #e2e8f0;cursor:pointer}
+.dv-sig{border:2px solid #e2e8f0;border-radius:10px;padding:8px;background:#fafbfc}
+.dv-sig img{width:100%;display:block}
+.dv-close{width:100%;padding:12px;border:none;border-radius:12px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;background:#f1f5f9;color:#64748b;margin-top:16px}
+.dv-img-full{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center;padding:20px;cursor:pointer}
+.dv-img-full.open{display:flex}
+.dv-img-full img{max-width:100%;max-height:90vh;border-radius:8px}
+</style>
+<div class="dv-overlay" id="dvModal">
+  <div class="dv-box">
+    <div class="dv-title">📋 Tagesdokumentation</div>
+    <div id="dvDate" style="text-align:center;font-size:.8rem;color:#64748b;margin-bottom:16px"></div>
+    <div id="dvContent"></div>
+    <button class="dv-close" title="Schließen" onclick="document.getElementById('dvModal').classList.remove('open')">Schließen</button>
+  </div>
+</div>
+<div class="dv-img-full" id="dvFullImg" title="Schließen" onclick="this.classList.remove('open')"><img id="dvFullImgSrc"></div>
+</div>
+<div class="copyright">© ArbeitgeberPro v1.0.0 ─ by Stefan Mohr</div>
+<script>
+const firebaseConfig={apiKey:"AIzaSyCI5hJLj22FTiAJoVIPis7VhoQqJiMLAZQ",authDomain:"ausbilderpro.firebaseapp.com",projectId:"ausbilderpro",storageBucket:"ausbilderpro.firebasestorage.app",messagingSenderId:"937082794250",appId:"1:937082794250:web:eb99bc41d8f39908df8af3"};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth();
+const db=firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+
+let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};
+
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function fmtDE(d){if(!d||d.length<10)return d||'?';const p=d.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
+function toast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type==='bad'?' bad':'');setTimeout(()=>t.className='toast',3000);}
+
+function doLogin(){
+  const email=document.getElementById('lEmail').value.trim();
+  const pw=document.getElementById('lPw').value;
+  if(!email||!pw){document.getElementById('lErr').textContent='Bitte E-Mail und Passwort eingeben';return;}
+  document.getElementById('lErr').textContent='';
+  auth.signInWithEmailAndPassword(email,pw).catch(err=>{
+    const m={'auth/user-not-found':'E-Mail nicht gefunden','auth/wrong-password':'Falsches Passwort','auth/invalid-email':'Ungültige E-Mail','auth/too-many-requests':'Zu viele Versuche'};
+    document.getElementById('lErr').textContent=m[err.code]||err.message;
+  });
+}
+function doReset(){
+  const email=document.getElementById('lEmail').value.trim();
+  if(!email){document.getElementById('lErr').textContent='Bitte E-Mail eingeben';return;}
+  auth.sendPasswordResetEmail(email).then(()=>toast('Reset-Link gesendet ✓')).catch(err=>document.getElementById('lErr').textContent=err.message);
+}
+function doLogout(){auth.signOut();}
+
+function showRegForm(){document.getElementById('loginForm').style.display='none';document.getElementById('regForm').style.display='';}
+function showLoginForm(){document.getElementById('regForm').style.display='none';document.getElementById('loginForm').style.display='';}
+
+function doRegister(){
+  const firma=document.getElementById('rFirma').value.trim();
+  const vorname=document.getElementById('rVorname').value.trim();
+  const nachname=document.getElementById('rNachname').value.trim();
+  const email=document.getElementById('rEmail').value.trim().toLowerCase();
+  const tel=document.getElementById('rTel').value.trim();
+  const pw=document.getElementById('rPw').value;
+  const err=document.getElementById('rErr');
+  err.textContent='';
+  if(!firma){err.textContent='Bitte Firmennamen eingeben';return;}
+  if(!vorname||!nachname){err.textContent='Bitte Vor- und Nachname eingeben';return;}
+  if(!email){err.textContent='Bitte E-Mail eingeben';return;}
+  if(pw.length<6){err.textContent='Passwort min. 6 Zeichen';return;}
+  err.textContent='Wird registriert…';
+  auth.createUserWithEmailAndPassword(email,pw).then(cred=>{
+    const uid=cred.user.uid;
+    return db.collection('users').doc(uid).set({
+      email, role:'arbeitgeber', firma, vorname, nachname, tel,
+      agStatus:'pending', registriertAm:Date.now()
+    }).then(()=>{
+      // Admin per E-Mail benachrichtigen
+      db.collection('mail').add({
+        to:'info@ausbilderpro.de',
+        message:{
+          subject:'🏭 Neue Betrieb-Registrierung: '+firma,
+          html:'<b>'+firma+'</b> hat sich als Arbeitgeber registriert.<br><br>'+
+            'Ansprechpartner: '+vorname+' '+nachname+'<br>'+
+            'E-Mail: '+email+'<br>'+(tel?'Telefon: '+tel+'<br>':'')+
+            '<br>Bitte in VerwaltungPro → Betriebe freischalten.'
+        }
+      });
+    });
+  }).then(()=>{
+    err.textContent='';
+    // Auth state change will handle the pending screen
+  }).catch(e=>{
+    const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach'};
+    err.textContent=msgs[e.code]||e.message;
+  });
+}
+
+auth.onAuthStateChanged(user=>{
+  if(user){
+    _uid=user.uid;_email=user.email;
+    document.getElementById('loginWrap').style.display='none';
+    // Erst prüfen ob freigeschaltet
+    db.collection('users').doc(user.uid).get().then(doc=>{
+      if(!doc.exists){toast('Kein Zugang','bad');auth.signOut();return;}
+      const d=doc.data();
+      if(d.role!=='arbeitgeber'){toast('Kein Arbeitgeber-Zugang','bad');auth.signOut();return;}
+      if(d.agStatus==='pending'){
+        // Pending screen zeigen
+        document.getElementById('loginWrap').style.display='';
+        document.getElementById('loginForm').style.display='none';
+        document.getElementById('regForm').style.display='none';
+        document.getElementById('pendingScreen').style.display='';
+        return;
+      }
+      // Freigeschaltet → App laden
+      document.getElementById('appWrap').style.display='';
+      loadUserData();
+    });
+  } else {
+    _uid=null;
+    document.getElementById('loginWrap').style.display='';
+    document.getElementById('loginForm').style.display='';
+    document.getElementById('regForm').style.display='none';
+    document.getElementById('pendingScreen').style.display='none';
+    document.getElementById('appWrap').style.display='none';
+    Object.values(_kursListeners).forEach(u=>u());
+    _kursListeners={};
+  }
+});
+
+function loadUserData(){
+  // Activity tracking
+  db.collection('users').doc(_uid).set({lastActive:Date.now(),lastApp:'ArbeitgeberPro',email:_email||'',firma:_firma||'',role:'arbeitgeber',sessionStart:Date.now()},{merge:true}).catch(()=>{});
+  if(!window._heartbeat) window._heartbeat=setInterval(()=>{
+    if(_uid) db.collection('users').doc(_uid).set({lastActive:Date.now()},{merge:true}).catch(()=>{});
+  },60000);
+  db.collection('users').doc(_uid).get().then(doc=>{
+    if(!doc.exists){toast('Kein Zugang','bad');return;}
+    const d=doc.data();
+    if(d.role!=='arbeitgeber'){toast('Kein Arbeitgeber-Zugang','bad');auth.signOut();return;}
+    _firma=d.firma||'';
+    document.getElementById('hdrFirma').textContent=_firma;
+    document.getElementById('welcomeTitle').textContent='Willkommen, '+esc(_firma);
+    document.getElementById('welcomeSub').textContent='Übersicht Ihrer Auszubildenden und deren Lehrgänge · Echtzeit-Anwesenheit';
+    loadAzubis();
+    checkAGPremium();
+    // Betrieb-Tab ist Default → initialisieren
+    setTimeout(()=>initAgBetrieb(), 1500);
+  });
+}
+
+function loadAzubis(){
+  if(!_firma)return;
+  db.collection('globalTN').where('firma','==',_firma).onSnapshot(snap=>{
+    _azubis=[];
+    snap.forEach(doc=>_azubis.push({id:doc.id,...doc.data()}));
+    _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
+    renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
+    checkAgBadges();
+  });
+}
+
+function setupKursListeners(){
+  // Ausfall-Banner bei TN-Änderungen aktualisieren
+  renderAusfallBanner();
+  const active=new Set();
+  _azubis.forEach(a=>{if(a.aktiverKursId)active.add(a.aktiverKursId);});
+  Object.keys(_kursListeners).forEach(k=>{if(!active.has(k)){_kursListeners[k]();delete _kursListeners[k];delete _kurse[k];}});
+  active.forEach(kursId=>{
+    if(_kursListeners[kursId])return;
+    db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(doc=>{
+      if(doc.exists){
+        _kurse[kursId]=_kurse[kursId]||{};Object.assign(_kurse[kursId],doc.data());renderAzubiList();
+      } else {
+        // Kurs wurde gelöscht – stale aktiverKursId aufräumen
+        _azubis.forEach(a=>{
+          if(a.aktiverKursId===kursId) a.aktiverKursId=null;
+        });
+        delete _kurse[kursId];
+        renderAzubiList();
+      }
+    });
+    _kursListeners[kursId]=db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').onSnapshot(snap=>{
+        if(!_kurse[kursId]||!_kurse[kursId].von) return; // Kurs existiert nicht (mehr)
+        _kurse[kursId].tnData={};
+        snap.forEach(doc=>_kurse[kursId].tnData[doc.id]=doc.data());
+        renderStats();renderAzubiList();
+      });
+  });
+}
+
+function renderAusfallBanner(){
+  const el=document.getElementById('agNotifBanner');
+  if(!el) return;
+  const today=localDate();
+  const ausfaelle=[];
+  _azubis.forEach(a=>{
+    const notifs=(a.benachrichtigungen||[]).filter(n=>n.typ==='kurs_ausfall'&&n.datum===today&&!n.gelesen);
+    notifs.forEach(n=>{
+      if(!ausfaelle.some(x=>x.kursId===n.kursId)){
+        ausfaelle.push({...n, tnName:(a.vorname||'')+' '+(a.nachname||'')});
+      }
+    });
+  });
+  if(!ausfaelle.length){el.innerHTML='';return;}
+  el.innerHTML=ausfaelle.map(n=>{
+    const betroffene=_azubis.filter(a=>(a.benachrichtigungen||[]).some(x=>x.typ==='kurs_ausfall'&&x.datum===today&&x.kursId===n.kursId));
+    const namen=betroffene.map(a=>(a.vorname||'')+' '+(a.nachname||'')).join(', ');
+    return '<div style="padding:14px;background:rgba(239,68,68,.1);border:3px solid #ef4444;border-radius:12px;margin-bottom:12px;animation:pulseRed 1.5s infinite">'
+      +'<div style="font-size:1rem;font-weight:800;color:#ef4444;margin-bottom:6px">🚨 LEHRGANG FÄLLT HEUTE AUS</div>'
+      +'<div style="font-size:.85rem;font-weight:700;margin-bottom:4px">'+esc(n.kursName||'Lehrgang')+'</div>'
+      +'<div style="font-size:.78rem;color:#1e293b;line-height:1.5;margin-bottom:6px">'+esc(n.nachricht||'')+'</div>'
+      +'<div style="font-size:.68rem;color:#64748b;margin-top:4px">Betroffen: <b>'+esc(namen)+'</b></div>'
+      +'<div style="font-size:.62rem;color:#94a3b8;margin-top:2px">Von: '+esc(n.von||'Ausbilder')+' · '+esc(n.datumDE||'')+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderStats(){
+  document.getElementById('statAzubis').textContent=_azubis.length;
+  const inKurs=_azubis.filter(a=>a.aktiverKursId).length;
+  document.getElementById('statAktiv').textContent=inKurs;
+  let tp=0,cp=0;
+  _azubis.forEach(a=>{
+    if(!a.aktiverKursId)return;
+    const kd=_kurse[a.aktiverKursId];
+    if(!kd||!kd.tnData||!kd.tnData[a.id])return;
+    const t=kd.tnData[a.id];
+    if(t.attPercent!=null){tp+=t.attPercent;cp++;}
+  });
+  document.getElementById('statAnw').textContent=cp?Math.round(tp/cp)+'%':'–';
+  // ÜBL-Hinweis wenn keine Azubis in Kursen
+  const banner=document.getElementById('agNotifBanner');
+  if(banner&&_azubis.length>0&&inKurs===0&&!banner.innerHTML.includes('kurs_ausfall')){
+    banner.innerHTML='<div style="padding:12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:10px;font-size:.75rem;color:var(--acc);margin-bottom:12px">ℹ Aktuell ist kein Auszubildender in einem ÜBL-Kurs eingeschrieben. Sobald ein Bildungszentrum Ihre Azubis einem Kurs zuweist, erscheinen hier die Kursinfos.</div>';
+  }
+}
+
+function renderAzubiList(){
+  const el=document.getElementById('azubiList');
+  if(!_azubis.length){el.innerHTML='<div class="empty">Noch keine Mitarbeiter angelegt.<br>Legen Sie im Betrieb-Tab unter Zeiten Ihre Mitarbeiter an.</div>';return;}
+  const openIds=new Set();
+  document.querySelectorAll('.azubi-card.expanded').forEach(c=>{if(c.dataset.tnId)openIds.add(c.dataset.tnId);});
+  el.innerHTML='';
+  const today=localDate();
+  // Sync-Hinweis
+  const hint=document.createElement('div');
+  hint.id='agSyncHint';
+  hint.style.cssText='font-size:.58rem;color:var(--mu);margin-bottom:10px;padding:0 4px';
+  el.appendChild(hint);
+  renderAGSyncStatus();
+  _azubis.forEach(a=>{
+    const isArchived=false;
+    const name=((a.vorname||'')+' '+(a.nachname||'')).trim();
+    const init=((a.vorname||'?')[0]+(a.nachname||'?')[0]).toUpperCase();
+    const kurs=a.aktiverKursId&&_kurse[a.aktiverKursId]&&_kurse[a.aktiverKursId].von?_kurse[a.aktiverKursId]:null;
+    const kursLaeuft=kurs&&kurs.von&&kurs.bis&&today>=kurs.von&&today<=kurs.bis;
+    const kursGeplant=kurs&&kurs.von&&today<kurs.von;
+    const td=kurs&&kurs.tnData?kurs.tnData[a.id]:null;
+    // Letzten abgebrochenen Kurs aus History finden (nur wenn Kurs noch laufen würde)
+    const lastAbgebr=!a.aktiverKursId?(a.kursHistory||[]).filter(h=>h.abgebrochen&&h.bis&&h.bis>=today).sort((a,b)=>(b.addedAt||0)-(a.addedAt||0))[0]:null;
+    let badge='';
+    if(lastAbgebr)badge='<span class="azubi-badge" style="background:rgba(220,38,38,.08);color:#dc2626">✗ Lehrgang abgebrochen</span>';
+    else if(a.status==='absent')badge='<span class="azubi-badge" style="background:rgba(220,38,38,.08);color:#dc2626">✗ Nicht erschienen</span>';
+    else if(a.wiederholer)badge='<span class="azubi-badge" style="background:rgba(217,119,6,.08);color:#d97706">↻ Wiederholer</span>';
+    else if(kursLaeuft)badge='<span class="azubi-badge" style="background:rgba(22,163,74,.08);color:#16a34a">● Laufend</span>';
+    else if(kursGeplant)badge='<span class="azubi-badge" style="background:rgba(37,99,235,.08);color:#2563eb">◐ Geplant</span>';
+    else if(a.aktiverKursId)badge='<span class="azubi-badge" style="background:rgba(148,163,184,.1);color:#94a3b8">○ Beendet</span>';
+    else badge='<span class="azubi-badge" style="background:rgba(148,163,184,.1);color:#94a3b8">Kein Lehrgang</span>';
+    // Berufsschultag heute?
+    const wochentage=['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const heuteWT=wochentage[new Date().getDay()];
+    const bsToday=kurs&&Array.isArray(kurs.berufsschultage)&&kurs.berufsschultage.includes(heuteWT);
+    if(bsToday)badge+='<span class="azubi-badge" style="background:rgba(139,92,246,.08);color:#7c3aed">🎓 Berufsschultag</span>';
+    let attBadge='';
+    if(td&&td.attTotal){const p=td.attPercent||0;const c=p>=80?'#16a34a':p>=60?'#d97706':'#dc2626';attBadge='<span class="azubi-badge" style="background:rgba('+(p>=80?'22,163,74':p>=60?'217,119,6':'220,38,38')+',.08);color:'+c+'">'+p+'%</span>';}
+    let wzBadge='';
+    if(td&&td.werkzeugStatus==='fehlt') wzBadge='<span class="azubi-badge" style="background:rgba(239,68,68,.08);color:#dc2626">🔧 Werkzeug fehlt</span>';
+    let urlBadge='';
+    const aktUrlaub=(a.urlaub||[]).find(u=>u.von<=today&&u.bis>=today);
+    if(aktUrlaub) urlBadge='<span class="azubi-badge" style="background:rgba(245,158,11,.08);color:#d97706">🏖 Urlaub</span>';
+    const card=document.createElement('div');
+    card.className='azubi-card';card.dataset.tnId=a.id;
+    if(isArchived) card.style.cssText+='opacity:.45;border-style:dashed;';
+    card.innerHTML=(a.photoUrl?'<div class="azubi-av"><img src="'+esc(a.photoUrl)+'"></div>':'<div class="azubi-av">'+esc(init)+'</div>')+'<div class="azubi-info"><div class="azubi-name">'+esc(name)+(isArchived?' <span style="font-size:.55rem;color:var(--mu)">📦 archiviert</span>':'')+'</div><div class="azubi-sub">'+(a.beruf||'')+(a.ausbjahr?' · '+a.ausbjahr+'. Lj':'')+'</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">'+badge+attBadge+wzBadge+urlBadge+'</div></div>';
+    const detail=document.createElement('div');
+    detail.className='azubi-detail';detail.style.display='none';
+    if(kurs){
+      let h='<div class="kurs-box"><div class="kurs-name">📚 '+esc(kurs.name||'Lehrgang')+'</div>';
+      h+='<div class="kurs-meta">'+fmtDE(kurs.von)+' – '+fmtDE(kurs.bis)+'</div>';
+      if(kurs.beschreibung)h+='<div style="font-size:.75rem;color:var(--tx);padding:8px 10px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.12);border-radius:7px;margin-bottom:8px;line-height:1.5">'+esc(kurs.beschreibung)+'</div>';
+      if(bsToday)h+='<div style="font-size:.75rem;padding:8px 10px;background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.2);border-radius:7px;margin-bottom:8px;color:#7c3aed;font-weight:700">🎓 Heute ist Berufsschultag</div>';
+      h+='<div class="kurs-field"><span class="kurs-field-label">Ausbilder</span><span>'+esc(kurs.ausbilderName||'–')+'</span></div>';
+      if(kurs.ausbilderEmail)h+='<div class="kurs-field"><span class="kurs-field-label">Kontakt</span><span><a href="mailto:'+esc(kurs.ausbilderEmail)+'" style="color:var(--acc)">'+esc(kurs.ausbilderEmail)+'</a>'+(kurs.ausbilderTel?' · <a href="tel:'+esc(kurs.ausbilderTel)+'" style="color:var(--acc)">📞'+esc(kurs.ausbilderTel)+'</a>':'')+'</span></div>';
+      if(kurs.standortName)h+='<div class="kurs-field"><span class="kurs-field-label">Standort</span><span>'+esc(kurs.standortName)+(kurs.standortGebaeude?' – '+esc(kurs.standortGebaeude):'')+'</span></div>';
+      // Werkzeug-Warnung
+      if(kurs.werkzeug&&kurs.werkzeug.length){
+        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">🔧 MITZUBRINGEN</div>';
+        h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+        kurs.werkzeug.forEach(w=>{h+='<span style="font-size:.62rem;padding:3px 8px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:5px;color:var(--tx)">'+esc(w)+'</span>';});
+        h+='</div>';
+        if(td&&td.werkzeugStatus==='fehlt'){
+          h+='<div style="margin-top:8px;padding:8px 10px;background:rgba(239,68,68,.06);border:2px solid rgba(239,68,68,.25);border-radius:7px;font-size:.72rem;color:#dc2626;font-weight:700">⚠ Werkzeug unvollständig'+(td.werkzeugFehlt?' – fehlt: '+esc(td.werkzeugFehlt):'')+'</div>';
+        } else if(td&&td.werkzeugStatus==='ok'){
+          h+='<div style="margin-top:8px;font-size:.62rem;color:#16a34a;font-weight:600">✓ Werkzeug vollständig</div>';
+        }
+        h+='</div>';
+      }
+      if(td&&td.attTotal){
+        const t=td,p=t.attPercent||0,col=p>=80?'#16a34a':p>=60?'#d97706':'#dc2626',total=t.attTotal||1;
+        const segs=[{v:t.attPresent||0,c:'#16a34a',l:'Anwesend'},{v:t.attLate||0,c:'#d97706',l:'Zu spät'},{v:t.attSick||0,c:'#fbbf24',l:'Krank'},{v:t.attAbsentE||0,c:'#60a5fa',l:'Entschuldigt'},{v:t.attAbsentU||0,c:'#dc2626',l:'Unentschuldigt'},{v:t.attBerufsschule||0,c:'#8b5cf6',l:'Berufsschule'}];
+        h+='<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">📊 ANWESENHEIT</div>';
+        h+='<div class="att-bar">';
+        segs.forEach(s=>{if(s.v>0)h+='<div class="att-seg" style="width:'+Math.max((s.v/total)*100,3)+'%;background:'+s.c+'" title="'+s.l+': '+s.v+'"></div>';});
+        h+='</div><div style="display:flex;align-items:center;gap:10px;margin-top:4px"><span style="font-size:1.3rem;font-weight:800;color:'+col+';font-family:\'JetBrains Mono\',monospace">'+p+'%</span><div class="att-summary">';
+        segs.forEach(s=>{if(s.v>0)h+='<span><span class="att-dot" style="background:'+s.c+'"></span>'+s.v+'× '+s.l+'</span>';});
+        h+='</div></div>';
+        h+='<div style="font-size:.6rem;color:var(--mu);margin-top:6px;font-family:\'JetBrains Mono\',monospace">Aktualisiert: '+(t.attLastSync?new Date(t.attLastSync).toLocaleString('de-DE'):'–')+'</div></div>';
+      }
+      // Noten nur nach Kursende anzeigen
+      const kursBeendet=kurs.bis&&today>kurs.bis;
+      if(kursBeendet&&td&&(td.noten_mitarbeit||td.noten_fuehrung||td.noten_praxis)){
+        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">📝 BENOTUNG</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+        if(td.noten_mitarbeit)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Mitarbeit: '+esc(td.noten_mitarbeit)+'</span>';
+        if(td.noten_fuehrung)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Führung: '+esc(td.noten_fuehrung)+'</span>';
+        if(td.noten_praxis)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Praxis: '+esc(td.noten_praxis)+'</span>';
+        const ex=td.noten_extra||{};Object.entries(ex).forEach(([k,v])=>{if(v)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">'+esc(k)+': '+esc(v)+'</span>';});
+        h+='</div></div>';
+      } else if(!kursBeendet&&td&&(td.noten_mitarbeit||td.noten_fuehrung||td.noten_praxis)){
+        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.65rem;color:var(--mu);font-style:italic">📝 Benotung wird nach Kursende sichtbar.</div></div>';
+      }
+      h+='</div>';
+      // Kurshistorie (wie bei AzubiPro)
+      const hist=(a.kursHistory||[]).filter(hh=>hh.kursId!==a.aktiverKursId&&!hh.abgebrochen&&!hh.entfernt&&!hh.nichtErschienen).sort((x,y)=>(y.von||'').localeCompare(x.von||''));
+      if(hist.length){
+        h+='<div style="margin-top:10px"><div style="font-size:.68rem;font-weight:800;color:var(--mu);letter-spacing:.04em;margin-bottom:6px">📅 WEITERE LEHRGÄNGE ('+hist.length+')</div>';
+        hist.forEach(hh=>{
+          h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:7px;margin-bottom:4px">'
+            +'<div style="width:6px;height:6px;border-radius:50%;background:#9ca3af;flex-shrink:0"></div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:700">'+esc(hh.kursName||'Lehrgang')+'</div>'
+            +'<div style="font-size:.6rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(hh.von)+' – '+fmtDE(hh.bis)+'</div></div>'
+            +'<span style="font-size:.55rem;padding:2px 6px;border-radius:4px;background:rgba(148,163,184,.1);color:#94a3b8;font-weight:700">Beendet</span>'
+            +'</div>';
+        });
+        h+='</div>';
+      }
+      detail.innerHTML=h;
+    } else if(lastAbgebr){
+      let h2='<div class="kurs-box" style="border-color:rgba(220,38,38,.3)">'
+        +'<div style="font-size:.75rem;padding:8px 10px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.2);border-radius:7px;margin-bottom:8px;color:#dc2626;font-weight:700">⚠ Lehrgang wurde abgebrochen</div>'
+        +'<div class="kurs-name" style="opacity:.6">📚 '+esc(lastAbgebr.kursName||'Lehrgang')+'</div>'
+        +'<div class="kurs-meta" style="opacity:.6">'+fmtDE(lastAbgebr.von)+' – '+fmtDE(lastAbgebr.bis)+'</div>'
+        +(lastAbgebr.ausbilderName?'<div class="kurs-field" style="opacity:.6"><span class="kurs-field-label">Ausbilder</span><span>'+esc(lastAbgebr.ausbilderName)+'</span></div>':'')
+        +'<div style="text-align:center;color:var(--mu);font-size:.72rem;padding:8px 0;margin-top:6px;border-top:1px solid var(--brd)">Wartet auf neuen Lehrgang</div>'
+        +'</div>';
+      const hist2=(a.kursHistory||[]).filter(hh=>!hh.abgebrochen&&!hh.entfernt&&!hh.nichtErschienen).sort((x,y)=>(y.von||'').localeCompare(x.von||''));
+      if(hist2.length){
+        h2+='<div style="margin-top:10px"><div style="font-size:.68rem;font-weight:800;color:var(--mu);letter-spacing:.04em;margin-bottom:6px">📅 WEITERE LEHRGÄNGE ('+hist2.length+')</div>';
+        hist2.forEach(hh=>{
+          h2+='<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:7px;margin-bottom:4px">'
+            +'<div style="width:6px;height:6px;border-radius:50%;background:#9ca3af;flex-shrink:0"></div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:700">'+esc(hh.kursName||'Lehrgang')+'</div>'
+            +'<div style="font-size:.6rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(hh.von)+' – '+fmtDE(hh.bis)+'</div></div>'
+            +'<span style="font-size:.55rem;padding:2px 6px;border-radius:4px;background:rgba(148,163,184,.1);color:#94a3b8;font-weight:700">Beendet</span>'
+            +'</div>';
+        });
+        h2+='</div>';
+      }
+      detail.innerHTML=h2;
+    } else {
+      let h3='<div class="kurs-box"><div style="text-align:center;color:var(--mu);font-size:.78rem;padding:10px">Aktuell keinem Lehrgang zugewiesen.</div></div>';
+      const hist3=(a.kursHistory||[]).filter(hh=>!hh.abgebrochen&&!hh.entfernt&&!hh.nichtErschienen).sort((x,y)=>(y.von||'').localeCompare(x.von||''));
+      if(hist3.length){
+        h3+='<div style="margin-top:10px"><div style="font-size:.68rem;font-weight:800;color:var(--mu);letter-spacing:.04em;margin-bottom:6px">📅 BISHERIGE LEHRGÄNGE ('+hist3.length+')</div>';
+        hist3.forEach(hh=>{
+          h3+='<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:7px;margin-bottom:4px">'
+            +'<div style="width:6px;height:6px;border-radius:50%;background:#9ca3af;flex-shrink:0"></div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:700">'+esc(hh.kursName||'Lehrgang')+'</div>'
+            +'<div style="font-size:.6rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(hh.von)+' – '+fmtDE(hh.bis)+'</div></div>'
+            +'<span style="font-size:.55rem;padding:2px 6px;border-radius:4px;background:rgba(148,163,184,.1);color:#94a3b8;font-weight:700">Beendet</span>'
+            +'</div>';
+        });
+        h3+='</div>';
+      }
+      detail.innerHTML=h3;
+    }
+    // Urlaub IMMER anzeigen (unabhängig von Kurs)
+    const tnUrlaub=a.urlaub||[];
+    const futureUrlaub=tnUrlaub.filter(u=>u.bis>=today);
+    if(futureUrlaub.length){
+      let uh='<div style="margin-top:8px;padding:12px 14px;background:rgba(245,158,11,.04);border:2px solid rgba(245,158,11,.2);border-radius:10px"><div style="font-size:.7rem;font-weight:800;color:#f59e0b;margin-bottom:6px">🏖 URLAUB</div>';
+      futureUrlaub.sort((x,y)=>(x.von||'').localeCompare(y.von||'')).forEach(u=>{
+        const isNow=u.von<=today&&u.bis>=today;
+        uh+='<div style="font-size:.72rem;padding:4px 0;color:'+(isNow?'#f59e0b':'var(--tx)')+';font-weight:'+(isNow?'700':'400')+'">'+fmtDE(u.von)+' – '+fmtDE(u.bis)+(u.label?' · '+esc(u.label):'')+(isNow?' <span style="font-size:.55rem;background:rgba(245,158,11,.12);padding:2px 6px;border-radius:3px">aktuell</span>':'')+'</div>';
+      });
+      uh+='</div>';
+      detail.innerHTML+=uh;
+    }
+    // Dokumente-Austausch
+    const dokWrap=document.createElement('div');
+    dokWrap.style.cssText='margin-top:8px;padding:12px 14px;background:var(--sur);border:2px solid rgba(37,99,235,.15);border-radius:10px';
+    if(_agPremium){
+      dokWrap.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:.7rem;font-weight:800;color:var(--acc)">📄 DOKUMENTE</div>'
+        +'<label style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600">📤 Hochladen<input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="agUploadDok(\''+a.id+'\',this)"></label></div>'
+        +'<div id="dokList_'+a.id+'" style="font-size:.7rem;color:var(--mu)">Lädt…</div>';
+      detail.appendChild(dokWrap);
+      loadDokumente(a.id);
+    } else {
+      dokWrap.style.borderColor='var(--brd)';
+      dokWrap.innerHTML='<div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:4px">📄 DOKUMENTE</div>'
+        +'<div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Dokumente direkt mit Ihren Azubis austauschen.</div>'
+        +'<button title="☁ Freischalten (1,99€/M)" onclick="toggleAGPremium()" style="font-size:.62rem;padding:5px 12px;border:1.5px solid rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600">☁ Freischalten (1,99€/M)</button>';
+      detail.appendChild(dokWrap);
+    }
+    card.addEventListener('click',()=>{
+      const isOpen=detail.style.display!=='none';
+      document.querySelectorAll('.azubi-card').forEach(c=>c.classList.remove('expanded'));
+      document.querySelectorAll('.azubi-detail').forEach(d=>d.style.display='none');
+      if(!isOpen){card.classList.add('expanded');detail.style.display='';}
+    });
+    el.appendChild(card);el.appendChild(detail);
+    if(openIds.has(a.id)){card.classList.add('expanded');detail.style.display='';}
+  });
+  loadHVKontakt();
+}
+
+function agArchive(tnId){
+  const archived=_getArchived();
+  if(!archived.includes(tnId)) archived.push(tnId);
+  _saveArchived(archived);
+  renderAzubiList();
+}
+function agUnarchive(tnId){
+  let archived=_getArchived();
+  archived=archived.filter(id=>id!==tnId);
+  _saveArchived(archived);
+  renderAzubiList();
+}
+function _getArchived(){
+  if(_agPremium&&_agArchivedCloud!==null) return [..._agArchivedCloud];
+  return JSON.parse(localStorage.getItem('ag_archiv_'+(_firma||''))||'[]');
+}
+function _saveArchived(arr){
+  // Immer lokal speichern
+  localStorage.setItem('ag_archiv_'+(_firma||''),JSON.stringify(arr));
+  // Cloud-Sync wenn Premium
+  if(_agPremium){
+    _agArchivedCloud=arr;
+    db.collection('users').doc(_uid).update({archivedTN:arr}).catch(()=>{});
+  }
+}
+let _agPremium=false;
+let _agArchivedCloud=null;
+function checkAGPremium(){
+  db.collection('users').doc(_uid).get().then(doc=>{
+    if(!doc.exists) return;
+    const d=doc.data();
+    _agPremium=!!d.agPremium;
+    if(_agPremium&&d.archivedTN){
+      _agArchivedCloud=d.archivedTN;
+      renderAzubiList();
+    }
+  }).catch(()=>{});
+}
+function toggleAGPremium(){
+  if(_agPremium){
+    // Downgrade
+    if(!confirm('Cloud-Sync deaktivieren? Archiv wird nur noch lokal gespeichert.')) return;
+    db.collection('users').doc(_uid).update({agPremium:false}).then(()=>{
+      _agPremium=false;_agArchivedCloud=null;
+      renderAzubiList();renderAGSyncStatus();
+    });
+  } else {
+    // Upgrade
+    db.collection('users').doc(_uid).update({agPremium:true,archivedTN:_getArchived()}).then(()=>{
+      _agPremium=true;_agArchivedCloud=_getArchived();
+      renderAzubiList();renderAGSyncStatus();
+      toast('☁ Cloud-Sync aktiviert ✓');
+    });
+  }
+}
+
+// ── Dokumente-Austausch ──
+function loadDokumente(tnId){
+  const el=document.getElementById('dokList_'+tnId);
+  if(!el) return;
+  db.collection('globalTN').doc(tnId).collection('dokumente')
+    .orderBy('ts','desc').onSnapshot(snap=>{
+      if(snap.empty){el.innerHTML='<div style="color:var(--mu);font-size:.65rem;font-style:italic">Noch keine Dokumente</div>';return;}
+      let h='';
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const fName=d.fileName||d.name||'Dokument';
+        const icon=fName.match(/\.pdf$/i)?'📕':fName.match(/\.(jpg|jpeg|png)$/i)?'🖼':'📄';
+        const vonLabel=d.vonRolle==='azubi'?'<span style="color:#7c3aed;font-weight:700">Azubi</span>':'<span style="color:var(--acc);font-weight:700">Betrieb</span>';
+        h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--brd)">'
+          +'<span style="font-size:1rem">'+icon+'</span>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(fName)+'</div>'
+          +'<div style="font-size:.55rem;color:var(--mu)">'+vonLabel+' · '+new Date(d.ts).toLocaleDateString('de-DE')+'</div></div>'
+          +'<button onclick="event.stopPropagation();downloadDok(\''+tnId+'\',\''+doc.id+'\')" style="font-size:.55rem;padding:3px 8px;border:1px solid var(--brd);border-radius:5px;background:var(--sur2);cursor:pointer;color:var(--tx)">💾</button>'
+          +'<button onclick="event.stopPropagation();deleteDok(\''+tnId+'\',\''+doc.id+'\',\''+esc(fName)+'\')" style="font-size:.55rem;padding:3px 8px;border:1px solid rgba(239,68,68,.2);border-radius:5px;background:none;cursor:pointer;color:#ef4444">✕</button>'
+          +'</div>';
+      });
+      el.innerHTML=h;
+    },()=>{el.innerHTML='<div style="color:var(--mu);font-size:.65rem">Fehler beim Laden</div>';});
+}
+
+function agUploadDok(tnId,input){
+  if(!_agPremium){
+    toast('📄 Dokumente erfordert Cloud-Sync (1,99€/M)','bad');
+    input.value='';return;
+  }
+  const file=input.files[0];
+  if(!file) return;
+  const maxMB=2;
+  if(file.size>maxMB*1024*1024){toast('Max. '+maxMB+' MB pro Datei','bad');input.value='';return;}
+  const reader=new FileReader();
+  reader.onload=function(){
+    db.collection('globalTN').doc(tnId).collection('dokumente').add({
+      fileName:file.name,
+      fileType:file.type,
+      fileSize:file.size,
+      data:reader.result,
+      vonRolle:'arbeitgeber',
+      vonEmail:_email||'',
+      vonFirma:_firma||'',
+      ts:Date.now()
+    }).then(()=>{toast('📄 Dokument gesendet ✓');}).catch(err=>toast('Fehler: '+err.message,'bad'));
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+
+function downloadDok(tnId,docId){
+  db.collection('globalTN').doc(tnId).collection('dokumente').doc(docId).get().then(doc=>{
+    if(!doc.exists) return;
+    const d=doc.data();
+    if(d.data){
+      const a=document.createElement('a');a.href=d.data;a.download=d.fileName||d.name||'dokument';a.click();
+    } else if(d.url){
+      window.open(d.url,'_blank');
+    }
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function deleteDok(tnId,docId,name){
+  if(!confirm('Dokument "'+name+'" löschen?')) return;
+  db.collection('globalTN').doc(tnId).collection('dokumente').doc(docId).delete()
+    .then(()=>toast('Gelöscht'))
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function renderAGSyncStatus(){
+  const el=document.getElementById('agSyncHint');
+  if(!el) return;
+  if(_agPremium){
+    el.innerHTML='<span style="color:#16a34a;font-weight:700">☁ Cloud-Sync aktiv</span> · Archiv wird geräteübergreifend gespeichert <button title="Deaktivieren" onclick="toggleAGPremium()" style="font-size:.6rem;padding:2px 8px;border:1px solid var(--brd);border-radius:5px;background:none;color:var(--mu);cursor:pointer;margin-left:6px">Deaktivieren</button>';
+  } else {
+    el.innerHTML='💡 Archiv wird nur lokal gespeichert. <button title="☁ Cloud-Sync aktivieren (1,99€/M)" onclick="toggleAGPremium()" style="font-size:.6rem;padding:2px 8px;border:1.5px solid rgba(37,99,235,.3);border-radius:5px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600;margin-left:4px">☁ Cloud-Sync aktivieren (1,99€/M)</button>';
+  }
+}
+
+function loadHVKontakt(){
+  db.collection('shared').doc('kursSettings').get().then(doc=>{
+    if(!doc.exists)return;const d=doc.data();
+    const target=document.getElementById('agHVKontakt');
+    if(target) target.innerHTML=
+      (d.hvName?'<div class="kurs-field"><span class="kurs-field-label">Name</span><span>'+esc(d.hvName)+'</span></div>':'')
+      +(d.hvEmail?'<div class="kurs-field"><span class="kurs-field-label">E-Mail</span><span><a href="mailto:'+esc(d.hvEmail)+'" style="color:var(--acc)">'+esc(d.hvEmail)+'</a></span></div>':'')
+      +(d.hvTel?'<div class="kurs-field"><span class="kurs-field-label">Telefon</span><span><a href="tel:'+esc(d.hvTel)+'" style="color:var(--acc)">📞 '+esc(d.hvTel)+'</a></span></div>':'');
+  }).catch(()=>{});
+}
+
+// SW + Install
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw-ag.js').then(()=>console.log('AG SW ok')).catch(e=>console.warn('SW:',e));});}
+function doInstallAG(){if(_installPrompt){_installPrompt.prompt();_installPrompt.userChoice.then(()=>{_installPrompt=null;const b=document.getElementById('installBanner');if(b)b.remove();});}}
+function dismissInstallAG(){const b=document.getElementById('installBanner');if(b)b.remove();sessionStorage.setItem('ag_install_dismissed','1');}
+
+// ═══════════════════════════════════
+// AG NAVIGATION
+// ═══════════════════════════════════
+// History management for back button
+let _navFromPop=false, _curPage='betrieb';
+history.replaceState({page:'betrieb'},'');
+window.addEventListener('popstate',e=>{
+  if(e.state&&e.state.page){_navFromPop=true;showAgPage(e.state.page);}
+  else{_navFromPop=true;showAgPage('betrieb');history.replaceState({page:'betrieb'},'');}
+});
+function showAgPage(id){
+  if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
+  _curPage=id; _navFromPop=false;
+  document.querySelectorAll('.agpage').forEach(p=>p.classList.remove('active'));
+  document.getElementById('agpage-'+id).classList.add('active');
+  document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
+  const nb=document.getElementById('agnav-'+id);
+  if(nb) nb.classList.add('active');
+  if(id==='betrieb') initAgBetrieb();
+  if(id==='uebl') loadAzubis();
+  if(id==='azubis') renderAgAzubiKontakte();
+  if(id==='home') loadGeofence();
+}
+
+// Secondary Firebase App for creating users without logging out AG
+let _secondaryApp=null;
+function getSecondaryAuth(){
+  if(!_secondaryApp){
+    _secondaryApp=firebase.initializeApp(firebaseConfig,'secondary');
+  }
+  return _secondaryApp.auth();
+}
+
+let _maTyp='arbeitnehmer';
+let _agBerufeListe=[];
+function loadAgBerufe(){
+  db.collection('shared').doc('kursSettings').collection('berufe').orderBy('order').get().then(snap=>{
+    _agBerufeListe=[];
+    snap.forEach(doc=>_agBerufeListe.push({id:doc.id,...doc.data()}));
+    const sel=document.getElementById('newMaBerufGruppe');
+    if(sel){
+      sel.innerHTML='<option value="">– Beruf wählen –</option>';
+      _agBerufeListe.forEach(b=>{sel.innerHTML+='<option value="'+esc(b.name)+'">'+(b.emoji||'📁')+' '+esc(b.name)+'</option>';});
+    }
+  }).catch(()=>{});
+}
+function agFillFachrichtungen(){
+  const berufSel=document.getElementById('newMaBerufGruppe');
+  const fachSel=document.getElementById('newMaFachrichtung');
+  const row=document.getElementById('newMaFachRow');
+  if(!berufSel||!fachSel) return;
+  const beruf=_agBerufeListe.find(b=>b.name===berufSel.value);
+  if(beruf&&beruf.berufe&&beruf.berufe.length>0){
+    if(row) row.style.display='';
+    fachSel.innerHTML='<option value="">– Fachrichtung wählen –</option>';
+    beruf.berufe.forEach(f=>{fachSel.innerHTML+='<option value="'+esc(f)+'">'+esc(f)+'</option>';});
+  } else {
+    if(row) row.style.display='none';
+    fachSel.innerHTML='<option value="">–</option>';
+  }
+}
+function setMaTyp(typ){
+  _maTyp=typ;
+  const btnAn=document.getElementById('typBtnAn');
+  const btnAz=document.getElementById('typBtnAz');
+  const berufRow=document.getElementById('berufRow');
+  const createBtn=document.getElementById('createMaBtn');
+  if(typ==='azubi'){
+    btnAz.style.border='2px solid #2563eb';btnAz.style.background='rgba(37,99,235,.08)';btnAz.style.color='#2563eb';
+    btnAn.style.border='2px solid var(--brd)';btnAn.style.background='#fff';btnAn.style.color='var(--mu)';
+    berufRow.style.display='';
+    loadAgBerufe();
+    createBtn.textContent='🎓+ Azubi anlegen';
+  } else {
+    btnAn.style.border='2px solid #2563eb';btnAn.style.background='rgba(37,99,235,.08)';btnAn.style.color='#2563eb';
+    btnAz.style.border='2px solid var(--brd)';btnAz.style.background='#fff';btnAz.style.color='var(--mu)';
+    berufRow.style.display='none';
+    createBtn.textContent='👤+ Arbeitnehmer anlegen';
+  }
+}
+
+function agCreateMitarbeiter(){
+  const vorname=document.getElementById('newMaVorname').value.trim();
+  const nachname=document.getElementById('newMaNachname').value.trim();
+  const email=document.getElementById('newMaEmail').value.trim().toLowerCase();
+  const pw=document.getElementById('newMaPw').value;
+  const berufSel=document.getElementById('newMaBerufGruppe');
+  const fachSel=document.getElementById('newMaFachrichtung');
+  const beruf=fachSel&&fachSel.value?fachSel.value:(berufSel?berufSel.value:'');
+  const err=document.getElementById('newMaErr');
+  const isAzubi=_maTyp==='azubi';
+  const rolle=isAzubi?'azubi':'arbeitnehmer';
+  const app=isAzubi?'AzubiPro':'MitarbeiterPro';
+  err.textContent='';
+  if(!vorname||!nachname){err.textContent='Bitte Vor- und Nachname eingeben';return;}
+  if(!email){err.textContent='Bitte E-Mail eingeben';return;}
+  if(pw.length<6){err.textContent='Passwort min. 6 Zeichen';return;}
+  if(isAzubi&&!beruf){err.textContent='Bitte Beruf angeben';return;}
+  if(!confirm((isAzubi?'Azubi':'Arbeitnehmer')+' anlegen?\n\n'+vorname+' '+nachname+'\n'+email+(beruf?'\nBeruf: '+beruf:'')+'\n\nZugang über '+app+'-App.')) return;
+  err.textContent='Wird angelegt…';
+  const secAuth=getSecondaryAuth();
+  secAuth.createUserWithEmailAndPassword(email,pw).then(cred=>{
+    const uid=cred.user.uid;
+    const secDb=_secondaryApp.firestore();
+    secDb.collection('users').doc(uid).set({email,role:rolle,firma:_firma});
+    const tnData={vorname,nachname,email,firma:_firma,typ:rolle,erstelltAm:Date.now(),erstelltVon:_firma||_email};
+    if(isAzubi&&beruf) tnData.beruf=beruf;
+    db.collection('globalTN').doc(uid).set(tnData);
+    secAuth.signOut();
+    document.getElementById('newMaVorname').value='';
+    document.getElementById('newMaNachname').value='';
+    document.getElementById('newMaEmail').value='';
+    document.getElementById('newMaPw').value='';
+    if(berufSel) berufSel.value='';
+    if(fachSel) fachSel.value='';
+    if(document.getElementById('newMaFachRow')) document.getElementById('newMaFachRow').style.display='none';
+    err.textContent='';
+    const appUrl=isAzubi?'https://ausbilderpro.de/AzubiPro.html':'https://ausbilderpro.de/MitarbeiterPro.html';
+    const shareText='Hallo '+vorname+', du wurdest bei '+(_firma||'AusbilderPro')+' als '+(isAzubi?'Azubi':'Mitarbeiter')+' angelegt.\n\nDeine Zugangsdaten:\nE-Mail: '+email+'\nPasswort: '+pw+'\n\nApp: '+appUrl+'\n\nBitte nach dem ersten Login das Passwort ändern.';
+    showMaShareModal(vorname+' '+nachname, app, appUrl, email, pw, shareText);
+  }).catch(e=>{
+    const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach'};
+    err.textContent='❌ '+(msgs[e.code]||e.message);
+  });
+}
+
+let _maShareText='';
+function showMaShareModal(name, app, url, email, pw, shareText){
+  _maShareText=shareText;
+  const modal=document.getElementById('maShareModal');
+  modal.dataset.shareText=shareText;
+  document.getElementById('maShareName').textContent='✅ '+name+' angelegt';
+  document.getElementById('maShareApp').textContent=app;
+  document.getElementById('maShareEmail').textContent=email;
+  document.getElementById('maSharePw').textContent=pw;
+  document.getElementById('maShareUrl').textContent=url;
+  modal.style.display='flex';
+  loadAzubis();
+}
+function closeMaShare(){document.getElementById('maShareModal').style.display='none';}
+function nativeShareMA(){
+  if(navigator.share) navigator.share({title:'Zugangsdaten',text:_maShareText}).catch(()=>{});
+  else toast('Teilen nicht verfügbar');
+}
+
+function showDoku(tnId,datum){
+  const dvDate=document.getElementById('dvDate');
+  const dvContent=document.getElementById('dvContent');
+  dvContent.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px">Lädt…</div>';
+  const parts=datum.split('-');
+  dvDate.textContent=parts[2]+'.'+parts[1]+'.'+parts[0];
+  document.getElementById('dvModal').classList.add('open');
+  db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum).get().then(doc=>{
+    if(!doc.exists){dvContent.innerHTML='<div class="empty">Keine Daten</div>';return;}
+    const d=doc.data();
+    let html='';
+    // GPS
+    if(d.gpsEingang||d.gpsAusgang){
+      html+='<div class="dv-section"><div class="dv-label">📍 Standorte</div>';
+      if(d.gpsEingang) html+='<div style="font-size:.72rem;margin-bottom:4px">▶ Eingang: <a href="https://maps.google.com/?q='+d.gpsEingang.lat+','+d.gpsEingang.lng+'" target="_blank" style="color:#2563eb">'+d.gpsEingang.lat+', '+d.gpsEingang.lng+'</a> <span style="color:#94a3b8">(±'+d.gpsEingang.acc+'m)</span></div>';
+      if(d.gpsAusgang) html+='<div style="font-size:.72rem">⏹ Ausgang: <a href="https://maps.google.com/?q='+d.gpsAusgang.lat+','+d.gpsAusgang.lng+'" target="_blank" style="color:#2563eb">'+d.gpsAusgang.lat+', '+d.gpsAusgang.lng+'</a> <span style="color:#94a3b8">(±'+d.gpsAusgang.acc+'m)</span></div>';
+      html+='</div>';
+    }
+    if(d.fotos&&d.fotos.length){
+      html+='<div class="dv-section"><div class="dv-label">📸 Fotos ('+d.fotos.length+')</div><div class="dv-photos">';
+      d.fotos.forEach(f=>{html+='<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')" loading="lazy">';});
+      html+='</div></div>';
+    }
+    if(d.unterschrift){
+      html+='<div class="dv-section"><div class="dv-label">✍ Kundenunterschrift</div><div class="dv-sig"><img src="'+d.unterschrift+'"></div></div>';
+    }
+    if(!d.fotos&&!d.unterschrift&&!d.gpsEingang&&!d.gpsAusgang) html='<div class="empty">Keine Dokumentation vorhanden</div>';
+    dvContent.innerHTML=html;
+  });
+}
+
+function renderAgAzubiKontakte(){
+  const el=document.getElementById('agAzubiKontakte');
+  if(!el) return;
+  if(!_azubis.length){el.innerHTML='<div class="empty">Keine Mitarbeiter</div>';return;}
+  let html='';
+  _azubis.forEach(az=>{
+    const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
+    const initials=name.split(' ').map(w=>(w[0]||'').toUpperCase()).join('').slice(0,2);
+    const tel=az.kontaktTelefon||'';
+    const email=az.kontaktEmail||az.email||'';
+    const beruf=az.beruf||'';
+    const lj=az.ausbjahr?az.ausbjahr+'. Lehrjahr':'';
+    const isMA=az.typ==='arbeitnehmer';
+    const typBadge=isMA?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(217,119,6,.12);color:#d97706;border-radius:4px;font-weight:700;margin-left:6px">Arbeitnehmer</span>'
+      :'<span style="font-size:.5rem;padding:2px 6px;background:rgba(37,99,235,.1);color:#3b82f6;border-radius:4px;font-weight:700;margin-left:6px">Azubi</span>';
+    const avatarBg=isMA?'rgba(217,119,6,.1)':'rgba(37,99,235,.1)';
+    const avatarBorder=isMA?'rgba(217,119,6,.25)':'rgba(37,99,235,.25)';
+    const avatarColor=isMA?'#d97706':'var(--acc)';
+    html+='<div class="card" style="display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:6px">'
+      +'<div style="width:44px;height:44px;border-radius:50%;background:'+avatarBg+';border:2px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:'+avatarColor+';flex-shrink:0">'+initials+'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:.88rem;font-weight:800;display:flex;align-items:center;flex-wrap:wrap">'+esc(name)+typBadge+'</div>'
+      +(beruf||lj?'<div style="font-size:.65rem;color:var(--mu)">'+esc([beruf,lj].filter(Boolean).join(' · '))+'</div>':'')
+      +(tel?'<a href="tel:'+esc(tel)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:6px 14px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:#059669">📞 '+esc(tel)+'</a>':'')
+      +(email?'<a href="mailto:'+esc(email)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-left:'+(tel?'6px':'0')+';padding:6px 14px;background:rgba(37,99,235,.1);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:var(--acc)">✉ '+esc(email)+'</a>':'')
+      +(!tel&&!email?'<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Keine Kontaktdaten hinterlegt</div>':'')
+      +'</div></div>';
+  });
+  el.innerHTML=html;
+}
+function showAgBetriebTab(tab){
+  document.querySelectorAll('.abtab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#agBetriebTabs .stab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('abtab-'+tab).classList.add('active');
+  event.target.classList.add('active');
+  if(tab==='zeiten'){fillAgMonatSelect('agZeitMonat');loadAgZeiten();startAgZeitLive();}
+  if(tab==='baustellen') loadAgAuftraege();
+  if(tab==='urlaub') loadAgUrlaub();
+  if(tab==='meldungen') loadAgMeldungen();
+}
+function initAgBetrieb(){
+  fillAgMonatSelect('agZeitMonat');
+  fillAgMonatSelect('agBsMonat');
+  fillAgAzubiSelect();
+  const active=document.querySelector('.abtab.active');
+  if(!active||active.id==='abtab-zeiten'){loadAgZeiten();startAgZeitLive();}
+}
+
+function fillAgAzubiSelect(){
+  ['agNachAzubi','agPlanAzubi','geoAzubi'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel) return;
+    sel.innerHTML='<option value="">Bitte wählen…</option>';
+    _azubis.forEach(az=>{
+      const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Azubi';
+      sel.innerHTML+='<option value="'+az.id+'">'+esc(name)+'</option>';
+    });
+  });
+}
+
+function loadAgPlanForAzubi(){
+  const tnId=document.getElementById('agPlanAzubi').value;
+  const el=document.getElementById('agPlanCurrent');
+  if(!tnId){el.textContent='';return;}
+  const az=_azubis.find(a=>a.id===tnId);
+  const plan=az?.arbeitszeitPlan;
+  if(plan){
+    const keys=['mo','di','mi','do','fr','sa','so'];
+    const ids=['Mo','Di','Mi','Do','Fr','Sa','So'];
+    let woche=0;
+    ids.forEach((t,i)=>{
+      const v=plan[keys[i]]||0; woche+=v;
+      const inp=document.getElementById('agPlan'+t);
+      if(inp) inp.value=v;
+    });
+    el.innerHTML='Aktuell: <b>'+woche+'h/Woche</b>'+(plan.sa||plan.so?' (inkl. Wochenende)':'')
+      +(plan.kernVon?' · Kernzeit '+plan.kernVon+'–'+plan.kernBis:'');
+    // Gleitzeit-Felder befüllen
+    const kv=document.getElementById('agPlanKernVon');if(kv) kv.value=plan.kernVon||'';
+    const kb=document.getElementById('agPlanKernBis');if(kb) kb.value=plan.kernBis||'';
+    const rv=document.getElementById('agPlanRahmenVon');if(rv) rv.value=plan.rahmenVon||'06:00';
+    const rb=document.getElementById('agPlanRahmenBis');if(rb) rb.value=plan.rahmenBis||'20:00';
+  } else {
+    el.innerHTML='<span style="color:#d97706">⚠ Noch nicht konfiguriert</span>';
+    ['Mo','Di','Mi','Do','Fr'].forEach(t=>{const inp=document.getElementById('agPlan'+t);if(inp) inp.value=t==='Fr'?6:8;});
+    ['Sa','So'].forEach(t=>{const inp=document.getElementById('agPlan'+t);if(inp) inp.value=0;});
+    const kv=document.getElementById('agPlanKernVon');if(kv) kv.value='';
+    const kb=document.getElementById('agPlanKernBis');if(kb) kb.value='';
+    const rv=document.getElementById('agPlanRahmenVon');if(rv) rv.value='06:00';
+    const rb=document.getElementById('agPlanRahmenBis');if(rb) rb.value='20:00';
+  }
+}
+
+function saveAgPlan(){
+  const tnId=document.getElementById('agPlanAzubi').value;
+  const err=document.getElementById('agPlanErr');
+  err.textContent='';
+  if(!tnId){err.textContent='Bitte Azubi wählen';return;}
+  const keys=['mo','di','mi','do','fr','sa','so'];
+  const ids=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  const plan={};
+  ids.forEach((t,i)=>{plan[keys[i]]=parseFloat(document.getElementById('agPlan'+t).value)||0;});
+  // Gleitzeit
+  const kernVon=document.getElementById('agPlanKernVon')?.value||'';
+  const kernBis=document.getElementById('agPlanKernBis')?.value||'';
+  const rahmenVon=document.getElementById('agPlanRahmenVon')?.value||'';
+  const rahmenBis=document.getElementById('agPlanRahmenBis')?.value||'';
+  if(kernVon) plan.kernVon=kernVon;
+  if(kernBis) plan.kernBis=kernBis;
+  if(rahmenVon) plan.rahmenVon=rahmenVon;
+  if(rahmenBis) plan.rahmenBis=rahmenBis;
+  const woche=keys.reduce((s,k)=>s+plan[k],0);
+  const azName=document.getElementById('agPlanAzubi').selectedOptions[0]?.text||'Azubi';
+  let info=woche+'h/Woche'+(plan.sa||plan.so?' (inkl. Wochenende)':'');
+  if(kernVon&&kernBis) info+='\nKernzeit: '+kernVon+' – '+kernBis;
+  if(rahmenVon&&rahmenBis) info+='\nRahmenzeit: '+rahmenVon+' – '+rahmenBis;
+  if(!confirm('Arbeitszeit für '+azName+' speichern?\n\n'+info)) return;
+  db.collection('globalTN').doc(tnId).update({arbeitszeitPlan:plan}).then(()=>{
+    const az=_azubis.find(a=>a.id===tnId);
+    if(az) az.arbeitszeitPlan=plan;
+    toast('✓ Arbeitszeit für '+azName+' gespeichert');
+    loadAgPlanForAzubi();
+    loadAgZeiten();
+  }).catch(e=>{err.textContent='Fehler: '+e.message;});
+}
+
+// Geofencing
+function loadGeoForAzubi(){
+  const tnId=document.getElementById('geoAzubi').value;
+  const el=document.getElementById('geoCurrent');
+  if(!tnId){el.textContent='';return;}
+  const az=_azubis.find(a=>a.id===tnId);
+  const geo=az?.geofence;
+  if(geo){
+    el.innerHTML='✅ Aktiv: <b>'+geo.lat.toFixed(5)+', '+geo.lng.toFixed(5)+'</b> (Radius: '+geo.radius+'m) <a href="https://maps.google.com/?q='+geo.lat+','+geo.lng+'" target="_blank" style="color:#2563eb;font-size:.6rem">→ Maps</a>';
+    document.getElementById('geoRadius').value=geo.radius;
+    document.getElementById('geoRadiusVal').textContent=geo.radius;
+  } else {
+    el.textContent='Kein Geofence aktiv – Stempeln überall möglich.';
+  }
+}
+function setGeoHere(){
+  const tnId=document.getElementById('geoAzubi').value;
+  if(!tnId){toast('Bitte MA wählen','bad');return;}
+  const radius=parseInt(document.getElementById('geoRadius').value)||200;
+  toast('📍 Standort wird ermittelt…');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const geo={lat:pos.coords.latitude,lng:pos.coords.longitude,radius:radius};
+    db.collection('globalTN').doc(tnId).update({geofence:geo}).then(()=>{
+      const az=_azubis.find(a=>a.id===tnId);
+      if(az) az.geofence=geo;
+      toast('✅ Geofence gesetzt ('+radius+'m Radius)');
+      loadGeoForAzubi();
+    });
+  },err=>{toast('❌ GPS-Fehler: '+err.message,'bad');},{enableHighAccuracy:true,timeout:10000});
+}
+function clearGeo(){
+  const tnId=document.getElementById('geoAzubi').value;
+  if(!tnId){toast('Bitte MA wählen','bad');return;}
+  if(!confirm('Geofencing für diesen Mitarbeiter deaktivieren?')) return;
+  db.collection('globalTN').doc(tnId).update({geofence:firebase.firestore.FieldValue.delete()}).then(()=>{
+    const az=_azubis.find(a=>a.id===tnId);
+    if(az) delete az.geofence;
+    toast('Geofencing deaktiviert');
+    loadGeoForAzubi();
+  });
+}
+
+function agZeitNachtragen(){
+  const tnId=document.getElementById('agNachAzubi').value;
+  const datum=document.getElementById('agNachDatum').value;
+  const ein=document.getElementById('agNachEin').value;
+  const aus=document.getElementById('agNachAus').value;
+  const err=document.getElementById('agNachErr');
+  err.textContent='';
+  if(!tnId){err.textContent='Bitte Azubi wählen';return;}
+  if(!datum||!ein||!aus){err.textContent='Bitte alle Felder ausfüllen';return;}
+  if(aus<=ein){err.textContent='Ausgang muss nach Eingang liegen';return;}
+  const istMin=timeToMin(aus)-timeToMin(ein);
+  const azName=document.getElementById('agNachAzubi').selectedOptions[0]?.text||'Azubi';
+  if(!confirm('Zeit nachtragen für '+azName+'?\n\n'+datum+': '+ein+' – '+aus+' ('+minToStr(istMin)+')')) return;
+  db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum).set({
+    datum, eingang:ein, ausgang:aus, pauseLog:[], pauseMinuten:0, istMinuten:istMin,
+    agBestaetigt:true, agNachgetragen:true, agNachgetragenAm:Date.now(), agNachgetragenVon:_firma||_email
+  },{merge:true}).then(()=>{
+    document.getElementById('agNachDatum').value='';
+    document.getElementById('agNachEin').value='';
+    document.getElementById('agNachAus').value='';
+    toast('✏ Zeit nachgetragen ✓');
+    loadAgZeiten();
+  }).catch(e=>{err.textContent='Fehler: '+e.message;});
+}
+function timeToMin(t){const p=(t||'0:0').split(':');return parseInt(p[0])*60+parseInt(p[1]||0);}
+
+let _agZeitLiveUnsubs=[];
+function startAgZeitLive(){
+  // Alte Listener stoppen
+  _agZeitLiveUnsubs.forEach(u=>u());
+  _agZeitLiveUnsubs=[];
+  if(!_azubis.length) return;
+  const today=localDate();
+  const liveData={};
+  const el=document.getElementById('agZeitLive');
+  function render(){
+    if(!el) return;
+    let html='';
+    _azubis.forEach(az=>{
+      const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Azubi';
+      const d=liveData[az.id];
+      if(!d){
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.05)">'
+          +'<span style="font-size:1rem">❌</span>'
+          +'<span style="font-size:.78rem;font-weight:600;color:var(--mu)">'+esc(name)+'</span>'
+          +'<span style="margin-left:auto;font-size:.65rem;color:var(--mu)">Nicht eingestempelt</span></div>';
+        return;
+      }
+      const pLog=d.pauseLog||[];
+      const offenePause=pLog.find(p=>p.start&&!p.ende);
+      let status='',statusCol='',icon='';
+      if(d.ausgang){
+        icon='✅';status='Feierabend · '+d.eingang+' – '+d.ausgang;statusCol='var(--mu)';
+      } else if(offenePause){
+        icon='⏸';status='Pause seit '+offenePause.start+' · Eingang '+d.eingang;statusCol='#d97706';
+      } else {
+        icon='🟢';status='Arbeitet seit '+d.eingang;statusCol='#059669';
+      }
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.05)">'
+        +'<span style="font-size:1rem">'+icon+'</span>'
+        +'<span style="font-size:.78rem;font-weight:700">'+esc(name)+'</span>'
+        +'<span style="margin-left:auto;font-size:.65rem;font-weight:600;color:'+statusCol+';font-family:\'JetBrains Mono\',monospace">'+status+'</span></div>';
+    });
+    el.innerHTML=html||'<div class="empty">Keine Azubis</div>';
+  }
+  // Für jeden Azubi einen Listener auf heute
+  _azubis.forEach(az=>{
+    const unsub=db.collection('globalTN').doc(az.id).collection('zeiterfassung').doc(today)
+      .onSnapshot(doc=>{
+        liveData[az.id]=doc.exists?doc.data():null;
+        render();
+      },()=>{liveData[az.id]=null;render();});
+    _agZeitLiveUnsubs.push(unsub);
+  });
+}
+function localDate(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function localYM(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+
+function getNRWFeiertage(year){
+  const a=year%19,b=Math.floor(year/100),c=year%100,d2=Math.floor(b/4),e=b%4;
+  const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d2-g+15)%30;
+  const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),dy=((h+l-7*m+114)%31)+1;
+  const easter=new Date(year,mo-1,dy);
+  const eD=(off)=>{const dd=new Date(easter);dd.setDate(dd.getDate()+off);return localDate(dd);};
+  const ft={};
+  ft[year+'-01-01']='Neujahr';ft[eD(-2)]='Karfreitag';ft[eD(1)]='Ostermontag';
+  ft[year+'-05-01']='Tag der Arbeit';ft[eD(39)]='Christi Himmelfahrt';ft[eD(50)]='Pfingstmontag';
+  ft[eD(60)]='Fronleichnam';ft[year+'-10-03']='Tag der Dt. Einheit';ft[year+'-11-01']='Allerheiligen';
+  ft[year+'-12-25']='1. Weihnachtstag';ft[year+'-12-26']='2. Weihnachtstag';
+  return ft;
+}
+
+function fillAgMonatSelect(id){
+  const sel=document.getElementById(id);
+  if(!sel||sel.children.length>0) return;
+  const now=new Date();
+  for(let i=0;i<6;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const label=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+    sel.innerHTML+='<option value="'+ym+'"'+(i===0?' selected':'')+'>'+label+'</option>';
+  }
+}
+function minToStr(m){const h=Math.floor(Math.abs(m)/60);const min=Math.abs(m)%60;return(m<0?'-':'')+h+'h '+String(min).padStart(2,'0')+'m';}
+
+// AG: ZEITEN
+function loadAgZeiten(){
+  const el=document.getElementById('agZeitenListe');
+  if(!el||!_azubis.length){el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
+  const ym=document.getElementById('agZeitMonat')?.value||localYM();
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  // Alle Tage des Monats (inkl. Sa/So wenn konfiguriert)
+  const allDays=[];
+  const mStart=new Date(ym+'-01T12:00');
+  const mEnd=new Date(mStart.getFullYear(),mStart.getMonth()+1,0,23,59);
+  const today=localDate();
+  for(let dt=new Date(mStart);dt<=mEnd;dt.setDate(dt.getDate()+1)){
+    const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+    if(ds>today) continue;
+    allDays.push(ds);
+  }
+  const promises=_azubis.map(az=>{
+    const p1=db.collection('globalTN').doc(az.id).collection('zeiterfassung')
+      .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').orderBy('datum').get();
+    const p2=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('type','==','krank').get();
+    const p3=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .where('status','==','genehmigt').get();
+    return Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlSnap])=>{
+      const zeitMap={};
+      zeitSnap.forEach(d=>{zeitMap[d.data().datum]={id:d.id,...d.data()};});
+      const krankDates=new Set();
+      krankSnap.forEach(d=>{const dd=d.data();if(dd.datum&&dd.datum.startsWith(ym))krankDates.add(dd.datum);});
+      const urlaubDates=new Set();
+      urlSnap.forEach(d=>{
+        const dd=d.data();if(!dd.von||!dd.bis)return;
+        const s=new Date(dd.von+'T12:00'),e=new Date(dd.bis+'T12:00');
+        for(let dt=new Date(s);dt<=e;dt.setDate(dt.getDate()+1)){
+          const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+          if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6)urlaubDates.add(ds);
+        }
+      });
+      return {az, zeitMap, krankDates, urlaubDates};
+    }).catch(()=>({az, zeitMap:{}, krankDates:new Set(), urlaubDates:new Set()}));
+  });
+  Promise.all(promises).then(results=>{
+    // Sortieren: Azubis zuerst, dann Arbeitnehmer
+    const azubis=results.filter(r=>r.az.typ!=='arbeitnehmer');
+    const mitarbeiter=results.filter(r=>r.az.typ==='arbeitnehmer');
+    let html='';
+    let idx=0;
+    function renderGroup(label,icon,items){
+      if(!items.length) return;
+      html+='<div style="font-size:.7rem;font-weight:700;color:var(--mu);margin:10px 0 6px;letter-spacing:.04em">'+icon+' '+label+' ('+items.length+')</div>';
+      items.forEach(({az, zeitMap, krankDates, urlaubDates})=>{
+      const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
+      const plan=az.arbeitszeitPlan||null;
+      let totalIst=0,totalSoll=0,tage=0;
+      const feiertage=getNRWFeiertage(parseInt(ym));
+      let dayHtml='';
+      allDays.forEach(ds=>{
+        const e=zeitMap[ds];
+        const isKrank=krankDates.has(ds);
+        const isUrlaub=urlaubDates.has(ds);
+        const isFeiertag=!!feiertage[ds];
+        const isFrei=isKrank||isUrlaub||isFeiertag;
+        const ist=e?.istMinuten||0;
+        const sollRaw=plan?getAgSollMin(ds,plan):0;
+        const soll=isFrei?0:sollRaw;
+        if(!sollRaw&&!e&&!isFrei) return;
+        totalIst+=ist;totalSoll+=soll;
+        if(e?.ausgang) tage++;
+        const datDE=new Date(ds+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+        const manuell=e?.manuell?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(245,158,11,.15);color:#d97706;border-radius:4px;font-weight:700;margin-left:3px">✎'+(e.agBestaetigt?' ✓':' offen')+'</span>':(e?.agKorrigiert?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(99,102,241,.12);color:#6366f1;border-radius:4px;font-weight:700;margin-left:3px">✏ korrigiert</span>':'');
+        const bestBtn=e?.manuell&&!e.agBestaetigt?'<button onclick="event.stopPropagation();agBestaetigeZeit(\''+az.id+'\',\''+ds+'\')" style="font-size:.5rem;padding:2px 6px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:3px">✓</button>':'';
+        const korrekturBtn=e?'<button onclick="event.stopPropagation();agKorrekturZeit(\''+az.id+'\',\''+ds+'\')" style="font-size:.5rem;padding:2px 5px;background:rgba(99,102,241,.1);color:#6366f1;border:none;border-radius:3px;cursor:pointer;margin-left:2px" title="Zeit korrigieren">✏</button>':'';
+        let statusTag='';
+        if(isFeiertag) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(139,92,246,.12);color:#7c3aed;border-radius:3px;font-weight:700;margin-left:3px">🎌</span>';
+        else if(isKrank) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.15);color:#ef4444;border-radius:3px;font-weight:700;margin-left:3px">🤒</span>';
+        else if(isUrlaub) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(16,185,129,.15);color:#059669;border-radius:3px;font-weight:700;margin-left:3px">🏖</span>';
+        if(plan){
+          const diff=ist-soll;const diffCol=isFrei?'var(--mu)':diff>=0?'#059669':'#ef4444';
+          const zeitText=e?(e.eingang+(e.ausgang?' – '+e.ausgang:'…')):(isFrei?'—':'');
+          const dokuIcons=e&&(e.fotos||e.unterschrift||e.gpsEingang)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku anzeigen">'+(e.gpsEingang?'📍':'')+(e.fotos?'📸':'')+(e.unterschrift?'✍':'')+'</span>':'';
+          const nachtarbeit=e&&e.ausgang&&parseInt(e.ausgang)>=22?'<span style="font-size:.5rem;margin-left:2px" title="Nachtarbeit">🌙</span>':'';
+          dayHtml+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
+            +'<span style="flex:1.5;color:var(--mu)">'+datDE+statusTag+'</span>'
+            +'<span style="flex:2">'+zeitText+nachtarbeit+dokuIcons+manuell+bestBtn+korrekturBtn+'</span>'
+            +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e?.ausgang?minToStr(ist):(isFrei?'—':''))+'</span>'
+            +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
+        } else if(e){
+          dayHtml+='<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
+            +'<span style="color:var(--mu)">'+datDE+statusTag+'</span>'
+            +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+(e&&(e.fotos||e.unterschrift)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku">📋</span>':'')+manuell+bestBtn+'</span>'
+            +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?minToStr(ist):'…')+'</span></div>';
+        } else if(isFrei){
+          dayHtml+='<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
+            +'<span style="color:var(--mu)">'+datDE+statusTag+'</span><span>—</span><span>—</span></div>';
+        }
+      });
+      // Heute-Status ermitteln
+      const todayE=zeitMap[today];
+      const todayKrank=krankDates.has(today);
+      const todayUrlaub=urlaubDates.has(today);
+      let todayStatus='',todayCol='var(--mu)';
+      if(todayKrank){todayStatus='🤒 Krank';todayCol='#ef4444';}
+      else if(todayUrlaub){todayStatus='🏖 Urlaub';todayCol='#059669';}
+      else if(todayE&&!todayE.ausgang){
+        const pLog=todayE.pauseLog||[];
+        const inPause=pLog.find(p=>p.start&&!p.ende);
+        todayStatus=inPause?'⏸ Pause seit '+inPause.start:'🟢 Arbeitet seit '+todayE.eingang;
+        todayCol=inPause?'#d97706':'#059669';
+      } else if(todayE?.ausgang){todayStatus='✅ '+todayE.eingang+' – '+todayE.ausgang;todayCol='var(--mu)';}
+      else {todayStatus='❌ Nicht eingestempelt';}
+      // Überstunden
+      const totalDiff=totalIst-totalSoll;
+      const diffCol=totalDiff>=0?'#059669':'#ef4444';
+      const diffStr=plan?(totalDiff>=0?'+':'')+minToStr(totalDiff):'';
+      const cid='agZeitDetail'+idx++;
+      // Header (immer sichtbar)
+      html+='<div style="margin-bottom:8px;border:1px solid var(--brd);border-radius:10px;overflow:hidden">'
+        +'<div onclick="document.getElementById(\''+cid+'\').style.display=document.getElementById(\''+cid+'\').style.display===\'none\'?\'block\':\'none\'" style="padding:10px;cursor:pointer;display:flex;align-items:center;gap:10px">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:800">'+esc(name)+'</div>'
+        +'<div style="font-size:.65rem;color:'+todayCol+';font-weight:700;margin-top:2px">'+todayStatus+'</div></div>'
+        +'<div style="text-align:right">';
+      if(plan) html+='<div style="font-size:.78rem;font-weight:800;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+diffStr+'</div>'
+        +'<div style="font-size:.5rem;color:var(--mu)">🤒'+krankDates.size+' 🏖'+urlaubDates.size+' · '+tage+'T</div>';
+      else html+='<div style="font-size:.72rem;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+minToStr(totalIst)+'</div>';
+      html+='</div><span style="color:var(--mu);font-size:.8rem">▼</span></div>'
+        // Details (ausgeblendet)
+        +'<div id="'+cid+'" style="display:none;padding:0 10px 10px;border-top:1px solid var(--brd)">'
+        +dayHtml;
+      if(plan){
+        html+='<div style="margin-top:6px;padding:6px;background:var(--sur2);border-radius:6px;display:flex;justify-content:space-between;font-size:.7rem">'
+          +'<span>Ist: <b>'+minToStr(totalIst)+'</b> · Soll: <b>'+minToStr(totalSoll)+'</b></span>'
+          +'<span style="font-weight:800;color:'+diffCol+'">'+(totalDiff>=0?'📈 +':'📉 ')+minToStr(totalDiff)+'</span></div>';
+      }
+      html+='<div style="display:flex;gap:4px;margin-top:8px">'
+        +'<button title="📄 PDF" onclick="exportStundenzettel(\''+az.id+'\',\''+esc(name)+'\',\''+ym+'\')" style="flex:1;padding:8px;background:#fff;border:1.5px solid #2563eb;border-radius:8px;color:#2563eb;font-size:.68rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📄 PDF</button>'
+        +'<button title="📊 CSV" onclick="exportStundenzettel(\''+az.id+'\',\''+esc(name)+'\',\''+ym+'\',\'csv\')" style="flex:1;padding:8px;background:#fff;border:1.5px solid #059669;border-radius:8px;color:#059669;font-size:.68rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📊 CSV</button>'
+        +'</div>';
+      // Monatsabschluss
+      const abschlussId='abschluss-'+ym;
+      html+='<div id="abschluss-'+az.id+'-'+ym+'" style="margin-top:4px;font-size:.62rem;text-align:center;color:var(--mu)">Lädt…</div>';
+      // Load abschluss status async
+      db.collection('globalTN').doc(az.id).collection('zeiterfassung').doc(abschlussId).get().then(adoc=>{
+        const el2=document.getElementById('abschluss-'+az.id+'-'+ym);
+        if(!el2) return;
+        if(adoc.exists&&adoc.data().abgeschlossen){
+          const abDat=adoc.data().abgeschlossenAm?new Date(adoc.data().abgeschlossenAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+          el2.innerHTML='<span style="color:#059669;font-weight:700">✅ Monat abgeschlossen'+(abDat?' am '+abDat:'')+'</span>';
+        } else {
+          el2.innerHTML='<button title="🔒 Monat abschließen" onclick="monatsAbschluss(\''+az.id+'\',\''+esc(name)+'\',\''+ym+'\')" style="width:100%;padding:6px;background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.3);border-radius:8px;color:#d97706;font-size:.62rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">🔒 Monat abschließen</button>';
+        }
+      }).catch(()=>{});
+      html+='</div></div>';
+      });
+    }
+    renderGroup('Auszubildende','👷',azubis);
+    renderGroup('Arbeitnehmer','👤',mitarbeiter);
+    el.innerHTML=html||'<div class="empty">Keine Daten</div>';
+  });
+}
+function getAgSollMin(dateStr,plan){
+  const dow=new Date(dateStr+'T12:00').getDay();
+  const map={0:'so',1:'mo',2:'di',3:'mi',4:'do',5:'fr',6:'sa'};
+  const key=map[dow];
+  return key?(plan[key]||0)*60:0;
+}
+function agBestaetigeZeit(tnId, datum){
+  db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum)
+    .update({agBestaetigt:true,agBestaetigtAm:Date.now(),
+      historie:firebase.firestore.FieldValue.arrayUnion({aktion:'bestätigt',von:_email||_firma,am:Date.now()})
+    })
+    .then(()=>{toast('✓ Zeit bestätigt');loadAgZeiten();})
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function agKorrekturZeit(tnId, datum){
+  const az=_azubis.find(a=>a.id===tnId);
+  const name=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
+  const neuEin=prompt('Korrektur für '+name+' am '+datum+'\n\nNeuer Eingang (HH:MM):');
+  if(!neuEin) return;
+  const neuAus=prompt('Neuer Ausgang (HH:MM):');
+  if(!neuAus) return;
+  if(!confirm('Zeit korrigieren?\n\n'+datum+': '+neuEin+' – '+neuAus+'\n\nDie Änderung wird protokolliert.')) return;
+  const istMin=timeToMin(neuAus)-timeToMin(neuEin);
+  if(istMin<=0){toast('Ausgang muss nach Eingang liegen','bad');return;}
+  const ref=db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum);
+  ref.get().then(doc=>{
+    const old=doc.exists?doc.data():{};
+    const histEintrag={aktion:'korrigiert',von:_email||_firma,am:Date.now(),
+      vorher:{eingang:old.eingang||'',ausgang:old.ausgang||'',istMinuten:old.istMinuten||0}};
+    ref.set({
+      datum,eingang:neuEin,ausgang:neuAus,pauseLog:old.pauseLog||[],pauseMinuten:old.pauseMinuten||0,
+      istMinuten:istMin,agKorrigiert:true,agKorrigiertAm:Date.now(),agKorrigiertVon:_email||_firma,
+      historie:firebase.firestore.FieldValue.arrayUnion(histEintrag)
+    },{merge:true}).then(()=>{toast('✅ Zeit korrigiert');loadAgZeiten();});
+  });
+}
+
+function timeToMin(t){const [h,m]=(t||'0:0').split(':').map(Number);return h*60+(m||0);}
+
+// AG: BAUSTELLEN
+// AG: AUFTRÄGE
+let _agAuftraege=[];
+function loadAgAuftraege(){
+  // Fill MA dropdown
+  const sel=document.getElementById('aufMa');
+  if(sel&&_azubis.length){
+    sel.innerHTML='';
+    _azubis.forEach(a=>{
+      const name=((a.vorname||'')+' '+(a.nachname||'')).trim();
+      sel.innerHTML+='<option value="'+a.id+'">'+esc(name)+'</option>';
+    });
+  }
+  // Load all auftraege from all employees
+  const elO=document.getElementById('agAufOffen');
+  const elE=document.getElementById('agAufErledigt');
+  if(!elO||!_azubis.length){if(elO)elO.innerHTML='<div class="empty">Keine Mitarbeiter</div>';return;}
+  elO.innerHTML='<div class="empty">Lädt…</div>';
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('auftraege')
+      .orderBy('erstelltAm','desc').get()
+      .then(snap=>{
+        const docs=snap.docs.map(d=>({id:d.id,tnId:az.id,tnName:((az.vorname||'')+' '+(az.nachname||'')).trim(),...d.data()}));
+        return docs;
+      }).catch(()=>[])
+  );
+  Promise.all(promises).then(results=>{
+    _agAuftraege=results.flat();
+    renderAgAuftraege();
+  });
+}
+
+function renderAgAuftraege(){
+  const offen=_agAuftraege.filter(a=>a.status!=='erledigt');
+  const erledigt=_agAuftraege.filter(a=>a.status==='erledigt');
+  const elO=document.getElementById('agAufOffen');
+  const elE=document.getElementById('agAufErledigt');
+  if(!offen.length){elO.innerHTML='<div class="empty">Keine offenen Aufträge</div>';}
+  else{
+    let h='';
+    offen.forEach(a=>{
+      const dat=a.erstelltAm?new Date(a.erstelltAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
+      h+='<div style="padding:10px;border:1.5px solid rgba(37,99,235,.2);border-radius:10px;margin-bottom:8px;background:rgba(37,99,235,.03)">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="font-size:.82rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
+        +'<span style="font-size:.55rem;color:var(--mu)">'+dat+'</span></div>'
+        +(a.adresse?'<div style="font-size:.68rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
+        +(a.beschreibung?'<div style="font-size:.68rem;color:var(--mu)">'+esc(a.beschreibung)+'</div>':'')
+        +'<div style="font-size:.6rem;color:var(--acc);margin-top:4px">👤 '+esc(a.tnName)+'</div>'
+        +(a.frist?'<div style="font-size:.58rem;margin-top:2px;'+(a.frist<localDate()?'color:#dc2626;font-weight:700':'color:#d97706')+'">📅 Frist: '+new Date(a.frist+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})+(a.frist<localDate()?' ⚠ ÜBERFÄLLIG':'')+'</div>':'')
+        +'</div>';
+    });
+    elO.innerHTML=h;
+  }
+  if(!erledigt.length){elE.innerHTML='<div class="empty">Keine erledigten Aufträge</div>';}
+  else{
+    let h='';
+    erledigt.forEach(a=>{
+      const dat=a.erledigtAm?new Date(a.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+      h+='<div onclick="showAuftragDoku(\''+a.tnId+'\',\''+a.id+'\')" style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor=\'#2563eb\'" onmouseout="this.style.borderColor=\'\'">'
+        +'<div style="display:flex;justify-content:space-between">'
+        +'<span style="font-size:.78rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
+        +'<span style="font-size:.55rem;color:#059669;font-weight:600">✅ '+dat+'</span></div>'
+        +(a.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
+        +'<div style="font-size:.6rem;color:var(--mu)">👤 '+esc(a.tnName)+'</div>'
+        +(a.taetigkeit?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">🔧 '+esc(a.taetigkeit)+'</div>':'')
+        +'<div style="font-size:.55rem;color:var(--acc);margin-top:2px">'
+        +(a.stunden?'⏱ '+a.stunden+'h ':'')
+        +(a.fotos?'📸 '+a.fotos.length+' ':'')
+        +(a.unterschrift?'✍ ':'')
+        +(a.material?'🧱 '+a.material.length+' ':'')
+        +(a.gpsErledigt?'📍':'')
+        +'</div>'
+        +'<button onclick="event.stopPropagation();exportAuftragsprotokoll(\''+a.tnId+'\',\''+a.id+'\')" style="margin-top:6px;padding:5px 12px;background:#fff;border:1px solid #2563eb;border-radius:6px;color:#2563eb;font-size:.6rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📄 PDF</button>'
+        +' <button onclick="event.stopPropagation();agAuftragWiedereroeffnen(\''+a.tnId+'\',\''+a.id+'\')" style="padding:5px 12px;background:#fff;border:1px solid #d97706;border-radius:6px;color:#d97706;font-size:.6rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">↩ Nacharbeit</button>'
+        +'</div>';
+    });
+    elE.innerHTML=h;
+  }
+}
+
+function agAuftragErstellen(){
+  const kunde=document.getElementById('aufKunde').value.trim();
+  const adresse=document.getElementById('aufAdresse').value.trim();
+  const beschr=document.getElementById('aufBeschr').value.trim();
+  const frist=document.getElementById('aufFrist').value;
+  const sel=document.getElementById('aufMa');
+  const maIds=Array.from(sel.selectedOptions).map(o=>o.value).filter(Boolean);
+  const err=document.getElementById('aufErr');
+  err.textContent='';
+  if(!kunde){err.textContent='Bitte Kunde eingeben';return;}
+  if(!maIds.length){err.textContent='Bitte mind. einen Mitarbeiter auswählen';return;}
+  err.textContent='Wird erstellt…';
+  const data={kunde, adresse, beschreibung:beschr, status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma};
+  if(frist) data.frist=frist;
+  const promises=maIds.map(id=>db.collection('globalTN').doc(id).collection('auftraege').add(data));
+  Promise.all(promises).then(()=>{
+    err.textContent='';
+    document.getElementById('aufKunde').value='';
+    document.getElementById('aufAdresse').value='';
+    document.getElementById('aufBeschr').value='';
+    document.getElementById('aufFrist').value='';
+    sel.selectedIndex=-1;
+    toast('📋 Auftrag an '+maIds.length+' Mitarbeiter erstellt');
+    loadAgAuftraege();
+  }).catch(e=>{err.textContent='❌ '+e.message;});
+}
+
+// AG: Auftrags-Doku anzeigen (reuse showDoku for auftraege)
+function showAuftragDoku(tnId,aufId){
+  const dvDate=document.getElementById('dvDate');
+  const dvContent=document.getElementById('dvContent');
+  dvContent.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px">Lädt…</div>';
+  dvDate.textContent='Auftragsdokumentation';
+  document.getElementById('dvModal').classList.add('open');
+  db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).get().then(doc=>{
+    if(!doc.exists){dvContent.innerHTML='<div class="empty">Keine Daten</div>';return;}
+    const d=doc.data();
+    let html='';
+    // Kunde + Adresse
+    if(d.kunde) html+='<div style="font-size:.9rem;font-weight:800;margin-bottom:4px">'+esc(d.kunde)+'</div>';
+    if(d.adresse) html+='<div style="font-size:.75rem;color:#64748b;margin-bottom:12px">📍 '+esc(d.adresse)+'</div>';
+    // Tätigkeit
+    if(d.taetigkeit) html+='<div class="dv-section"><div class="dv-label">🔧 Tätigkeit</div><div style="font-size:.78rem;line-height:1.5">'+esc(d.taetigkeit)+'</div></div>';
+    // Stunden
+    if(d.stunden) html+='<div class="dv-section"><div class="dv-label">⏱ Stundenaufwand</div><div style="font-size:1.1rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:#059669">'+d.stunden+' Stunden</div></div>';
+    // Material
+    if(d.material&&d.material.length) html+='<div class="dv-section"><div class="dv-label">🧱 Material ('+d.material.length+')</div><div style="display:flex;gap:4px;flex-wrap:wrap">'+d.material.map(m=>'<span style="padding:4px 10px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:6px;font-size:.68rem;font-weight:600;color:#2563eb">'+esc(m)+'</span>').join('')+'</div></div>';
+    // GPS
+    if(d.gpsErledigt) html+='<div class="dv-section"><div class="dv-label">📍 Standort</div><div style="font-size:.72rem"><a href="https://maps.google.com/?q='+d.gpsErledigt.lat+','+d.gpsErledigt.lng+'" target="_blank" style="color:#2563eb">'+d.gpsErledigt.lat+', '+d.gpsErledigt.lng+'</a> <span style="color:#94a3b8">(±'+d.gpsErledigt.acc+'m)</span></div></div>';
+    // Fotos
+    if(d.fotos&&d.fotos.length){
+      html+='<div class="dv-section"><div class="dv-label">📸 Fotos ('+d.fotos.length+')</div><div class="dv-photos">';
+      d.fotos.forEach(f=>{html+='<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')" loading="lazy">';});
+      html+='</div></div>';
+    }
+    // Unterschrift
+    if(d.unterschrift) html+='<div class="dv-section"><div class="dv-label">✍ Kundenunterschrift</div><div class="dv-sig"><img src="'+d.unterschrift+'"></div></div>';
+    if(!html) html='<div class="empty">Keine Dokumentation</div>';
+    dvContent.innerHTML=html;
+  });
+}
+
+function agAuftragWiedereroeffnen(tnId,aufId){
+  if(!confirm('Auftrag wiedereröffnen? Der Mitarbeiter sieht ihn wieder als offenen Auftrag.')) return;
+  db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).update({
+    status:'offen', wiederoeffnetAm:Date.now(), wiederoeffnetVon:_firma||_email
+  }).then(()=>{toast('↩ Auftrag wiedereröffnet');loadAgAuftraege();});
+}
+
+// PDF EXPORTS
+function exportStundenzettel(tnId,name,ym,format){
+  toast('📄 Wird erstellt…');
+  const az=_azubis.find(a=>a.id===tnId);
+  const plan=az?.arbeitszeitPlan||null;
+  const [y,mo]=ym.split('-').map(Number);
+  const feiertage=getNRWFeiertage(y);
+  // Parallel: Zeit + Krank + Urlaub
+  const p1=db.collection('globalTN').doc(tnId).collection('zeiterfassung')
+    .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').get();
+  const p2=db.collection('globalTN').doc(tnId).collection('betriebMeldungen')
+    .where('type','==','krank').get();
+  const p3=db.collection('globalTN').doc(tnId).collection('urlaubsantraege')
+    .where('status','==','genehmigt').get();
+  Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlaubSnap])=>{
+    const zeitMap={};zeitSnap.forEach(d=>{zeitMap[d.data().datum]={...d.data()};});
+    const krankDates=new Set();
+    krankSnap.forEach(doc=>{const d=doc.data();if(d.datum&&d.datum.startsWith(ym)) krankDates.add(d.datum);});
+    const urlaubDates=new Set();
+    urlaubSnap.forEach(doc=>{
+      const d=doc.data();if(!d.von||!d.bis) return;
+      const start=new Date(d.von+'T12:00'),end=new Date(d.bis+'T12:00');
+      for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){
+        const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+        if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6) urlaubDates.add(ds);
+      }
+    });
+    const tage=new Date(y,mo,0).getDate();
+    let rows='',csvRows=[],totalIst=0,totalSoll=0,krankCount=0,urlaubCount=0,feiertagCount=0;
+    csvRows.push(['Tag','Datum','Eingang','Ausgang','Pause(min)','Ist(min)','Soll(min)','Diff(min)','Status'].join(';'));
+    for(let d=1;d<=tage;d++){
+      const ds=ym+'-'+String(d).padStart(2,'0');
+      const dat=new Date(ds+'T12:00');
+      const tag=['So','Mo','Di','Mi','Do','Fr','Sa'][dat.getDay()];
+      const e=zeitMap[ds];
+      const isWE=dat.getDay()===0||dat.getDay()===6;
+      const isFT=!!feiertage[ds];
+      const isKrank=krankDates.has(ds);
+      const isUrlaub=urlaubDates.has(ds);
+      const isFrei=isFT||isKrank||isUrlaub;
+      const sollMin=(isFrei||isWE)?0:(plan?getAgSollMin(ds,plan):0);
+      const istMin=e?.istMinuten||0;
+      const diff=istMin-sollMin;
+      if(!isWE||e) {totalIst+=istMin;totalSoll+=sollMin;}
+      if(isFT&&!isWE) feiertagCount++;
+      if(isKrank) krankCount++;
+      if(isUrlaub) urlaubCount++;
+      let status='';
+      if(isFT) status=feiertage[ds];
+      else if(isKrank) status='Krank';
+      else if(isUrlaub) status='Urlaub';
+      const rowBg=isFT?'background:#f5f3ff':isKrank?'background:#fef2f2':isUrlaub?'background:#ecfdf5':isWE?'background:#f8fafc;color:#94a3b8':'';
+      rows+='<tr style="'+rowBg+'">'
+        +'<td>'+tag+', '+String(d).padStart(2,'0')+'.'+String(mo).padStart(2,'0')+'.</td>'
+        +'<td>'+(e?.eingang||'–')+'</td><td>'+(e?.ausgang||'–')+'</td>'
+        +'<td>'+(e?.pauseMinuten?e.pauseMinuten+'min':'–')+'</td>'
+        +'<td style="font-weight:700">'+(e?.ausgang?minToStr(istMin):'–')+'</td>'
+        +(plan?'<td>'+(isFrei?'–':minToStr(sollMin))+'</td><td style="font-weight:700;color:'+(isFrei?'#7c3aed':diff>=0?'#059669':'#ef4444')+'">'+(isFrei?status:(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):'–'))+'</td>':'')
+        +'</tr>';
+      csvRows.push([tag,String(d).padStart(2,'0')+'.'+String(mo).padStart(2,'0')+'.'+y,e?.eingang||'',e?.ausgang||'',e?.pauseMinuten||'',istMin,sollMin,diff,status].join(';'));
+    }
+    const totalDiff=totalIst-totalSoll;
+    csvRows.push(['','','','','Gesamt',totalIst,totalSoll,totalDiff,''].join(';'));
+    csvRows.push(['','','','','Krank: '+krankCount+', Urlaub: '+urlaubCount+', Feiertage: '+feiertagCount,'','','',''].join(';'));
+
+    if(format==='csv'){
+      const blob=new Blob(['\ufeff'+csvRows.join('\n')],{type:'text/csv;charset=utf-8'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download='Stundenzettel_'+name.replace(/\s/g,'_')+'_'+ym+'.csv';
+      a.click();URL.revokeObjectURL(a.href);
+      toast('📊 CSV heruntergeladen');
+      return;
+    }
+
+    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Stundenzettel '+esc(name)+' '+ym+'</title>'
+      +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:30px;font-size:11px;color:#1e293b}'
+      +'table{width:100%;border-collapse:collapse;margin-top:16px}th,td{padding:5px 8px;border:1px solid #cbd5e1;text-align:left}'
+      +'th{background:#f1f5f9;font-size:10px;font-weight:700}h1{font-size:16px;margin-bottom:4px}'
+      +'.meta{color:#64748b;font-size:10px;margin-bottom:12px}'
+      +'.summary{margin-top:12px;padding:10px;border:1px solid #cbd5e1;border-radius:4px;font-size:10px}'
+      +'.sig{display:flex;gap:60px;margin-top:30px}.sig div{flex:1;border-top:1px solid #94a3b8;padding-top:4px;font-size:9px;color:#64748b}'
+      +'@media print{body{padding:15px}}</style></head><body>'
+      +'<h1>Stundenzettel</h1>'
+      +'<div class="meta"><b>'+esc(name)+'</b> · '+esc(_firma||'')+'<br>Zeitraum: '+ym+'</div>'
+      +'<table><thead><tr><th>Tag</th><th>Eingang</th><th>Ausgang</th><th>Pause</th><th>Ist</th>'
+      +(plan?'<th>Soll</th><th>+/– / Status</th>':'')+'</tr></thead><tbody>'+rows+'</tbody>'
+      +'<tfoot><tr style="font-weight:700;background:#f1f5f9"><td colspan="4">Gesamt</td><td>'+minToStr(totalIst)+'</td>'
+      +(plan?'<td>'+minToStr(totalSoll)+'</td><td style="color:'+(totalDiff>=0?'#059669':'#ef4444')+'">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</td>':'')
+      +'</tr></tfoot></table>'
+      +'<div class="summary"><b>Zusammenfassung:</b> 🤒 Krank: '+krankCount+' · 🏖 Urlaub: '+urlaubCount+' · 🎌 Feiertage: '+feiertagCount
+      +(plan?' · Soll: '+minToStr(totalSoll)+' · Ist: '+minToStr(totalIst)+' · <b style="color:'+(totalDiff>=0?'#059669':'#ef4444')+'">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</b>':'')+'</div>'
+      +'<div class="sig"><div>Datum, Unterschrift Arbeitnehmer</div><div>Datum, Unterschrift Arbeitgeber</div></div>'
+      +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
+    const w=window.open('','_blank');
+    w.document.write(html);w.document.close();
+  });
+}
+
+function exportDATEV(){
+  const ym=document.getElementById('agZeitMonat')?.value||localYM();
+  const [y,mo]=ym.split('-').map(Number);
+  const feiertage=getNRWFeiertage(y);
+  toast('📊 DATEV-Export wird erstellt…');
+  const tage=new Date(y,mo,0).getDate();
+  const promises=_azubis.map(az=>{
+    const plan=az.arbeitszeitPlan||null;
+    const p1=db.collection('globalTN').doc(az.id).collection('zeiterfassung')
+      .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').get();
+    const p2=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('type','==','krank').get();
+    const p3=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .where('status','==','genehmigt').get();
+    return Promise.all([p1,p2,p3]).then(([zSnap,kSnap,uSnap])=>{
+      const zeitMap={};zSnap.forEach(d=>{zeitMap[d.data().datum]=d.data();});
+      const krankDates=new Set();kSnap.forEach(doc=>{const d=doc.data();if(d.datum&&d.datum.startsWith(ym)) krankDates.add(d.datum);});
+      const urlaubDates=new Set();
+      uSnap.forEach(doc=>{
+        const d=doc.data();if(!d.von||!d.bis) return;
+        const start=new Date(d.von+'T12:00'),end=new Date(d.bis+'T12:00');
+        for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){
+          const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+          if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6) urlaubDates.add(ds);
+        }
+      });
+      let istMin=0,sollMin=0,arbeitstage=0;
+      for(let d=1;d<=tage;d++){
+        const ds=ym+'-'+String(d).padStart(2,'0');
+        const e=zeitMap[ds];
+        const dow=new Date(ds+'T12:00').getDay();
+        const isWE=dow===0||dow===6;
+        const isFT=!!feiertage[ds];
+        const isK=krankDates.has(ds);
+        const isU=urlaubDates.has(ds);
+        if(e?.istMinuten) istMin+=e.istMinuten;
+        if(e?.ausgang) arbeitstage++;
+        if(!isWE&&!isFT&&!isK&&!isU&&plan){
+          const map={0:'so',1:'mo',2:'di',3:'mi',4:'do',5:'fr',6:'sa'};
+          sollMin+=(plan[map[dow]]||0)*60;
+        }
+      }
+      const name=((az.vorname||'')+' '+(az.nachname||'')).trim();
+      return {
+        pnr:az.id.substring(0,8).toUpperCase(),
+        name, firma:_firma||'',
+        zeitraum:ym,
+        arbeitstage,
+        istStd:(istMin/60).toFixed(2),
+        sollStd:(sollMin/60).toFixed(2),
+        diffStd:((istMin-sollMin)/60).toFixed(2),
+        krankTage:krankDates.size,
+        urlaubTage:urlaubDates.size,
+        feierTage:Object.keys(feiertage).filter(d=>d.startsWith(ym)&&new Date(d+'T12:00').getDay()!==0&&new Date(d+'T12:00').getDay()!==6).length
+      };
+    });
+  });
+  Promise.all(promises).then(rows=>{
+    const header=['Personalnummer','Name','Firma','Zeitraum','Arbeitstage','Ist-Stunden','Soll-Stunden','Differenz','Lohnart 200 (Normal)','Lohnart 210 (Überstd.)','Krankheitstage','Urlaubstage','Feiertage'];
+    const csv=[header.join(';')];
+    rows.forEach(r=>{
+      const normal=Math.min(parseFloat(r.istStd),parseFloat(r.sollStd));
+      const ueberStd=Math.max(0,parseFloat(r.istStd)-parseFloat(r.sollStd));
+      csv.push([r.pnr,r.name,r.firma,r.zeitraum,r.arbeitstage,r.istStd,r.sollStd,r.diffStd,normal.toFixed(2),ueberStd.toFixed(2),r.krankTage,r.urlaubTage,r.feierTage].join(';'));
+    });
+    const blob=new Blob(['\ufeff'+csv.join('\n')],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='DATEV_'+(_firma||'Export').replace(/\s/g,'_')+'_'+ym+'.csv';
+    a.click();URL.revokeObjectURL(a.href);
+    toast('📊 DATEV-Export heruntergeladen ('+rows.length+' Mitarbeiter)');
+  });
+}
+
+function monatsAbschluss(tnId,name,ym){
+  if(!confirm('Monat '+ym+' für '+name+' abschließen?\n\nDanach sind keine Änderungen mehr möglich.')) return;
+  const ref=db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc('abschluss-'+ym);
+  ref.set({abgeschlossen:true,abgeschlossenAm:Date.now(),abgeschlossenVon:_email||_firma}).then(()=>{
+    toast('🔒 Monat abgeschlossen');
+    loadAgZeiten();
+  });
+}
+
+function exportAuftragsprotokoll(tnId,aufId){
+  toast('📄 Protokoll wird erstellt…');
+  db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).get().then(doc=>{
+    if(!doc.exists){toast('Auftrag nicht gefunden','bad');return;}
+    const d=doc.data();
+    const az=_azubis.find(a=>a.id===tnId);
+    const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
+    const dat=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    let fotosHtml='';
+    if(d.fotos&&d.fotos.length){fotosHtml='<h3>Fotodokumentation</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">';d.fotos.forEach(f=>{fotosHtml+='<img src="'+f+'" style="width:180px;border-radius:6px;border:1px solid #cbd5e1">';});fotosHtml+='</div>';}
+    let sigHtml='';
+    if(d.unterschrift){sigHtml='<h3>Kundenunterschrift</h3><div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px;display:inline-block;margin:8px 0"><img src="'+d.unterschrift+'" style="height:80px"></div>';}
+    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Auftragsprotokoll '+esc(d.kunde||'')+'</title>'
+      +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:30px;font-size:12px;color:#1e293b}'
+      +'h1{font-size:16px;margin-bottom:4px}h3{font-size:12px;margin-top:16px;color:#2563eb}.row{display:flex;gap:20px;margin:4px 0}'
+      +'.label{color:#64748b;min-width:100px;font-size:10px;font-weight:700}.val{font-weight:600}'
+      +'.mat{display:inline-block;padding:3px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;font-size:10px;margin:2px}'
+      +'@media print{body{padding:15px}}</style></head><body>'
+      +'<h1>Auftragsprotokoll</h1>'
+      +'<div style="color:#64748b;font-size:10px;margin-bottom:16px">'+esc(_firma||'')+' · Erstellt am '+(new Date().toLocaleDateString('de-DE'))+'</div>'
+      +'<div class="row"><span class="label">Kunde:</span><span class="val">'+esc(d.kunde||'')+'</span></div>'
+      +(d.adresse?'<div class="row"><span class="label">Adresse:</span><span class="val">'+esc(d.adresse)+'</span></div>':'')
+      +(d.beschreibung?'<div class="row"><span class="label">Auftrag:</span><span class="val">'+esc(d.beschreibung)+'</span></div>':'')
+      +'<div class="row"><span class="label">Mitarbeiter:</span><span class="val">'+esc(maName)+'</span></div>'
+      +(d.taetigkeit?'<h3>Durchgeführte Arbeiten</h3><div style="margin:8px 0;line-height:1.6">'+esc(d.taetigkeit)+'</div>':'')
+      +(d.stunden?'<div class="row"><span class="label">Stundenaufwand:</span><span class="val">'+d.stunden+' Stunden</span></div>':'')
+      +(d.material&&d.material.length?'<h3>Verwendetes Material</h3><div style="margin:8px 0">'+d.material.map(m=>'<span class="mat">'+esc(m)+'</span>').join('')+'</div>':'')
+      +fotosHtml+sigHtml
+      +'<div style="margin-top:30px;font-size:9px;color:#94a3b8">Erledigt am: '+dat+'</div>'
+      +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
+    const w=window.open('','_blank');
+    w.document.write(html);w.document.close();
+  });
+}
+
+// GEOFENCING
+function loadGeofence(){
+  const el=document.getElementById('geoStatus');
+  if(!el||!_uid) return;
+  db.collection('users').doc(_uid).get().then(doc=>{
+    const geo=doc.exists&&doc.data().geofence;
+    if(geo&&geo.lat){
+      const r=document.getElementById('geoRadius');
+      if(r) r.value=String(geo.radius||500);
+      el.innerHTML='<div style="padding:8px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:8px">'
+        +'<div style="font-size:.75rem;font-weight:700;color:#2563eb">✅ Arbeitsort aktiv</div>'
+        +'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">📍 '+geo.lat.toFixed(5)+', '+geo.lng.toFixed(5)+' · Radius: '+(geo.radius||500)+'m</div>'
+        +(geo.name?'<div style="font-size:.65rem;color:var(--mu)">'+esc(geo.name)+'</div>':'')
+        +'</div>';
+    } else {
+      el.innerHTML='<div style="font-size:.72rem;color:#d97706">⚠ Kein Arbeitsort definiert – Stempeln überall möglich</div>';
+    }
+  });
+}
+
+function setGeofence(){
+  if(!navigator.geolocation){toast('GPS nicht verfügbar','bad');return;}
+  toast('📍 Standort wird ermittelt…');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const geo={lat:pos.coords.latitude,lng:pos.coords.longitude,acc:Math.round(pos.coords.accuracy),radius:parseInt(document.getElementById('geoRadius').value)||500};
+    if(geo.radius===0){removeGeofence();return;}
+    // Speichere auf AG-User
+    db.collection('users').doc(_uid).update({geofence:geo}).then(()=>{
+      // Auf alle MA/Azubis übertragen
+      _azubis.forEach(az=>{
+        db.collection('globalTN').doc(az.id).update({geofence:geo}).catch(()=>{});
+      });
+      toast('✅ Arbeitsort gesetzt – '+_azubis.length+' Mitarbeiter aktualisiert');
+      loadGeofence();
+    });
+  },err=>{toast('GPS-Fehler: '+err.message,'bad');},{enableHighAccuracy:true,timeout:15000});
+}
+
+function updateGeoRadius(){
+  const r=parseInt(document.getElementById('geoRadius').value);
+  if(r===0){removeGeofence();return;}
+  db.collection('users').doc(_uid).get().then(doc=>{
+    const geo=doc.exists&&doc.data().geofence;
+    if(!geo||!geo.lat){toast('Bitte erst Standort setzen','bad');return;}
+    geo.radius=r;
+    db.collection('users').doc(_uid).update({geofence:geo}).then(()=>{
+      _azubis.forEach(az=>{db.collection('globalTN').doc(az.id).update({geofence:geo}).catch(()=>{});});
+      toast('✅ Radius auf '+r+'m gesetzt');
+      loadGeofence();
+    });
+  });
+}
+
+function removeGeofence(){
+  const del=firebase.firestore.FieldValue.delete();
+  db.collection('users').doc(_uid).update({geofence:del}).then(()=>{
+    _azubis.forEach(az=>{db.collection('globalTN').doc(az.id).update({geofence:del}).catch(()=>{});});
+    toast('Geofencing deaktiviert');
+    loadGeofence();
+  });
+}
+
+// AG: URLAUB
+function loadAgUrlaub(){
+  loadAgJahresUebersicht();
+  const oEl=document.getElementById('agUrlaubOffen');
+  const aEl=document.getElementById('agUrlaubAlle');
+  if(!oEl||!aEl||!_azubis.length){if(oEl)oEl.innerHTML='<div class="empty">Keine Azubis</div>';return;}
+  oEl.innerHTML='<div class="empty">Lädt…</div>';aEl.innerHTML='<div class="empty">Lädt…</div>';
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .orderBy('beantragAm','desc').limit(20).get()
+      .then(snap=>({az, entries:snap.docs.map(d=>({docId:d.id,...d.data()}))}))
+      .catch(()=>({az, entries:[]}))
+  );
+  Promise.all(promises).then(results=>{
+    let offenHtml='',alleHtml='';
+    results.forEach(({az, entries})=>{
+      entries.forEach(e=>{
+        const name=((az.vorname||'')+' '+(az.nachname||'')).trim();
+        const vonDE=new Date(e.von+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+        const bisDE=new Date(e.bis+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+        const statusCol=e.status==='genehmigt'?'#059669':e.status==='abgelehnt'||e.status==='widerrufen'?'#ef4444':'#d97706';
+        const statusIcon=e.status==='genehmigt'?'✅':e.status==='abgelehnt'?'❌':e.status==='widerrufen'?'🗑':'⏳';
+        const artIcon=e.art==='ueberstunden'?'⏱':'🏖';
+        const artLabel=e.art==='ueberstunden'?'Überstundenabbau':'Urlaub';
+        const card='<div style="padding:10px;border:1.5px solid '+(e.status==='beantragt'?'rgba(245,158,11,.4)':'var(--brd)')+';border-radius:10px;margin-bottom:6px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+          +'<span style="font-size:.8rem;font-weight:700">'+esc(name)+'</span>'
+          +'<span style="font-size:.6rem;font-weight:700;color:'+statusCol+';padding:2px 8px;background:'+statusCol+'15;border-radius:4px">'+statusIcon+' '+e.status+'</span></div>'
+          +'<div style="font-size:.7rem;color:var(--mu);margin-top:4px">'+artIcon+' '+artLabel+' · '+vonDE+' – '+bisDE+' · '+e.tage+' Tage'+(e.grund?' · '+esc(e.grund):'')+'</div>';
+        if(e.status==='beantragt'){
+          offenHtml+=card+'<div style="display:flex;gap:6px;margin-top:8px">'
+            +'<button title="✅ Genehmigen" onclick="agUrlaubEntscheidung(\''+az.id+'\',\''+e.docId+'\',\'genehmigt\')" style="flex:1;padding:8px;background:#059669;color:#fff;border:none;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Genehmigen</button>'
+            +'<button title="❌ Ablehnen" onclick="agUrlaubEntscheidung(\''+az.id+'\',\''+e.docId+'\',\'abgelehnt\')" style="flex:1;padding:8px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">❌ Ablehnen</button></div></div>';
+        } else if(e.status==='genehmigt'){
+          alleHtml+=card+'<button title="🗑 Urlaub widerrufen" onclick="agUrlaubWiderrufen(\''+az.id+'\',\''+e.docId+'\',\''+e.von+'\',\''+e.bis+'\')" style="margin-top:6px;width:100%;padding:6px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.25);border-radius:8px;font-size:.65rem;font-weight:700;color:#ef4444;cursor:pointer;font-family:\'Sora\',sans-serif">🗑 Urlaub widerrufen</button></div>';
+        } else { alleHtml+=card+'</div>'; }
+      });
+    });
+    oEl.innerHTML=offenHtml||'<div class="empty">Keine offenen Anträge</div>';
+    aEl.innerHTML=alleHtml||'<div class="empty">Keine Anträge</div>';
+  });
+}
+
+function loadAgJahresUebersicht(){
+  const el=document.getElementById('agJahresUebersicht');
+  if(!el||!_azubis.length){if(el)el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  const promises=_azubis.map(az=>{
+    const p1=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .where('status','==','genehmigt').get();
+    const p2=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('type','==','krank').get();
+    return Promise.all([p1,p2]).then(([urlSnap,krankSnap])=>{
+      let urlT=0,ueT=0;
+      urlSnap.forEach(d=>{const dd=d.data();if(dd.art==='ueberstunden')ueT+=(dd.tage||0);else urlT+=(dd.tage||0);});
+      const krankDates=new Set();
+      krankSnap.forEach(d=>{const dd=d.data();if(dd.datum)krankDates.add(dd.datum);});
+      return {az, krank:krankDates.size, urlaub:urlT, ueber:ueT};
+    }).catch(()=>({az, krank:0, urlaub:0, ueber:0}));
+  });
+  Promise.all(promises).then(results=>{
+    let html='<div style="font-size:.65rem;color:var(--mu);margin-bottom:6px">'+new Date().getFullYear()+'</div>';
+    results.forEach(r=>{
+      const name=((r.az.vorname||'')+' '+(r.az.nachname||'')).trim()||'Azubi';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.72rem">'
+        +'<span style="font-weight:700;flex:1">'+esc(name)+'</span>'
+        +'<span style="color:#ef4444;font-weight:700" title="Krank">🤒 '+r.krank+'T</span>'
+        +'<span style="color:#059669;font-weight:700" title="Urlaub">🏖 '+r.urlaub+'T</span>'
+        +'<span style="color:#6366f1;font-weight:700" title="Überstunden">⏱ '+r.ueber+'T</span>'
+        +'</div>';
+    });
+    el.innerHTML=html;
+  });
+}
+function agUrlaubEntscheidung(tnId, docId, status){
+  const antragRef=db.collection('globalTN').doc(tnId).collection('urlaubsantraege').doc(docId);
+  // Erst Antragsdaten laden (für von/bis bei Genehmigung)
+  antragRef.get().then(doc=>{
+    const antrag=doc.exists?doc.data():{};
+    const istUrlaub=antrag.art!=='ueberstunden';
+    const hinweis2=status==='genehmigt'&&istUrlaub?'\n\nHinweis: Der Urlaubszeitraum wird mit der Verwaltung für die überbetriebliche Lehrgangsplanung geteilt.':'';
+    if(!confirm('Antrag '+(status==='genehmigt'?'genehmigen':'ablehnen')+'?'+hinweis2)) return;
+    return antragRef.update({status, entschiedenAm:Date.now(), entschiedenVon:_firma||_email}).then(()=>{
+      toast(status==='genehmigt'?'✅ Genehmigt':'❌ Abgelehnt');
+      // Azubi benachrichtigen
+      db.collection('globalTN').doc(tnId).update({
+        benachrichtigungen:firebase.firestore.FieldValue.arrayUnion({
+          typ:'urlaub_'+status, text:'Dein Urlaubsantrag wurde '+status+'.'+(status==='genehmigt'?' ('+antrag.von+' – '+antrag.bis+')':''),
+          datum:new Date().toISOString(), gelesen:false
+        })
+      }).catch(()=>{});
+      // Bei Genehmigung: Nur URLAUB ins globalTN.urlaub Array schreiben (nicht Überstundenabbau)
+      if(status==='genehmigt'&&antrag.von&&antrag.bis&&antrag.art!=='ueberstunden'){
+        db.collection('globalTN').doc(tnId).update({
+          urlaub:firebase.firestore.FieldValue.arrayUnion({
+            von:antrag.von, bis:antrag.bis,
+            label:'Urlaub (genehmigt)',
+            ts:Date.now(), genehmigt:true, genehmigtVon:_firma||_email
+          })
+        }).catch(()=>{});
+      }
+      loadAgUrlaub();
+    });
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function agUrlaubWiderrufen(tnId, docId, von, bis){
+  if(!confirm('Urlaub widerrufen?\n\n'+von+' – '+bis+'\n\nDer Azubi wird benachrichtigt.')) return;
+  // 1. Antrag als widerrufen markieren
+  db.collection('globalTN').doc(tnId).collection('urlaubsantraege').doc(docId)
+    .update({status:'widerrufen', widerrufenAm:Date.now(), widerrufenVon:_firma||_email}).catch(()=>{});
+  // 2. Aus globalTN.urlaub Array entfernen
+  db.collection('globalTN').doc(tnId).get().then(doc=>{
+    if(!doc.exists) return;
+    const data=doc.data();
+    const urlaub=(data.urlaub||[]).filter(u=>!(u.von===von&&u.bis===bis));
+    return db.collection('globalTN').doc(tnId).update({urlaub});
+  }).catch(()=>{});
+  // 3. Azubi benachrichtigen
+  db.collection('globalTN').doc(tnId).update({
+    benachrichtigungen:firebase.firestore.FieldValue.arrayUnion({
+      typ:'urlaub_widerrufen',
+      text:'Dein genehmigter Urlaub ('+von+' – '+bis+') wurde vom Betrieb widerrufen. Bitte kontaktiere deinen Arbeitgeber.',
+      datum:new Date().toISOString(), gelesen:false
+    })
+  }).catch(()=>{});
+  toast('🗑 Urlaub widerrufen');
+  setTimeout(()=>loadAgUrlaub(),500);
+}
+
+// AG: MELDUNGEN
+function loadAgMeldungen(){
+  const el=document.getElementById('agMeldListe');
+  if(!el||!_azubis.length){el.innerHTML='<div class="empty">Keine Azubis</div>';return;}
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .orderBy('zeit','desc').limit(10).get()
+      .then(snap=>({az, entries:snap.docs.map(d=>({docId:d.id,...d.data()}))}))
+      .catch(()=>({az, entries:[]}))
+  );
+  Promise.all(promises).then(results=>{
+    const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
+    let all=[];
+    results.forEach(({az, entries})=>{
+      entries.forEach(e=>all.push({...e, azName:((az.vorname||'')+' '+(az.nachname||'')).trim(), tnId:az.id}));
+    });
+    all.sort((a,b)=>(b.zeit||'').localeCompare(a.zeit||''));
+    if(!all.length){el.innerHTML='<div class="empty">Keine Meldungen</div>';return;}
+    let html='';
+    all.forEach(m=>{
+      const zeit=m.zeit?new Date(m.zeit).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+      const gelesenBadge=m.gelesen?'<span style="font-size:.5rem;color:var(--mu)">✓ gelesen</span>':'<button title="✓ Gelesen" onclick="agMeldGelesen(\''+m.tnId+'\',\''+m.docId+'\')" style="font-size:.5rem;padding:2px 8px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700">✓ Gelesen</button>';
+      html+='<div style="padding:8px;border-bottom:1px solid rgba(0,0,0,.05);display:flex;align-items:flex-start;gap:8px">'
+        +'<span style="font-size:1.1rem">'+(icons[m.type]||'💬')+'</span>'
+        +'<div style="flex:1;min-width:0"><div style="font-size:.75rem;font-weight:700">'+esc(m.azName)+'</div>'
+        +'<div style="font-size:.7rem;color:var(--tx)">'+esc(m.text||'')+'</div>'
+        +'<div style="font-size:.55rem;color:var(--mu);margin-top:2px">'+zeit+'</div></div>'
+        +'<div>'+gelesenBadge+'</div></div>';
+    });
+    el.innerHTML=html;
+  });
+}
+function agMeldGelesen(tnId, docId){
+  db.collection('globalTN').doc(tnId).collection('betriebMeldungen').doc(docId)
+    .update({gelesen:true,gelesenAm:Date.now(),gelesenVon:_firma||_email})
+    .then(()=>{toast('✓ Gelesen');loadAgMeldungen();checkAgBadges();})
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function checkAgBadges(){
+  if(!_azubis.length) return;
+  let meldCount=0, urlaubCount=0, zeitCount=0;
+  const promises=_azubis.map(az=>{
+    const p1=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('gelesen','==',false).get().then(s=>{meldCount+=s.size;}).catch(()=>{});
+    const p2=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .where('status','==','beantragt').get().then(s=>{urlaubCount+=s.size;}).catch(()=>{});
+    const p3=db.collection('globalTN').doc(az.id).collection('zeiterfassung')
+      .where('manuell','==',true).where('agBestaetigt','==',false).get().then(s=>{zeitCount+=s.size;}).catch(()=>{});
+    return Promise.all([p1,p2,p3]);
+  });
+  Promise.all(promises).then(()=>{
+    const total=meldCount+urlaubCount+zeitCount;
+    // Betrieb-Tab Badge
+    setBadge('agnav-betrieb', total);
+    // Sub-Tab Badges
+    const tabs=document.querySelectorAll('#agBetriebTabs .stab');
+    tabs.forEach(t=>{
+      const old=t.querySelector('.ag-badge');if(old)old.remove();
+      let count=0;
+      if(t.textContent.includes('Zeiten')) count=zeitCount;
+      else if(t.textContent.includes('Urlaub')) count=urlaubCount;
+      else if(t.textContent.includes('Meldungen')) count=meldCount;
+      if(count>0){
+        t.style.position='relative';
+        const b=document.createElement('span');b.className='ag-badge';
+        b.style.cssText='position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 2px 6px rgba(239,68,68,.4);animation:pulseRed 1.5s infinite;';
+        b.textContent=count;
+        t.appendChild(b);
+      }
+    });
+  });
+}
+function setBadge(elId, count){
+  const el=document.getElementById(elId);
+  if(!el) return;
+  let badge=el.querySelector('.ag-badge');
+  if(count>0){
+    if(!badge){badge=document.createElement('span');badge.className='ag-badge';el.style.position='relative';el.appendChild(badge);}
+    badge.textContent=count;
+  } else if(badge) badge.remove();
+}
+// ── Install Banner ──
+let _installPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  _installPrompt=e;
+  showInstallBanner();
+});
+
+function isStandalone(){
+  return window.matchMedia('(display-mode:standalone)').matches||navigator.standalone;
+}
+
+function showInstallBanner(){
+  if(isStandalone()) return;
+  if(document.getElementById('installBanner')) return;
+  const visits=parseInt(localStorage.getItem('ag_install_visits')||'0')+1;
+  localStorage.setItem('ag_install_visits',visits);
+  if(visits>5&&localStorage.getItem('ag_install_big_dismissed')) { showInstallReminder(); return; }
+  const banner=document.createElement('div');
+  banner.id='installBanner';
+  banner.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:16px;background:linear-gradient(135deg,#1e293b,#334155);color:#fff;font-family:"Sora",sans-serif;box-shadow:0 -4px 24px rgba(0,0,0,.3)';
+  banner.innerHTML=
+    '<div style="display:flex;align-items:center;gap:12px;max-width:500px;margin:0 auto">'
+    +'<div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#2563eb,#059669);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>'
+    +'<div style="flex:1">'
+    +'<div style="font-size:.88rem;font-weight:800">ArbeitgeberPro installieren</div>'
+    +'<div style="font-size:.66rem;opacity:.7;margin-top:2px">Schneller Zugriff vom Startbildschirm</div>'
+    +'</div>'
+    +'<button onclick="doInstall()" style="padding:10px 18px;border:none;border-radius:10px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;font-family:Sora,sans-serif;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0" title="App installieren">Installieren</button>'
+    +'<button onclick="dismissInstallBig()" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:1.2rem;cursor:pointer;padding:4px;flex-shrink:0" title="Schließen">✕</button>'
+    +'</div>';
+  document.body.appendChild(banner);
+}
+
+function showInstallReminder(){
+  if(isStandalone()) return;
+  if(document.getElementById('installReminder')) return;
+  if(sessionStorage.getItem('ag_reminder_dismissed')) return;
+  const r=document.createElement('div');
+  r.id='installReminder';
+  r.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9998;padding:8px 14px;background:#1e293b;color:#fff;font-family:"Sora",sans-serif;font-size:.68rem;display:flex;align-items:center;justify-content:center;gap:10px';
+  r.innerHTML='<span style="opacity:.7">ArbeitgeberPro noch nicht installiert</span>'
+    +'<button onclick="doInstall()" style="padding:4px 12px;border:none;border-radius:6px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;font-family:Sora,sans-serif;font-size:.65rem;font-weight:700;cursor:pointer" title="App installieren">Jetzt installieren</button>'
+    +'<button title="Schließen" onclick="this.parentElement.remove();sessionStorage.setItem(\'ag_reminder_dismissed\',\'1\')" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:.9rem;cursor:pointer;padding:2px;margin-left:4px">✕</button>';
+  document.body.appendChild(r);
+}
+
+function doInstall(){
+  if(_installPrompt){
+    _installPrompt.prompt();
+    _installPrompt.userChoice.then(r=>{
+      if(r.outcome==='accepted'){if(typeof toast==='function')toast('App wird installiert!');}
+      _installPrompt=null;
+      const b=document.getElementById('installBanner');if(b)b.remove();
+      const rm=document.getElementById('installReminder');if(rm)rm.remove();
+    });
+  } else {
+    // iOS fallback
+    const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+    if(isIOS){
+      alert('Tippe auf das Teilen-Symbol (⬆) unten in Safari,\ndann auf „Zum Home-Bildschirm".');
+    } else {
+      alert('Öffne das Browser-Menü (⋮) und tippe auf\n„App installieren" oder „Zum Startbildschirm hinzufügen".');
+    }
+  }
+}
+
+function dismissInstallBig(){
+  const b=document.getElementById('installBanner');if(b)b.remove();
+  localStorage.setItem('ag_install_big_dismissed','1');
+}
+
+window.addEventListener('load',()=>{
+  if(isStandalone()) return;
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  if(isIOS&&!_installPrompt){
+    setTimeout(showInstallBanner,2000);
+  }
+  // Reminder für wiederkehrende Browser-Besucher
+  const visits=parseInt(localStorage.getItem('ag_install_visits')||'0');
+  if(visits>5&&localStorage.getItem('ag_install_big_dismissed')){
+    setTimeout(showInstallReminder,1500);
+  }
+});
+
+</script>
+</body>
+</html>
