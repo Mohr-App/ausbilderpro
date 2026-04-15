@@ -3916,6 +3916,7 @@ function saveAusbilderProfil(){
   if(!name){toast('Bitte Name eingeben','bad');return;}
   localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify({name,telefon,email}));
   document.getElementById('ausbilderProfilModal').classList.remove('open');
+  loadAusbilder(); // Header-Name aktualisieren
   toast('Profil gespeichert ✓');
 }
 function changeAusbilderPw(){
@@ -5056,6 +5057,17 @@ function setDriveBtn(cls,txt){
 function tick(){const n=new Date();document.getElementById('clk').innerHTML=n.toLocaleDateString('de-DE')+'<br>'+n.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
 
 function syncAusbilder(from){
+  const profName=getAusbilderProfil().name||'';
+  if(profName){
+    // Profil ist gesetzt → Hinweis zeigen
+    toast('Name wird über Mein Profil gesteuert (⚙ Mehr → 👤 Mein Profil)');
+    // Eingabe rückgängig machen
+    const d=document.getElementById('ausbilderIn');
+    const m=document.getElementById('ausbilderInMob');
+    if(d) d.value=profName;
+    if(m) m.value=profName;
+    return;
+  }
   const d=document.getElementById('ausbilderIn');
   const m=document.getElementById('ausbilderInMob');
   if(from==='mob'){ if(d)d.value=m.value; S.ausbilder=m.value; }
@@ -5064,9 +5076,14 @@ function syncAusbilder(from){
 }
 function saveAusbilder(){ syncAusbilder('desk'); }
 function loadAusbilder(){
-  const v=S.ausbilder||'';
-  const d=document.getElementById('ausbilderIn'); if(d)d.value=v;
-  const m=document.getElementById('ausbilderInMob'); if(m)m.value=v;
+  const profName=getAusbilderProfil().name||'';
+  const v=profName||S.ausbilder||'';
+  const d=document.getElementById('ausbilderIn');
+  const m=document.getElementById('ausbilderInMob');
+  if(d){ d.value=v; if(profName){d.style.color='var(--acc)';d.title='Name aus Mein Profil – zum Ändern: ⚙ Mehr → 👤 Mein Profil';}else{d.style.color='';d.title='';} }
+  if(m){ m.value=v; if(profName){m.style.color='var(--acc)';m.title='Name aus Mein Profil – zum Ändern: ⚙ Mehr → 👤 Mein Profil';}else{m.style.color='';m.title='';} }
+  // Profilname auch in S.ausbilder synchronisieren
+  if(profName && S.ausbilder!==profName){ S.ausbilder=profName; persist(); }
 }
 
 // ── MOBILE DRAWER ──
