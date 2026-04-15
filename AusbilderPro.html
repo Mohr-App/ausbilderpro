@@ -1271,7 +1271,7 @@ const DEFAULT_RIGHT = ['12','11','10','9','8','7']; // 7 nearest tafel
 
 let S = { kats:{}, katOrder:[], curKat:null, curInst:null };
 // ── PAPIERKORB (30 Tage) ──
-let _trash=JSON.parse(localStorage.getItem(_lsKey('ap_trash'))||'[]');
+let _trash=[];
 function trashPurge(){const now=Date.now(),d30=30*24*60*60*1000;_trash=_trash.filter(t=>(now-t.ts)<d30);localStorage.setItem(_lsKey('ap_trash'),JSON.stringify(_trash));}
 function trashPush(type,label,data){_trash.push({type,label,data:JSON.stringify(data),ts:Date.now()});localStorage.setItem(_lsKey('ap_trash'),JSON.stringify(_trash));}
 trashPurge();
@@ -1427,6 +1427,7 @@ function toast(msg){
   setTimeout(()=>{d.style.opacity='0';setTimeout(()=>d.remove(),300);},2500);
 }
 function hydrate(){
+  if(!_fbUid) return; // Kein User → nichts laden
   const r=localStorage.getItem(_lsKey('ap_v1'));
   if(r) S=JSON.parse(r);
   // ensure katOrder exists and contains all kat ids
@@ -6085,6 +6086,13 @@ try{
     // State für neuen User zurücksetzen (localStorage ist jetzt UID-spezifisch)
     S={kats:{},katOrder:[],curKat:null,curInst:null};
     _trash=[];
+    // Alte unscoped Keys löschen (verhindert Datenleck an andere User)
+    localStorage.removeItem('ap_v1');
+    localStorage.removeItem('ap_trash');
+    localStorage.removeItem('ausbilderProfil');
+    // User-spezifischen Trash laden
+    try{_trash=JSON.parse(localStorage.getItem(_lsKey('ap_trash'))||'[]');}catch(e){_trash=[];}
+    trashPurge();
     renderAll(); // UI sofort leeren bevor Firestore lädt
     const email = user.email.toLowerCase();
     // 1. Rolle prüfen (Admin?)
