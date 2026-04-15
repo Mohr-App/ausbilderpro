@@ -1271,9 +1271,9 @@ const DEFAULT_RIGHT = ['12','11','10','9','8','7']; // 7 nearest tafel
 
 let S = { kats:{}, katOrder:[], curKat:null, curInst:null };
 // ── PAPIERKORB (30 Tage) ──
-let _trash=JSON.parse(localStorage.getItem('ap_trash')||'[]');
-function trashPurge(){const now=Date.now(),d30=30*24*60*60*1000;_trash=_trash.filter(t=>(now-t.ts)<d30);localStorage.setItem('ap_trash',JSON.stringify(_trash));}
-function trashPush(type,label,data){_trash.push({type,label,data:JSON.stringify(data),ts:Date.now()});localStorage.setItem('ap_trash',JSON.stringify(_trash));}
+let _trash=JSON.parse(localStorage.getItem(_lsKey('ap_trash'))||'[]');
+function trashPurge(){const now=Date.now(),d30=30*24*60*60*1000;_trash=_trash.filter(t=>(now-t.ts)<d30);localStorage.setItem(_lsKey('ap_trash'),JSON.stringify(_trash));}
+function trashPush(type,label,data){_trash.push({type,label,data:JSON.stringify(data),ts:Date.now()});localStorage.setItem(_lsKey('ap_trash'),JSON.stringify(_trash));}
 trashPurge();
 function openTrash(){
   trashPurge();
@@ -1318,7 +1318,7 @@ function restoreTrash(idx){
     } else {toast('Lehrgang existiert nicht mehr','bad');return;}
   }
   _trash.splice(idx,1);
-  localStorage.setItem('ap_trash',JSON.stringify(_trash));
+  localStorage.setItem(_lsKey('ap_trash'),JSON.stringify(_trash));
   persist();renderAll();
   toast('↩ Wiederhergestellt ✓');
   openTrash();
@@ -1326,13 +1326,13 @@ function restoreTrash(idx){
 function deleteTrash(idx){
   if(!confirm('Endgültig löschen? Kann nicht rückgängig gemacht werden.'))return;
   _trash.splice(idx,1);
-  localStorage.setItem('ap_trash',JSON.stringify(_trash));
+  localStorage.setItem(_lsKey('ap_trash'),JSON.stringify(_trash));
   openTrash();
 }
 function emptyTrash(){
   if(!confirm('Gesamten Papierkorb leeren?\n\nAlle '+_trash.length+' Einträge werden endgültig gelöscht.'))return;
   _trash=[];
-  localStorage.setItem('ap_trash','[]');
+  localStorage.setItem(_lsKey('ap_trash'),'[]');
   openTrash();
   toast('🗑 Papierkorb geleert');
 }
@@ -1347,7 +1347,7 @@ let _saveTimer = null;
 let _autoExportTimer = null;
 
 function persist(){
-  localStorage.setItem('ap_v1', JSON.stringify(S));
+  localStorage.setItem(_lsKey('ap_v1'), JSON.stringify(S));
   _changeCount++;
   showSaveInd();
   // Cloud-Sync (hook wird von Firebase-Block gesetzt)
@@ -1427,7 +1427,7 @@ function toast(msg){
   setTimeout(()=>{d.style.opacity='0';setTimeout(()=>d.remove(),300);},2500);
 }
 function hydrate(){
-  const r=localStorage.getItem('ap_v1');
+  const r=localStorage.getItem(_lsKey('ap_v1'));
   if(r) S=JSON.parse(r);
   // ensure katOrder exists and contains all kat ids
   if(!S.katOrder) S.katOrder=[];
@@ -3872,7 +3872,7 @@ ${pages}
 // ─── KURS AUSFALL – Benachrichtigung an Azubi + Arbeitgeber ───
 // ─── AUSBILDER PROFIL ───
 function getAusbilderProfil(){
-  try{return JSON.parse(localStorage.getItem('ausbilderProfil')||'{}');}catch(e){return{};}
+  try{return JSON.parse(localStorage.getItem(_lsKey('ausbilderProfil'))||'{}');}catch(e){return{};}
 }
 function openAusbilderProfil(){
   const p=getAusbilderProfil();
@@ -3886,7 +3886,7 @@ function saveAusbilderProfil(){
   const telefon=(document.getElementById('apTelefon').value||'').trim();
   const email=(document.getElementById('apEmail').value||'').trim();
   if(!name){toast('Bitte Name eingeben','bad');return;}
-  localStorage.setItem('ausbilderProfil',JSON.stringify({name,telefon,email}));
+  localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify({name,telefon,email}));
   document.getElementById('ausbilderProfilModal').classList.remove('open');
   toast('Profil gespeichert ✓');
 }
@@ -4824,13 +4824,13 @@ function showDemoUpgrade(){
 function doExport(){
   if(_demoMode){ showDemoUpgrade(); return; }
   _lastExportCount=_changeCount;
-  let pw=localStorage.getItem('ap_exppw')||'';
+  let pw=localStorage.getItem(_lsKey('ap_exppw'))||'';
   if(!pw){
     pw=prompt('Export-Passwort festlegen (einmalig):');
     if(pw===null) return;
     if(pw.trim()===''){alert('Bitte ein Passwort eingeben.');return;}
     if(pw===_EXP_MASTER){alert('Dieses Passwort ist reserviert. Bitte ein anderes wählen.');return;}
-    localStorage.setItem('ap_exppw', pw);
+    localStorage.setItem(_lsKey('ap_exppw'), pw);
     showInfoToast('🔐 Export-Passwort gespeichert','Wird ab jetzt automatisch verwendet.');
   }
   const plain=JSON.stringify(S,null,2);
@@ -4847,7 +4847,7 @@ function doExportChangePw(){
   if(pw===null) return;
   if(pw.trim()===''){alert('Bitte ein Passwort eingeben.');return;}
   if(pw===_EXP_MASTER){alert('Dieses Passwort ist reserviert. Bitte ein anderes wählen.');return;}
-  localStorage.setItem('ap_exppw', pw);
+  localStorage.setItem(_lsKey('ap_exppw'), pw);
   showInfoToast('🔐 Export-Passwort geändert','Neues Passwort wird ab jetzt verwendet.');
 }
 
@@ -6062,6 +6062,7 @@ const _fbCfg={
   appId:"1:937082794250:web:eb99bc41d8f39908df8af3"
 };
 let _auth=null,_db=null,_st=null,_fbUid=null,_syncTimer=null,_isAdmin=false;
+function _lsKey(base){return _fbUid ? base+'_'+_fbUid : base;}
 let _demoMode=false;
 let _tnPhotos={}; // {tnId: photoUrl}
 let _tnUrlaub={}; // {tnId: [{von,bis,label}]}
@@ -6080,6 +6081,9 @@ try{
   _auth.onAuthStateChanged(user=>{
   if(user){
     _fbUid=user.uid;
+    // State für neuen User zurücksetzen (localStorage ist jetzt UID-spezifisch)
+    S={kats:{},katOrder:[],curKat:null,curInst:null};
+    _trash=[];
     const email = user.email.toLowerCase();
     // 1. Rolle prüfen (Admin?)
     _db.collection('users').doc(_fbUid).get().then(doc=>{
@@ -6254,6 +6258,12 @@ function exitDemo(){
 }
 
 function fbLoadData(){
+  // Migration: alte unscoped Daten → user-spezifisch
+  if(_fbUid && !localStorage.getItem(_lsKey('ap_v1')) && localStorage.getItem('ap_v1')){
+    localStorage.setItem(_lsKey('ap_v1'), localStorage.getItem('ap_v1'));
+    localStorage.setItem(_lsKey('ap_trash'), localStorage.getItem('ap_trash')||'[]');
+    localStorage.setItem(_lsKey('ausbilderProfil'), localStorage.getItem('ausbilderProfil')||'{}');
+  }
   const ci=document.getElementById('cloudInd');
   ci.textContent='☁ Lädt…';
   _db.collection('users').doc(_fbUid).collection('data').doc('state').get()
@@ -6265,7 +6275,7 @@ function fbLoadData(){
           Object.keys(S.kats).forEach(id=>{ if(!S.katOrder.includes(id)) S.katOrder.push(id); });
           S.katOrder=S.katOrder.filter(id=>S.kats[id]);
           fixSelection();
-          localStorage.setItem('ap_v1',JSON.stringify(S));
+          localStorage.setItem(_lsKey('ap_v1'),JSON.stringify(S));
         }catch(e){}
       }
       renderAll();
