@@ -1003,11 +1003,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="mhd"><div class="mtit" id="mtit">Sitzplatz</div><button class="xcls" onclick="safeCloseModal()" title="Schließen">✕</button></div>
     <div class="mbdy">
       <div class="tabs">
-        <button class="tab active" onclick="stab('info')">📋 Person</button>
-        <button class="tab" onclick="stab('grades')">📊 Noten</button>
-        <button class="tab" onclick="stab('att')">📅 Anwesenheit</button>
-        <button class="tab" onclick="stab('docs')">📎 Dokumente</button>
-        <button class="tab" onclick="stab('hist')">📋 Historie</button>
+        <button class="tab active" onclick="stab('info')" title="Name, Betrieb, Beruf, Notizen">📋 Person</button>
+        <button class="tab" onclick="stab('grades')" title="Führung, Mitarbeit, Praxis bewerten">📊 Noten</button>
+        <button class="tab" onclick="stab('att')" title="Anwesenheit pro Tag erfassen">📅 Anwesenheit</button>
+        <button class="tab" onclick="stab('docs')" title="Dateien für diesen TN hochladen">📎 Dokumente</button>
+        <button class="tab" onclick="stab('hist')" title="Alle bisherigen Kurse dieses TN">📋 Historie</button>
       </div>
       <div class="tp active" id="tp-info">
         <div class="fg ac-wrap">
@@ -1105,11 +1105,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <!-- main status -->
         <label class="fl" style="margin-bottom:8px">Status</label>
         <div class="att-main-grid">
-          <button class="att-main-btn" id="btnP"  onclick="selMain('present')"><span class="abm-icon">✅</span>Anwesend</button>
-          <button class="att-main-btn" id="btnAE" onclick="selMain('absent_e')"><span class="abm-icon">📋</span>Abwesend – Entschuldigt</button>
-          <button class="att-main-btn" id="btnAU" onclick="selMain('absent_u')"><span class="abm-icon">❌</span>Abwesend – Unentschuldigt</button>
-          <button class="att-main-btn" id="btnK"  onclick="selMain('sick')"><span class="abm-icon">🤒</span>Krank</button>
-          <button class="att-main-btn" id="btnBS" onclick="selMain('berufsschule')" style="grid-column:span 2"><span class="abm-icon">🏫</span>Berufsschule</button>
+          <button class="att-main-btn" id="btnP"  onclick="selMain('present')" title="TN war heute anwesend"><span class="abm-icon">✅</span>Anwesend</button>
+          <button class="att-main-btn" id="btnAE" onclick="selMain('absent_e')" title="TN fehlt mit Entschuldigung"><span class="abm-icon">📋</span>Abwesend – Entschuldigt</button>
+          <button class="att-main-btn" id="btnAU" onclick="selMain('absent_u')" title="TN fehlt ohne Entschuldigung"><span class="abm-icon">❌</span>Abwesend – Unentschuldigt</button>
+          <button class="att-main-btn" id="btnK"  onclick="selMain('sick')" title="TN ist krank gemeldet"><span class="abm-icon">🤒</span>Krank</button>
+          <button class="att-main-btn" id="btnBS" onclick="selMain('berufsschule')" style="grid-column:span 2" title="TN ist in der Berufsschule"><span class="abm-icon">🏫</span>Berufsschule</button>
         </div>
         <!-- present sub-options -->
         <div class="present-sub" id="presentSub">
@@ -1167,9 +1167,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div style="color:var(--mu);font-size:.75rem;text-align:center;padding:20px">Kurshistorie wird geladen…</div>
         </div>
       </div>
-      <button class="bsave" id="btnSaveSeat" onclick="saveSeat()">💾 Speichern</button>
-      <button class="bsave" id="btnBescheinigung" onclick="generateBescheinigungAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1;display:none">📄 Bescheinigung</button>
-      <button class="bsave bdgr" id="btnClearSeat" onclick="clearSeat()" title="Platz leeren">🗑 Sitzplatz leeren</button>
+      <button class="bsave" id="btnSaveSeat" onclick="saveSeat()" title="Alle Änderungen am Sitzplatz speichern">💾 Speichern</button>
+      <button class="bsave" id="btnBescheinigung" onclick="generateBescheinigungAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1;display:none" title="PDF-Bescheinigung mit Noten und Anwesenheit erstellen">📄 Bescheinigung</button>
+      <button class="bsave bdgr" id="btnClearSeat" onclick="clearSeat()" title="Teilnehmer vom Platz entfernen – Daten bleiben im Pool erhalten">🗑 Sitzplatz leeren</button>
     </div>
   </div>
 </div>
@@ -2180,15 +2180,15 @@ function renderMain(){
   el.innerHTML=
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="hdr-menu-btn" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button></div></div>'
     +'<div class="hdr-actions" id="kursActions">'
-    +'<button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed">🎓 Berufsschultag</button>'
-    +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()">📁 Dokumente</button>'
-    +'<button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📋 TN-Liste</button>'
-    +'<button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1">📄 Bescheinigungen</button>'
-    +'<button class="tbtn main-docs-btn" onclick="ausbilderKommtSpaeter()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706">🕐 Komme später</button>'
-    +'<button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444">⚠️ Ausfall</button>'
-    +(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981">👤+ TN</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed">🔗 QR + Pool aktivieren</button>')
-    +'<button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Verschieben">↔ Verschieben</button>'
-    +'<button class="tbtn main-docs-btn" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Löschen">🗑 Löschen</button>'
+    +'<button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
+    +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()" title="Kursunterlagen hochladen und verwalten">📁 Dokumente</button>'
+    +'<button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">📋 TN-Liste</button>'
+    +'<button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen</button>'
+    +'<button class="tbtn main-docs-btn" onclick="ausbilderKommtSpaeter()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706" title="Alle Azubis im Kurs benachrichtigen">🕐 Komme später</button>'
+    +'<button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Kurs für heute als ausgefallen markieren">⚠️ Ausfall</button>'
+    +(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981" title="Teilnehmer manuell zum Kurs hinzufügen">👤+ TN</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed" title="Kurs mit Firestore verknüpfen für QR-Beitritt und TN-Pool">🔗 QR + Pool aktivieren</button>')
+    +'<button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Lehrgang in eine andere Lehrgangsart verschieben">↔ Verschieben</button>'
+    +'<button class="tbtn main-docs-btn" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Lehrgang löschen (30 Tage im Papierkorb)">🗑 Löschen</button>'
     +'</div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
