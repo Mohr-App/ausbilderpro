@@ -879,6 +879,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="fg" style="margin-top:6px"><label class="fl">Telefon</label><input class="fi" id="apTelefon" type="tel" placeholder="0170 1234567"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">E-Mail (für Azubis sichtbar)</label><input class="fi" id="apEmail" type="email" placeholder="deine@arbeits-email.de"></div>
 <button class="bsave" onclick="saveAusbilderProfil()" style="margin-top:12px" title="Profil speichern">💾 Speichern</button>
+<div style="margin-top:16px;padding-top:14px;border-top:1.5px solid var(--brd)">
+<div style="font-size:.72rem;font-weight:700;color:var(--tx);margin-bottom:8px">🔑 Passwort ändern</div>
+<div class="fg"><label class="fl">Neues Passwort</label><input class="fi" id="apPwNew" type="password" placeholder="Min. 6 Zeichen" autocomplete="new-password"></div>
+<div class="fg" style="margin-top:6px"><label class="fl">Passwort wiederholen</label><input class="fi" id="apPwNew2" type="password" placeholder="Wiederholen" autocomplete="new-password"></div>
+<div id="apPwErr" style="font-size:.68rem;margin-top:4px"></div>
+<button class="bsave" onclick="changeAusbilderPw()" style="margin-top:8px;background:linear-gradient(135deg,#475569,#64748b)" title="Passwort ändern">🔑 Passwort ändern</button>
+</div>
 </div></div></div>
 
 <!-- TN DETAIL MODAL -->
@@ -3897,6 +3904,54 @@ function saveAusbilderProfil(){
   document.getElementById('ausbilderProfilModal').classList.remove('open');
   toast('Profil gespeichert ✓');
 }
+function changeAusbilderPw(){
+  const pw1=document.getElementById('apPwNew').value;
+  const pw2=document.getElementById('apPwNew2').value;
+  const err=document.getElementById('apPwErr');
+  err.textContent='';err.style.color='var(--bad)';
+  if(!pw1||pw1.length<6){err.textContent='Mindestens 6 Zeichen';return;}
+  if(pw1!==pw2){err.textContent='Passwörter stimmen nicht überein';return;}
+  _auth.currentUser.updatePassword(pw1).then(()=>{
+    document.getElementById('apPwNew').value='';
+    document.getElementById('apPwNew2').value='';
+    err.style.color='var(--acc)';err.textContent='✓ Passwort geändert';
+    // Markiere in Firestore dass PW geändert wurde
+    if(_db&&_fbUid) _db.collection('users').doc(_fbUid).set({pwChanged:true},{merge:true}).catch(()=>{});
+    // Banner ausblenden
+    const b=document.getElementById('pwChangeBanner');if(b)b.remove();
+    toast('Passwort geändert ✓');
+  }).catch(e=>{
+    if(e.code==='auth/requires-recent-login') err.textContent='Bitte neu anmelden und erneut versuchen';
+    else err.textContent=e.message;
+  });
+}
+function checkFirstLoginPwHint(){
+  if(!_db||!_fbUid) return;
+  _db.collection('users').doc(_fbUid).get().then(doc=>{
+    if(!doc.exists) return;
+    const d=doc.data();
+    // Nur anzeigen wenn PW noch nie geändert wurde
+    if(d.pwChanged) return;
+    // Banner einfügen
+    const existing=document.getElementById('pwChangeBanner');
+    if(existing) return;
+    const banner=document.createElement('div');
+    banner.id='pwChangeBanner';
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9998;padding:12px 16px;background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;font-family:Sora,sans-serif;display:flex;align-items:center;gap:12px;box-shadow:0 4px 12px rgba(0,0,0,.15)';
+    banner.innerHTML=
+      '<div style="flex:1;min-width:0">'
+      +'<div style="font-size:.82rem;font-weight:800">🔑 Passwort ändern</div>'
+      +'<div style="font-size:.68rem;opacity:.9;margin-top:2px">Bitte ändere dein vorläufiges Passwort unter Mein Profil.</div>'
+      +'</div>'
+      +'<button onclick="this.parentElement.remove();openAusbilderProfil()" style="padding:8px 16px;background:#fff;color:#d97706;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:Sora,sans-serif;white-space:nowrap">Jetzt ändern</button>'
+      +'<button onclick="dismissPwBanner()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:1.1rem;cursor:pointer;padding:4px" title="Nicht mehr anzeigen">✕</button>';
+    document.body.prepend(banner);
+  }).catch(()=>{});
+}
+function dismissPwBanner(){
+  const b=document.getElementById('pwChangeBanner');if(b)b.remove();
+  if(_db&&_fbUid) _db.collection('users').doc(_fbUid).set({pwChanged:true},{merge:true}).catch(()=>{});
+}
 function getAusbilderKursData(){
   const p=getAusbilderProfil();
   const loginEmail=_auth?.currentUser?.email?.toLowerCase()||'';
@@ -6299,6 +6354,7 @@ function fbLoadData(){
       resolveAllPoolTnIds();
       loadTNPhotos();
       checkAusbNotifications();
+      checkFirstLoginPwHint();
       ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||'');
     })
     .catch(()=>{
