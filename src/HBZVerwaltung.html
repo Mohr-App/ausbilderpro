@@ -557,6 +557,20 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- DSGVO OVERLAY -->
+<div id="dsgvoOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:400px;width:100%;background:var(--sur);border:2px solid var(--brd);border-radius:16px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.4)">
+    <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:6px">📋 Datenschutz & Nutzungsbedingungen</div>
+    <div style="font-size:.75rem;color:var(--mu);line-height:1.6;margin-bottom:14px">Um VerwaltungPro nutzen zu können, bestätige bitte die folgenden Bedingungen. Deine Daten werden ausschließlich zur Verwaltung der Bildungszentrums-Lehrgänge verwendet.</div>
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(59,130,246,.04);border:1.5px solid rgba(59,130,246,.15);border-radius:10px;cursor:pointer;user-select:none;margin-bottom:12px">
+      <input type="checkbox" id="dsgvoConsentCheck" style="margin-top:2px;width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:#10b981">
+      <span style="font-size:.68rem;color:var(--mu);line-height:1.6">Ich habe die <a href="https://ausbilderpro.de/datenschutz.html" target="_blank" style="color:var(--acc);text-decoration:underline" onclick="event.stopPropagation()">Datenschutzerklärung</a> und die <a href="https://ausbilderpro.de/nutzungsbedingungen.html" target="_blank" style="color:var(--acc);text-decoration:underline" onclick="event.stopPropagation()">Nutzungsbedingungen</a> gelesen und stimme der Verarbeitung meiner Daten zu.</span>
+    </label>
+    <button title="✓ Bestätigen & weiter" onclick="submitDsgvoConsent()" style="width:100%;padding:12px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✓ Bestätigen & weiter</button>
+    <div class="err" id="dsgvoErr" style="margin-top:6px"></div>
+  </div>
+</div>
+
 <!-- APP -->
 <div id="appWrap">
   <div class="hdr">
@@ -1676,6 +1690,7 @@ function grantAccess(u, role){
   db.collection('users').doc(_uid).set({email:u.email, role:role},{merge:true}).catch(()=>{});
   checkBackupReminder();
   loadUrlaubBadge();
+  checkDsgvoConsent();
 }
 
 function showNoAccessHBZ(email){
@@ -8180,6 +8195,26 @@ function doFullBackup(){
 }
 
 // Backup-Reminder: alle 30 Tage
+function checkDsgvoConsent(){
+  if(!_uid) return;
+  db.collection('users').doc(_uid).get().then(doc=>{
+    if(!doc.exists) return;
+    if(doc.data().dsgvoZustimmung) return;
+    const ov=document.getElementById('dsgvoOverlay');
+    if(ov) ov.style.display='flex';
+  }).catch(()=>{});
+}
+function submitDsgvoConsent(){
+  const checked=document.getElementById('dsgvoConsentCheck')?.checked;
+  const errEl=document.getElementById('dsgvoErr');
+  if(!checked){if(errEl)errEl.textContent='Bitte Checkbox anklicken um fortzufahren';return;}
+  if(!_uid){if(errEl)errEl.textContent='Nicht angemeldet';return;}
+  const consent={datenschutz:true,nutzungsbedingungen:true,zeitpunkt:new Date().toISOString(),version:'1.0'};
+  db.collection('users').doc(_uid).set({dsgvoZustimmung:consent},{merge:true}).then(()=>{
+    document.getElementById('dsgvoOverlay').style.display='none';
+    toast('✓ Zustimmung gespeichert');
+  }).catch(err=>{if(errEl)errEl.textContent='Fehler: '+err.message;});
+}
 function checkBackupReminder(){
   const last=parseInt(localStorage.getItem('vp_lastBackup')||'0');
   const daysSince=Math.floor((Date.now()-last)/(1000*60*60*24));
