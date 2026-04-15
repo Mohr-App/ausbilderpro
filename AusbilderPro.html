@@ -2635,9 +2635,10 @@ function mkSeat(id,seats){
   el.addEventListener('dragover',e=>{ e.preventDefault(); if(_dragSeatId&&_dragSeatId!==id){ document.querySelectorAll('.seat').forEach(s=>s.classList.remove('drag-over')); el.classList.add('drag-over'); } });
   el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
   el.addEventListener('drop',e=>{ e.preventDefault(); if(!_dragSeatId||_dragSeatId===id)return; swapSeats(_dragSeatId,id); });
-  if(!d||!d.name){ el.innerHTML+='<div class="shint">+ Sitzplatz belegen</div>'; }
+  if(!d||!d.name){ el.innerHTML+='<div class="shint" title="Klicken um Teilnehmer zuzuweisen">+ Sitzplatz belegen</div>'; }
   else{
     el.classList.add('filled');
+    el.title=d.name+' – Klicken für Details';
     if(d.wiederholer) el.classList.add('wiederholer');
     const att=d.attendance||[];
     // one dot per day – oldest left, newest right, max 14
@@ -2647,13 +2648,13 @@ function mkSeat(id,seats){
     if(dotsHtml) el.innerHTML+='<div class="sdots-row">'+dotsHtml+'</div>';
     // grades
     let g='';
-    if(d.fuehrung)  g+='<span class="gb '+gradeClass(d.fuehrung)+'">F:'+d.fuehrung+'</span>';
-    if(d.mitarbeit) g+='<span class="gb '+gradeClass(d.mitarbeit)+'">M:'+d.mitarbeit+'</span>';
-    if(d.praxis)    g+='<span class="gb '+gradeClass(d.praxis)+'">P:'+d.praxis+'</span>';
+    if(d.fuehrung)  g+='<span class="gb '+gradeClass(d.fuehrung)+'" title="Führung: Note '+d.fuehrung+'">F:'+d.fuehrung+'</span>';
+    if(d.mitarbeit) g+='<span class="gb '+gradeClass(d.mitarbeit)+'" title="Mitarbeit: Note '+d.mitarbeit+'">M:'+d.mitarbeit+'</span>';
+    if(d.praxis)    g+='<span class="gb '+gradeClass(d.praxis)+'" title="Praxis: Note '+d.praxis+'">P:'+d.praxis+'</span>';
     const inst2=curInst();
     (inst2&&inst2.customGrades||[]).forEach(cg=>{
       const v=(d.extraGrades||{})[cg.id];
-      if(v) g+='<span class="gb '+gradeClass(v)+'" style="border:1px solid rgba(167,139,250,.3)">'+esc(cg.label.substring(0,4))+':'+v+'</span>';
+      if(v) g+='<span class="gb '+gradeClass(v)+'" title="'+esc(cg.label)+': Note '+v+'" style="border:1px solid rgba(167,139,250,.3)">'+esc(cg.label.substring(0,4))+':'+v+'</span>';
     });
     // att summary
     const pCnt=att.filter(a=>a.type==='present'&&!a.lateMins&&!a.earlyMins).length;
@@ -2677,7 +2678,7 @@ function mkSeat(id,seats){
     const instEnd=inst.eY&&inst.eM&&inst.eD?(inst.eY+'-'+inst.eM+'-'+inst.eD):'9999-12-31';
     const instStart=inst.sY&&inst.sM&&inst.sD?(inst.sY+'-'+inst.sM+'-'+inst.sD):'0000-01-01';
     const qaBtn=(qaSt||hasDetail||qaD>instEnd||qaD<instStart)?'':'<div class="sqa-btn" onclick="event.stopPropagation();seatQuickAtt(\''+id+'\')" title="Anwesend markieren">✓</div>';
-    const wzBadge=d.werkzeugStatus==='fehlt'?'<div style="font-size:.5rem;color:#ef4444;font-weight:800;margin-top:1px">🔧 unvollständig</div>':'';
+    const wzBadge=d.werkzeugStatus==='fehlt'?'<div style="font-size:.5rem;color:#ef4444;font-weight:800;margin-top:1px" title="Werkzeug unvollständig – Details im Teilnehmer-Fenster">🔧 unvollständig</div>':'';
     // Meldungs-Overlay
     let meldHtml='';
     if(d.poolTnId&&_tnMeldungen[d.poolTnId]&&_tnMeldungen[d.poolTnId].length){
