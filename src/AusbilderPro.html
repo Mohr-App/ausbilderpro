@@ -6085,6 +6085,7 @@ try{
     // State für neuen User zurücksetzen (localStorage ist jetzt UID-spezifisch)
     S={kats:{},katOrder:[],curKat:null,curInst:null};
     _trash=[];
+    renderAll(); // UI sofort leeren bevor Firestore lädt
     const email = user.email.toLowerCase();
     // 1. Rolle prüfen (Admin?)
     _db.collection('users').doc(_fbUid).get().then(doc=>{
@@ -6259,12 +6260,6 @@ function exitDemo(){
 }
 
 function fbLoadData(){
-  // Migration: alte unscoped Daten → user-spezifisch
-  if(_fbUid && !localStorage.getItem(_lsKey('ap_v1')) && localStorage.getItem('ap_v1')){
-    localStorage.setItem(_lsKey('ap_v1'), localStorage.getItem('ap_v1'));
-    localStorage.setItem(_lsKey('ap_trash'), localStorage.getItem('ap_trash')||'[]');
-    localStorage.setItem(_lsKey('ausbilderProfil'), localStorage.getItem('ausbilderProfil')||'{}');
-  }
   const ci=document.getElementById('cloudInd');
   ci.textContent='☁ Lädt…';
   _db.collection('users').doc(_fbUid).collection('data').doc('state').get()
