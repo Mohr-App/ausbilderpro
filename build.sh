@@ -20,17 +20,18 @@ def obfuscate_js(js_code):
     tmp_out = tmp_in + '.obf.js'
     try:
         r = subprocess.run(['javascript-obfuscator', tmp_in, '--output', tmp_out,
-            '--compact', 'true', '--control-flow-flattening', 'false',
-            '--dead-code-injection', 'false', '--string-array', 'true',
-            '--string-array-encoding', 'base64', '--string-array-threshold', '0.5',
-            '--rename-globals', 'false', '--self-defending', 'false',
+            '--compact', 'true',
+            '--control-flow-flattening', 'false',
+            '--dead-code-injection', 'false',
+            '--string-array', 'false',
+            '--rename-globals', 'false',
+            '--self-defending', 'false',
             '--identifier-names-generator', 'hexadecimal',
-            '--unicode-escape-sequence', 'false', '--target', 'browser'],
+            '--target', 'browser'],
             capture_output=True, text=True, timeout=180)
         if r.returncode != 0 or not os.path.exists(tmp_out):
             return js_code, 'fail'
         obf = open(tmp_out, 'r', encoding='utf-8').read()
-        # Syntax check
         with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False, encoding='utf-8') as chk:
             chk.write(obf); chk_path = chk.name
         cr = subprocess.run(['node', '--check', chk_path], capture_output=True, text=True, timeout=30)
@@ -44,24 +45,13 @@ def obfuscate_js(js_code):
         for f in [tmp_in, tmp_out]:
             if os.path.exists(f): os.unlink(f)
 
-# Replace each inline <script>...</script> with obfuscated version
-# CRITICAL: Preserve HTML structure and tag order exactly!
 parts = []
 last_end = 0
 obf_count = 0
-
 for m in re.finditer(r'(<script(?:\s[^>]*)?>)(.*?)(</script>)', code, re.DOTALL):
-    tag_open = m.group(1)
-    js_body = m.group(2)
-    tag_close = m.group(3)
-    
-    # Skip external scripts (src=...)
-    if 'src=' in tag_open:
+    tag_open, js_body, tag_close = m.group(1), m.group(2), m.group(3)
+    if 'src=' in tag_open or len(js_body.strip()) < 100:
         continue
-    # Skip tiny scripts
-    if len(js_body.strip()) < 100:
-        continue
-    
     parts.append(code[last_end:m.start()])
     obf_js, status = obfuscate_js(js_body)
     parts.append(tag_open + obf_js + tag_close)
@@ -70,12 +60,10 @@ for m in re.finditer(r'(<script(?:\s[^>]*)?>)(.*?)(</script>)', code, re.DOTALL)
 
 parts.append(code[last_end:])
 result = ''.join(parts)
-
-# NO HTML reordering - just write as-is
 open(out_path, 'w', encoding='utf-8').write(result)
 orig = os.path.getsize(src_path)
 final = os.path.getsize(out_path)
-print(f"{'✓ obfuscated' if obf_count else '⚡ minified'}  ({orig//1024}KB → {final//1024}KB)")
+print(f"{'✓' if obf_count else '⚡'}  ({orig//1024}KB → {final//1024}KB)")
 PYEOF
 done
-echo "═══ Build fertig! ═══"
+echo "═══ Fertig ═══"
