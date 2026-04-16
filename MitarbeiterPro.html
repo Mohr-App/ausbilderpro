@@ -778,7 +778,7 @@ function sendBetriebMeldung(type){
 let _pendingBetriebMeld=null;
 
 function _doSendBetriebMeldung(type, text){
-  const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Azubi';
+  const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Mitarbeiter';
   const firma=_tnData?.firma||'';
   db.collection('globalTN').doc(_tnId).collection('betriebMeldungen').add({
     type, text, name, firma,
@@ -790,7 +790,46 @@ function _doSendBetriebMeldung(type, text){
     toast('✓ Meldung an Betrieb gesendet');
     if(type==='text'){const inp=document.getElementById('betriebMeldungText');if(inp)inp.value='';}
     loadBetriebMeldungen();
+    if(type==='krank'||type==='spaeter'||type==='frueher'||type==='text'){
+      _sendMeldungEmailAG(firma, type, text, name);
+    }
   }).catch(err=>{document.getElementById('betriebMeldErr').textContent='Fehler: '+err.message;});
+}
+
+function _sendMeldungEmailAG(firma, type, text, name){
+  if(!firma) return;
+  db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
+    if(snap.empty) return;
+    const emails=[];
+    snap.forEach(doc=>{
+      const u=doc.data();
+      if(u.email) emails.push(u.email);
+    });
+    if(!emails.length) return;
+    const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
+    const subject=(icons[type]||'💬')+' Meldung von '+name+': '+text;
+    const zeit=new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    emails.forEach(email=>{
+      db.collection('mail').add({
+        to: email,
+        message: {
+          subject: subject,
+          html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
+            +'<div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div>'
+            +'<div style="padding:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">'
+            +'<p style="margin:0 0 16px;font-size:.9rem;color:#374151">Einer Ihrer Mitarbeiter hat eine Meldung gesendet:</p>'
+            +'<div style="padding:16px;background:#f1f5f9;border-left:4px solid #d97706;border-radius:6px;margin-bottom:16px">'
+            +'<p style="margin:0 0 4px;font-size:1rem;font-weight:700;color:#0f172a">'+(icons[type]||'💬')+' '+text+'</p>'
+            +'<p style="margin:0;font-size:.8rem;color:#64748b">Von: <b>'+name+'</b> · '+zeit+'</p>'
+            +'</div>'
+            +'<p style="margin:0;font-size:.8rem;color:#64748b">Öffnen Sie ArbeitgeberPro, um die Meldung zu bearbeiten.</p>'
+            +'</div>'
+            +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
+            +'</div>'
+        }
+      }).catch(()=>{});
+    });
+  }).catch(()=>{});
 }
 
 function loadBetriebMeldungen(){
