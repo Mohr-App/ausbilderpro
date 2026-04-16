@@ -589,6 +589,7 @@ auth.onAuthStateChanged(u=>{
     });
   } else {
     _uid=null; _tnId=null; _tnData=null;
+    if(_tnDocUnsub){_tnDocUnsub();_tnDocUnsub=null;}
     {
       document.getElementById('loginWrap').style.display='flex';
     }
@@ -671,7 +672,18 @@ function loadData(){
   checkDsgvoConsent();
   checkAzubiBadges();
 
+  // Live-Listener auf TN-Dokument – Echtzeit-Benachrichtigungen
+  if(_tnId&&!_tnDocUnsub){
+    _tnDocUnsub=db.collection('globalTN').doc(_tnId).onSnapshot(doc=>{
+      if(!doc.exists) return;
+      const newData=doc.data();
+      const changed=JSON.stringify(newData.benachrichtigungen||[])!==JSON.stringify(_tnData?.benachrichtigungen||[]);
+      _tnData=newData;
+      if(changed) checkBenachrichtigungen();
+    });
+  }
 }
+let _tnDocUnsub=null;
 
 // ═══════════════════════════════════
 // BETRIEB-KANAL

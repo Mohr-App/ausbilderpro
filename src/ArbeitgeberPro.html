@@ -548,6 +548,7 @@ auth.onAuthStateChanged(user=>{
     document.getElementById('appWrap').style.display='none';
     Object.values(_kursListeners).forEach(u=>u());
     _kursListeners={};
+    _meldUnsubs.forEach(u=>u());_meldUnsubs=[];_meldSeen=new Set();
   }
 });
 
@@ -581,6 +582,7 @@ function loadAzubis(){
     _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
     renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
     checkAgBadges();
+    setupLiveMeldungen();
   });
 }
 
@@ -2268,7 +2270,32 @@ function agMeldGelesen(tnId, docId){
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
-function checkAgBadges(){
+let _meldUnsubs=[];
+function setupLiveMeldungen(){
+  // Alte Listener aufräumen
+  _meldUnsubs.forEach(u=>u());
+  _meldUnsubs=[];
+  if(!_azubis.length) return;
+  // Pro Azubi einen Live-Listener auf ungelesene betriebMeldungen
+  _azubis.forEach(az=>{
+    const unsub=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('gelesen','==',false).onSnapshot(snap=>{
+        // Toast bei neuen Meldungen
+        snap.docChanges().forEach(ch=>{
+          if(ch.type==='added'&&!_meldSeen.has(ch.doc.id)){
+            _meldSeen.add(ch.doc.id);
+            const m=ch.doc.data();
+            const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
+            toast((icons[m.type]||'💬')+' '+esc(m.azName||m.name||'Azubi')+': '+esc(m.text||''));
+          }
+        });
+        _updateAgBadges();
+      },()=>{});
+    _meldUnsubs.push(unsub);
+  });
+}
+let _meldSeen=new Set();
+function _updateAgBadges(){
   if(!_azubis.length) return;
   let meldCount=0, urlaubCount=0, zeitCount=0;
   const promises=_azubis.map(az=>{
@@ -2282,9 +2309,7 @@ function checkAgBadges(){
   });
   Promise.all(promises).then(()=>{
     const total=meldCount+urlaubCount+zeitCount;
-    // Betrieb-Tab Badge
     setBadge('agnav-betrieb', total);
-    // Sub-Tab Badges
     const tabs=document.querySelectorAll('#agBetriebTabs .stab');
     tabs.forEach(t=>{
       const old=t.querySelector('.ag-badge');if(old)old.remove();
@@ -2300,8 +2325,12 @@ function checkAgBadges(){
         t.appendChild(b);
       }
     });
+    // Meldungen-Tab aktualisieren wenn offen
+    const meldTab=document.querySelector('.abtab.active');
+    if(meldTab&&meldTab.id==='abtab-meldungen') loadAgMeldungen();
   });
 }
+function checkAgBadges(){ _updateAgBadges(); }
 function setBadge(elId, count){
   const el=document.getElementById(elId);
   if(!el) return;
