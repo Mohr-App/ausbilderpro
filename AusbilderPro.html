@@ -4529,8 +4529,8 @@ function ausbilderKommtSpaeter(){
   Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
   if(!tnIds.size){toast('Keine verknüpften TN','bad');return;}
   safeConfirm(
-    '🕐 Komme später',
-    '<b>'+esc(ausbilderName)+'</b> kommt heute um ca. <b>'+esc(zeit.trim())+' Uhr</b>.'
+    '🕐 Unterricht beginnt später',
+    '<b>'+esc(ausbilderName)+'</b> startet den Unterricht heute um ca. <b>'+esc(zeit.trim())+' Uhr</b>.'
     +(freitext?'<br><br><span style="font-style:italic;color:#6B7280">"'+esc(freitext)+'"</span>':'')
     +'<br><br><span style="font-size:.75rem;color:#6B7280">Alle <b>'+tnIds.size+' Azubis</b> werden per App und E-Mail benachrichtigt.</span>',
     'Ja, alle Azubis jetzt benachrichtigen',
@@ -4551,7 +4551,7 @@ function _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, todayDE, 
       return _db.collection('globalTN').doc(tnId).update({
         benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
           typ:'ausbilder_spaeter',
-          text: ausbilderName+' kommt heute voraussichtlich um '+zeit.trim()+' Uhr.'+(freitext?' '+freitext:'')+ ' Bitte wartet im Schulungsraum.',
+          text: 'Der Unterricht beginnt heute voraussichtlich erst um '+zeit.trim()+' Uhr.'+(freitext?' '+freitext:'')+ ' Bitte wartet im Schulungsraum.',
           kursName: kursLabel,
           ausbilder: ausbilderName,
           datum: new Date().toISOString(),
@@ -4559,8 +4559,9 @@ function _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, todayDE, 
         })
       }).then(()=>{
         // E-Mail
-        sendTnEmail(tnData, '🕐 '+kursLabel+' – Ausbilder kommt später',
-          '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">dein Ausbilder <b>'+ausbilderName+'</b> kommt heute zum Lehrgang <b>"'+kursLabel+'"</b> voraussichtlich erst um <b style="color:#d97706">'+zeit.trim()+' Uhr</b>.</p>'
+        sendTnEmail(tnData, '🕐 '+kursLabel+' – Unterricht beginnt später',
+          '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">der Unterricht im Lehrgang <b>"'+kursLabel+'"</b> beginnt heute voraussichtlich erst um <b style="color:#d97706">'+zeit.trim()+' Uhr</b>.</p>'
+          +'<p style="margin:0 0 12px;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
           +(freitext?'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.6;font-style:italic">"'+freitext+'"</p>':'')
           +'<div style="padding:12px;background:#fffbeb;border:2px solid #fde68a;border-radius:8px;margin-bottom:12px">'
           +'<p style="margin:0;font-size:.85rem;color:#92400e;font-weight:700">Bitte wartet im Schulungsraum.</p></div>'
