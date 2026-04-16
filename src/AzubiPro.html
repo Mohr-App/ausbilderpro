@@ -1142,9 +1142,24 @@ function _doSendMeldung(type, kursId){
       if(type==='text'){const inp=document.getElementById('meldungText');if(inp)inp.value='';}
       setTimeout(()=>{if(st)st.style.display='none';},3000);
       toast('Meldung gesendet ✓');
-      // E-Mail an Ausbilder (falls hinterlegt) – nur bei wichtigen Meldungen
+      // E-Mail an Ausbilder
       if(type==='krank'||type==='spaeter'||type==='frueher'||type==='text'){
         _sendMeldungEmailAusbilder(kursId, type, text, name);
+      }
+      // Bei krank zusätzlich AG informieren (wichtige Meldung, der Betrieb muss wissen)
+      if(type==='krank'){
+        const firma=_tnData?.firma||'';
+        if(firma){
+          // Parallel auch als Betriebsmeldung speichern + Mail
+          db.collection('globalTN').doc(_tnId).collection('betriebMeldungen').add({
+            type, text, name, firma,
+            tnId: _tnId,
+            zeit: new Date().toISOString(),
+            datum: localDate(),
+            gelesen: false
+          }).catch(()=>{});
+          _sendMeldungEmailAG(firma, type, text, name);
+        }
       }
     }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
@@ -1407,6 +1422,18 @@ function _doSendBetriebMeldung(type, text){
     // E-Mail an Arbeitgeber
     if(type==='krank'||type==='spaeter'||type==='frueher'||type==='text'){
       _sendMeldungEmailAG(firma, type, text, name);
+    }
+    // Bei krank auch aktiven Ausbilder im Kurs informieren
+    if(type==='krank' && _tnData?.aktiverKursId){
+      const kursId=_tnData.aktiverKursId;
+      db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('meldungen').add({
+          type, text, name,
+          tnId: _tnId,
+          zeit: new Date().toISOString(),
+          gelesen: false
+        }).catch(()=>{});
+      _sendMeldungEmailAusbilder(kursId, type, text, name);
     }
   }).catch(err=>{document.getElementById('betriebMeldErr').textContent='Fehler: '+err.message;});
 }
