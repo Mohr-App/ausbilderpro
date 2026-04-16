@@ -805,7 +805,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <div class="sb" id="sb">
     <div id="hbzKurseSection"></div>
     <button class="sb-abruf-btn" title="📥 Lehrgänge abrufen" onclick="openLehrgangAbrufen()">📥 Lehrgänge abrufen</button>
-    <div class="sb-sec">Lehrgangsarten <button class="sb-add-kat" onclick="openKatModal()" title="Hinzufügen / Wiederherstellen">+</button></div>
+    <div class="sb-sec" style="flex-direction:column;align-items:stretch;gap:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span>Lehrgangsarten</span>
+        <button class="sb-add-kat" onclick="openKatModal()" title="+ Lehrgangsart anlegen (z.B. Elektroniker, Mechatroniker)">+</button>
+      </div>
+      <div style="font-size:.55rem;color:var(--mu);font-weight:400;line-height:1.4;padding-right:4px">Berufsgruppe anlegen, darunter einzelne Lehrgänge mit Daten</div>
+    </div>
     <div id="katList"></div>
   </div>
   <div class="main" id="mainArea"></div>
@@ -939,6 +945,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <div class="dpm">
     <div class="dpm-hd"><div class="dpm-tit" id="dpTit">Neuer Lehrgang</div><button class="xcls" onclick="closeDp()" title="Schließen">✕</button></div>
     <div class="dpm-bd">
+      <div style="padding:10px 12px;background:rgba(5,150,105,.06);border:1.5px solid rgba(5,150,105,.2);border-radius:8px;margin-bottom:14px;font-size:.7rem;color:var(--tx);line-height:1.5">
+        Du legst jetzt einen <b>konkreten Lehrgang</b> mit Start-/Enddatum an. Die Lehrgangsart ist oben im Titel angezeigt.
+      </div>
       <div class="dpm-row"><div class="dpm-lbl">Von</div><div class="drow"><select class="dpsel" id="dpSD"><option value="">TT</option></select><span class="dsep">.</span><select class="dpsel" id="dpSM"></select><span class="dsep">.</span><select class="dpsel" id="dpSY"><option value="">JJJJ</option></select></div></div>
       <div class="dpm-row"><div class="dpm-lbl">Bis</div><div class="drow"><select class="dpsel" id="dpED"><option value="">TT</option></select><span class="dsep">.</span><select class="dpsel" id="dpEM"></select><span class="dsep">.</span><select class="dpsel" id="dpEY"><option value="">JJJJ</option></select></div></div>
       <button class="dp-save" title="💾 Lehrgang anlegen" onclick="saveNewInst()">💾 Lehrgang anlegen</button>
@@ -990,11 +999,15 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <!-- ADD KAT MODAL -->
 <div class="katml" id="katml" onclick="if(event.target===this)closeKatModal()">
   <div class="katml-box">
-    <div class="katml-hd"><div class="katml-tit">Lehrgangsart hinzufügen</div><button class="xcls" onclick="closeKatModal()" title="Schließen">✕</button></div>
+    <div class="katml-hd"><div class="katml-tit">Lehrgangsart anlegen</div><button class="xcls" onclick="closeKatModal()" title="Schließen">✕</button></div>
     <div class="katml-bd">
-      <p style="font-size:.74rem;color:var(--mu);margin-bottom:10px">Neue Lehrgangsart eingeben (z.B. „Elektroniker EuG", „Mechatroniker", „Klasse 10a"):</p>
+      <div style="padding:10px 12px;background:rgba(59,130,246,.06);border:1.5px solid rgba(59,130,246,.2);border-radius:8px;margin-bottom:14px;font-size:.72rem;color:var(--tx);line-height:1.5">
+        <div style="font-weight:700;margin-bottom:4px;color:var(--acc)">💡 Was ist eine Lehrgangsart?</div>
+        Eine Lehrgangsart ist die <b>Berufsgruppe</b> (z.B. „Elektroniker EuG", „Mechatroniker"). Danach kannst du darunter <b>einzelne Lehrgänge</b> mit konkreten Start-/Enddaten anlegen.
+      </div>
+      <p style="font-size:.74rem;color:var(--mu);margin-bottom:10px">Aus vordefinierten auswählen:</p>
       <div class="katml-div"></div>
-      <p style="font-size:.74rem;color:var(--mu);margin-bottom:8px">Eigene Art:</p>
+      <p style="font-size:.74rem;color:var(--mu);margin-bottom:8px;margin-top:14px">Oder eigene Art anlegen:</p>
       <div class="katml-custom">
         <input class="katml-inp" id="katInp" type="text" placeholder="z.B. ET1, Klasse 4a…" onkeydown="if(event.key==='Enter')addCustomKat()">
         <button class="katml-add" title="+ Anlegen" onclick="addCustomKat()">+ Anlegen</button>
@@ -1669,7 +1682,8 @@ function renderSidebar(){
 
     const addBtn=document.createElement('div');
     addBtn.className='kat-newinst'+(k.open?' show':'');
-    addBtn.innerHTML='<span style="font-size:1rem">+</span> Neuer Lehrgang';
+    addBtn.innerHTML='<span style="font-size:1rem">+</span> Lehrgang in dieser Lehrgangsart anlegen';
+    addBtn.title='Einen konkreten Lehrgang mit Start-/Enddatum in '+k.label+' anlegen';
     addBtn.onclick=()=>openDp(id);
     list.appendChild(addBtn);
   });
@@ -5134,7 +5148,8 @@ function renderMobKatList(){
     list.appendChild(ch);
     const addBtn=document.createElement('div');
     addBtn.className='kat-newinst'+(k.open?' show':'');
-    addBtn.innerHTML='<span style="font-size:1rem">+</span> Neuer Lehrgang';
+    addBtn.innerHTML='<span style="font-size:1rem">+</span> Lehrgang anlegen';
+    addBtn.title='Einen konkreten Lehrgang mit Start-/Enddatum in '+k.label+' anlegen';
     addBtn.onclick=()=>{ drawerClose(); openDp(id); };
     list.appendChild(addBtn);
   }
