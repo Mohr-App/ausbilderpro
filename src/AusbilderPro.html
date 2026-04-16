@@ -189,8 +189,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .seat.pool-target{outline:2px dashed var(--acc);outline-offset:2px;}
 @media(max-width:900px){.pool-sidebar{display:none;}}
 .main-docs-btn{font-size:.65rem!important;padding:3px 9px!important;}
-.hdr-actions{display:none;flex-wrap:wrap;gap:4px;padding:8px 0;animation:slideDown .2s ease;}
+.main-title{display:flex;flex-direction:column;gap:2px;position:relative;}
+.main-title-hidden{}
+.hdr-actions{display:none;position:absolute;top:100%;left:0;margin-top:8px;background:var(--sur);border:2px solid #e2e8f0;border-radius:10px;padding:6px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.15);min-width:240px;flex-direction:column;gap:3px;animation:slideDown .15s ease;}
 .hdr-actions.show{display:flex;}
+.hdr-actions .tbtn{width:100%;text-align:left;justify-content:flex-start;}
 @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .hdr-menu-btn{padding:6px 14px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.2);border-radius:8px;color:#3b82f6;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;transition:all .12s;}
 .hdr-menu-btn.open{background:rgba(37,99,235,.15);border-color:rgba(37,99,235,.4);}
@@ -202,7 +205,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 /* MAIN */
 .main{flex:1;padding:16px 18px 10px;overflow-x:auto;overflow-y:auto;min-width:0;display:flex;flex-direction:column;min-height:0;background:#ffffff;}
 .main-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:10px;flex-wrap:wrap;flex-shrink:0;}
-.main-title{display:flex;flex-direction:column;gap:2px;}
 .main-kat{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--mu);text-transform:uppercase;letter-spacing:.1em;}
 .main-dates{font-size:1rem;font-weight:700;color:var(--tx);}
 
@@ -2500,6 +2502,21 @@ function toggleKursActions(){
   el.classList.toggle('show');
   if(btn) btn.classList.toggle('open');
   if(btn) btn.textContent=el.classList.contains('show')?'✕ Schließen':'☰ Aktionen';
+  if(el.classList.contains('show')){
+    setTimeout(()=>document.addEventListener('click',_closeKursActionsOnOutside,{once:true}),10);
+  }
+}
+function _closeKursActionsOnOutside(e){
+  const el=document.getElementById('kursActions');
+  const btn=document.getElementById('kursActBtn');
+  if(!el) return;
+  if(el.contains(e.target)){
+    document.addEventListener('click',_closeKursActionsOnOutside,{once:true});
+    return;
+  }
+  if(e.target===btn) return;
+  el.classList.remove('show');
+  if(btn){btn.classList.remove('open');btn.textContent='☰ Aktionen';}
 }
 
 function updateKurstage(val){
