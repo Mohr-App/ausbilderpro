@@ -189,11 +189,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .seat.pool-target{outline:2px dashed var(--acc);outline-offset:2px;}
 @media(max-width:900px){.pool-sidebar{display:none;}}
 .main-docs-btn{font-size:.65rem!important;padding:3px 9px!important;}
-.hdr-actions{display:none;flex-wrap:wrap;gap:4px;padding:8px 0;animation:slideDown .2s ease;}
+.hdr-actions{display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--sur);border:2px solid #e2e8f0;border-radius:10px;padding:6px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.15);min-width:240px;flex-direction:column;gap:3px;animation:slideDown .15s ease;}
 .hdr-actions.show{display:flex;}
+.hdr-actions .tbtn{width:100%;text-align:left;justify-content:flex-start;}
 @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .hdr-menu-btn{padding:6px 14px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.2);border-radius:8px;color:#3b82f6;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;transition:all .12s;}
 .hdr-menu-btn.open{background:rgba(37,99,235,.15);border-color:rgba(37,99,235,.4);}
+.kurs-act-wrap{position:relative;}
 .kat-newinst{display:none;align-items:center;gap:5px;padding:5px 10px 5px 24px;cursor:pointer;color:var(--acc);font-size:.73rem;font-weight:600;opacity:.7;transition:opacity .12s;flex-shrink:0;}
 .kat-newinst.show{display:flex;}
 .kat-newinst:hover{opacity:1;}
@@ -2236,7 +2238,7 @@ function renderMain(){
     return;
   }
   el.innerHTML=
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button></div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><div class="kurs-act-wrap"><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button>'
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
     +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()" title="Kursunterlagen hochladen und verwalten">📁 Dokumente</button>'
@@ -2247,6 +2249,8 @@ function renderMain(){
     +(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button><button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981" title="Teilnehmer manuell zum Kurs hinzufügen">👤+ TN</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed" title="Kurs mit Firestore verknüpfen für QR-Beitritt und TN-Pool">🔗 QR + Pool aktivieren</button>')
     +'<button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Lehrgang in eine andere Lehrgangsart verschieben">↔ Verschieben</button>'
     +'<button class="tbtn main-docs-btn" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Lehrgang löschen (30 Tage im Papierkorb)">🗑 Löschen</button>'
+    +'</div>'
+    +'</div>'
     +'</div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
@@ -2500,6 +2504,24 @@ function toggleKursActions(){
   el.classList.toggle('show');
   if(btn) btn.classList.toggle('open');
   if(btn) btn.textContent=el.classList.contains('show')?'✕ Schließen':'☰ Aktionen';
+  // Click-outside-to-close
+  if(el.classList.contains('show')){
+    setTimeout(()=>{
+      document.addEventListener('click', _closeKursActionsOnOutside, {once:true});
+    }, 10);
+  }
+}
+function _closeKursActionsOnOutside(e){
+  const el=document.getElementById('kursActions');
+  const btn=document.getElementById('kursActBtn');
+  if(!el) return;
+  if(!el.contains(e.target) && e.target!==btn){
+    el.classList.remove('show');
+    if(btn){btn.classList.remove('open');btn.textContent='☰ Aktionen';}
+  } else if(el.contains(e.target)){
+    // Click war innerhalb Menü → re-register damit Menü beim nächsten Outside-Click schließt
+    document.addEventListener('click', _closeKursActionsOnOutside, {once:true});
+  }
 }
 
 function updateKurstage(val){
