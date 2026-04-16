@@ -189,8 +189,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .seat.pool-target{outline:2px dashed var(--acc);outline-offset:2px;}
 @media(max-width:900px){.pool-sidebar{display:none;}}
 .main-docs-btn{font-size:.65rem!important;padding:3px 9px!important;}
-.hdr-actions{display:none;flex-wrap:wrap;gap:4px;padding:8px 0;animation:slideDown .2s ease;}
+.hdr-actions{display:none;position:fixed;background:var(--sur);border:2px solid #e2e8f0;border-radius:10px;padding:6px;z-index:500;box-shadow:0 8px 32px rgba(0,0,0,.15);min-width:240px;max-height:80vh;overflow-y:auto;flex-direction:column;gap:3px;animation:slideDown .15s ease;}
 .hdr-actions.show{display:flex;}
+.hdr-actions .tbtn{width:100%!important;text-align:left!important;justify-content:flex-start!important;padding:8px 12px!important;font-size:.75rem!important;}
 @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .hdr-menu-btn{padding:6px 14px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.2);border-radius:8px;color:#3b82f6;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;transition:all .12s;}
 .hdr-menu-btn.open{background:rgba(37,99,235,.15);border-color:rgba(37,99,235,.4);}
@@ -2497,9 +2498,33 @@ function toggleKursActions(){
   const el=document.getElementById('kursActions');
   const btn=document.getElementById('kursActBtn');
   if(!el) return;
-  el.classList.toggle('show');
-  if(btn) btn.classList.toggle('open');
-  if(btn) btn.textContent=el.classList.contains('show')?'✕ Schließen':'☰ Aktionen';
+  const isShown=el.classList.contains('show');
+  if(isShown){
+    el.classList.remove('show');
+    if(btn){btn.classList.remove('open');btn.textContent='☰ Aktionen';}
+    return;
+  }
+  // Position unter dem Button berechnen
+  if(btn){
+    const r=btn.getBoundingClientRect();
+    el.style.top=(r.bottom+6)+'px';
+    el.style.left=Math.max(8, r.right - 240)+'px'; // rechtsbündig unter Button, min 8px vom Rand
+  }
+  el.classList.add('show');
+  if(btn){btn.classList.add('open');btn.textContent='✕ Schließen';}
+  setTimeout(()=>document.addEventListener('click',_closeKursActionsOnOutside,{once:true}),10);
+}
+function _closeKursActionsOnOutside(e){
+  const el=document.getElementById('kursActions');
+  const btn=document.getElementById('kursActBtn');
+  if(!el) return;
+  if(el.contains(e.target)){
+    document.addEventListener('click',_closeKursActionsOnOutside,{once:true});
+    return;
+  }
+  if(e.target===btn) return;
+  el.classList.remove('show');
+  if(btn){btn.classList.remove('open');btn.textContent='☰ Aktionen';}
 }
 
 function updateKurstage(val){
