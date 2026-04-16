@@ -2241,7 +2241,7 @@ function renderMain(){
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
     +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()" title="Kursunterlagen hochladen und verwalten">📁 Dokumente</button>'
-    +'<button class="tbtn main-docs-btn" onclick="ausbilderKommtSpaeter()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706" title="Alle Azubis im Kurs benachrichtigen">🕐 Komme später</button>'
+    +'<button class="tbtn main-docs-btn" onclick="ausbilderKommtSpaeter()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
     +'<button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Kurs für heute als ausgefallen markieren">⚠️ Ausfall</button>'
     +'<button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">📋 TN-Liste</button>'
     +'<button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen</button>'
@@ -4502,6 +4502,8 @@ function kursAusfall(){
             +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.</p>'
             +'<p style="margin:0;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
           );
+          // E-Mail an Arbeitgeber des TN
+          sendKursAusfallEmailAG(tnData, kursLabel, todayDE, ausbilderName);
           return _db.collection('globalTN').doc(tnId).update({benachrichtigungen:benach});
         }).then(()=>ok++).catch(()=>fail++));
       });
@@ -5279,6 +5281,38 @@ function sendTnEmail(tnData, subject, htmlBody){
         +'</div>'
     }
   }).catch(err=>console.warn('Mail-Fehler:',err));
+}
+
+function sendKursAusfallEmailAG(tnData, kursLabel, todayDE, ausbilderName){
+  if(!_db) return;
+  const firma=tnData.firma||'';
+  if(!firma) return;
+  const tnName=((tnData.vorname||'')+' '+(tnData.nachname||'')).trim()||'Azubi';
+  _db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
+    if(snap.empty) return;
+    snap.forEach(doc=>{
+      const u=doc.data();
+      if(!u.email) return;
+      _db.collection('mail').add({
+        to: u.email,
+        message: {
+          subject: '🚨 Lehrgang "'+kursLabel+'" fällt heute aus – '+tnName,
+          html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
+            +'<div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div>'
+            +'<div style="padding:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">'
+            +'<div style="padding:14px;background:#fef2f2;border:3px solid #ef4444;border-radius:10px;margin-bottom:12px">'
+            +'<p style="margin:0 0 8px;font-size:1rem;font-weight:800;color:#ef4444">🚨 LEHRGANG FÄLLT HEUTE AUS</p>'
+            +'<p style="margin:0;font-size:.9rem;color:#1e293b;font-weight:700">'+kursLabel+' – '+todayDE+'</p>'
+            +'</div>'
+            +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">Ihr Auszubildender <b>'+tnName+'</b> ist vom heutigen Kursausfall betroffen. Er/Sie wurde gebeten, sofort den Betrieb aufzusuchen.</p>'
+            +'<p style="margin:0;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
+            +'</div>'
+            +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
+            +'</div>'
+        }
+      }).catch(()=>{});
+    });
+  }).catch(()=>{});
 }
 
 function syncGlobalTNStatus(tnId, statusType){
