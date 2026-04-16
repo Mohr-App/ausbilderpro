@@ -552,8 +552,8 @@ auth.onAuthStateChanged(user=>{
 });
 
 function loadUserData(){
-  // Activity tracking
-  db.collection('users').doc(_uid).set({lastActive:Date.now(),lastApp:'ArbeitgeberPro',email:_email||'',firma:_firma||'',role:'arbeitgeber',sessionStart:Date.now()},{merge:true}).catch(()=>{});
+  // Activity tracking (NICHT firma überschreiben - könnte leer sein und existing Wert zerstören)
+  db.collection('users').doc(_uid).set({lastActive:Date.now(),lastApp:'ArbeitgeberPro',email:_email||'',role:'arbeitgeber',sessionStart:Date.now()},{merge:true}).catch(()=>{});
   if(!window._heartbeat) window._heartbeat=setInterval(()=>{
     if(_uid) db.collection('users').doc(_uid).set({lastActive:Date.now()},{merge:true}).catch(()=>{});
   },60000);
