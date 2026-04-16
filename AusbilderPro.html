@@ -670,7 +670,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
   <div id="hbzKurseSectionMob" style="flex-shrink:0"></div>
   <button class="sb-abruf-btn" onclick="drawerClose();openLehrgangAbrufen()" style="margin:6px 12px" title="Menü schließen">📥 Lehrgänge abrufen</button>
-  <div class="sb-sec" style="flex-shrink:0;">Lehrgangsarten <button class="sb-add-kat" onclick="drawerClose();openKatModal()" title="Menü schließen">+</button></div>
+  <div class="sb-sec" style="flex-shrink:0;">📚 Berufsgruppen <button class="sb-add-kat" onclick="drawerClose();openKatModal()" title="Berufsgruppe anlegen">+ Berufsgruppe</button></div>
   <div class="mob-drawer-scroll" id="mobKatList"></div>
 </div>
 
@@ -807,10 +807,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <button class="sb-abruf-btn" title="📥 Lehrgänge abrufen" onclick="openLehrgangAbrufen()">📥 Lehrgänge abrufen</button>
     <div class="sb-sec" style="flex-direction:column;align-items:stretch;gap:4px">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <span>Lehrgangsarten</span>
-        <button class="sb-add-kat" onclick="openKatModal()" title="+ Lehrgangsart anlegen (z.B. Elektroniker, Mechatroniker)">+</button>
+        <span>📚 Berufsgruppen</span>
+        <button class="sb-add-kat" onclick="openKatModal()" title="Schritt 1: Berufsgruppe anlegen (z.B. Elektroniker, Mechatroniker)">+ Berufsgruppe</button>
       </div>
-      <div style="font-size:.55rem;color:var(--mu);font-weight:400;line-height:1.4;padding-right:4px">Berufsgruppe anlegen, darunter einzelne Lehrgänge mit Daten</div>
+      <div style="font-size:.55rem;color:var(--mu);font-weight:400;line-height:1.4;padding-right:4px">① Berufsgruppe anlegen → ② darunter einzelne Lehrgänge mit Datum</div>
     </div>
     <div id="katList"></div>
   </div>
@@ -1682,8 +1682,8 @@ function renderSidebar(){
 
     const addBtn=document.createElement('div');
     addBtn.className='kat-newinst'+(k.open?' show':'');
-    addBtn.innerHTML='<span style="font-size:1rem">+</span> Lehrgang in dieser Lehrgangsart anlegen';
-    addBtn.title='Einen konkreten Lehrgang mit Start-/Enddatum in '+k.label+' anlegen';
+    addBtn.innerHTML='<span style="font-size:1rem">+</span> Neuer Lehrgang in „'+esc(k.label)+'"';
+    addBtn.title='Konkreter Lehrgang mit Start-/Enddatum in '+k.label;
     addBtn.onclick=()=>openDp(id);
     list.appendChild(addBtn);
   });
@@ -2196,15 +2196,31 @@ function renderMain(){
     const hasAnyInst=Object.values(S.kats).some(k=>Object.keys(k.instances||{}).length>0);
     if(katName){
       // Hat Lehrgangsart, aber kein Lehrgang darin
-      el.innerHTML='<div class="es"><h2>'+esc(katName)+'</h2><p>Noch kein Lehrgang angelegt.</p><button class="es-btn" onclick="openDp(\''+ S.curKat +'\')" title="Neuen Lehrgang erstellen">+ Neuer Lehrgang</button></div>';
+      el.innerHTML='<div class="es" style="max-width:420px;margin:0 auto">'
+        +'<div style="font-size:2rem;margin-bottom:8px">📚</div>'
+        +'<h2 style="color:var(--tx);margin-bottom:6px">'+esc(katName)+'</h2>'
+        +'<div style="display:inline-block;padding:4px 10px;background:rgba(5,150,105,.1);color:#059669;border-radius:6px;font-size:.68rem;font-weight:700;margin-bottom:14px">✓ Berufsgruppe angelegt</div>'
+        +'<p style="line-height:1.7;margin-bottom:16px;color:var(--mu)">Jetzt fehlt noch Schritt 2: Ein konkreter Lehrgang mit Start- und Enddatum.</p>'
+        +'<button class="es-btn" onclick="openDp(\''+ S.curKat +'\')" title="Neuen Lehrgang erstellen" style="font-size:.95rem;padding:14px 28px;background:linear-gradient(135deg,#059669,#10b981)">→ Schritt 2: Lehrgang mit Datum anlegen</button>'
+        +'</div>';
     } else if(!hasAnyInst){
       // Komplett leer → Willkommensscreen mit Lehrgänge abrufen
       el.innerHTML=
-        '<div class="es" style="max-width:420px;margin:0 auto">'
+        '<div class="es" style="max-width:460px;margin:0 auto">'
         +'<div style="font-size:2.5rem;margin-bottom:12px">📋</div>'
         +'<h2 style="color:var(--tx);margin-bottom:8px">Willkommen bei AusbilderPro</h2>'
-        +'<p style="line-height:1.7;margin-bottom:20px">Starte mit deinem ersten Lehrgang – entweder von der Verwaltung zugewiesen oder eigenständig erstellt.</p>'
-        +'<button class="es-btn" title="+ Lehrgangsart anlegen" onclick="openKatModal()" style="font-size:.95rem;padding:14px 28px;background:linear-gradient(135deg,#2563eb,#059669)">+ Lehrgangsart anlegen & loslegen</button>'
+        +'<p style="line-height:1.7;margin-bottom:20px;color:var(--mu)">So startest du deinen ersten Lehrgang:</p>'
+        +'<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;text-align:left">'
+        +'<div style="display:flex;gap:12px;align-items:center;padding:12px;background:rgba(37,99,235,.05);border:1.5px solid rgba(37,99,235,.2);border-radius:10px">'
+        +'<div style="width:32px;height:32px;border-radius:50%;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">1</div>'
+        +'<div style="flex:1"><div style="font-weight:700;font-size:.85rem">Berufsgruppe anlegen</div><div style="font-size:.7rem;color:var(--mu);margin-top:2px">z.B. „Elektroniker", „Mechatroniker"</div></div>'
+        +'</div>'
+        +'<div style="display:flex;gap:12px;align-items:center;padding:12px;background:rgba(5,150,105,.05);border:1.5px solid rgba(5,150,105,.2);border-radius:10px">'
+        +'<div style="width:32px;height:32px;border-radius:50%;background:#059669;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">2</div>'
+        +'<div style="flex:1"><div style="font-weight:700;font-size:.85rem">Lehrgang mit Datum anlegen</div><div style="font-size:.7rem;color:var(--mu);margin-top:2px">Konkreter Kurs von 15.04. – 26.04.</div></div>'
+        +'</div>'
+        +'</div>'
+        +'<button class="es-btn" title="Jetzt starten" onclick="openKatModal()" style="font-size:.95rem;padding:14px 28px;background:linear-gradient(135deg,#2563eb,#059669)">→ Schritt 1: Berufsgruppe anlegen</button>'
         +'<div style="margin-top:24px;border-top:1px solid var(--brd);padding-top:16px">'
         +'<div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Falls die Verwaltung dir Lehrgänge zugewiesen hat:</div>'
         +'<button class="es-btn" title="📥 Lehrgänge abrufen" onclick="openLehrgangAbrufen()" id="esAbrufBtn" style="font-size:.75rem;padding:9px 18px;background:var(--sur2);color:var(--mu);box-shadow:none">📥 Lehrgänge von Verwaltung abrufen</button>'
