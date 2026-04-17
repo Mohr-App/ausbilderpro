@@ -617,31 +617,18 @@ function loadUserData(){
 }
 
 function loadAzubis(){
-  if(!_firma&&!_uid)return;
-  // Zwei Queries: firmaUid (sicher) + firma-String (Fallback)
-  const q1=db.collection('globalTN').where('firmaUid','==',_uid).onSnapshot(snap1=>{
-    const byUid=[];
-    snap1.forEach(doc=>byUid.push({id:doc.id,...doc.data()}));
-    // Fallback: firma-String (für Bestandsdaten ohne firmaUid)
-    db.collection('globalTN').where('firma','==',_firma).get().then(snap2=>{
-      const merged=new Map();
-      byUid.forEach(a=>merged.set(a.id,a));
-      snap2.forEach(doc=>{if(!merged.has(doc.id))merged.set(doc.id,{id:doc.id,...doc.data()});});
-      _azubis=[...merged.values()];
-      _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
-      renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
-      checkAgBadges();
-      setupLiveMeldungen();
-      _showFirmaCodeBanner();
-    }).catch(()=>{
-      _azubis=byUid;
-      _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
-      renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
-      checkAgBadges();
-      setupLiveMeldungen();
-      _showFirmaCodeBanner();
-    });
+  if(!_uid)return;
+  // Nur per firmaUid – keine firma-String-Suche mehr
+  db.collection('globalTN').where('firmaUid','==',_uid).onSnapshot(snap=>{
+    _azubis=[];
+    snap.forEach(doc=>_azubis.push({id:doc.id,...doc.data()}));
+    _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
+    renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
+    checkAgBadges();
+    setupLiveMeldungen();
+    _showFirmaCodeBanner();
   });
+}
 }
 
 function _showFirmaCodeBanner(){
