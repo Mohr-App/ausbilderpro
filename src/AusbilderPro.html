@@ -3621,6 +3621,13 @@ function saveSeat(){
   const _saveSeatId=curSeat;
   const _saveKatId=S.curKat;
   const _saveInstId=S.curInst;
+  // Quick-Attendance bereinigen wenn heutiger Eintrag gelöscht wurde
+  const _qaToday=new Date().toISOString().slice(0,10);
+  if(inst.attendance&&inst.attendance[_qaToday]&&inst.attendance[_qaToday][curSeat]){
+    if(!tmpAtt.some(a=>a.date===_qaToday)){
+      delete inst.attendance[_qaToday][curSeat];
+    }
+  }
   const newProf=(document.getElementById('iProf').value||'').trim();
   const oldProf=(oldSeat.profession||'').trim();
   const poolTnId=oldSeat.poolTnId||null;
