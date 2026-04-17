@@ -5254,8 +5254,11 @@ function onMobSearch(){
 
 function init(){
   hydrate(); loadAusbilder(); tick(); setInterval(tick,1000);
-  // Re-render Seats nach Font-Loading (verhindert abgeschnittene Namen beim ersten Laden)
-  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{renderSeats();if(_mobileListMode)renderMobileList();});
+  // Re-render nach Font-Loading (verhindert abgeschnittene Namen beim ersten Laden)
+  var _fontRerendered=false;
+  function _fontRerender(){if(_fontRerendered)return;_fontRerendered=true;renderSeats();if(_mobileListMode)renderMobileList();}
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>setTimeout(_fontRerender,100));
+  setTimeout(_fontRerender,3000); // Fallback
   const ind=document.getElementById('saveInd');
   const txt=document.getElementById('saveIndTxt');
   if(ind&&txt){ txt.textContent='Bereit'; ind.className='save-ind'; }
