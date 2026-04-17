@@ -198,8 +198,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           </div>
           <div id="geoAdressWrap" style="display:none;margin-top:8px;padding:12px;background:rgba(37,99,235,.04);border:2px solid rgba(37,99,235,.2);border-radius:10px">
             <div style="font-size:.95rem;font-weight:800;color:var(--acc);margin-bottom:8px">📍 Adresse des Arbeitsortes eingeben</div>
-            <input class="fi" id="geoAdresse" type="text" placeholder="z.B. Domstraße 1, 50667 Köln" style="width:100%;font-size:1.1rem;padding:14px 16px;border:2px solid rgba(37,99,235,.3);border-radius:8px;margin-bottom:8px;box-sizing:border-box">
-            <button class="btn" onclick="setGeoByAddress()" style="width:100%;font-size:.88rem;padding:12px;font-weight:700">🔍 Adresse suchen</button>
+            <div style="position:relative">
+              <input class="fi" id="geoAdresse" type="text" placeholder="z.B. Domstraße 1, 50667 Köln" autocomplete="off" oninput="_geoAutocomplete()" style="width:100%;font-size:1.1rem;padding:14px 16px;border:2px solid rgba(37,99,235,.3);border-radius:8px;box-sizing:border-box">
+              <div id="geoSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:2px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:300;max-height:220px;overflow-y:auto"></div>
+            </div>
+            <button class="btn" onclick="setGeoByAddress()" style="width:100%;font-size:.88rem;padding:12px;font-weight:700;margin-top:8px">🔍 Adresse suchen</button>
             <div id="geoAdressResult" style="font-size:.68rem;color:var(--mu);margin-top:6px"></div>
           </div>
           <div style="margin-top:6px">
@@ -1381,6 +1384,18 @@ function setGeoByAddress(){
   if(!tnId){toast('Bitte MA wählen','bad');return;}
   const addr=(document.getElementById('geoAdresse').value||'').trim();
   if(!addr){toast('Bitte Adresse eingeben','bad');return;}
+  // Falls durch Autocomplete schon Koordinaten gesetzt
+  if(_geoSelectedLat&&_geoSelectedLng){
+    const radius=parseInt(document.getElementById('geoRadius').value)||200;
+    if(!confirm('Standort setzen?\n\n'+addr+'\nRadius: '+radius+'m')) return;
+    const geo={lat:_geoSelectedLat,lng:_geoSelectedLng,radius};
+    db.collection('globalTN').doc(tnId).update({geofence:geo}).then(()=>{
+      const az=_azubis.find(a=>a.id===tnId);if(az)az.geofence=geo;
+      toast('✅ Geofence gesetzt ('+radius+'m Radius)');
+      loadGeoForAzubi();_geoSelectedLat=null;_geoSelectedLng=null;
+    });
+    return;
+  }
   const resultEl=document.getElementById('geoAdressResult');
   resultEl.textContent='🔍 Suche…';
   fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(addr)+'&format=json&limit=1&countrycodes=de')
@@ -1403,6 +1418,47 @@ function setGeoByAddress(){
       });
     })
     .catch(err=>{resultEl.textContent='❌ Fehler: '+err.message;});
+}
+
+let _geoSelectedLat=null, _geoSelectedLng=null, _geoAcTimer=null;
+function _geoAutocomplete(){
+  const inp=document.getElementById('geoAdresse');
+  const drop=document.getElementById('geoSuggestions');
+  const q=(inp.value||'').trim();
+  _geoSelectedLat=null;_geoSelectedLng=null;
+  clearTimeout(_geoAcTimer);
+  if(q.length<3){drop.style.display='none';return;}
+  _geoAcTimer=setTimeout(()=>{
+    fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=5&countrycodes=de&addressdetails=1')
+      .then(r=>r.json())
+      .then(data=>{
+        if(!data.length){drop.style.display='none';return;}
+        drop.innerHTML=data.map((loc,i)=>{
+          const parts=loc.display_name.split(',').slice(0,3).join(', ');
+          return '<div onclick="_geoPickSuggestion('+i+')" style="padding:10px 14px;font-size:.82rem;cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .1s" onmouseenter="this.style.background=\'rgba(37,99,235,.06)\'" onmouseleave="this.style.background=\'#fff\'" data-lat="'+loc.lat+'" data-lng="'+loc.lon+'">'
+            +'<div style="font-weight:600;color:#0f172a">'+esc(parts)+'</div>'
+            +'<div style="font-size:.62rem;color:#94a3b8;margin-top:1px">'+esc(loc.display_name)+'</div>'
+            +'</div>';
+        }).join('');
+        drop.style.display='';
+      }).catch(()=>{drop.style.display='none';});
+  }, 350);
+}
+function _geoPickSuggestion(i){
+  const drop=document.getElementById('geoSuggestions');
+  const items=drop.querySelectorAll('[data-lat]');
+  if(!items[i]) return;
+  const lat=parseFloat(items[i].dataset.lat);
+  const lng=parseFloat(items[i].dataset.lng);
+  const name=items[i].querySelector('div').textContent;
+  document.getElementById('geoAdresse').value=name;
+  _geoSelectedLat=lat;_geoSelectedLng=lng;
+  drop.style.display='none';
+  const resultEl=document.getElementById('geoAdressResult');
+  const radius=parseInt(document.getElementById('geoRadius').value)||200;
+  resultEl.innerHTML='✅ <b>'+esc(name)+'</b><br>'
+    +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.6rem">'+lat.toFixed(5)+', '+lng.toFixed(5)+'</span> · Radius: '+radius+'m'
+    +'<br><a href="https://maps.google.com/?q='+lat+','+lng+'" target="_blank" style="color:#2563eb;font-size:.6rem">→ in Google Maps prüfen</a>';
 }
 
 function agZeitNachtragen(){
