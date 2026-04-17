@@ -325,6 +325,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
       <div id="betriebContent">
+      <!-- Firmencode eingeben -->
+      <div class="card" id="firmaCodeInput" style="margin-bottom:10px">
+        <div class="card-title">🔗 Firmencode eingeben</div>
+        <div id="firmaCodeStatus" style="font-size:.72rem;color:var(--mu);margin-bottom:6px;line-height:1.5">Dein Betrieb hat einen Code für dich. Gib ihn hier ein, um dich sicher mit deinem Arbeitgeber zu verknüpfen.</div>
+        <div style="display:flex;gap:6px">
+          <input class="fi" id="firmaCodeInp" type="text" placeholder="z.B. ESM-7X3K" maxlength="10" style="flex:1;font-size:1.1rem;padding:12px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.1em;text-align:center" autocomplete="off">
+          <button class="btn" onclick="submitFirmaCode()" style="padding:12px 18px;font-weight:700;font-size:.82rem;white-space:nowrap">✓ Verknüpfen</button>
+        </div>
+        <div id="firmaCodeErr" style="font-size:.68rem;margin-top:4px"></div>
+      </div>
       <!-- Sub-Tabs -->
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="betriebTabs">
         <button class="stab active" onclick="showBetriebTab('zeiten')" title="Zeiten anzeigen">Zeiten</button>
@@ -671,6 +681,7 @@ function loadData(){
   loadHVKontakt();
   checkDsgvoConsent();
   checkAzubiBadges();
+  checkFirmaCodeUI();
 
   // Live-Listener auf TN-Dokument – Echtzeit-Benachrichtigungen
   if(_tnId&&!_tnDocUnsub){
@@ -809,38 +820,45 @@ function _doSendBetriebMeldung(type, text){
 }
 
 function _sendMeldungEmailAG(firma, type, text, name){
+  const firmaUid=_tnData?.firmaUid||'';
+  if(firmaUid){
+    db.collection('users').doc(firmaUid).get().then(doc=>{
+      if(!doc.exists) return;
+      const u=doc.data();
+      if(u.email) _fireMeldMail(u.email, type, text, name);
+    }).catch(()=>{});
+    return;
+  }
   if(!firma) return;
   db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
     if(snap.empty) return;
-    const emails=[];
     snap.forEach(doc=>{
       const u=doc.data();
-      if(u.email) emails.push(u.email);
+      if(u.email) _fireMeldMail(u.email, type, text, name);
     });
-    if(!emails.length) return;
-    const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
-    const subject=(icons[type]||'💬')+' Meldung von '+name+': '+text;
-    const zeit=new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    emails.forEach(email=>{
-      db.collection('mail').add({
-        to: email,
-        message: {
-          subject: subject,
-          html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
-            +'<div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div>'
-            +'<div style="padding:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">'
-            +'<p style="margin:0 0 16px;font-size:.9rem;color:#374151">Einer Ihrer Mitarbeiter hat eine Meldung gesendet:</p>'
-            +'<div style="padding:16px;background:#f1f5f9;border-left:4px solid #d97706;border-radius:6px;margin-bottom:16px">'
-            +'<p style="margin:0 0 4px;font-size:1rem;font-weight:700;color:#0f172a">'+(icons[type]||'💬')+' '+text+'</p>'
-            +'<p style="margin:0;font-size:.8rem;color:#64748b">Von: <b>'+name+'</b> · '+zeit+'</p>'
-            +'</div>'
-            +'<p style="margin:0;font-size:.8rem;color:#64748b">Öffnen Sie ArbeitgeberPro, um die Meldung zu bearbeiten.</p>'
-            +'</div>'
-            +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
-            +'</div>'
-        }
-      }).catch(()=>{});
-    });
+  }).catch(()=>{});
+}
+function _fireMeldMail(email, type, text, name){
+  const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
+  const subject=(icons[type]||'💬')+' Meldung von '+name+': '+text;
+  const zeit=new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  db.collection('mail').add({
+    to: email,
+    message: {
+      subject: subject,
+      html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
+        +'<div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div>'
+        +'<div style="padding:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">'
+        +'<p style="margin:0 0 16px;font-size:.9rem;color:#374151">Einer Ihrer Mitarbeiter hat eine Meldung gesendet:</p>'
+        +'<div style="padding:16px;background:#f1f5f9;border-left:4px solid #d97706;border-radius:6px;margin-bottom:16px">'
+        +'<p style="margin:0 0 4px;font-size:1rem;font-weight:700;color:#0f172a">'+(icons[type]||'💬')+' '+text+'</p>'
+        +'<p style="margin:0;font-size:.8rem;color:#64748b">Von: <b>'+name+'</b> · '+zeit+'</p>'
+        +'</div>'
+        +'<p style="margin:0;font-size:.8rem;color:#64748b">Öffnen Sie ArbeitgeberPro, um die Meldung zu bearbeiten.</p>'
+        +'</div>'
+        +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
+        +'</div>'
+    }
   }).catch(()=>{});
 }
 
@@ -1873,6 +1891,43 @@ function submitDsgvoConsent(){
   }).catch(err=>{
     if(errEl) errEl.textContent='Fehler: '+err.message;
   });
+}
+
+function checkFirmaCodeUI(){
+  const card=document.getElementById('firmaCodeInput');
+  if(!card||!_tnData) return;
+  if(_tnData.firmaUid){
+    card.innerHTML='<div class="card-title">🔗 Betrieb verknüpft</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;padding:10px;background:rgba(16,185,129,.06);border:1.5px solid rgba(16,185,129,.2);border-radius:8px">'
+      +'<span style="font-size:1.2rem">✅</span>'
+      +'<div style="flex:1"><div style="font-size:.78rem;font-weight:700;color:#059669">'+esc(_tnData.firma||'Betrieb')+'</div>'
+      +'<div style="font-size:.6rem;color:var(--mu)">Sicher verknüpft</div></div></div>';
+  }
+}
+
+function submitFirmaCode(){
+  const inp=document.getElementById('firmaCodeInp');
+  const err=document.getElementById('firmaCodeErr');
+  const code=(inp.value||'').trim().toUpperCase();
+  err.textContent='';err.style.color='#ef4444';
+  if(!code||code.length<5){err.textContent='Bitte gültigen Code eingeben';return;}
+  if(!_tnId){err.textContent='Nicht angemeldet';return;}
+  err.style.color='var(--acc)';err.textContent='Wird geprüft…';
+  db.collection('users').where('firmaCode','==',code).where('role','==','arbeitgeber').limit(1).get().then(snap=>{
+    if(snap.empty){err.style.color='#ef4444';err.textContent='❌ Code nicht gefunden.';return;}
+    const agDoc=snap.docs[0];
+    const agData=agDoc.data();
+    const agUid=agDoc.id;
+    const firma=agData.firma||'';
+    if(!confirm('Mit „'+firma+'" verknüpfen?')){err.textContent='';return;}
+    db.collection('globalTN').doc(_tnId).update({firmaUid:agUid,firma:firma}).then(()=>{
+      _tnData.firmaUid=agUid;_tnData.firma=firma;
+      inp.value='';
+      err.style.color='#059669';err.textContent='✅ Erfolgreich verknüpft mit '+firma;
+      toast('✅ Betrieb verknüpft: '+firma);
+      checkFirmaCodeUI();
+    }).catch(e=>{err.style.color='#ef4444';err.textContent='Fehler: '+e.message;});
+  }).catch(e=>{err.style.color='#ef4444';err.textContent='Fehler: '+e.message;});
 }
 
 function loadHVKontakt(){

@@ -150,6 +150,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="card-icon green" style="width:36px;height:36px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
         <div style="font-size:1.1rem;font-weight:800">Betrieb</div>
       </div>
+      <!-- Firmencode -->
+      <div class="card" id="firmaCodeCard" style="margin-bottom:12px">
+        <div class="card-title">🔗 Firmencode für Azubi-Verknüpfung</div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:8px;line-height:1.5">Geben Sie diesen Code an Ihre Azubis/Mitarbeiter weiter. Diese geben ihn in ihrer App unter „Betrieb" ein, um sich sicher mit Ihrem Unternehmen zu verknüpfen.</div>
+        <div style="text-align:center;padding:14px;background:rgba(37,99,235,.04);border:2px dashed rgba(37,99,235,.3);border-radius:10px">
+          <div id="firmaCodeDisplay" style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:800;color:var(--acc);letter-spacing:.15em;user-select:all;cursor:pointer" onclick="navigator.clipboard?.writeText(this.textContent.trim()).then(()=>toast('✓ Code kopiert'))">—</div>
+          <div style="font-size:.6rem;color:var(--mu);margin-top:4px">Antippen zum Kopieren</div>
+        </div>
+        <button onclick="_regenerateFirmaCode()" style="margin-top:8px;width:100%;padding:8px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.2);border-radius:8px;color:#ef4444;font-size:.68rem;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">🔄 Neuen Code generieren (alter wird ungültig)</button>
+      </div>
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto" id="agBetriebTabs">
         <button class="stab active" title="Zeiten" onclick="showAgBetriebTab('zeiten')">Zeiten</button>
         <button class="stab" title="Aufträge" onclick="showAgBetriebTab('baustellen')">Aufträge</button>
@@ -322,6 +332,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
       </div>
       <div id="agNotifBanner"></div>
+      <div id="firmaCodeBanner"></div>
       <div class="card">
         <div class="card-title">👥 Ihre Auszubildenden</div>
         <div id="azubiList"><div class="empty">Lädt…</div></div>
@@ -446,6 +457,12 @@ let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function fmtDE(d){if(!d||d.length<10)return d||'?';const p=d.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
 function toast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type==='bad'?' bad':'');setTimeout(()=>t.className='toast',3000);}
+function _generateFirmaCode(firma){
+  const prefix=(firma||'XXX').replace(/[^A-Za-z]/g,'').substring(0,3).toUpperCase()||'FRM';
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code='';for(let i=0;i<4;i++) code+=chars[Math.floor(Math.random()*chars.length)];
+  return prefix+'-'+code;
+}
 function checkDsgvoConsent(){
   if(!_uid) return;
   db.collection('users').doc(_uid).get().then(doc=>{
@@ -505,7 +522,8 @@ function doRegister(){
     const uid=cred.user.uid;
     return db.collection('users').doc(uid).set({
       email, role:'arbeitgeber', firma, vorname, nachname, tel,
-      agStatus:'pending', registriertAm:Date.now()
+      agStatus:'pending', registriertAm:Date.now(),
+      firmaCode: _generateFirmaCode(firma)
     }).then(()=>{
       // Admin per E-Mail benachrichtigen
       db.collection('mail').add({
@@ -562,8 +580,8 @@ auth.onAuthStateChanged(user=>{
   }
 });
 
+let _firmaCode='';
 function loadUserData(){
-  // Activity tracking (NICHT firma überschreiben - könnte leer sein und existing Wert zerstören)
   db.collection('users').doc(_uid).set({lastActive:Date.now(),lastApp:'ArbeitgeberPro',email:_email||'',role:'arbeitgeber',sessionStart:Date.now()},{merge:true}).catch(()=>{});
   if(!window._heartbeat) window._heartbeat=setInterval(()=>{
     if(_uid) db.collection('users').doc(_uid).set({lastActive:Date.now()},{merge:true}).catch(()=>{});
@@ -573,26 +591,79 @@ function loadUserData(){
     const d=doc.data();
     if(d.role!=='arbeitgeber'){toast('Kein Arbeitgeber-Zugang','bad');auth.signOut();return;}
     _firma=d.firma||'';
+    _firmaCode=d.firmaCode||'';
+    // Firmencode generieren falls noch keiner existiert (Bestandskunden)
+    if(!_firmaCode){
+      _firmaCode=_generateFirmaCode(_firma);
+      db.collection('users').doc(_uid).update({firmaCode:_firmaCode}).catch(()=>{});
+    }
     document.getElementById('hdrFirma').textContent=_firma;
     document.getElementById('welcomeTitle').textContent='Willkommen, '+esc(_firma);
     document.getElementById('welcomeSub').textContent='Übersicht Ihrer Auszubildenden und deren Lehrgänge · Echtzeit-Anwesenheit';
     loadAzubis();
     checkAGPremium();
     checkDsgvoConsent();
-    // Betrieb-Tab ist Default → initialisieren
     setTimeout(()=>initAgBetrieb(), 1500);
   });
 }
 
 function loadAzubis(){
-  if(!_firma)return;
-  db.collection('globalTN').where('firma','==',_firma).onSnapshot(snap=>{
-    _azubis=[];
-    snap.forEach(doc=>_azubis.push({id:doc.id,...doc.data()}));
-    _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
-    renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
-    checkAgBadges();
-    setupLiveMeldungen();
+  if(!_firma&&!_uid)return;
+  // Zwei Queries: firmaUid (sicher) + firma-String (Fallback)
+  const q1=db.collection('globalTN').where('firmaUid','==',_uid).onSnapshot(snap1=>{
+    const byUid=[];
+    snap1.forEach(doc=>byUid.push({id:doc.id,...doc.data()}));
+    // Fallback: firma-String (für Bestandsdaten ohne firmaUid)
+    db.collection('globalTN').where('firma','==',_firma).get().then(snap2=>{
+      const merged=new Map();
+      byUid.forEach(a=>merged.set(a.id,a));
+      snap2.forEach(doc=>{if(!merged.has(doc.id))merged.set(doc.id,{id:doc.id,...doc.data()});});
+      _azubis=[...merged.values()];
+      _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
+      renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
+      checkAgBadges();
+      setupLiveMeldungen();
+      _showFirmaCodeBanner();
+    }).catch(()=>{
+      _azubis=byUid;
+      _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
+      renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
+      checkAgBadges();
+      setupLiveMeldungen();
+      _showFirmaCodeBanner();
+    });
+  });
+}
+
+function _showFirmaCodeBanner(){
+  const el=document.getElementById('firmaCodeBanner');
+  if(!el) return;
+  // Prüfe ob mindestens ein Azubi per firmaUid verknüpft ist
+  const linked=_azubis.some(a=>a.firmaUid===_uid);
+  const dismissed=sessionStorage.getItem('firmaCodeDismissed');
+  if(linked||dismissed){el.innerHTML='';return;}
+  if(!_azubis.length){
+    // Keine Azubis → Hinweis mit Dismiss-Option
+    el.innerHTML='<div style="padding:12px 16px;background:rgba(37,99,235,.06);border:2px solid rgba(37,99,235,.2);border-radius:10px;margin-bottom:10px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+      +'<div style="font-size:.82rem;font-weight:800;color:var(--acc)">🔗 Firmencode</div>'
+      +'<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:.6rem;color:var(--mu)"><input type="checkbox" onchange="sessionStorage.setItem(\'firmaCodeDismissed\',\'1\');document.getElementById(\'firmaCodeBanner\').innerHTML=\'\'"> Nicht mehr anzeigen</label>'
+      +'</div>'
+      +'<div style="font-size:.75rem;color:var(--tx);line-height:1.5;margin-bottom:8px">Sie haben noch keine Azubis/Mitarbeiter. Wenn Sie Azubis haben die bereits in AzubiPro registriert sind, geben Sie diesen Ihren Firmencode zur Verknüpfung:</div>'
+      +'<div style="text-align:center;padding:10px;background:#fff;border:2px dashed rgba(37,99,235,.3);border-radius:8px;font-family:\'JetBrains Mono\',monospace;font-size:1.3rem;font-weight:800;color:var(--acc);letter-spacing:.1em;user-select:all">'+esc(_firmaCode)+'</div>'
+      +'<div style="font-size:.6rem;color:var(--mu);text-align:center;margin-top:4px">Azubi gibt diesen Code in seiner App unter „Betrieb" ein</div>'
+      +'</div>';
+  } else {
+    // Hat Azubis aber keiner per firmaUid verknüpft → dringender Hinweis
+    const unlinked=_azubis.filter(a=>!a.firmaUid);
+    el.innerHTML='<div style="padding:12px 16px;background:rgba(245,158,11,.08);border:2px solid rgba(245,158,11,.3);border-radius:10px;margin-bottom:10px">'
+      +'<div style="font-size:.82rem;font-weight:800;color:#d97706;margin-bottom:6px">🔗 '+unlinked.length+' Azubi'+(unlinked.length>1?'s':'')+' noch nicht sicher verknüpft</div>'
+      +'<div style="font-size:.75rem;color:var(--tx);line-height:1.5;margin-bottom:8px">Geben Sie Ihren Firmencode an Ihre Azubis weiter. Diese geben den Code in ihrer App unter „Betrieb" ein – damit ist die Zuordnung eindeutig und sicher.</div>'
+      +'<div style="text-align:center;padding:10px;background:#fff;border:2px dashed rgba(245,158,11,.3);border-radius:8px;font-family:\'JetBrains Mono\',monospace;font-size:1.3rem;font-weight:800;color:#d97706;letter-spacing:.1em;user-select:all">'+esc(_firmaCode)+'</div>'
+      +'<div style="font-size:.6rem;color:var(--mu);text-align:center;margin-top:4px">Code antippen zum Kopieren · Azubi gibt ihn unter „Betrieb" → „Firmencode" ein</div>'
+      +'</div>';
+  }
+}
   });
 }
 
@@ -1255,8 +1326,21 @@ function initAgBetrieb(){
   fillAgMonatSelect('agZeitMonat');
   fillAgMonatSelect('agBsMonat');
   fillAgAzubiSelect();
+  // Firmencode anzeigen
+  const codeEl=document.getElementById('firmaCodeDisplay');
+  if(codeEl&&_firmaCode) codeEl.textContent=_firmaCode;
   const active=document.querySelector('.abtab.active');
   if(!active||active.id==='abtab-zeiten'){loadAgZeiten();startAgZeitLive();}
+}
+
+function _regenerateFirmaCode(){
+  if(!confirm('Neuen Firmencode generieren?\n\nDer alte Code wird sofort ungültig. Alle Azubis die den alten Code noch nicht eingegeben haben, brauchen den neuen.')) return;
+  _firmaCode=_generateFirmaCode(_firma);
+  db.collection('users').doc(_uid).update({firmaCode:_firmaCode}).then(()=>{
+    const codeEl=document.getElementById('firmaCodeDisplay');
+    if(codeEl) codeEl.textContent=_firmaCode;
+    toast('🔄 Neuer Firmencode: '+_firmaCode);
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 function fillAgAzubiSelect(){
