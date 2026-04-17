@@ -360,6 +360,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="card-icon green" style="width:36px;height:36px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
         <div style="font-size:1.1rem;font-weight:800">Mein Betrieb</div>
       </div>
+      <!-- Firmencode eingeben - IMMER sichtbar -->
+      <div class="card" id="firmaCodeInput" style="margin-bottom:10px">
+        <div class="card-title">🔗 Firmencode eingeben</div>
+        <div id="firmaCodeStatus" style="font-size:.72rem;color:var(--mu);margin-bottom:6px;line-height:1.5">Dein Betrieb hat einen Code für dich. Gib ihn hier ein, um dich sicher mit deinem Arbeitgeber zu verknüpfen.</div>
+        <div style="display:flex;gap:6px">
+          <input class="fi" id="firmaCodeInp" type="text" placeholder="z.B. ESM-7X3K" maxlength="10" style="flex:1;font-size:1.1rem;padding:12px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.1em;text-align:center" autocomplete="off">
+          <button class="btn" onclick="submitFirmaCode()" style="padding:12px 18px;font-weight:700;font-size:.82rem;white-space:nowrap">✓ Verknüpfen</button>
+        </div>
+        <div id="firmaCodeErr" style="font-size:.68rem;margin-top:4px"></div>
+      </div>
       <!-- AG Hinweis -->
       <div id="agHintBanner" style="display:none">
         <div style="text-align:center;padding:30px 16px">
@@ -382,16 +392,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <!-- Sub-Tabs + Content (nur sichtbar wenn AG verbunden) -->
       <div id="betriebContent">
-      <!-- Firmencode eingeben -->
-      <div class="card" id="firmaCodeInput" style="margin-bottom:10px">
-        <div class="card-title">🔗 Firmencode eingeben</div>
-        <div id="firmaCodeStatus" style="font-size:.72rem;color:var(--mu);margin-bottom:6px;line-height:1.5">Dein Betrieb hat einen Code für dich. Gib ihn hier ein, um dich sicher mit deinem Arbeitgeber zu verknüpfen.</div>
-        <div style="display:flex;gap:6px">
-          <input class="fi" id="firmaCodeInp" type="text" placeholder="z.B. ESM-7X3K" maxlength="10" style="flex:1;font-size:1.1rem;padding:12px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.1em;text-align:center" autocomplete="off">
-          <button class="btn" onclick="submitFirmaCode()" style="padding:12px 18px;font-weight:700;font-size:.82rem;white-space:nowrap">✓ Verknüpfen</button>
-        </div>
-        <div id="firmaCodeErr" style="font-size:.68rem;margin-top:4px"></div>
-      </div>
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="betriebTabs">
         <button class="stab active" onclick="showBetriebTab('zeiten')" title="Zeiten anzeigen">Zeiten</button>
         <button class="stab" onclick="showBetriebTab('baustellen')" title="Aufträge anzeigen">Aufträge</button>
@@ -1320,7 +1320,7 @@ function initBetrieb(){
   // AG-Hinweis Banner
   const agBanner=document.getElementById('agHintBanner');
   const agContent=document.getElementById('betriebContent');
-  const hasAG=_tnData&&(_tnData.arbeitgeberId||_tnData.betriebId||_tnData.arbeitszeitPlan);
+  const hasAG=_tnData&&(_tnData.arbeitgeberId||_tnData.betriebId||_tnData.arbeitszeitPlan||_tnData.firma||_tnData.firmaUid);
   if(agBanner) agBanner.style.display=hasAG?'none':'block';
   if(agContent) agContent.style.display=hasAG?'block':'none';
   if(!_betriebInit){
