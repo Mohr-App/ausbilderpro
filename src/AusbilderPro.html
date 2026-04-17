@@ -5172,10 +5172,10 @@ function renderMobKatList(){
   const list=document.getElementById('mobKatList');
   if(!list)return;
   list.innerHTML='';
-  const pre=Object.entries(S.kats).filter(([,k])=>k.predefined);
-  const cust=Object.entries(S.kats).filter(([,k])=>!k.predefined);
+  const today=new Date().toISOString().slice(0,10);
   let _mobIdx=0;
-  function appendKat([id,k]){
+  S.katOrder.filter(id=>S.kats[id]).forEach(id=>{
+    const k=S.kats[id];
     const total=Object.values(k.instances||{}).reduce((s,inst)=>s+Object.values(inst.seats||{}).filter(d=>d&&d.name).length,0);
     const katCol=_katColors[_mobIdx%_katColors.length];_mobIdx++;
     const row=document.createElement('div');
@@ -5190,33 +5190,43 @@ function renderMobKatList(){
     const ch=document.createElement('div');
     ch.className='kat-ch'+(k.open?' open':'');
     ch.style.borderLeft='3px solid '+katCol;
-    Object.entries(k.instances||{}).sort(([,a],[,b])=>{
+    // Sortierung wie Desktop: neueste zuerst
+    const sorted=Object.entries(k.instances||{}).sort(([,a],[,b])=>{
       const da=a.sY+'-'+String(a.sM).padStart(2,'0')+'-'+String(a.sD).padStart(2,'0');
       const db2=b.sY+'-'+String(b.sM).padStart(2,'0')+'-'+String(b.sD).padStart(2,'0');
-      return da<db2?-1:da>db2?1:0;
-    }).forEach(([iid,inst])=>{
+      return da>db2?-1:da<db2?1:0;
+    });
+    let lastYear=null;
+    sorted.forEach(([iid,inst])=>{
+      const sDate=inst.sY+'-'+String(inst.sM).padStart(2,'0')+'-'+String(inst.sD).padStart(2,'0');
+      const eDate=(inst.eY||inst.sY)+'-'+String(inst.eM||12).padStart(2,'0')+'-'+String(inst.eD||28).padStart(2,'0');
+      const isCurrent=sDate<=today&&eDate>=today;
+      const isPast=eDate<today;
+      // Jahres-Trenner
+      if(inst.sY&&inst.sY!==lastYear&&lastYear!==null&&isPast){
+        const sep=document.createElement('div');
+        sep.style.cssText='font-size:.55rem;font-weight:700;color:#94a3b8;padding:6px 12px 2px;letter-spacing:.08em;font-family:"JetBrains Mono",monospace;border-top:1px solid rgba(148,163,184,.2);margin-top:4px';
+        sep.textContent='── '+inst.sY+' ──';
+        ch.appendChild(sep);
+      }
+      lastYear=inst.sY;
       const active=S.curKat===id&&S.curInst===iid;
       const cnt=Object.values(inst.seats||{}).filter(d=>d&&d.name).length;
       const ir=document.createElement('div');
       ir.className='inst-row'+(active?' active':'');
-      ir.innerHTML='<div class="inst-dot"></div><div class="inst-info"><div class="inst-dates">'+esc(instLabel(inst))+'</div>'+(cnt?'<div class="inst-cnt">'+cnt+' Schüler</div>':'')+'</div>';
+      if(isPast) ir.style.opacity='.6';
+      ir.innerHTML='<div class="inst-dot"'+(isCurrent?' style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4)"':'')+'></div><div class="inst-info"><div class="inst-dates">'+esc(instLabel(inst))+'</div>'+(cnt?'<div class="inst-cnt">'+cnt+' Schüler</div>':'')+(isCurrent?'<div style="font-size:.5rem;color:#22c55e;font-weight:700">● AKTUELL</div>':'')+'</div>';
       ir.addEventListener('click',()=>{ selInst(id,iid); drawerClose(); });
       ch.appendChild(ir);
     });
     list.appendChild(ch);
     const addBtn=document.createElement('div');
     addBtn.className='kat-newinst'+(k.open?' show':'');
-    addBtn.innerHTML='<span style="font-size:1rem">+</span> Lehrgang anlegen';
-    addBtn.title='Einen konkreten Lehrgang mit Start-/Enddatum in '+k.label+' anlegen';
+    addBtn.innerHTML='<span style="font-size:1rem">+</span> Neuer Lehrgang in „'+esc(k.label)+'"';
+    addBtn.title='Konkreter Lehrgang mit Start-/Enddatum in '+k.label;
     addBtn.onclick=()=>{ drawerClose(); openDp(id); };
     list.appendChild(addBtn);
-  }
-  pre.forEach(appendKat);
-  if(cust.length){
-    const d=document.createElement('div');d.className='sb-div';list.appendChild(d);
-    const s=document.createElement('div');s.className='sb-sec';s.style.padding='10px 12px 4px';s.textContent='Eigene';list.appendChild(s);
-    cust.forEach(appendKat);
-  }
+  });
 }
 function onMobSearch(){
   const q=(document.getElementById('mobSearch').value||'').trim().toLowerCase();
