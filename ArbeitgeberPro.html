@@ -192,8 +192,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div><label class="fl">Mitarbeiter / Azubi</label><select class="fi" id="geoAzubi" onchange="loadGeoForAzubi()" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
           <div id="geoCurrent" style="font-size:.68rem;color:var(--mu);margin:6px 0"></div>
           <div style="display:flex;gap:4px">
-            <button class="btn" title="📍 Meinen Standort setzen" onclick="setGeoHere()" style="flex:2;font-size:.72rem;padding:8px">📍 Meinen Standort setzen</button>
-            <button title="✗ Aus" onclick="clearGeo()" style="flex:1;padding:8px;background:#fff;border:1.5px solid #ef4444;border-radius:8px;color:#ef4444;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✗ Aus</button>
+            <button class="btn" title="📍 Meinen Standort setzen" onclick="setGeoHere()" style="flex:1;font-size:.72rem;padding:8px">📍 Mein Standort</button>
+            <button class="btn" title="📍 Adresse eingeben" onclick="document.getElementById('geoAdressWrap').style.display=document.getElementById('geoAdressWrap').style.display==='none'?'':'none'" style="flex:1;font-size:.72rem;padding:8px;background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.25);color:var(--acc)">📍 Adresse eingeben</button>
+            <button title="✗ Aus" onclick="clearGeo()" style="padding:8px;background:#fff;border:1.5px solid #ef4444;border-radius:8px;color:#ef4444;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✗ Aus</button>
+          </div>
+          <div id="geoAdressWrap" style="display:none;margin-top:6px">
+            <div style="display:flex;gap:4px">
+              <input class="fi" id="geoAdresse" type="text" placeholder="z.B. Domstraße 1, 50667 Köln" style="flex:1;font-size:.75rem">
+              <button class="btn" onclick="setGeoByAddress()" style="font-size:.72rem;padding:8px 12px;white-space:nowrap">🔍 Suchen</button>
+            </div>
+            <div id="geoAdressResult" style="font-size:.62rem;color:var(--mu);margin-top:4px"></div>
           </div>
           <div style="margin-top:6px">
             <label class="fl">Radius: <span id="geoRadiusVal">200</span>m</label>
@@ -1367,6 +1375,35 @@ function clearGeo(){
     toast('Geofencing deaktiviert');
     loadGeoForAzubi();
   });
+}
+
+function setGeoByAddress(){
+  const tnId=document.getElementById('geoAzubi').value;
+  if(!tnId){toast('Bitte MA wählen','bad');return;}
+  const addr=(document.getElementById('geoAdresse').value||'').trim();
+  if(!addr){toast('Bitte Adresse eingeben','bad');return;}
+  const resultEl=document.getElementById('geoAdressResult');
+  resultEl.textContent='🔍 Suche…';
+  fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(addr)+'&format=json&limit=1&countrycodes=de')
+    .then(r=>r.json())
+    .then(data=>{
+      if(!data.length){resultEl.textContent='❌ Adresse nicht gefunden';return;}
+      const loc=data[0];
+      const lat=parseFloat(loc.lat);
+      const lng=parseFloat(loc.lon);
+      const radius=parseInt(document.getElementById('geoRadius').value)||200;
+      resultEl.innerHTML='✅ <b>'+esc(loc.display_name.split(',').slice(0,3).join(', '))+'</b><br>'
+        +'<span style="font-family:\'JetBrains Mono\',monospace">'+lat.toFixed(5)+', '+lng.toFixed(5)+'</span> · Radius: '+radius+'m'
+        +'<br><a href="https://maps.google.com/?q='+lat+','+lng+'" target="_blank" style="color:#2563eb;font-size:.6rem">→ in Google Maps prüfen</a>';
+      if(!confirm('Standort setzen?\n\n'+loc.display_name.split(',').slice(0,3).join(', ')+'\nRadius: '+radius+'m')) return;
+      const geo={lat,lng,radius};
+      db.collection('globalTN').doc(tnId).update({geofence:geo}).then(()=>{
+        const az=_azubis.find(a=>a.id===tnId);if(az)az.geofence=geo;
+        toast('✅ Geofence gesetzt ('+radius+'m Radius)');
+        loadGeoForAzubi();
+      });
+    })
+    .catch(err=>{resultEl.textContent='❌ Fehler: '+err.message;});
 }
 
 function agZeitNachtragen(){
