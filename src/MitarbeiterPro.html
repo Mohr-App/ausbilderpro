@@ -1013,7 +1013,11 @@ function getGPS(){
 }
 
 function checkGeofence(gps){
-  if(!_tnData?.geofence||!gps) return true;
+  if(!_tnData?.geofence) return true;
+  if(!gps){
+    toast('⚠ Ohne GPS gestempelt – dein Betrieb wird informiert','bad');
+    return 'no-gps';
+  }
   const geo=_tnData.geofence;
   const R=6371000;
   const dLat=(gps.lat-geo.lat)*Math.PI/180;
@@ -1104,10 +1108,12 @@ function zeitStempeln(){
   if(_zeitState==='aus'){
     if(_zeitHeute&&_zeitHeute.ausgang){if(!confirm('Bereits ausgestempelt. Neuen Tag starten?'))return;}
     getGPS().then(gps=>{
-      if(!checkGeofence(gps)) return;
+      const geoResult=checkGeofence(gps);
+      if(geoResult===false) return;
       checkGleitzeit(jetzt,'ein');
       const data={eingang:jetzt,pauseLog:[],datum:today};
       if(gps) data.gpsEingang=gps;
+      if(geoResult==='no-gps') data.ohneGPS=true;
       ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
     });
   } else if(_zeitState==='ein'||_zeitState==='pause'){
@@ -1117,8 +1123,10 @@ function zeitStempeln(){
     const istMin=calcIstMinuten(_zeitHeute.eingang,jetzt,pauseMin);
     const update={ausgang:jetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin};
     getGPS().then(gps=>{
-      if(!checkGeofence(gps)) return;
+      const geoResult=checkGeofence(gps);
+      if(geoResult===false) return;
       if(gps) update.gpsAusgang=gps;
+      if(geoResult==='no-gps') update.ohneGPS=true;
       ref.update(update).then(()=>{loadZeitHeute();toast('⏹ Ausgestempelt um '+jetzt);});
     });
   }

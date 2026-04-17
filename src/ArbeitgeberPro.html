@@ -1427,9 +1427,11 @@ function startAgZeitLive(){
       } else {
         icon='🟢';status='Arbeitet seit '+d.eingang;statusCol='#059669';
       }
+      const gpsWarn=d.ohneGPS?'<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.12);color:#ef4444;border-radius:3px;font-weight:700;margin-left:6px">⚠ ohne GPS</span>':'';
       html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.05)">'
         +'<span style="font-size:1rem">'+icon+'</span>'
         +'<span style="font-size:.78rem;font-weight:700">'+esc(name)+'</span>'
+        +gpsWarn
         +'<span style="margin-left:auto;font-size:.65rem;font-weight:600;color:'+statusCol+';font-family:\'JetBrains Mono\',monospace">'+status+'</span></div>';
     });
     el.innerHTML=html||'<div class="empty">Keine Azubis</div>';
@@ -1544,6 +1546,7 @@ function loadAgZeiten(){
         if(e?.ausgang) tage++;
         const datDE=new Date(ds+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
         const manuell=e?.manuell?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(245,158,11,.15);color:#d97706;border-radius:4px;font-weight:700;margin-left:3px">✎'+(e.agBestaetigt?' ✓':' offen')+'</span>':(e?.agKorrigiert?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(99,102,241,.12);color:#6366f1;border-radius:4px;font-weight:700;margin-left:3px">✏ korrigiert</span>':'');
+        const ohneGpsBadge=e?.ohneGPS?'<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.12);color:#ef4444;border-radius:3px;font-weight:700;margin-left:3px" title="Ohne GPS-Standort gestempelt">⚠ ohne GPS</span>':'';
         const bestBtn=e?.manuell&&!e.agBestaetigt?'<button onclick="event.stopPropagation();agBestaetigeZeit(\''+az.id+'\',\''+ds+'\')" style="font-size:.5rem;padding:2px 6px;background:var(--acc);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:3px">✓</button>':'';
         const korrekturBtn=e?'<button onclick="event.stopPropagation();agKorrekturZeit(\''+az.id+'\',\''+ds+'\')" style="font-size:.5rem;padding:2px 5px;background:rgba(99,102,241,.1);color:#6366f1;border:none;border-radius:3px;cursor:pointer;margin-left:2px" title="Zeit korrigieren">✏</button>':'';
         let statusTag='';
@@ -1557,13 +1560,13 @@ function loadAgZeiten(){
           const nachtarbeit=e&&e.ausgang&&parseInt(e.ausgang)>=22?'<span style="font-size:.5rem;margin-left:2px" title="Nachtarbeit">🌙</span>':'';
           dayHtml+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
             +'<span style="flex:1.5;color:var(--mu)">'+datDE+statusTag+'</span>'
-            +'<span style="flex:2">'+zeitText+nachtarbeit+dokuIcons+manuell+bestBtn+korrekturBtn+'</span>'
+            +'<span style="flex:2">'+zeitText+nachtarbeit+dokuIcons+manuell+ohneGpsBadge+bestBtn+korrekturBtn+'</span>'
             +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e?.ausgang?minToStr(ist):(isFrei?'—':''))+'</span>'
             +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
         } else if(e){
           dayHtml+='<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
             +'<span style="color:var(--mu)">'+datDE+statusTag+'</span>'
-            +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+(e&&(e.fotos||e.unterschrift)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku">📋</span>':'')+manuell+bestBtn+'</span>'
+            +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+(e&&(e.fotos||e.unterschrift)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku">📋</span>':'')+manuell+ohneGpsBadge+bestBtn+'</span>'
             +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?minToStr(ist):'…')+'</span></div>';
         } else if(isFrei){
           dayHtml+='<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
