@@ -2940,16 +2940,17 @@ function renderAuftraege(){
           +a.fotosAG.map(f=>'<img src="'+f+'" onclick="showAufImgFull(this.src)" loading="lazy">').join('')
           +'</div>'
         : '';
-      const nachBlock=(a.nachtraege&&a.nachtraege.length)
-        ? '<div class="nachtrag-block"><div class="nachtrag-block-title">➕ Nachträge vom Chef ('+a.nachtraege.length+')</div>'
-          +a.nachtraege.map(n=>{
-            const nd=new Date(n.erstelltAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-            const ph=(n.fotos&&n.fotos.length)
-              ? '<div class="nachtrag-item-ph">'+n.fotos.map(f=>'<img src="'+f+'" onclick="showAufImgFull(this.src)" loading="lazy">').join('')+'</div>'
-              : '';
-            return '<div class="nachtrag-item"><div class="nachtrag-item-head">'+esc(n.erstelltVon||'AG')+' · '+nd+'</div><div class="nachtrag-item-tx">'+esc(n.text||'')+'</div>'+ph+'</div>';
-          }).join('')
-          +'</div>'
+      const nachList=a.nachtraege||[];
+      let nachStd=0, nachMat=0, nachSig=0;
+      nachList.forEach(n=>{if(n.stunden)nachStd+=Number(n.stunden)||0; if(n.material)nachMat+=n.material.length; if(n.unterschrift)nachSig++;});
+      const nachBlock=nachList.length
+        ? '<button onclick="openAufDetails(\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:6px;padding:8px 10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-left:3px solid #d97706;border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:8px">'
+          +'<span style="font-size:.68rem;font-weight:800;color:#92400e">➕ '+nachList.length+' Nachtrag'+(nachList.length>1?'e':'')+'</span>'
+          +(nachStd>0?'<span style="font-size:.6rem;color:#92400e;font-family:\'JetBrains Mono\',monospace">'+nachStd+'h</span>':'')
+          +(nachMat>0?'<span style="font-size:.6rem;color:#92400e">🧱'+nachMat+'</span>':'')
+          +(nachSig>0?'<span style="font-size:.6rem;color:#92400e">✍'+nachSig+'</span>':'')
+          +'<span style="margin-left:auto;font-size:.6rem;color:#92400e">→ anzeigen</span>'
+          +'</button>'
         : '';
       const unread=_azAufUnread(a);
       const chatBadge=unread?'<span class="chat-fab-badge">'+unread+'</span>':'';
@@ -2977,7 +2978,21 @@ function renderAuftraege(){
     let h='';
     erledigt.forEach(a=>{
       const dat=a.erledigtAm?new Date(a.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-      const nachCount=(a.nachtraege&&a.nachtraege.length)||0;
+      const nachList=a.nachtraege||[];
+      let nachStd=0, nachMat=0, nachSig=0;
+      nachList.forEach(n=>{if(n.stunden)nachStd+=Number(n.stunden)||0; if(n.material)nachMat+=n.material.length; if(n.unterschrift)nachSig++;});
+      const nachCount=nachList.length;
+      const hauptStd=Number(a.stunden)||0;
+      const gesamtStd=hauptStd+nachStd;
+      const nachTeaser=nachCount
+        ? '<button onclick="openAufDetails(\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:6px;padding:6px 10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-left:3px solid #d97706;border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:6px">'
+          +'<span style="font-size:.62rem;font-weight:700;color:#92400e">➕ '+nachCount+' Nachtrag'+(nachCount>1?'e':'')+'</span>'
+          +(nachStd>0?'<span style="font-size:.58rem;color:#92400e;font-family:\'JetBrains Mono\',monospace">'+nachStd+'h</span>':'')
+          +(nachMat>0?'<span style="font-size:.58rem;color:#92400e">🧱'+nachMat+'</span>':'')
+          +(nachSig>0?'<span style="font-size:.58rem;color:#92400e">✍'+nachSig+'</span>':'')
+          +'<span style="margin-left:auto;font-size:.55rem;color:#92400e">→</span>'
+          +'</button>'
+        : '';
       const unread=_azAufUnread(a);
       const chatBadge=unread?'<span class="chat-fab-badge">'+unread+'</span>':'';
       h+='<div style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;opacity:.85">'
@@ -2985,7 +3000,8 @@ function renderAuftraege(){
         +'<span style="font-size:.78rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
         +'<span style="font-size:.55rem;color:#059669;font-weight:600">✅ '+dat+'</span></div>'
         +(a.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
-        +((a.fotosAG||a.fotos||a.unterschrift||nachCount)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(a.fotosAG?'📎 '+a.fotosAG.length+' ':'')+(a.fotos?'📸 '+a.fotos.length+' ':'')+(a.unterschrift?'✍ ':'')+(nachCount?'➕ '+nachCount+' ':'')+'</div>':'')
+        +((a.fotosAG||a.fotos||a.unterschrift||gesamtStd>0)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(gesamtStd>0?'⏱ '+gesamtStd+'h '+(nachStd>0?'('+hauptStd+'+'+nachStd+') ':''):'')+(a.fotosAG?'📎 '+a.fotosAG.length+' ':'')+(a.fotos?'📸 '+a.fotos.length+' ':'')+(a.unterschrift?'✍ ':'')+'</div>':'')
+        +nachTeaser
         +'<button class="chat-fab" onclick="openAufDetails(\''+a.id+'\')" style="padding:6px 10px;font-size:.68rem;margin-top:6px">💬 Chat'+chatBadge+'</button>'
         +' <button onclick="resendBescheinigung(\''+a.id+'\')" style="padding:6px 10px;margin-top:6px;background:#fff;border:1.5px solid #059669;color:#059669;border-radius:8px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📧 Kunde</button>'
         +'</div>';

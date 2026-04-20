@@ -2723,9 +2723,23 @@ function renderAgAuftraege(){
     let h='';
     erledigt.forEach(a=>{
       const dat=a.erledigtAm?new Date(a.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-      const nachCount=(a.nachtraege&&a.nachtraege.length)||0;
+      const nachList=a.nachtraege||[];
+      let nachStd=0, nachMat=0, nachSig=0;
+      nachList.forEach(n=>{if(n.stunden)nachStd+=Number(n.stunden)||0; if(n.material)nachMat+=n.material.length; if(n.unterschrift)nachSig++;});
+      const nachCount=nachList.length;
+      const hauptStd=Number(a.stunden)||0;
+      const gesamtStd=hauptStd+nachStd;
       const unread=_aufdUnread(a);
       const chatBadge=unread?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;padding:0 3px;margin-left:3px">'+unread+'</span>':'';
+      const nachTeaser=nachCount
+        ? '<button onclick="event.stopPropagation();openAufDetails(\''+a.tnId+'\',\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:4px;padding:5px 8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-left:3px solid #d97706;border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:6px">'
+          +'<span style="font-size:.58rem;font-weight:700;color:#92400e">➕ '+nachCount+' Nachtrag'+(nachCount>1?'e':'')+'</span>'
+          +(nachStd>0?'<span style="font-size:.56rem;color:#92400e;font-family:\'JetBrains Mono\',monospace">'+nachStd+'h</span>':'')
+          +(nachMat>0?'<span style="font-size:.56rem;color:#92400e">🧱'+nachMat+'</span>':'')
+          +(nachSig>0?'<span style="font-size:.56rem;color:#92400e">✍'+nachSig+'</span>':'')
+          +'<span style="margin-left:auto;font-size:.54rem;color:#92400e">→</span>'
+          +'</button>'
+        : '';
       h+='<div onclick="openAufDetails(\''+a.tnId+'\',\''+a.id+'\')" style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor=\'#2563eb\'" onmouseout="this.style.borderColor=\'\'">'
         +'<div style="display:flex;justify-content:space-between">'
         +'<span style="font-size:.78rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
@@ -2734,15 +2748,15 @@ function renderAgAuftraege(){
         +'<div style="font-size:.6rem;color:var(--mu)">👤 '+esc(a.tnName)+'</div>'
         +(a.taetigkeit?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">🔧 '+esc(a.taetigkeit)+'</div>':'')
         +'<div style="font-size:.55rem;color:var(--acc);margin-top:2px">'
-        +(a.stunden?'⏱ '+a.stunden+'h ':'')
+        +(gesamtStd>0?'⏱ '+gesamtStd+'h'+(nachStd>0?' ('+hauptStd+'+'+nachStd+')':'')+' ':'')
         +(a.fotosAG?'📎 '+a.fotosAG.length+' ':'')
         +(a.fotos?'📸 '+a.fotos.length+' ':'')
         +(a.unterschrift?'✍ ':'')
         +(a.material?'🧱 '+a.material.length+' ':'')
         +(a.gpsErledigt?'📍 ':'')
-        +(nachCount?'➕ '+nachCount+' ':'')
         +'💬'+chatBadge
         +'</div>'
+        +nachTeaser
         +'<button onclick="event.stopPropagation();exportAuftragsprotokoll(\''+a.tnId+'\',\''+a.id+'\')" style="margin-top:6px;padding:5px 12px;background:#fff;border:1px solid #2563eb;border-radius:6px;color:#2563eb;font-size:.6rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📄 PDF</button>'
         +' <button onclick="event.stopPropagation();agAuftragWiedereroeffnen(\''+a.tnId+'\',\''+a.id+'\')" style="padding:5px 12px;background:#fff;border:1px solid #d97706;border-radius:6px;color:#d97706;font-size:.6rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">↩ Nacharbeit</button>'
         +'</div>';
