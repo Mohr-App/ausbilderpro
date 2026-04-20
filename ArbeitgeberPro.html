@@ -1600,14 +1600,14 @@ function _resizeAuftragPhoto(file, cb){
   fr.onload=e=>{
     const img=new Image();
     img.onload=()=>{
-      const maxD=1200;
+      const maxD=1000;
       let w=img.width, h=img.height;
       if(w>=h && w>maxD){h=Math.round(h*maxD/w); w=maxD;}
       else if(h>maxD){w=Math.round(w*maxD/h); h=maxD;}
       const c=document.createElement('canvas');
       c.width=w; c.height=h;
       c.getContext('2d').drawImage(img, 0, 0, w, h);
-      cb(c.toDataURL('image/jpeg', 0.72));
+      cb(c.toDataURL('image/jpeg', 0.70));
     };
     img.onerror=()=>cb(null);
     img.src=e.target.result;
@@ -1618,10 +1618,10 @@ function _resizeAuftragPhoto(file, cb){
 function _onAufPhotos(ev){
   const files=Array.from(ev.target.files||[]);
   if(!files.length) return;
-  const slots=8-_pendingAufPhotos.length;
-  if(slots<=0){toast('Max. 8 Bilder pro Auftrag','bad');ev.target.value='';return;}
+  const slots=6-_pendingAufPhotos.length;
+  if(slots<=0){toast('Max. 6 Bilder pro Auftrag','bad');ev.target.value='';return;}
   const use=files.slice(0, slots);
-  if(files.length>slots) toast('Nur '+slots+' Bild(er) angefügt (max. 8)','bad');
+  if(files.length>slots) toast('Nur '+slots+' Bild(er) angefügt (max. 6)','bad');
   let done=0;
   use.forEach(f=>{
     _resizeAuftragPhoto(f, d=>{
@@ -2466,11 +2466,12 @@ function agAuftragErstellen(){
     _pendingAufPhotos=[];
     _aufRenderPhotos();
     closeAuftragModal();
-    // Termin-Mail an Kunde wenn Email + Termin + Checkbox aktiv
+    // Termin-Mail an Kunde wenn Email + Termin + Checkbox aktiv (nur 1x, auch bei mehreren MAs)
     const sendTerminMail=document.getElementById('aufTerminMail').checked;
     if(kundeEmail&&terminDatum&&sendTerminMail){
-      refs.forEach(r=>sendTerminMailToKunde({...baseData,...r}));
-      // Mail-Log am Auftrag speichern
+      const allMaNames=refs.map(r=>r.maName).filter(Boolean).join(', ');
+      sendTerminMailToKunde({...baseData, kundeEmail, terminDatum, terminUhrzeit, maName:allMaNames});
+      // terminMailAt auf jedem Auftrag-Doc setzen für Nachvollziehbarkeit
       refs.forEach(r=>{
         db.collection('globalTN').doc(r.tnId).collection('auftraege').doc(r.id).update({terminMailAt:Date.now()}).catch(()=>{});
       });
@@ -2678,8 +2679,12 @@ function openAufDetails(tnId, aufId){
       let html='';
       snap.forEach(doc=>{
         const m=doc.data();
-        const mine=m.vonUid===_uid;
         const time=new Date(m.erstelltAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        if(m.system){
+          html+='<div style="text-align:center;margin:8px 0;font-size:.62rem;color:#d97706;padding:6px 10px;background:rgba(245,158,11,.08);border-radius:8px">'+esc(m.text||'')+' <span style="color:var(--mu);font-family:monospace;font-size:.5rem">· '+time+'</span></div>';
+          return;
+        }
+        const mine=m.vonUid===_uid;
         html+='<div class="chat-msg '+(mine?'mine':'other')+'">'
           +(mine?'':'<div class="chat-msg-meta">'+esc(m.vonName||'')+'</div>')
           +'<div class="chat-msg-b">'+esc(m.text||'')+'</div>'
@@ -2817,8 +2822,8 @@ function closeNachtragModal(){document.getElementById('nachtragModal').classList
 function _onNachPhotos(ev){
   const files=Array.from(ev.target.files||[]);
   if(!files.length) return;
-  const slots=4-_pendingNachPhotos.length;
-  if(slots<=0){toast('Max. 4 Bilder pro Nachtrag','bad');ev.target.value='';return;}
+  const slots=3-_pendingNachPhotos.length;
+  if(slots<=0){toast('Max. 3 Bilder pro Nachtrag','bad');ev.target.value='';return;}
   const use=files.slice(0,slots);
   if(files.length>slots) toast('Nur '+slots+' Bild(er) angefügt','bad');
   let done=0;
