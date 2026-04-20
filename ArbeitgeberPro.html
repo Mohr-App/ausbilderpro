@@ -80,6 +80,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .stab{padding:8px 16px;border:none;border-radius:20px;background:var(--sur2);color:var(--mu);font-size:.72rem;font-weight:600;font-family:'Sora',sans-serif;cursor:pointer;white-space:nowrap;transition:all .15s;}
 .stab.active{background:linear-gradient(135deg,#2563eb,#059669);color:#fff;}
 .abtab{display:none;}.abtab.active{display:block;}
+.abtab2{display:none;}.abtab2.active{display:block;}
 .ag-badge{position:absolute;top:2px;right:8px;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 2px 6px rgba(239,68,68,.4);animation:pulseRed 1.5s infinite;}
 .mdl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
 .mdl.open{display:flex}
@@ -190,12 +191,50 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
       <!-- LIVE: Mitarbeiter -->
       <div class="abtab" id="abtab-mitarbeiter">
-        <button class="big-btn" onclick="openMaAnlegenModal()" style="margin-bottom:12px">
-          <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">+</span>
-          <span class="bb-tx"><span class="bb-t">Mitarbeiter / Azubi anlegen</span><span class="bb-s">Zugang für MitarbeiterPro oder AzubiPro</span></span>
-          <span class="bb-arr">›</span>
-        </button>
-        <div id="agAzubiKontakte"><div class="empty">Lädt…</div></div>
+        <div style="display:flex;gap:4px;margin-bottom:12px" id="agMaTabs">
+          <button class="stab active" title="Arbeitnehmer" onclick="showAgMaTab('arbeitnehmer')">Arbeitnehmer</button>
+          <button class="stab" title="Azubis" onclick="showAgMaTab('azubis')">Azubis</button>
+        </div>
+
+        <!-- Arbeitnehmer -->
+        <div class="abtab2 active" id="abtab-ma-arbeitnehmer">
+          <button class="big-btn" onclick="openMaAnlegenModal('arbeitnehmer')" style="margin-bottom:12px">
+            <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">👤+</span>
+            <span class="bb-tx"><span class="bb-t">Arbeitnehmer anlegen</span><span class="bb-s">Zugang für MitarbeiterPro</span></span>
+            <span class="bb-arr">›</span>
+          </button>
+          <div id="agArbeitnehmerListe"><div class="empty">Lädt…</div></div>
+        </div>
+
+        <!-- Azubis -->
+        <div class="abtab2" id="abtab-ma-azubis">
+          <button class="big-btn" onclick="openMaAnlegenModal('azubi')" style="margin-bottom:12px">
+            <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">🎓+</span>
+            <span class="bb-tx"><span class="bb-t">Azubi anlegen</span><span class="bb-s">Zugang für AzubiPro</span></span>
+            <span class="bb-arr">›</span>
+          </button>
+          <div class="stat-row" style="margin-bottom:10px">
+            <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Azubis</div></div>
+            <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Kursen</div></div>
+            <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
+          </div>
+          <div id="agNotifBanner"></div>
+          <!-- Collapsible ÜBL-Kursansicht -->
+          <div style="margin-bottom:12px">
+            <button onclick="toggleUeblView()" id="ueblToggleBtn" style="width:100%;padding:12px 14px;background:rgba(245,158,11,.06);border:1.5px solid rgba(245,158,11,.25);border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:'Sora',sans-serif;color:var(--tx)">
+              <span style="font-size:1rem">🎓</span>
+              <div style="flex:1;text-align:left"><div style="font-size:.78rem;font-weight:700">ÜBL-Kursansicht</div><div style="font-size:.6rem;color:var(--mu)">Lehrgänge, Anwesenheit, Noten</div></div>
+              <span id="ueblArrow" style="font-size:.9rem;color:var(--mu)">▾</span>
+            </button>
+            <div id="ueblCollapse" style="display:none;padding:12px 2px 0">
+              <div id="azubiList"><div class="empty">Lädt…</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">👥 Azubi-Kontakte</div>
+            <div id="agAzubiListe"><div class="empty">Lädt…</div></div>
+          </div>
+        </div>
       </div>
 
       <!-- LIVE: Aufträge -->
@@ -414,14 +453,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="mdl" id="maAnlegenModal">
   <div class="mdl-box">
     <div class="mdl-head">
-      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center">+</span>Mitarbeiter / Azubi anlegen</div>
+      <div class="mdl-title"><span id="maModalIcon" style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center">👤</span><span id="maModalTitle">Arbeitnehmer anlegen</span></div>
       <button class="mdl-x" onclick="closeMaAnlegenModal()" title="Schließen">✕</button>
     </div>
-    <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px">Erstellt einen Zugang für MitarbeiterPro oder AzubiPro.</div>
-    <div style="display:flex;gap:6px;margin-bottom:10px">
-      <button id="typBtnAn" title="👤 Arbeitnehmer" onclick="setMaTyp('arbeitnehmer')" style="flex:1;padding:10px;border:2px solid #2563eb;border-radius:8px;background:rgba(37,99,235,.08);color:#2563eb;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">👤 Arbeitnehmer</button>
-      <button id="typBtnAz" title="🎓 Azubi" onclick="setMaTyp('azubi')" style="flex:1;padding:10px;border:2px solid var(--brd);border-radius:8px;background:#fff;color:var(--mu);font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">🎓 Azubi</button>
-    </div>
+    <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px" id="maModalSub">Erstellt einen Zugang für MitarbeiterPro.</div>
     <!-- Profilbild-Upload -->
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px;background:var(--sur2);border-radius:10px">
       <label class="ava-upload" id="newMaAvaWrap" title="Profilbild wählen">
@@ -441,7 +476,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </div>
     <div><label class="fl">E-Mail</label><input class="fi" type="email" id="newMaEmail" style="font-size:.8rem"></div>
     <div><label class="fl">Passwort (min. 6 Zeichen)</label><input class="fi" type="text" id="newMaPw" style="font-size:.8rem" placeholder="Wird dem Mitarbeiter mitgeteilt"></div>
-    <button class="btn" title="👤+ Arbeitnehmer anlegen" onclick="agCreateMitarbeiter()" style="margin-top:10px;width:100%;font-size:.85rem;padding:12px" id="createMaBtn">👤+ Arbeitnehmer anlegen</button>
+    <button class="btn" title="anlegen" onclick="agCreateMitarbeiter()" style="margin-top:10px;width:100%;font-size:.85rem;padding:12px" id="createMaBtn">👤+ Arbeitnehmer anlegen</button>
     <div class="err" id="newMaErr" style="margin-top:6px"></div>
   </div>
 </div>
@@ -1234,17 +1269,26 @@ function setMaTyp(typ){
   const btnAz=document.getElementById('typBtnAz');
   const berufRow=document.getElementById('berufRow');
   const createBtn=document.getElementById('createMaBtn');
+  const title=document.getElementById('maModalTitle');
+  const sub=document.getElementById('maModalSub');
+  const icon=document.getElementById('maModalIcon');
   if(typ==='azubi'){
-    btnAz.style.border='2px solid #2563eb';btnAz.style.background='rgba(37,99,235,.08)';btnAz.style.color='#2563eb';
-    btnAn.style.border='2px solid var(--brd)';btnAn.style.background='#fff';btnAn.style.color='var(--mu)';
-    berufRow.style.display='';
+    if(btnAz){btnAz.style.border='2px solid #2563eb';btnAz.style.background='rgba(37,99,235,.08)';btnAz.style.color='#2563eb';}
+    if(btnAn){btnAn.style.border='2px solid var(--brd)';btnAn.style.background='#fff';btnAn.style.color='var(--mu)';}
+    if(berufRow) berufRow.style.display='';
     loadAgBerufe();
-    createBtn.textContent='🎓+ Azubi anlegen';
+    if(createBtn) createBtn.textContent='🎓+ Azubi anlegen';
+    if(title) title.textContent='Azubi anlegen';
+    if(sub) sub.textContent='Erstellt einen Zugang für AzubiPro.';
+    if(icon) icon.textContent='🎓';
   } else {
-    btnAn.style.border='2px solid #2563eb';btnAn.style.background='rgba(37,99,235,.08)';btnAn.style.color='#2563eb';
-    btnAz.style.border='2px solid var(--brd)';btnAz.style.background='#fff';btnAz.style.color='var(--mu)';
-    berufRow.style.display='none';
-    createBtn.textContent='👤+ Arbeitnehmer anlegen';
+    if(btnAn){btnAn.style.border='2px solid #2563eb';btnAn.style.background='rgba(37,99,235,.08)';btnAn.style.color='#2563eb';}
+    if(btnAz){btnAz.style.border='2px solid var(--brd)';btnAz.style.background='#fff';btnAz.style.color='var(--mu)';}
+    if(berufRow) berufRow.style.display='none';
+    if(createBtn) createBtn.textContent='👤+ Arbeitnehmer anlegen';
+    if(title) title.textContent='Arbeitnehmer anlegen';
+    if(sub) sub.textContent='Erstellt einen Zugang für MitarbeiterPro.';
+    if(icon) icon.textContent='👤';
   }
 }
 
@@ -1347,40 +1391,58 @@ function showDoku(tnId,datum){
 }
 
 function renderAgAzubiKontakte(){
-  const el=document.getElementById('agAzubiKontakte');
+  const elAn=document.getElementById('agArbeitnehmerListe');
+  const elAz=document.getElementById('agAzubiListe');
+  if(!elAn&&!elAz) return;
+  const arbeitnehmer=_azubis.filter(a=>a.typ==='arbeitnehmer');
+  const azubis=_azubis.filter(a=>a.typ!=='arbeitnehmer');
+  if(elAn) elAn.innerHTML=arbeitnehmer.length
+    ? arbeitnehmer.map(_renderMaCard).join('')
+    : '<div class="empty">Noch keine Arbeitnehmer angelegt</div>';
+  if(elAz) elAz.innerHTML=azubis.length
+    ? azubis.map(_renderMaCard).join('')
+    : '<div class="empty">Noch keine Azubis angelegt</div>';
+}
+function _renderMaCard(az){
+  const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
+  const initials=name.split(' ').map(w=>(w[0]||'').toUpperCase()).join('').slice(0,2);
+  const tel=az.kontaktTelefon||'';
+  const email=az.kontaktEmail||az.email||'';
+  const beruf=az.beruf||'';
+  const lj=az.ausbjahr?az.ausbjahr+'. Lehrjahr':'';
+  const isMA=az.typ==='arbeitnehmer';
+  const avatarBg=isMA?'rgba(217,119,6,.1)':'rgba(37,99,235,.1)';
+  const avatarBorder=isMA?'rgba(217,119,6,.25)':'rgba(37,99,235,.25)';
+  const avatarColor=isMA?'#d97706':'var(--acc)';
+  const avaInner=az.photoUrl
+    ? '<img src="'+esc(az.photoUrl)+'" style="width:100%;height:100%;object-fit:cover">'
+    : initials;
+  return '<div class="card" style="display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:6px">'
+    +'<div onclick="openAvaEditModal(\''+esc(az.id)+'\')" title="Profilbild ändern" style="position:relative;width:48px;height:48px;border-radius:50%;background:'+avatarBg+';border:2px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:'+avatarColor+';flex-shrink:0;cursor:pointer;overflow:hidden">'
+    +avaInner
+    +'<div style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:#fff;border:1.5px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.58rem">📷</div>'
+    +'</div>'
+    +'<div style="flex:1;min-width:0">'
+    +'<div style="font-size:.88rem;font-weight:800">'+esc(name)+'</div>'
+    +(beruf||lj?'<div style="font-size:.65rem;color:var(--mu)">'+esc([beruf,lj].filter(Boolean).join(' · '))+'</div>':'')
+    +(tel?'<a href="tel:'+esc(tel)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:6px 14px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:#059669">📞 '+esc(tel)+'</a>':'')
+    +(email?'<a href="mailto:'+esc(email)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-left:'+(tel?'6px':'0')+';padding:6px 14px;background:rgba(37,99,235,.1);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:var(--acc)">✉ '+esc(email)+'</a>':'')
+    +(!tel&&!email?'<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Keine Kontaktdaten hinterlegt</div>':'')
+    +'</div></div>';
+}
+// Mitarbeiter-Sub-Sub-Tabs: Arbeitnehmer / Azubis
+function showAgMaTab(tab){
+  document.querySelectorAll('#abtab-mitarbeiter .abtab2').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#agMaTabs .stab').forEach(t=>t.classList.remove('active'));
+  const pane=document.getElementById('abtab-ma-'+tab); if(pane) pane.classList.add('active');
+  if(event&&event.target) event.target.classList.add('active');
+}
+function toggleUeblView(){
+  const el=document.getElementById('ueblCollapse');
+  const arr=document.getElementById('ueblArrow');
   if(!el) return;
-  if(!_azubis.length){el.innerHTML='<div class="empty">Keine Mitarbeiter</div>';return;}
-  let html='';
-  _azubis.forEach(az=>{
-    const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
-    const initials=name.split(' ').map(w=>(w[0]||'').toUpperCase()).join('').slice(0,2);
-    const tel=az.kontaktTelefon||'';
-    const email=az.kontaktEmail||az.email||'';
-    const beruf=az.beruf||'';
-    const lj=az.ausbjahr?az.ausbjahr+'. Lehrjahr':'';
-    const isMA=az.typ==='arbeitnehmer';
-    const typBadge=isMA?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(217,119,6,.12);color:#d97706;border-radius:4px;font-weight:700;margin-left:6px">Arbeitnehmer</span>'
-      :'<span style="font-size:.5rem;padding:2px 6px;background:rgba(37,99,235,.1);color:#3b82f6;border-radius:4px;font-weight:700;margin-left:6px">Azubi</span>';
-    const avatarBg=isMA?'rgba(217,119,6,.1)':'rgba(37,99,235,.1)';
-    const avatarBorder=isMA?'rgba(217,119,6,.25)':'rgba(37,99,235,.25)';
-    const avatarColor=isMA?'#d97706':'var(--acc)';
-    const avaInner=az.photoUrl
-      ? '<img src="'+esc(az.photoUrl)+'" style="width:100%;height:100%;object-fit:cover">'
-      : initials;
-    html+='<div class="card" style="display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:6px">'
-      +'<div onclick="openAvaEditModal(\''+esc(az.id)+'\')" title="Profilbild ändern" style="position:relative;width:48px;height:48px;border-radius:50%;background:'+avatarBg+';border:2px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:'+avatarColor+';flex-shrink:0;cursor:pointer;overflow:hidden">'
-      +avaInner
-      +'<div style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:#fff;border:1.5px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.58rem">📷</div>'
-      +'</div>'
-      +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:.88rem;font-weight:800;display:flex;align-items:center;flex-wrap:wrap">'+esc(name)+typBadge+'</div>'
-      +(beruf||lj?'<div style="font-size:.65rem;color:var(--mu)">'+esc([beruf,lj].filter(Boolean).join(' · '))+'</div>':'')
-      +(tel?'<a href="tel:'+esc(tel)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:6px 14px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:#059669">📞 '+esc(tel)+'</a>':'')
-      +(email?'<a href="mailto:'+esc(email)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-left:'+(tel?'6px':'0')+';padding:6px 14px;background:rgba(37,99,235,.1);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:var(--acc)">✉ '+esc(email)+'</a>':'')
-      +(!tel&&!email?'<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Keine Kontaktdaten hinterlegt</div>':'')
-      +'</div></div>';
-  });
-  el.innerHTML=html;
+  if(el.style.display==='none'){el.style.display='';if(arr) arr.textContent='▴';}
+  else{el.style.display='none';if(arr) arr.textContent='▾';}
 }
 
 // ─── Foto-Resize zu 200×200 JPEG base64 ───────────────────────
@@ -1418,7 +1480,8 @@ function openAuftragModal(){
 function closeAuftragModal(){document.getElementById('auftragModal').classList.remove('open');}
 
 let _pendingNewMaPhoto=null;
-function openMaAnlegenModal(){
+function openMaAnlegenModal(typ){
+  typ=typ||'arbeitnehmer';
   document.getElementById('newMaVorname').value='';
   document.getElementById('newMaNachname').value='';
   document.getElementById('newMaEmail').value='';
@@ -1429,7 +1492,7 @@ function openMaAnlegenModal(){
   const im=document.getElementById('newMaAvaImg'); if(im){im.style.display='none';im.src='';}
   const hi=document.getElementById('newMaPhotoHint'); if(hi) hi.style.display='none';
   const ff=document.getElementById('newMaPhotoFile'); if(ff) ff.value='';
-  setMaTyp(_maTyp||'arbeitnehmer');
+  setMaTyp(typ);
   document.getElementById('maAnlegenModal').classList.add('open');
 }
 function closeMaAnlegenModal(){document.getElementById('maAnlegenModal').classList.remove('open');}
