@@ -122,6 +122,19 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .aufd-tab{display:flex;gap:4px;margin-bottom:12px}
 .aufd-tab .stab{flex:1}
 .aufd-pane{display:none}.aufd-pane.active{display:block}
+.stab-dd{position:relative;display:inline-block}
+.stab-dd-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1.5px solid var(--brd);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:200;min-width:170px;padding:4px;animation:fadeInDown .15s ease}
+.stab-dd-menu.open{display:block}
+.stab-dd-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:600;color:var(--tx);transition:background .12s;user-select:none}
+.stab-dd-item:hover{background:var(--sur2)}
+.stab-dd-item.active{background:rgba(37,99,235,.08);color:var(--acc)}
+.stab-dd-item .ddi-ic{font-size:1rem;width:22px;text-align:center}
+@keyframes fadeInDown{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.tab-order-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;margin-bottom:6px}
+.tab-order-item .toi-label{flex:1;font-size:.8rem;font-weight:600;color:var(--tx)}
+.tab-order-btn{width:30px;height:30px;border-radius:6px;background:#fff;border:1.5px solid var(--brd);cursor:pointer;font-size:.85rem;color:var(--mu);display:flex;align-items:center;justify-content:center;font-weight:700}
+.tab-order-btn:hover:not(:disabled){border-color:var(--acc);color:var(--acc)}
+.tab-order-btn:disabled{opacity:.3;cursor:not-allowed}
 </style>
 <script src="https://js-de.sentry-cdn.com/954a236264f49755ae54bc9f69f05762.min.js" crossorigin="anonymous"></script>
 </head>
@@ -195,11 +208,17 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="card-icon green" style="width:36px;height:36px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg></div>
         <div style="font-size:1.1rem;font-weight:800">Live</div>
       </div>
-      <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto" id="agLiveTabs">
-        <button class="stab active" title="Heute" onclick="showAgLiveTab('heute')">Heute</button>
-        <button class="stab" title="Mitarbeiter" onclick="showAgLiveTab('mitarbeiter')">Mitarbeiter</button>
-        <button class="stab" title="Aufträge" onclick="showAgLiveTab('auftraege')">Aufträge</button>
-        <button class="stab" title="Meldungen" onclick="showAgLiveTab('meldungen')">Meldungen</button>
+      <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;align-items:flex-start" id="agLiveTabs">
+        <button class="stab active" data-tab="heute" title="Heute" onclick="showAgLiveTab('heute')">Heute</button>
+        <div class="stab-dd" data-tab="mitarbeiter">
+          <button class="stab" id="agMaTabBtn" title="Mitarbeiter" onclick="toggleMaDropdown(event)">👥 Mitarbeiter ▾</button>
+          <div class="stab-dd-menu" id="agMaDropdown">
+            <div class="stab-dd-item" id="ddItemArbeitnehmer" onclick="selectAgMaType('arbeitnehmer')"><span class="ddi-ic">👤</span>Arbeitnehmer</div>
+            <div class="stab-dd-item" id="ddItemAzubi" onclick="selectAgMaType('azubi')"><span class="ddi-ic">🎓</span>Azubis</div>
+          </div>
+        </div>
+        <button class="stab" data-tab="auftraege" title="Aufträge" onclick="showAgLiveTab('auftraege')">Aufträge</button>
+        <button class="stab" data-tab="meldungen" title="Meldungen" onclick="showAgLiveTab('meldungen')">Meldungen</button>
       </div>
 
       <!-- LIVE: Heute -->
@@ -212,11 +231,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
       <!-- LIVE: Mitarbeiter -->
       <div class="abtab" id="abtab-mitarbeiter">
-        <div style="display:flex;gap:4px;margin-bottom:12px" id="agMaTabs">
-          <button class="stab active" title="Arbeitnehmer" onclick="showAgMaTab('arbeitnehmer')">Arbeitnehmer</button>
-          <button class="stab" title="Azubis" onclick="showAgMaTab('azubis')">Azubis</button>
-        </div>
-
         <!-- Arbeitnehmer -->
         <div class="abtab2 active" id="abtab-ma-arbeitnehmer">
           <button class="big-btn" onclick="openMaAnlegenModal('arbeitnehmer')" style="margin-bottom:12px">
@@ -293,8 +307,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="font-size:1.1rem;font-weight:800">Auswertung</div>
       </div>
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto" id="agAusTabs">
-        <button class="stab active" title="Monat" onclick="showAgAusTab('monat')">Monat</button>
-        <button class="stab" title="Urlaub" onclick="showAgAusTab('urlaub')">Urlaub</button>
+        <button class="stab active" data-tab="monat" title="Monat" onclick="showAgAusTab('monat')">Monat</button>
+        <button class="stab" data-tab="urlaub" title="Urlaub" onclick="showAgAusTab('urlaub')">Urlaub</button>
       </div>
 
       <!-- AUSWERTUNG: Monat -->
@@ -346,6 +360,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div style="font-size:.55rem;color:var(--mu);margin-top:4px">Antippen zum Kopieren</div>
         </div>
         <button onclick="_regenerateFirmaCode()" style="margin-top:8px;width:100%;padding:6px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);border-radius:6px;color:#ef4444;font-size:.6rem;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">🔄 Neuen Code generieren</button>
+      </div>
+
+      <!-- Reiter-Reihenfolge -->
+      <div class="card">
+        <div class="card-title">🔀 Reiter-Reihenfolge (Live)</div>
+        <div id="agTabOrderSettings"></div>
+      </div>
       </div>
 
       <!-- Arbeitszeiten / Gleitzeit -->
@@ -439,15 +460,15 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </div>
   </div>
 
-  <!-- Bottom Nav: 3 Tabs — Live / Auswertung / Einstellungen -->
-  <div class="bnav">
-    <button class="bnav-btn active" id="agnav-live" onclick="showAgPage('live')" title="Live">
+  <!-- Bottom Nav: Live / Auswertung / Einstellungen — Reihenfolge personalisierbar -->
+  <div class="bnav" id="agBnav">
+    <button class="bnav-btn active" data-page="live" id="agnav-live" onclick="showAgPage('live')" title="Live">
       <span class="bi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg></span>Live
     </button>
-    <button class="bnav-btn" id="agnav-auswertung" onclick="showAgPage('auswertung')" title="Auswertung">
+    <button class="bnav-btn" data-page="auswertung" id="agnav-auswertung" onclick="showAgPage('auswertung')" title="Auswertung">
       <span class="bi"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>Auswertung
     </button>
-    <button class="bnav-btn" id="agnav-einstellungen" onclick="showAgPage('einstellungen')" title="Einstellungen">
+    <button class="bnav-btn" data-page="einstellungen" id="agnav-einstellungen" onclick="showAgPage('einstellungen')" title="Einstellungen">
       <span class="bi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>Einstell.
     </button>
   </div>
@@ -1326,6 +1347,11 @@ function dismissInstallAG(){const b=document.getElementById('installBanner');if(
 // ═══════════════════════════════════
 // AG NAVIGATION
 // ═══════════════════════════════════
+window.addEventListener('DOMContentLoaded', ()=>{
+  _applyAllTabOrders();
+  _applyAgMaType();
+});
+
 // History management for back button
 let _navFromPop=false, _curPage='live';
 history.replaceState({page:'live'},'');
@@ -1554,13 +1580,6 @@ function _renderMaCard(az){
     +(!tel&&!email?'<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Keine Kontaktdaten hinterlegt</div>':'')
     +'</div></div>';
 }
-// Mitarbeiter-Sub-Sub-Tabs: Arbeitnehmer / Azubis
-function showAgMaTab(tab){
-  document.querySelectorAll('#abtab-mitarbeiter .abtab2').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('#agMaTabs .stab').forEach(t=>t.classList.remove('active'));
-  const pane=document.getElementById('abtab-ma-'+tab); if(pane) pane.classList.add('active');
-  if(event&&event.target) event.target.classList.add('active');
-}
 function toggleUeblView(){
   const el=document.getElementById('ueblCollapse');
   const arr=document.getElementById('ueblArrow');
@@ -1761,27 +1780,161 @@ function showAgLiveTab(tab){
   document.querySelectorAll('#agpage-live .abtab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('#agLiveTabs .stab').forEach(t=>t.classList.remove('active'));
   const pane=document.getElementById('abtab-'+tab); if(pane) pane.classList.add('active');
-  if(event&&event.target) event.target.classList.add('active');
+  // Passenden Tab-Button via data-tab aktivieren (robust gegen Dropdown-Container)
+  const tabEl=document.querySelector('#agLiveTabs [data-tab="'+tab+'"]');
+  if(tabEl){
+    const btn=tabEl.classList.contains('stab')?tabEl:tabEl.querySelector('.stab');
+    if(btn) btn.classList.add('active');
+  }
   if(tab==='heute') startAgZeitLive();
-  if(tab==='mitarbeiter'){ loadAzubis(); renderAgAzubiKontakte(); }
+  if(tab==='mitarbeiter'){ loadAzubis(); renderAgAzubiKontakte(); _applyAgMaType(); }
   if(tab==='auftraege') loadAgAuftraege();
   if(tab==='meldungen') loadAgMeldungen();
+}
+// Mitarbeiter-Dropdown
+let _agMaType=localStorage.getItem('ag_ma_type')||'arbeitnehmer';
+function toggleMaDropdown(ev){
+  if(ev){ev.stopPropagation();}
+  const dd=document.getElementById('agMaDropdown');
+  const wasOpen=dd.classList.contains('open');
+  // Alle anderen Dropdowns schließen
+  document.querySelectorAll('.stab-dd-menu.open').forEach(d=>d.classList.remove('open'));
+  if(!wasOpen) dd.classList.add('open');
+  // Tab aktivieren (mit Inhalt)
+  showAgLiveTab('mitarbeiter');
+}
+function selectAgMaType(type){
+  _agMaType=type;
+  localStorage.setItem('ag_ma_type',type);
+  document.getElementById('agMaDropdown').classList.remove('open');
+  _applyAgMaType();
+}
+function _applyAgMaType(){
+  const lbl=_agMaType==='azubi'?'🎓 Azubis ▾':'👤 Arbeitnehmer ▾';
+  const btn=document.getElementById('agMaTabBtn');
+  if(btn) btn.textContent=lbl;
+  // Panes switchen
+  document.querySelectorAll('#abtab-mitarbeiter .abtab2').forEach(t=>t.classList.remove('active'));
+  const pane=document.getElementById('abtab-ma-'+(_agMaType==='azubi'?'azubis':'arbeitnehmer'));
+  if(pane) pane.classList.add('active');
+  // Dropdown-Items active-markieren
+  document.getElementById('ddItemArbeitnehmer').classList.toggle('active', _agMaType==='arbeitnehmer');
+  document.getElementById('ddItemAzubi').classList.toggle('active', _agMaType==='azubi');
+}
+// Klick außerhalb schließt Dropdowns
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.stab-dd')){
+    document.querySelectorAll('.stab-dd-menu.open').forEach(d=>d.classList.remove('open'));
+  }
+});
+
+// ─── Generisches Reorder-System (Bottom-Nav + Live-Tabs + Auswertung-Tabs) ───
+const _tabConfigs={
+  bnav: {
+    containerId:'agBnav',
+    storageKey:'ag_bnav_order',
+    attr:'data-page',
+    labels:{live:'📡 Live', auswertung:'📊 Auswertung', einstellungen:'⚙ Einstellungen'},
+    default:['live','auswertung','einstellungen']
+  },
+  live: {
+    containerId:'agLiveTabs',
+    storageKey:'ag_live_tab_order',
+    attr:'data-tab',
+    labels:{heute:'📡 Heute', mitarbeiter:'👥 Mitarbeiter', auftraege:'📋 Aufträge', meldungen:'📨 Meldungen'},
+    default:['heute','mitarbeiter','auftraege','meldungen']
+  },
+  auswertung: {
+    containerId:'agAusTabs',
+    storageKey:'ag_aus_tab_order',
+    attr:'data-tab',
+    labels:{monat:'📅 Monat', urlaub:'🏖 Urlaub'},
+    default:['monat','urlaub']
+  }
+};
+function _getTabOrder(key){
+  const cfg=_tabConfigs[key];
+  try{
+    const saved=JSON.parse(localStorage.getItem(cfg.storageKey)||'null');
+    if(Array.isArray(saved) && saved.length===cfg.default.length && cfg.default.every(t=>saved.includes(t))){
+      return saved;
+    }
+  }catch(e){}
+  return cfg.default.slice();
+}
+function _applyTabOrder(key){
+  const cfg=_tabConfigs[key];
+  const cont=document.getElementById(cfg.containerId);
+  if(!cont) return;
+  const order=_getTabOrder(key);
+  order.forEach(id=>{
+    const el=cont.querySelector('['+cfg.attr+'="'+id+'"]');
+    if(el) cont.appendChild(el); // appendChild verschiebt, dupliziert nicht
+  });
+}
+function _applyAllTabOrders(){
+  _applyTabOrder('bnav');
+  _applyTabOrder('live');
+  _applyTabOrder('auswertung');
+}
+function moveAgTab(key, idx, dir){
+  const cfg=_tabConfigs[key];
+  const order=_getTabOrder(key);
+  const target=idx+dir;
+  if(target<0||target>=order.length) return;
+  [order[idx], order[target]]=[order[target], order[idx]];
+  localStorage.setItem(cfg.storageKey, JSON.stringify(order));
+  _applyTabOrder(key);
+  renderAgTabOrderSettings();
+}
+function resetAgTabOrder(key){
+  localStorage.removeItem(_tabConfigs[key].storageKey);
+  _applyTabOrder(key);
+  renderAgTabOrderSettings();
+}
+function renderAgTabOrderSettings(){
+  const el=document.getElementById('agTabOrderSettings');
+  if(!el) return;
+  const groups=[
+    {key:'bnav', title:'🧭 Haupt-Navigation (unten)', sub:'Live · Auswertung · Einstellungen'},
+    {key:'live', title:'📡 Live-Reiter', sub:'Heute · Mitarbeiter · Aufträge · Meldungen'},
+    {key:'auswertung', title:'📊 Auswertung-Reiter', sub:'Monat · Urlaub'}
+  ];
+  let h='<div style="font-size:.65rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Reihenfolge aller Reiter anpassen. Deine Auswahl wird lokal auf diesem Gerät gespeichert.</div>';
+  groups.forEach((g,gi)=>{
+    const cfg=_tabConfigs[g.key];
+    const order=_getTabOrder(g.key);
+    h+='<div style="margin-bottom:'+(gi===groups.length-1?'0':'16px')+';padding:10px;background:var(--sur2);border-radius:10px">'
+      +'<div style="font-size:.75rem;font-weight:700;color:var(--tx);margin-bottom:2px">'+g.title+'</div>'
+      +'<div style="font-size:.58rem;color:var(--mu);margin-bottom:10px">'+g.sub+'</div>';
+    order.forEach((id,idx)=>{
+      h+='<div class="tab-order-item">'
+        +'<span class="toi-label">'+(cfg.labels[id]||id)+'</span>'
+        +'<button class="tab-order-btn" onclick="moveAgTab(\''+g.key+'\','+idx+',-1)"'+(idx===0?' disabled':'')+' title="Nach oben">▲</button>'
+        +'<button class="tab-order-btn" onclick="moveAgTab(\''+g.key+'\','+idx+',1)"'+(idx===order.length-1?' disabled':'')+' title="Nach unten">▼</button>'
+        +'</div>';
+    });
+    h+='<button onclick="resetAgTabOrder(\''+g.key+'\')" style="margin-top:4px;padding:6px 12px;background:#fff;border:1.5px solid var(--brd);border-radius:6px;font-size:.62rem;cursor:pointer;color:var(--mu);font-family:\'Sora\',sans-serif">↺ Standard</button>'
+      +'</div>';
+  });
+  el.innerHTML=h;
 }
 // Auswertung-Sub-Tabs: Monat / Urlaub
 function showAgAusTab(tab){
   document.querySelectorAll('#agpage-auswertung .abtab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('#agAusTabs .stab').forEach(t=>t.classList.remove('active'));
   const pane=document.getElementById('abtab-'+tab); if(pane) pane.classList.add('active');
-  if(event&&event.target) event.target.classList.add('active');
+  const btn=document.querySelector('#agAusTabs [data-tab="'+tab+'"]');
+  if(btn) btn.classList.add('active');
   if(tab==='monat'){fillAgMonatSelect('agZeitMonat');loadAgZeiten();}
   if(tab==='urlaub') loadAgUrlaub();
 }
-// Legacy-Wrapper falls irgendwo noch showAgBetriebTab('zeiten'|'baustellen'|'urlaub'|'meldungen') aufgerufen wird
+// Legacy-Wrapper robust gegen Tab-Reorder (nutzt data-attrs statt Indizes)
 function showAgBetriebTab(tab){
-  if(tab==='zeiten'){ showAgPage('auswertung'); setTimeout(()=>{const b=document.querySelector('#agAusTabs .stab'); if(b){event={target:b}; showAgAusTab('monat');}},0); return; }
-  if(tab==='baustellen'){ showAgPage('live'); setTimeout(()=>{const btns=document.querySelectorAll('#agLiveTabs .stab'); if(btns[1]){event={target:btns[1]}; showAgLiveTab('auftraege');}},0); return; }
-  if(tab==='urlaub'){ showAgPage('auswertung'); setTimeout(()=>{const btns=document.querySelectorAll('#agAusTabs .stab'); if(btns[1]){event={target:btns[1]}; showAgAusTab('urlaub');}},0); return; }
-  if(tab==='meldungen'){ showAgPage('live'); setTimeout(()=>{const btns=document.querySelectorAll('#agLiveTabs .stab'); if(btns[2]){event={target:btns[2]}; showAgLiveTab('meldungen');}},0); return; }
+  if(tab==='zeiten'){ showAgPage('auswertung'); setTimeout(()=>showAgAusTab('monat'),0); return; }
+  if(tab==='baustellen'){ showAgPage('live'); setTimeout(()=>showAgLiveTab('auftraege'),0); return; }
+  if(tab==='urlaub'){ showAgPage('auswertung'); setTimeout(()=>showAgAusTab('urlaub'),0); return; }
+  if(tab==='meldungen'){ showAgPage('live'); setTimeout(()=>showAgLiveTab('meldungen'),0); return; }
 }
 
 function initAgLive(){
@@ -1803,6 +1956,8 @@ function initAgEinstellungen(){
   // Firmencode anzeigen
   const codeEl=document.getElementById('firmaCodeDisplay');
   if(codeEl&&_firmaCode) codeEl.textContent=_firmaCode;
+  // Reiter-Reihenfolge-Einstellungen rendern
+  renderAgTabOrderSettings();
 }
 // Legacy-Alias falls altes initAgBetrieb noch gerufen wird
 function initAgBetrieb(){ initAgLive(); initAgAuswertung(); initAgEinstellungen(); }
