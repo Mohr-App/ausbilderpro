@@ -564,9 +564,17 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </div>
     <div id="aufdSub" style="font-size:.65rem;color:var(--mu);margin-bottom:10px"></div>
     <div class="aufd-tab">
+      <button class="stab" id="aufdTabProt" onclick="showAufdTab('prot')">📋 Protokoll</button>
       <button class="stab active" id="aufdTabChat" onclick="showAufdTab('chat')">💬 Chat</button>
       <button class="stab" id="aufdTabNach" onclick="showAufdTab('nach')">➕ Nachträge</button>
       <button class="stab" id="aufdTabKunde" onclick="showAufdTab('kunde')">👤 Kunde</button>
+    </div>
+    <!-- Protokoll-Bereich (read-only) -->
+    <div class="aufd-pane" id="aufd-prot">
+      <div id="aufdProtBody"><div class="empty">Lädt…</div></div>
+      <div id="aufdProtActions" style="margin-top:12px;display:none">
+        <button onclick="exportCurrentAufdPdf()" style="width:100%;padding:10px;background:#fff;border:1.5px solid #2563eb;color:#2563eb;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📄 Als PDF (DIN A4) öffnen</button>
+      </div>
     </div>
     <!-- Chat-Bereich -->
     <div class="aufd-pane active" id="aufd-chat">
@@ -2953,7 +2961,10 @@ function openAufDetails(tnId, aufId){
   if(!a){toast('Auftrag nicht gefunden','bad');return;}
   document.getElementById('aufdTitle').textContent=a.kunde||'Auftrag';
   document.getElementById('aufdSub').textContent=(a.beschreibung||'')+' · '+(a.tnName||'');
-  showAufdTab('chat');
+  // Bei erledigten Aufträgen direkt mit Protokoll öffnen, sonst Chat
+  const isErledigt=a.status==='erledigt';
+  showAufdTab(isErledigt?'prot':'chat');
+  _renderAufdProtokoll(a);
   document.getElementById('aufdChatInput').value='';
   document.getElementById('aufdChatErr').textContent='';
   document.getElementById('aufdChatBox').innerHTML='<div class="chat-empty">Lädt…</div>';
@@ -2999,9 +3010,79 @@ function showAufdTab(tab){
   document.querySelectorAll('#aufDetailsModal .aufd-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('#aufDetailsModal .aufd-tab .stab').forEach(t=>t.classList.remove('active'));
   document.getElementById('aufd-'+tab).classList.add('active');
-  const btnMap={chat:'aufdTabChat',nach:'aufdTabNach',kunde:'aufdTabKunde'};
+  const btnMap={prot:'aufdTabProt',chat:'aufdTabChat',nach:'aufdTabNach',kunde:'aufdTabKunde'};
   const btn=document.getElementById(btnMap[tab]); if(btn) btn.classList.add('active');
   if(tab==='kunde') _renderAufdKundeTab();
+}
+function _renderAufdProtokoll(a){
+  const body=document.getElementById('aufdProtBody');
+  const actions=document.getElementById('aufdProtActions');
+  if(!body||!a){return;}
+  const isErledigt=a.status==='erledigt';
+  const maName=a.tnName||'';
+  let h='';
+  // Status-Banner
+  const statusTxt=isErledigt?'✅ Erledigt':(a.status==='inarbeit'?'⏱ In Arbeit':'📋 Offen');
+  const statusCol=isErledigt?'#059669':(a.status==='inarbeit'?'#d97706':'#2563eb');
+  const statusBg=isErledigt?'rgba(16,185,129,.08)':(a.status==='inarbeit'?'rgba(245,158,11,.08)':'rgba(37,99,235,.08)');
+  h+='<div style="padding:8px 12px;background:'+statusBg+';border:1px solid '+statusCol+'33;border-radius:8px;margin-bottom:10px;font-size:.72rem;font-weight:700;color:'+statusCol+'">'+statusTxt;
+  if(a.erledigtAm) h+=' <span style="font-weight:500;color:var(--mu);font-family:\'JetBrains Mono\',monospace;font-size:.62rem">· '+new Date(a.erledigtAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>';
+  h+='</div>';
+  // Basis-Daten
+  h+='<div style="padding:10px;background:var(--sur2);border-radius:8px;margin-bottom:10px;font-size:.7rem;line-height:1.6">';
+  if(a.kunde) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Kunde:</span><b>'+esc(a.kunde)+'</b></div>';
+  if(a.adresse) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Adresse:</span>'+esc(a.adresse)+'</div>';
+  if(a.beschreibung) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Auftrag:</span>'+esc(a.beschreibung)+'</div>';
+  if(maName) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Mitarbeiter:</span>'+esc(maName)+'</div>';
+  if(a.frist) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Frist:</span>'+esc(a.frist)+'</div>';
+  h+='</div>';
+  // Referenzbilder AG
+  if(a.fotosAG&&a.fotosAG.length){
+    h+='<div style="font-size:.7rem;font-weight:700;color:#2563eb;margin:10px 0 6px">📎 Referenzbilder vom Betrieb</div>';
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
+    a.fotosAG.forEach(f=>{h+='<a href="'+f+'" target="_blank" style="display:block"><img src="'+f+'" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--brd)"></a>';});
+    h+='</div>';
+  }
+  // Erledigungs-Daten (nur wenn vorhanden)
+  if(isErledigt||a.taetigkeit||a.stunden||(a.material&&a.material.length)||(a.fotos&&a.fotos.length)||a.unterschrift){
+    h+='<div style="border-top:1px solid var(--brd);margin:12px 0 8px;padding-top:10px">';
+    h+='<div style="font-size:.75rem;font-weight:800;color:var(--tx);margin-bottom:8px">🔧 Durchgeführte Arbeit</div>';
+    if(a.taetigkeit){
+      h+='<div style="padding:8px 10px;background:rgba(5,150,105,.05);border:1px solid rgba(5,150,105,.15);border-radius:6px;margin-bottom:8px;font-size:.72rem;line-height:1.5;white-space:pre-wrap">'+esc(a.taetigkeit)+'</div>';
+    }
+    if(a.stunden){
+      h+='<div style="font-size:.72rem;margin-bottom:6px"><span style="color:var(--mu)">⏱ Stundenaufwand:</span> <b>'+esc(String(a.stunden))+' h</b></div>';
+    }
+    if(a.material&&a.material.length){
+      h+='<div style="font-size:.7rem;margin-bottom:8px"><div style="color:var(--mu);margin-bottom:4px">🧱 Verwendetes Material:</div>';
+      a.material.forEach(m=>{h+='<span style="display:inline-block;padding:3px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;font-size:.65rem;margin:2px">'+esc(m)+'</span>';});
+      h+='</div>';
+    }
+    if(a.fotos&&a.fotos.length){
+      h+='<div style="font-size:.7rem;color:var(--mu);margin:8px 0 4px">📸 Fotodokumentation:</div>';
+      h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
+      a.fotos.forEach(f=>{h+='<a href="'+f+'" target="_blank" style="display:block"><img src="'+f+'" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--brd)"></a>';});
+      h+='</div>';
+    }
+    if(a.unterschrift){
+      h+='<div style="font-size:.7rem;color:var(--mu);margin:8px 0 4px">✍ Kundenunterschrift:</div>';
+      h+='<div style="padding:8px;background:#fff;border:1px solid var(--brd);border-radius:6px;display:inline-block;margin-bottom:8px"><img src="'+a.unterschrift+'" style="height:60px"></div>';
+    } else if(a.unterschriftVerweigert){
+      h+='<div style="padding:8px 10px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:6px;margin-bottom:8px;font-size:.68rem;color:#dc2626"><b>⚠ Unterschrift verweigert</b>'+(a.unterschriftVerweigertGrund?'<br>Grund: '+esc(a.unterschriftVerweigertGrund):'')+'</div>';
+    }
+    if(a.gpsErledigt){
+      const gps=a.gpsErledigt;
+      h+='<div style="font-size:.65rem;color:var(--mu);margin-top:6px">📍 GPS Abschluss: '+gps.lat?.toFixed(5)+', '+gps.lng?.toFixed(5)+(gps.acc?' (±'+gps.acc+'m)':'')+'</div>';
+    }
+    h+='</div>';
+  } else {
+    h+='<div class="empty" style="margin-top:10px">Noch keine Erledigungsdaten</div>';
+  }
+  body.innerHTML=h;
+  actions.style.display=isErledigt?'':'none';
+}
+function exportCurrentAufdPdf(){
+  if(_aufdTn&&_aufdAufId) exportAuftragsprotokoll(_aufdTn,_aufdAufId);
 }
 function _renderAufdKundeTab(){
   if(!_aufdTn||!_aufdAufId) return;
@@ -3363,7 +3444,7 @@ function exportAuftragsprotokoll(tnId,aufId){
     const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
     const dat=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
     let fotosAGHtml='';
-    if(d.fotosAG&&d.fotosAG.length){fotosAGHtml='<h3>Referenzbilder vom AG</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">';d.fotosAG.forEach(f=>{fotosAGHtml+='<img src="'+f+'" style="width:180px;border-radius:6px;border:1px solid #cbd5e1">';});fotosAGHtml+='</div>';}
+    if(d.fotosAG&&d.fotosAG.length){fotosAGHtml='<h3>Referenzbilder vom AG</h3><div style="display:flex;gap:4mm;flex-wrap:wrap;margin:3mm 0">';d.fotosAG.forEach(f=>{fotosAGHtml+='<img src="'+f+'" style="width:56mm;height:auto;border-radius:2mm;border:.3mm solid #cbd5e1">';});fotosAGHtml+='</div>';}
     let nachHtml='';
     if(d.nachtraege&&d.nachtraege.length){
       nachHtml='<h3>Nachträge</h3>';
@@ -3373,23 +3454,26 @@ function exportAuftragsprotokoll(tnId,aufId){
           +'<div style="font-size:9px;color:#78716c;margin-bottom:4px">'+esc(n.erstelltVon||'AG')+' · '+dat+'</div>'
           +'<div style="font-size:11px;line-height:1.5">'+esc(n.text||'')+'</div>';
         if(n.fotos&&n.fotos.length){
-          nachHtml+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
-          n.fotos.forEach(f=>{nachHtml+='<img src="'+f+'" style="width:140px;border-radius:4px;border:1px solid #cbd5e1">';});
+          nachHtml+='<div style="display:flex;gap:3mm;flex-wrap:wrap;margin-top:3mm">';
+          n.fotos.forEach(f=>{nachHtml+='<img src="'+f+'" style="width:44mm;height:auto;border-radius:1.5mm;border:.3mm solid #cbd5e1">';});
           nachHtml+='</div>';
         }
         nachHtml+='</div>';
       });
     }
     let fotosHtml='';
-    if(d.fotos&&d.fotos.length){fotosHtml='<h3>Fotodokumentation</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">';d.fotos.forEach(f=>{fotosHtml+='<img src="'+f+'" style="width:180px;border-radius:6px;border:1px solid #cbd5e1">';});fotosHtml+='</div>';}
+    if(d.fotos&&d.fotos.length){fotosHtml='<h3>Fotodokumentation</h3><div style="display:flex;gap:4mm;flex-wrap:wrap;margin:3mm 0">';d.fotos.forEach(f=>{fotosHtml+='<img src="'+f+'" style="width:56mm;height:auto;border-radius:2mm;border:.3mm solid #cbd5e1">';});fotosHtml+='</div>';}
     let sigHtml='';
-    if(d.unterschrift){sigHtml='<h3>Kundenunterschrift</h3><div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px;display:inline-block;margin:8px 0"><img src="'+d.unterschrift+'" style="height:80px"></div>';}
+    if(d.unterschrift){sigHtml='<h3>Kundenunterschrift</h3><div style="border:.3mm solid #cbd5e1;border-radius:2mm;padding:2mm;display:inline-block;margin:3mm 0"><img src="'+d.unterschrift+'" style="height:25mm"></div>';}
     const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Auftragsprotokoll '+esc(d.kunde||'')+'</title>'
-      +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:30px;font-size:12px;color:#1e293b}'
-      +'h1{font-size:16px;margin-bottom:4px}h3{font-size:12px;margin-top:16px;color:#2563eb}.row{display:flex;gap:20px;margin:4px 0}'
-      +'.label{color:#64748b;min-width:100px;font-size:10px;font-weight:700}.val{font-weight:600}'
-      +'.mat{display:inline-block;padding:3px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;font-size:10px;margin:2px}'
-      +'@media print{body{padding:15px}}</style></head><body>'
+      +'<style>@page{size:A4;margin:18mm 15mm}*{margin:0;padding:0;box-sizing:border-box}'
+      +'html,body{width:210mm}body{font-family:Arial,sans-serif;padding:0;font-size:11pt;color:#1e293b;line-height:1.45}'
+      +'h1{font-size:18pt;margin-bottom:4px}h3{font-size:11pt;margin-top:14pt;color:#2563eb;page-break-after:avoid}'
+      +'.row{display:flex;gap:16pt;margin:3pt 0}'
+      +'.label{color:#64748b;min-width:85pt;font-size:9pt;font-weight:700}.val{font-weight:600}'
+      +'.mat{display:inline-block;padding:2pt 6pt;background:#eff6ff;border:1px solid #bfdbfe;border-radius:3pt;font-size:9pt;margin:1pt}'
+      +'img{max-width:100%;page-break-inside:avoid}'
+      +'@media print{body{padding:0}button{display:none}}</style></head><body>'
       +'<h1>Auftragsprotokoll</h1>'
       +'<div style="color:#64748b;font-size:10px;margin-bottom:16px">'+esc(_firma||'')+' · Erstellt am '+(new Date().toLocaleDateString('de-DE'))+'</div>'
       +'<div class="row"><span class="label">Kunde:</span><span class="val">'+esc(d.kunde||'')+'</span></div>'

@@ -494,6 +494,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .mdl-title{font-size:1rem;font-weight:800;display:flex;align-items:center;gap:10px;flex:1;min-width:0}
 .mdl-x{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--mu);padding:2px 6px;line-height:1}
 .chat-box{max-height:55vh;overflow-y:auto;padding:8px;background:var(--sur2);border-radius:10px;margin-bottom:10px}
+.aufd-tab{display:flex;gap:4px;margin-bottom:12px}
+.aufd-tab .stab{flex:1}
+.aufd-pane{display:none}.aufd-pane.active{display:block}
 .chat-msg{margin-bottom:8px;display:flex;flex-direction:column;max-width:80%}
 .chat-msg.mine{align-self:flex-end;margin-left:auto;align-items:flex-end}
 .chat-msg.other{align-self:flex-start;margin-right:auto;align-items:flex-start}
@@ -513,16 +516,27 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="mdl" id="aufDetailsModal">
   <div class="mdl-box" style="max-width:520px">
     <div class="mdl-head">
-      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center;flex-shrink:0">💬</span><span id="aufdTitle">Chat</span></div>
+      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center;flex-shrink:0">📋</span><span id="aufdTitle">Auftrag</span></div>
       <button class="mdl-x" onclick="closeAufDetails()" title="Schließen">✕</button>
     </div>
     <div id="aufdSub" style="font-size:.65rem;color:var(--mu);margin-bottom:10px"></div>
-    <div class="chat-box" id="aufdChatBox"><div class="chat-empty">Noch keine Nachrichten</div></div>
-    <div class="chat-input-row">
-      <textarea id="aufdChatInput" placeholder="Nachricht an den Chef…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMaChatMsg();}"></textarea>
-      <button class="chat-send" onclick="sendMaChatMsg()">Senden</button>
+    <div class="aufd-tab">
+      <button class="stab" id="aufdTabProt" onclick="showAufdTab('prot')">📋 Protokoll</button>
+      <button class="stab active" id="aufdTabChat" onclick="showAufdTab('chat')">💬 Chat</button>
     </div>
-    <div class="err" id="aufdChatErr" style="margin-top:6px"></div>
+    <!-- Protokoll-Bereich (read-only) -->
+    <div class="aufd-pane" id="aufd-prot">
+      <div id="aufdProtBody"><div class="empty">Lädt…</div></div>
+    </div>
+    <!-- Chat-Bereich -->
+    <div class="aufd-pane active" id="aufd-chat">
+      <div class="chat-box" id="aufdChatBox"><div class="chat-empty">Noch keine Nachrichten</div></div>
+      <div class="chat-input-row">
+        <textarea id="aufdChatInput" placeholder="Nachricht an den Chef…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMaChatMsg();}"></textarea>
+        <button class="chat-send" onclick="sendMaChatMsg()">Senden</button>
+      </div>
+      <div class="err" id="aufdChatErr" style="margin-top:6px"></div>
+    </div>
   </div>
 </div>
 
@@ -1795,8 +1809,12 @@ function openAufDetails(aufId){
   _aufdAufId=aufId;
   const a=_auftraege.find(x=>x.id===aufId);
   if(!a){toast('Auftrag nicht gefunden','bad');return;}
-  document.getElementById('aufdTitle').textContent=a.kunde||'Chat';
+  document.getElementById('aufdTitle').textContent=a.kunde||'Auftrag';
   document.getElementById('aufdSub').textContent=a.beschreibung||'';
+  // Bei erledigten Aufträgen direkt mit Protokoll öffnen, sonst Chat
+  const isErledigt=a.status==='erledigt';
+  showAufdTab(isErledigt?'prot':'chat');
+  _renderAufdProtokoll(a);
   document.getElementById('aufdChatInput').value='';
   document.getElementById('aufdChatErr').textContent='';
   document.getElementById('aufdChatBox').innerHTML='<div class="chat-empty">Lädt…</div>';
@@ -1828,6 +1846,68 @@ function openAufDetails(aufId){
       document.getElementById('aufdChatBox').innerHTML='<div class="chat-empty">Fehler: '+esc(err.message)+'</div>';
     });
   document.getElementById('aufDetailsModal').classList.add('open');
+}
+function showAufdTab(tab){
+  document.querySelectorAll('#aufDetailsModal .aufd-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#aufDetailsModal .aufd-tab .stab').forEach(t=>t.classList.remove('active'));
+  const pane=document.getElementById('aufd-'+tab); if(pane) pane.classList.add('active');
+  const btnMap={prot:'aufdTabProt',chat:'aufdTabChat'};
+  const btn=document.getElementById(btnMap[tab]); if(btn) btn.classList.add('active');
+}
+function _renderAufdProtokoll(a){
+  const body=document.getElementById('aufdProtBody');
+  if(!body||!a) return;
+  const isErledigt=a.status==='erledigt';
+  let h='';
+  const statusTxt=isErledigt?'✅ Erledigt':(a.status==='inarbeit'?'⏱ In Arbeit':'📋 Offen');
+  const statusCol=isErledigt?'#059669':(a.status==='inarbeit'?'#d97706':'#2563eb');
+  const statusBg=isErledigt?'rgba(16,185,129,.08)':(a.status==='inarbeit'?'rgba(245,158,11,.08)':'rgba(37,99,235,.08)');
+  h+='<div style="padding:8px 12px;background:'+statusBg+';border:1px solid '+statusCol+'33;border-radius:8px;margin-bottom:10px;font-size:.72rem;font-weight:700;color:'+statusCol+'">'+statusTxt;
+  if(a.erledigtAm) h+=' <span style="font-weight:500;color:var(--mu);font-family:\'JetBrains Mono\',monospace;font-size:.62rem">· '+new Date(a.erledigtAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>';
+  h+='</div>';
+  h+='<div style="padding:10px;background:var(--sur2);border-radius:8px;margin-bottom:10px;font-size:.7rem;line-height:1.6">';
+  if(a.kunde) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Kunde:</span><b>'+esc(a.kunde)+'</b></div>';
+  if(a.adresse) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Adresse:</span>'+esc(a.adresse)+'</div>';
+  if(a.beschreibung) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Auftrag:</span>'+esc(a.beschreibung)+'</div>';
+  if(a.frist) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Frist:</span>'+esc(a.frist)+'</div>';
+  h+='</div>';
+  if(a.fotosAG&&a.fotosAG.length){
+    h+='<div style="font-size:.7rem;font-weight:700;color:#2563eb;margin:10px 0 6px">📎 Referenzbilder vom Betrieb</div>';
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
+    a.fotosAG.forEach(f=>{h+='<a href="'+f+'" target="_blank" style="display:block"><img src="'+f+'" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--brd)"></a>';});
+    h+='</div>';
+  }
+  if(isErledigt||a.taetigkeit||a.stunden||(a.material&&a.material.length)||(a.fotos&&a.fotos.length)||a.unterschrift){
+    h+='<div style="border-top:1px solid var(--brd);margin:12px 0 8px;padding-top:10px">';
+    h+='<div style="font-size:.75rem;font-weight:800;color:var(--tx);margin-bottom:8px">🔧 Durchgeführte Arbeit</div>';
+    if(a.taetigkeit){
+      h+='<div style="padding:8px 10px;background:rgba(5,150,105,.05);border:1px solid rgba(5,150,105,.15);border-radius:6px;margin-bottom:8px;font-size:.72rem;line-height:1.5;white-space:pre-wrap">'+esc(a.taetigkeit)+'</div>';
+    }
+    if(a.stunden){
+      h+='<div style="font-size:.72rem;margin-bottom:6px"><span style="color:var(--mu)">⏱ Stundenaufwand:</span> <b>'+esc(String(a.stunden))+' h</b></div>';
+    }
+    if(a.material&&a.material.length){
+      h+='<div style="font-size:.7rem;margin-bottom:8px"><div style="color:var(--mu);margin-bottom:4px">🧱 Verwendetes Material:</div>';
+      a.material.forEach(m=>{h+='<span style="display:inline-block;padding:3px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;font-size:.65rem;margin:2px">'+esc(m)+'</span>';});
+      h+='</div>';
+    }
+    if(a.fotos&&a.fotos.length){
+      h+='<div style="font-size:.7rem;color:var(--mu);margin:8px 0 4px">📸 Fotodokumentation:</div>';
+      h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
+      a.fotos.forEach(f=>{h+='<a href="'+f+'" target="_blank" style="display:block"><img src="'+f+'" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--brd)"></a>';});
+      h+='</div>';
+    }
+    if(a.unterschrift){
+      h+='<div style="font-size:.7rem;color:var(--mu);margin:8px 0 4px">✍ Kundenunterschrift:</div>';
+      h+='<div style="padding:8px;background:#fff;border:1px solid var(--brd);border-radius:6px;display:inline-block;margin-bottom:8px"><img src="'+a.unterschrift+'" style="height:60px"></div>';
+    } else if(a.unterschriftVerweigert){
+      h+='<div style="padding:8px 10px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:6px;margin-bottom:8px;font-size:.68rem;color:#dc2626"><b>⚠ Unterschrift verweigert</b>'+(a.unterschriftVerweigertGrund?'<br>Grund: '+esc(a.unterschriftVerweigertGrund):'')+'</div>';
+    }
+    h+='</div>';
+  } else {
+    h+='<div class="empty" style="margin-top:10px">Noch keine Erledigungsdaten</div>';
+  }
+  body.innerHTML=h;
 }
 function closeAufDetails(){
   if(_aufdChatUnsub){_aufdChatUnsub();_aufdChatUnsub=null;}
