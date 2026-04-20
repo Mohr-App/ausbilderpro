@@ -468,6 +468,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="flex:1"><label class="fl">Termin (optional)</label><input class="fi" type="date" id="aufTerminDatum" style="font-size:.8rem"></div>
       <div style="flex:1"><label class="fl">Uhrzeit</label><input class="fi" type="time" id="aufTerminUhrzeit" style="font-size:.8rem"></div>
     </div>
+    <label style="display:flex;align-items:center;gap:8px;margin:6px 0;padding:8px 10px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.15);border-radius:8px;cursor:pointer;user-select:none;font-size:.7rem;color:var(--tx)">
+      <input type="checkbox" id="aufTerminMail" checked style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb">
+      <span>📧 Kunde per E-Mail über Termin informieren</span>
+    </label>
     <div><label class="fl">Frist (optional)</label><input class="fi" type="date" id="aufFrist" style="font-size:.8rem"></div>
     <div><label class="fl">Zuweisen an (Mehrfach möglich)</label><select class="fi" id="aufMa" multiple style="font-size:.8rem;min-height:80px"><option value="" disabled>Bitte wählen…</option></select></div>
     <label class="fl" style="margin-top:8px">Bilder anfügen (optional)</label>
@@ -526,7 +530,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="flex:1"><label class="fl">Termin-Datum</label><input class="fi" type="date" id="aufdTerminDatum" style="font-size:.8rem"></div>
         <div style="flex:1"><label class="fl">Uhrzeit</label><input class="fi" type="time" id="aufdTerminUhrzeit" style="font-size:.8rem"></div>
       </div>
-      <button class="btn" onclick="saveAufdKundeTermin()" style="margin-top:10px;width:100%;font-size:.82rem;padding:10px">✓ Speichern (Kunde wird benachrichtigt)</button>
+      <label style="display:flex;align-items:center;gap:8px;margin:6px 0;padding:8px 10px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.15);border-radius:8px;cursor:pointer;user-select:none;font-size:.7rem;color:var(--tx)">
+        <input type="checkbox" id="aufdTerminMail" checked style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb">
+        <span>📧 Kunde bei Änderung per E-Mail informieren</span>
+      </label>
+      <button class="btn" onclick="saveAufdKundeTermin()" style="margin-top:6px;width:100%;font-size:.82rem;padding:10px">✓ Speichern</button>
       <div class="err" id="aufdKundeErr" style="margin-top:6px"></div>
       <div id="aufdKundeStatus" style="margin-top:12px;font-size:.7rem;color:var(--mu);line-height:1.5"></div>
       <div id="aufdKundeActions" style="margin-top:10px;display:none">
@@ -1648,6 +1656,7 @@ function openAuftragModal(){
   document.getElementById('aufBeschr').value='';
   document.getElementById('aufTerminDatum').value='';
   document.getElementById('aufTerminUhrzeit').value='';
+  document.getElementById('aufTerminMail').checked=true;
   document.getElementById('aufFrist').value='';
   document.getElementById('aufErr').textContent='';
   _pendingAufPhotos=[];
@@ -2457,11 +2466,16 @@ function agAuftragErstellen(){
     _pendingAufPhotos=[];
     _aufRenderPhotos();
     closeAuftragModal();
-    // Termin-Mail an Kunde wenn Email + Termin vorhanden
-    if(kundeEmail&&terminDatum){
+    // Termin-Mail an Kunde wenn Email + Termin + Checkbox aktiv
+    const sendTerminMail=document.getElementById('aufTerminMail').checked;
+    if(kundeEmail&&terminDatum&&sendTerminMail){
       refs.forEach(r=>sendTerminMailToKunde({...baseData,...r}));
+      // Mail-Log am Auftrag speichern
+      refs.forEach(r=>{
+        db.collection('globalTN').doc(r.tnId).collection('auftraege').doc(r.id).update({terminMailAt:Date.now()}).catch(()=>{});
+      });
     }
-    toast('📋 Auftrag an '+maIds.length+' Mitarbeiter erstellt'+(kundeEmail&&terminDatum?' · 📧 Kunde benachrichtigt':''));
+    toast('📋 Auftrag an '+maIds.length+' Mitarbeiter erstellt'+(kundeEmail&&terminDatum&&sendTerminMail?' · 📧 Kunde benachrichtigt':''));
     loadAgAuftraege();
   }).catch(e=>{err.textContent='❌ '+e.message;});
 }
@@ -2496,12 +2510,23 @@ function sendKundenBescheinigungMail(tnId, aufId){
   db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).get().then(doc=>{
     if(!doc.exists){toast('Auftrag nicht gefunden','bad');return;}
     const d=doc.data();
+    // Unterschriftsprüfung
+    if(!d.unterschrift && !d.unterschriftVerweigert){
+      const opt=prompt('Keine Kundenunterschrift vorhanden.\n\nGeben Sie "VERWEIGERT" ein um die Bescheinigung trotzdem zu senden (Kunde hat Unterschrift verweigert).\n\nAbbrechen mit leer lassen oder "Cancel".','');
+      if(!opt || opt.trim().toUpperCase()!=='VERWEIGERT') return;
+      const grund=prompt('Optional: Grund/Vermerk zur Verweigerung (wird auf der Bescheinigung vermerkt):','')||'';
+      db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).update({
+        unterschriftVerweigert:true,
+        unterschriftVerweigertAm:Date.now(),
+        unterschriftVerweigertGrund:grund
+      }).catch(()=>{});
+      d.unterschriftVerweigert=true; d.unterschriftVerweigertAm=Date.now(); d.unterschriftVerweigertGrund=grund;
+    }
     let email=d.kundeEmail;
     if(!email){
       email=prompt('E-Mail-Adresse des Kunden für die Bescheinigung:','');
       if(!email) return;
       email=email.trim().toLowerCase();
-      // Mailadresse auch speichern
       db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).update({kundeEmail:email}).catch(()=>{});
     }
     const az=_azubis.find(a=>a.id===tnId);
@@ -2543,6 +2568,9 @@ function _kundenBescheinigungHtml(d, firma, maName, dat){
   }
   if(d.unterschrift){
     h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Kundenunterschrift</h3><div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px;display:inline-block"><img src="'+d.unterschrift+'" style="height:80px"></div>';
+  } else if(d.unterschriftVerweigert){
+    const vDat=d.unterschriftVerweigertAm?new Date(d.unterschriftVerweigertAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):dat;
+    h+='<h3 style="color:#d97706;font-size:14px;margin:16px 0 6px">⚠ Unterschrift verweigert</h3><div style="padding:10px 12px;background:#fffbeb;border-left:3px solid #d97706;border-radius:4px;font-size:12px;line-height:1.55">Der Kunde war vor Ort, hat die Unterschrift jedoch verweigert.<br>Datum: '+vDat+(d.unterschriftVerweigertGrund?'<br>Vermerk: '+esc(d.unterschriftVerweigertGrund):'')+'</div>';
   }
   h+='<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="font-size:11px;color:#94a3b8">Diese Bescheinigung wurde elektronisch erstellt und ist ohne Unterschrift gültig.</p></div>';
   return h;
@@ -2715,8 +2743,9 @@ function saveAufdKundeTermin(){
     // Lokales Update
     Object.assign(a, {kundeEmail:email, terminDatum, terminUhrzeit});
     err.textContent='';
-    // Wenn Termin gesetzt + Email vorhanden + termChanged → Mail senden
-    if(email && terminDatum && termChanged){
+    // Wenn Termin gesetzt + Email + Checkbox aktiv + termChanged → Mail
+    const wantMail=document.getElementById('aufdTerminMail').checked;
+    if(email && terminDatum && termChanged && wantMail){
       const az=_azubis.find(x=>x.id===_aufdTn);
       const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
       sendTerminMailToKunde({...a, kundeEmail:email, terminDatum, terminUhrzeit, maName});

@@ -1900,6 +1900,18 @@ function maybeSendBescheinigung(aufId){
   db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).get().then(doc=>{
     if(!doc.exists) return;
     const d=doc.data();
+    // Unterschrift vorhanden ODER Verweigerung bereits dokumentiert?
+    if(!d.unterschrift && !d.unterschriftVerweigert){
+      const opt=prompt('Keine Kundenunterschrift vorhanden.\n\nBescheinigung kann nur gesendet werden wenn:\n- Kunde unterschrieben hat, oder\n- Unterschrift explizit verweigert wurde\n\nGeben Sie "VERWEIGERT" ein wenn der Kunde die Unterschrift verweigert hat.\nLeer lassen = Versand abbrechen.','');
+      if(!opt || opt.trim().toUpperCase()!=='VERWEIGERT') return;
+      const grund=prompt('Optional: Grund/Vermerk zur Verweigerung (wird auf der Bescheinigung vermerkt):','')||'';
+      db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).update({
+        unterschriftVerweigert:true,
+        unterschriftVerweigertAm:Date.now(),
+        unterschriftVerweigertGrund:grund
+      }).catch(()=>{});
+      d.unterschriftVerweigert=true; d.unterschriftVerweigertAm=Date.now(); d.unterschriftVerweigertGrund=grund;
+    }
     let email=d.kundeEmail;
     if(!email){
       const ask=confirm('Auftragsbescheinigung jetzt per E-Mail an den Kunden senden?\n\nEs wurde noch keine Kunden-E-Mail hinterlegt.');
@@ -1952,6 +1964,9 @@ function _kundenBescheinigungHtml(d, firma, maName, dat){
   }
   if(d.unterschrift){
     h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Kundenunterschrift</h3><div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px;display:inline-block"><img src="'+d.unterschrift+'" style="height:80px"></div>';
+  } else if(d.unterschriftVerweigert){
+    const vDat=d.unterschriftVerweigertAm?new Date(d.unterschriftVerweigertAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):dat;
+    h+='<h3 style="color:#d97706;font-size:14px;margin:16px 0 6px">⚠ Unterschrift verweigert</h3><div style="padding:10px 12px;background:#fffbeb;border-left:3px solid #d97706;border-radius:4px;font-size:12px;line-height:1.55">Der Kunde war vor Ort, hat die Unterschrift jedoch verweigert.<br>Datum: '+vDat+(d.unterschriftVerweigertGrund?'<br>Vermerk: '+esc(d.unterschriftVerweigertGrund):'')+'</div>';
   }
   h+='<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="font-size:11px;color:#94a3b8">Diese Bescheinigung wurde elektronisch erstellt.</p></div>';
   return h;
