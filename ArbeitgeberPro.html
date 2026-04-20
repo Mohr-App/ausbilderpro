@@ -444,6 +444,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div><label class="fl">Beschreibung</label><input class="fi" id="aufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.8rem"></div>
     <div><label class="fl">Frist (optional)</label><input class="fi" type="date" id="aufFrist" style="font-size:.8rem"></div>
     <div><label class="fl">Zuweisen an (Mehrfach möglich)</label><select class="fi" id="aufMa" multiple style="font-size:.8rem;min-height:80px"><option value="" disabled>Bitte wählen…</option></select></div>
+    <label class="fl" style="margin-top:8px">Bilder anfügen (optional)</label>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <label style="flex:1;padding:10px;background:rgba(37,99,235,.08);color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:10px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
+        📷 Kamera
+        <input type="file" id="aufCamFile" accept="image/*" capture="environment" onchange="_onAufPhotos(event)" style="display:none">
+      </label>
+      <label style="flex:1;padding:10px;background:rgba(37,99,235,.08);color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:10px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
+        🖼 Datei(en)
+        <input type="file" id="aufGalFile" accept="image/*" multiple onchange="_onAufPhotos(event)" style="display:none">
+      </label>
+    </div>
+    <div id="aufPhotosPreview" style="display:none;margin-bottom:10px"></div>
     <button class="btn" title="📋 Auftrag erstellen" onclick="agAuftragErstellen()" style="margin-top:10px;width:100%;font-size:.85rem;padding:12px">📋 Auftrag erstellen</button>
     <div class="err" id="aufErr" style="margin-top:6px"></div>
   </div>
@@ -1468,12 +1480,73 @@ function _resizePhoto(file, cb){
 }
 
 // ─── Modals: Öffnen / Schließen ───────────────────────────────
+// ─── Auftrag: Bilder anhängen (Kamera/Datei, max 8, resize auf 1200px) ───
+let _pendingAufPhotos=[];
+function _resizeAuftragPhoto(file, cb){
+  if(!file){cb(null);return;}
+  const fr=new FileReader();
+  fr.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const maxD=1200;
+      let w=img.width, h=img.height;
+      if(w>=h && w>maxD){h=Math.round(h*maxD/w); w=maxD;}
+      else if(h>maxD){w=Math.round(w*maxD/h); h=maxD;}
+      const c=document.createElement('canvas');
+      c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      cb(c.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror=()=>cb(null);
+    img.src=e.target.result;
+  };
+  fr.onerror=()=>cb(null);
+  fr.readAsDataURL(file);
+}
+function _onAufPhotos(ev){
+  const files=Array.from(ev.target.files||[]);
+  if(!files.length) return;
+  const slots=8-_pendingAufPhotos.length;
+  if(slots<=0){toast('Max. 8 Bilder pro Auftrag','bad');ev.target.value='';return;}
+  const use=files.slice(0, slots);
+  if(files.length>slots) toast('Nur '+slots+' Bild(er) angefügt (max. 8)','bad');
+  let done=0;
+  use.forEach(f=>{
+    _resizeAuftragPhoto(f, d=>{
+      if(d) _pendingAufPhotos.push(d);
+      done++;
+      if(done===use.length) _aufRenderPhotos();
+    });
+  });
+  ev.target.value='';
+}
+function _aufRenderPhotos(){
+  const el=document.getElementById('aufPhotosPreview');
+  if(!el) return;
+  if(!_pendingAufPhotos.length){el.style.display='none';el.innerHTML='';return;}
+  el.style.display='';
+  el.innerHTML='<div style="font-size:.6rem;color:var(--mu);margin-bottom:6px">'+_pendingAufPhotos.length+' Bild'+(_pendingAufPhotos.length!==1?'er':'')+' angefügt</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +_pendingAufPhotos.map((p,i)=>
+      '<div style="position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1.5px solid var(--brd)">'
+        +'<img src="'+p+'" style="width:100%;height:100%;object-fit:cover">'
+        +'<button onclick="_aufRemovePhoto('+i+')" title="Entfernen" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(220,38,38,.92);color:#fff;border:none;font-size:.65rem;font-weight:700;cursor:pointer;line-height:1;padding:0">✕</button>'
+      +'</div>'
+    ).join('')
+    +'</div>';
+}
+function _aufRemovePhoto(idx){_pendingAufPhotos.splice(idx,1);_aufRenderPhotos();}
+
 function openAuftragModal(){
   document.getElementById('aufKunde').value='';
   document.getElementById('aufAdresse').value='';
   document.getElementById('aufBeschr').value='';
   document.getElementById('aufFrist').value='';
   document.getElementById('aufErr').textContent='';
+  _pendingAufPhotos=[];
+  _aufRenderPhotos();
+  const cf=document.getElementById('aufCamFile'); if(cf) cf.value='';
+  const gf=document.getElementById('aufGalFile'); if(gf) gf.value='';
   fillAgAzubiSelect();
   document.getElementById('auftragModal').classList.add('open');
 }
@@ -2179,14 +2252,21 @@ function renderAgAuftraege(){
     let h='';
     offen.forEach(a=>{
       const dat=a.erstelltAm?new Date(a.erstelltAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
+      const thumbs=(a.fotosAG&&a.fotosAG.length)
+        ? '<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">'
+          +a.fotosAG.slice(0,4).map(f=>'<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--brd);cursor:pointer" loading="lazy">').join('')
+          +(a.fotosAG.length>4?'<div style="width:44px;height:44px;border-radius:6px;border:1px solid var(--brd);background:var(--sur2);display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:700;color:var(--mu)">+'+(a.fotosAG.length-4)+'</div>':'')
+          +'</div>'
+        : '';
       h+='<div style="padding:10px;border:1.5px solid rgba(37,99,235,.2);border-radius:10px;margin-bottom:8px;background:rgba(37,99,235,.03)">'
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
         +'<span style="font-size:.82rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
         +'<span style="font-size:.55rem;color:var(--mu)">'+dat+'</span></div>'
         +(a.adresse?'<div style="font-size:.68rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
         +(a.beschreibung?'<div style="font-size:.68rem;color:var(--mu)">'+esc(a.beschreibung)+'</div>':'')
-        +'<div style="font-size:.6rem;color:var(--acc);margin-top:4px">👤 '+esc(a.tnName)+'</div>'
+        +'<div style="font-size:.6rem;color:var(--acc);margin-top:4px">👤 '+esc(a.tnName)+(a.fotosAG&&a.fotosAG.length?' · 📎 '+a.fotosAG.length:'')+'</div>'
         +(a.frist?'<div style="font-size:.58rem;margin-top:2px;'+(a.frist<localDate()?'color:#dc2626;font-weight:700':'color:#d97706')+'">📅 Frist: '+new Date(a.frist+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})+(a.frist<localDate()?' ⚠ ÜBERFÄLLIG':'')+'</div>':'')
+        +thumbs
         +'</div>';
     });
     elO.innerHTML=h;
@@ -2205,6 +2285,7 @@ function renderAgAuftraege(){
         +(a.taetigkeit?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">🔧 '+esc(a.taetigkeit)+'</div>':'')
         +'<div style="font-size:.55rem;color:var(--acc);margin-top:2px">'
         +(a.stunden?'⏱ '+a.stunden+'h ':'')
+        +(a.fotosAG?'📎 '+a.fotosAG.length+' ':'')
         +(a.fotos?'📸 '+a.fotos.length+' ':'')
         +(a.unterschrift?'✍ ':'')
         +(a.material?'🧱 '+a.material.length+' ':'')
@@ -2232,6 +2313,7 @@ function agAuftragErstellen(){
   err.textContent='Wird erstellt…';
   const data={kunde, adresse, beschreibung:beschr, status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma};
   if(frist) data.frist=frist;
+  if(_pendingAufPhotos.length) data.fotosAG=_pendingAufPhotos.slice();
   const promises=maIds.map(id=>db.collection('globalTN').doc(id).collection('auftraege').add(data));
   Promise.all(promises).then(()=>{
     err.textContent='';
@@ -2240,6 +2322,8 @@ function agAuftragErstellen(){
     document.getElementById('aufBeschr').value='';
     document.getElementById('aufFrist').value='';
     sel.selectedIndex=-1;
+    _pendingAufPhotos=[];
+    _aufRenderPhotos();
     closeAuftragModal();
     toast('📋 Auftrag an '+maIds.length+' Mitarbeiter erstellt');
     loadAgAuftraege();
@@ -2268,7 +2352,13 @@ function showAuftragDoku(tnId,aufId){
     if(d.material&&d.material.length) html+='<div class="dv-section"><div class="dv-label">🧱 Material ('+d.material.length+')</div><div style="display:flex;gap:4px;flex-wrap:wrap">'+d.material.map(m=>'<span style="padding:4px 10px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:6px;font-size:.68rem;font-weight:600;color:#2563eb">'+esc(m)+'</span>').join('')+'</div></div>';
     // GPS
     if(d.gpsErledigt) html+='<div class="dv-section"><div class="dv-label">📍 Standort</div><div style="font-size:.72rem"><a href="https://maps.google.com/?q='+d.gpsErledigt.lat+','+d.gpsErledigt.lng+'" target="_blank" style="color:#2563eb">'+d.gpsErledigt.lat+', '+d.gpsErledigt.lng+'</a> <span style="color:#94a3b8">(±'+d.gpsErledigt.acc+'m)</span></div></div>';
-    // Fotos
+    // AG-Referenzbilder (beim Erstellen angehängt)
+    if(d.fotosAG&&d.fotosAG.length){
+      html+='<div class="dv-section"><div class="dv-label">📎 Referenzbilder vom AG ('+d.fotosAG.length+')</div><div class="dv-photos">';
+      d.fotosAG.forEach(f=>{html+='<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')" loading="lazy">';});
+      html+='</div></div>';
+    }
+    // Fotos (vom MA bei Abschluss)
     if(d.fotos&&d.fotos.length){
       html+='<div class="dv-section"><div class="dv-label">📸 Fotos ('+d.fotos.length+')</div><div class="dv-photos">';
       d.fotos.forEach(f=>{html+='<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')" loading="lazy">';});
@@ -2476,6 +2566,8 @@ function exportAuftragsprotokoll(tnId,aufId){
     const az=_azubis.find(a=>a.id===tnId);
     const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
     const dat=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    let fotosAGHtml='';
+    if(d.fotosAG&&d.fotosAG.length){fotosAGHtml='<h3>Referenzbilder vom AG</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">';d.fotosAG.forEach(f=>{fotosAGHtml+='<img src="'+f+'" style="width:180px;border-radius:6px;border:1px solid #cbd5e1">';});fotosAGHtml+='</div>';}
     let fotosHtml='';
     if(d.fotos&&d.fotos.length){fotosHtml='<h3>Fotodokumentation</h3><div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">';d.fotos.forEach(f=>{fotosHtml+='<img src="'+f+'" style="width:180px;border-radius:6px;border:1px solid #cbd5e1">';});fotosHtml+='</div>';}
     let sigHtml='';
@@ -2495,7 +2587,7 @@ function exportAuftragsprotokoll(tnId,aufId){
       +(d.taetigkeit?'<h3>Durchgeführte Arbeiten</h3><div style="margin:8px 0;line-height:1.6">'+esc(d.taetigkeit)+'</div>':'')
       +(d.stunden?'<div class="row"><span class="label">Stundenaufwand:</span><span class="val">'+d.stunden+' Stunden</span></div>':'')
       +(d.material&&d.material.length?'<h3>Verwendetes Material</h3><div style="margin:8px 0">'+d.material.map(m=>'<span class="mat">'+esc(m)+'</span>').join('')+'</div>':'')
-      +fotosHtml+sigHtml
+      +fotosAGHtml+fotosHtml+sigHtml
       +'<div style="margin-top:30px;font-size:9px;color:#94a3b8">Erledigt am: '+dat+'</div>'
       +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
     const w=window.open('','_blank');
