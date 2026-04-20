@@ -591,8 +591,55 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .aufimg-ag{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding:8px;background:rgba(37,99,235,.04);border:1px dashed rgba(37,99,235,.3);border-radius:8px}
 .aufimg-ag-title{width:100%;font-size:.58rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
 .aufimg-ag img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid rgba(37,99,235,.2);cursor:pointer}
+.nachtrag-block{margin-top:8px;padding:8px 10px;background:rgba(245,158,11,.06);border-left:3px solid #d97706;border-radius:6px}
+.nachtrag-block-title{font-size:.58rem;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.nachtrag-item{padding:6px 0;border-bottom:1px solid rgba(245,158,11,.15)}
+.nachtrag-item:last-child{border-bottom:none}
+.nachtrag-item-head{font-size:.52rem;color:var(--mu);font-family:'JetBrains Mono',monospace;margin-bottom:2px}
+.nachtrag-item-tx{font-size:.74rem;line-height:1.4;color:var(--tx)}
+.nachtrag-item-ph{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.nachtrag-item-ph img{width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid rgba(245,158,11,.3);cursor:pointer}
+.chat-fab{display:inline-flex;align-items:center;gap:4px;margin-top:8px;padding:8px 14px;background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);border-radius:8px;color:var(--acc);font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;position:relative}
+.chat-fab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.52rem;font-weight:800;border-radius:50%;padding:0 4px;margin-left:4px}
+.mdl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.mdl.open{display:flex}
+.mdl-box{background:#fff;border-radius:16px;width:100%;max-width:480px;padding:22px 22px 18px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.mdl-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.mdl-title{font-size:1rem;font-weight:800;display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.mdl-x{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--mu);padding:2px 6px;line-height:1}
+.chat-box{max-height:55vh;overflow-y:auto;padding:8px;background:var(--sur2);border-radius:10px;margin-bottom:10px}
+.chat-msg{margin-bottom:8px;display:flex;flex-direction:column;max-width:80%}
+.chat-msg.mine{align-self:flex-end;margin-left:auto;align-items:flex-end}
+.chat-msg.other{align-self:flex-start;margin-right:auto;align-items:flex-start}
+.chat-msg-b{padding:8px 12px;border-radius:12px;font-size:.78rem;line-height:1.4;word-wrap:break-word}
+.chat-msg.mine .chat-msg-b{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border-bottom-right-radius:4px}
+.chat-msg.other .chat-msg-b{background:#fff;border:1px solid var(--brd);color:var(--tx);border-bottom-left-radius:4px}
+.chat-msg-meta{font-size:.52rem;color:var(--mu);margin-top:2px;padding:0 4px;font-family:'JetBrains Mono',monospace}
+.chat-empty{text-align:center;color:var(--mu);font-size:.7rem;padding:20px;font-family:'JetBrains Mono',monospace}
+.chat-input-row{display:flex;gap:6px;align-items:flex-end}
+.chat-input-row textarea{flex:1;padding:10px;border:1.5px solid var(--brd);border-radius:10px;font-size:.78rem;font-family:'Sora',sans-serif;resize:none;max-height:100px;min-height:38px;outline:none}
+.chat-input-row textarea:focus{border-color:var(--acc)}
+.chat-send{padding:10px 16px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;white-space:nowrap}
 </style>
 <div class="aufimg-full" id="aufImgFull" onclick="this.classList.remove('open')"><img id="aufImgFullSrc"></div>
+
+<!-- AUFTRAG-DETAILS MODAL (Chat) -->
+<div class="mdl" id="aufDetailsModal">
+  <div class="mdl-box" style="max-width:520px">
+    <div class="mdl-head">
+      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center;flex-shrink:0">💬</span><span id="aufdTitle">Chat</span></div>
+      <button class="mdl-x" onclick="closeAufDetails()" title="Schließen">✕</button>
+    </div>
+    <div id="aufdSub" style="font-size:.65rem;color:var(--mu);margin-bottom:10px"></div>
+    <div class="chat-box" id="aufdChatBox"><div class="chat-empty">Noch keine Nachrichten</div></div>
+    <div class="chat-input-row">
+      <textarea id="aufdChatInput" placeholder="Nachricht an den Chef…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAzChatMsg();}"></textarea>
+      <button class="chat-send" onclick="sendAzChatMsg()">Senden</button>
+    </div>
+    <div class="err" id="aufdChatErr" style="margin-top:6px"></div>
+  </div>
+</div>
+
 <div class="as-overlay" id="asModal">
   <div class="as-box">
     <div class="as-title" id="asTitle">⏹ Ausstempeln</div>
@@ -2352,6 +2399,77 @@ function loadAuftraege(){
     });
 }
 
+// ─── Auftrag-Details-Modal (Chat) ─────────────────────────────
+let _aufdAufId=null, _aufdChatUnsub=null;
+function _azAufUnread(a){
+  if(!a||!a.lastMessageAt||a.lastMessageVon==='ma') return 0;
+  const seen=(a.lastSeenBy&&a.lastSeenBy[_uid])||0;
+  return a.lastMessageAt>seen?1:0;
+}
+function openAufDetails(aufId){
+  _aufdAufId=aufId;
+  const a=_auftraege.find(x=>x.id===aufId);
+  if(!a){toast('Auftrag nicht gefunden','bad');return;}
+  document.getElementById('aufdTitle').textContent=a.kunde||'Chat';
+  document.getElementById('aufdSub').textContent=a.beschreibung||'';
+  document.getElementById('aufdChatInput').value='';
+  document.getElementById('aufdChatErr').textContent='';
+  document.getElementById('aufdChatBox').innerHTML='<div class="chat-empty">Lädt…</div>';
+  // Als gelesen markieren
+  const seenKey='lastSeenBy.'+_uid;
+  db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).update({[seenKey]:Date.now()}).catch(()=>{});
+  // Live-Subscription
+  if(_aufdChatUnsub){_aufdChatUnsub();_aufdChatUnsub=null;}
+  _aufdChatUnsub=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).collection('messages')
+    .orderBy('erstelltAm','asc').onSnapshot(snap=>{
+      const box=document.getElementById('aufdChatBox');
+      if(!snap.size){box.innerHTML='<div class="chat-empty">Noch keine Nachrichten</div>';return;}
+      let html='';
+      snap.forEach(doc=>{
+        const m=doc.data();
+        const mine=m.vonUid===_uid;
+        const time=new Date(m.erstelltAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        html+='<div class="chat-msg '+(mine?'mine':'other')+'">'
+          +(mine?'':'<div class="chat-msg-meta">'+esc(m.vonName||'')+'</div>')
+          +'<div class="chat-msg-b">'+esc(m.text||'')+'</div>'
+          +'<div class="chat-msg-meta">'+time+'</div>'
+          +'</div>';
+      });
+      box.innerHTML=html;
+      box.scrollTop=box.scrollHeight;
+    },err=>{
+      document.getElementById('aufdChatBox').innerHTML='<div class="chat-empty">Fehler: '+esc(err.message)+'</div>';
+    });
+  document.getElementById('aufDetailsModal').classList.add('open');
+}
+function closeAufDetails(){
+  if(_aufdChatUnsub){_aufdChatUnsub();_aufdChatUnsub=null;}
+  document.getElementById('aufDetailsModal').classList.remove('open');
+  _aufdAufId=null;
+  renderAuftraege(); // für Badge-Refresh
+}
+function sendAzChatMsg(){
+  if(!_aufdAufId) return;
+  const ti=document.getElementById('aufdChatInput');
+  const text=(ti.value||'').trim();
+  if(!text) return;
+  const err=document.getElementById('aufdChatErr');
+  err.textContent='';
+  const tnData=_tnData||{};
+  const name=((tnData.vorname||'')+' '+(tnData.nachname||'')).trim()||_email||'Mitarbeiter';
+  const msg={text, von:'ma', vonUid:_uid, vonName:name, erstelltAm:Date.now()};
+  const aufRef=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_aufdAufId);
+  aufRef.collection('messages').add(msg).then(()=>{
+    ti.value='';
+    return aufRef.update({
+      lastMessageAt:msg.erstelltAm,
+      lastMessagePreview:text.slice(0,60),
+      lastMessageVon:'ma',
+      ['lastSeenBy.'+_uid]:msg.erstelltAm
+    });
+  }).catch(e=>{err.textContent='❌ '+e.message;});
+}
+
 function showAufImgFull(src){
   const el=document.getElementById('aufImgFull');
   const im=document.getElementById('aufImgFullSrc');
@@ -2384,6 +2502,19 @@ function renderAuftraege(){
           +a.fotosAG.map(f=>'<img src="'+f+'" onclick="showAufImgFull(this.src)" loading="lazy">').join('')
           +'</div>'
         : '';
+      const nachBlock=(a.nachtraege&&a.nachtraege.length)
+        ? '<div class="nachtrag-block"><div class="nachtrag-block-title">➕ Nachträge vom Chef ('+a.nachtraege.length+')</div>'
+          +a.nachtraege.map(n=>{
+            const nd=new Date(n.erstelltAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+            const ph=(n.fotos&&n.fotos.length)
+              ? '<div class="nachtrag-item-ph">'+n.fotos.map(f=>'<img src="'+f+'" onclick="showAufImgFull(this.src)" loading="lazy">').join('')+'</div>'
+              : '';
+            return '<div class="nachtrag-item"><div class="nachtrag-item-head">'+esc(n.erstelltVon||'AG')+' · '+nd+'</div><div class="nachtrag-item-tx">'+esc(n.text||'')+'</div>'+ph+'</div>';
+          }).join('')
+          +'</div>'
+        : '';
+      const unread=_azAufUnread(a);
+      const chatBadge=unread?'<span class="chat-fab-badge">'+unread+'</span>':'';
       h+='<div style="padding:12px;border:1.5px solid '+borderCol+';border-radius:10px;margin-bottom:8px;background:'+bgCol+'">'
         +(isRunning?'<div style="font-size:.6rem;font-weight:700;color:#059669;margin-bottom:4px">▶ In Arbeit'+(seit?' seit '+seit:'')+'</div>':'')
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
@@ -2392,8 +2523,10 @@ function renderAuftraege(){
         +(a.adresse?'<a href="'+mapsUrl+'" target="_blank" style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:8px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:8px;text-decoration:none;font-size:.72rem;color:#2563eb;font-weight:600">📍 '+esc(a.adresse)+' <span style="margin-left:auto;font-size:.65rem">→ Maps</span></a>':'')
         +(a.beschreibung?'<div style="font-size:.78rem;color:var(--tx);margin-top:8px;padding:8px 10px;background:rgba(0,0,0,.02);border-radius:6px;line-height:1.5">'+esc(a.beschreibung)+'</div>':'')
         +refBilder
+        +nachBlock
         +(a.erstelltVon&&a.erstelltVon!=='selbst'?'<div style="font-size:.58rem;color:var(--mu);margin-top:4px">Von: '+esc(a.erstelltVon)+'</div>':'')
         +(a.frist?'<div style="font-size:.62rem;margin-top:2px;'+(a.frist<localDate()?'color:#dc2626;font-weight:700':'color:#d97706')+'">📅 Frist: '+new Date(a.frist+"T12:00").toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"2-digit"})+(a.frist<localDate()?' ⚠ ÜBERFÄLLIG':'')+'</div>':'')
+        +'<button class="chat-fab" onclick="openAufDetails(\''+a.id+'\')">💬 Chat mit Chef'+chatBadge+'</button>'
         +(isRunning
           ?'<button title="✅ Auftrag erledigen" onclick="auftragErledigen(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Auftrag erledigen</button>'
           :'<button title="▶ Auftrag starten" onclick="auftragStarten(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">▶ Auftrag starten</button>')
@@ -2406,12 +2539,16 @@ function renderAuftraege(){
     let h='';
     erledigt.forEach(a=>{
       const dat=a.erledigtAm?new Date(a.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-      h+='<div style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;opacity:.7">'
+      const nachCount=(a.nachtraege&&a.nachtraege.length)||0;
+      const unread=_azAufUnread(a);
+      const chatBadge=unread?'<span class="chat-fab-badge">'+unread+'</span>':'';
+      h+='<div style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;opacity:.85">'
         +'<div style="display:flex;justify-content:space-between">'
         +'<span style="font-size:.78rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
         +'<span style="font-size:.55rem;color:#059669;font-weight:600">✅ '+dat+'</span></div>'
         +(a.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
-        +((a.fotosAG||a.fotos||a.unterschrift)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(a.fotosAG?'📎 '+a.fotosAG.length+' ':'')+(a.fotos?'📸 '+a.fotos.length+' ':'')+(a.unterschrift?'✍ ':'')+'</div>':'')
+        +((a.fotosAG||a.fotos||a.unterschrift||nachCount)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(a.fotosAG?'📎 '+a.fotosAG.length+' ':'')+(a.fotos?'📸 '+a.fotos.length+' ':'')+(a.unterschrift?'✍ ':'')+(nachCount?'➕ '+nachCount+' ':'')+'</div>':'')
+        +'<button class="chat-fab" onclick="openAufDetails(\''+a.id+'\')" style="padding:6px 10px;font-size:.68rem;margin-top:6px">💬 Chat'+chatBadge+'</button>'
         +'</div>';
     });
     elE.innerHTML=h;
