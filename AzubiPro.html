@@ -675,6 +675,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div id="nachMatTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
         </div>
         <div id="nachPhotosPreview" style="display:none;margin-top:6px"></div>
+        <!-- Kundenunterschrift für Nachtrag -->
+        <div style="margin-top:8px;padding:8px;background:#fff;border:1.5px dashed #fed7aa;border-radius:8px">
+          <div style="font-size:.58rem;color:var(--mu);font-weight:700;margin-bottom:4px">✍ KUNDENUNTERSCHRIFT</div>
+          <canvas class="sig-canvas" id="nachSigCanvas" style="width:100%;height:100px;border:1.5px solid #e2e8f0;border-radius:6px;touch-action:none;cursor:crosshair;background:#fafbfc"></canvas>
+          <div style="display:flex;gap:4px;margin-top:4px;font-size:.62rem">
+            <button type="button" onclick="nachSigClear()" style="flex:1;padding:5px;background:#fff;border:1px solid var(--brd);border-radius:6px;color:var(--mu);font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">🗑 Löschen</button>
+            <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;padding:5px;background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.2);border-radius:6px;color:#dc2626;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">
+              <input type="checkbox" id="nachSigVerweigert" style="width:12px;height:12px;accent-color:#dc2626">
+              <span>Verweigert</span>
+            </label>
+          </div>
+        </div>
         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
           <label style="flex:1;min-width:80px;padding:8px;background:#fff;border:1.5px solid #fed7aa;border-radius:8px;font-size:.68rem;font-weight:700;color:#d97706;cursor:pointer;text-align:center;font-family:'Sora',sans-serif">📷 Kamera
             <input type="file" id="nachCamFile" accept="image/*" capture="environment" onchange="_onNachPhotos(event)" style="display:none" multiple>
@@ -2597,7 +2609,45 @@ function showAufdTab(tab){
     const a=_auftraege.find(x=>x.id===_aufdAufId);
     if(a) _renderNachListe(a);
     _populateNachMatList();
+    // Signature-Pad initialisieren (verzögert damit Canvas Bounding-Rect hat)
+    setTimeout(nachSigInit,50);
   }
+}
+// ─── Nachtrag-Signature ─────────────────────────────────────
+let _nachSigCanvas,_nachSigCtx,_nachSigDrawing=false,_nachSigPaths=[],_nachSigCurPath=[];
+function nachSigInit(){
+  _nachSigCanvas=document.getElementById('nachSigCanvas');
+  if(!_nachSigCanvas) return;
+  _nachSigCtx=_nachSigCanvas.getContext('2d');
+  const r=_nachSigCanvas.getBoundingClientRect();
+  if(!r.width) return;
+  _nachSigCanvas.width=r.width*2;_nachSigCanvas.height=r.height*2;
+  _nachSigCtx.scale(2,2);
+  _nachSigCtx.strokeStyle='#0f172a';_nachSigCtx.lineWidth=2;_nachSigCtx.lineCap='round';_nachSigCtx.lineJoin='round';
+  _nachSigPaths=[];_nachSigCurPath=[];
+  const pos=e=>{const r=_nachSigCanvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
+  _nachSigCanvas.onpointerdown=e=>{e.preventDefault();_nachSigDrawing=true;_nachSigCurPath=[];const p=pos(e);_nachSigCurPath.push(p);_nachSigCtx.beginPath();_nachSigCtx.moveTo(p.x,p.y);};
+  _nachSigCanvas.onpointermove=e=>{if(!_nachSigDrawing)return;e.preventDefault();const p=pos(e);_nachSigCurPath.push(p);_nachSigCtx.lineTo(p.x,p.y);_nachSigCtx.stroke();};
+  _nachSigCanvas.onpointerup=_nachSigCanvas.onpointerleave=e=>{if(_nachSigDrawing){_nachSigDrawing=false;if(_nachSigCurPath.length>1)_nachSigPaths.push([..._nachSigCurPath]);_nachSigCurPath=[];}};
+}
+function nachSigClear(){
+  _nachSigPaths=[];_nachSigCurPath=[];
+  if(_nachSigCtx&&_nachSigCanvas) _nachSigCtx.clearRect(0,0,_nachSigCanvas.width,_nachSigCanvas.height);
+}
+function nachSigGetData(){
+  if(!_nachSigPaths.length) return null;
+  const cv=document.createElement('canvas');
+  cv.width=400;cv.height=100;
+  const ctx=cv.getContext('2d');
+  const sx=400/(_nachSigCanvas.width/2),sy=100/(_nachSigCanvas.height/2);
+  ctx.strokeStyle='#0f172a';ctx.lineWidth=1.5;ctx.lineCap='round';ctx.lineJoin='round';
+  _nachSigPaths.forEach(path=>{
+    if(path.length<2) return;
+    ctx.beginPath();ctx.moveTo(path[0].x*sx,path[0].y*sy);
+    for(let i=1;i<path.length;i++) ctx.lineTo(path[i].x*sx,path[i].y*sy);
+    ctx.stroke();
+  });
+  return cv.toDataURL('image/png');
 }
 // ─── Nachträge ───────────────────────────────────────────────
 let _pendingNachPhotos=[], _pendingNachMat=[];
@@ -2655,6 +2705,12 @@ function _renderNachListe(a){
       html+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">';
       n.fotos.forEach(f=>{html+='<a href="'+f+'" target="_blank"><img src="'+f+'" style="width:50px;height:50px;object-fit:cover;border-radius:4px;border:1px solid '+col+'40"></a>';});
       html+='</div>';
+    }
+    if(n.unterschrift){
+      html+='<div style="margin-top:6px;font-size:.58rem;color:var(--mu);font-weight:700">✍ Kundenunterschrift:</div>';
+      html+='<div style="padding:4px;background:#fff;border:1px solid '+col+'40;border-radius:4px;display:inline-block;margin-top:3px"><img src="'+n.unterschrift+'" style="height:40px"></div>';
+    } else if(n.unterschriftVerweigert){
+      html+='<div style="margin-top:6px;padding:4px 8px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:4px;font-size:.6rem;color:#dc2626;font-weight:600">⚠ Unterschrift verweigert</div>';
     }
     html+='</div>';
   });
@@ -2718,25 +2774,37 @@ function saveNachtragAz(){
   const err=document.getElementById('nachErr');
   err.textContent='';err.style.color='#ef4444';
   if(!txt){err.textContent='Bitte Beschreibung eingeben';return;}
+  const sigData=nachSigGetData();
+  const sigVerweigert=document.getElementById('nachSigVerweigert')?.checked;
+  // Warnung wenn weder Unterschrift noch Verweigerung bei relevanten Nachträgen
+  if(!sigData&&!sigVerweigert&&(std>0||_pendingNachMat.length>0)){
+    if(!confirm('Keine Kundenunterschrift vorhanden.\n\nNachtrag trotzdem speichern?\n\nTipp: Kunde unterschreiben lassen oder "Verweigert" ankreuzen.')) return;
+  }
   err.style.color='var(--acc)';err.textContent='Wird gespeichert…';
   const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||_email||'Mitarbeiter';
   const n={text:txt,erstelltAm:Date.now(),erstelltVon:name,erstelltVonUid:_uid};
   if(std>0) n.stunden=std;
   if(_pendingNachMat.length) n.material=_pendingNachMat.slice();
   if(_pendingNachPhotos.length) n.fotos=_pendingNachPhotos.slice();
+  if(sigData) n.unterschrift=sigData;
+  else if(sigVerweigert){n.unterschriftVerweigert=true;n.unterschriftVerweigertAm=Date.now();}
   const aufRef=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_aufdAufId);
   aufRef.update({nachtraege:firebase.firestore.FieldValue.arrayUnion(n)}).then(()=>{
     err.textContent='';
     toast('➕ Nachtrag gespeichert');
     document.getElementById('nachTxt').value='';
     document.getElementById('nachStunden').value='';
+    if(document.getElementById('nachSigVerweigert')) document.getElementById('nachSigVerweigert').checked=false;
     _pendingNachPhotos=[];_pendingNachMat=[];
     _nachRenderPhotos();_nachRenderMat();
+    nachSigClear();
     const a=_auftraege.find(x=>x.id===_aufdAufId);
     if(a){a.nachtraege=(a.nachtraege||[]).concat([n]); _renderNachListe(a);}
     const msgParts=['➕ Nachtrag: '+txt];
     if(std>0) msgParts.push(std+'h');
     if(_pendingNachMat.length) msgParts.push(_pendingNachMat.length+' Material');
+    if(sigData) msgParts.push('✍ signiert');
+    else if(sigVerweigert) msgParts.push('⚠ Unterschrift verweigert');
     aufRef.collection('messages').add({text:msgParts.join(' · '),von:'ma',vonUid:_uid,vonName:name,erstelltAm:Date.now(),system:true}).catch(()=>{});
     aufRef.update({lastMessageAt:Date.now(),lastMessageVon:'ma'}).catch(()=>{});
   }).catch(e=>{err.style.color='#ef4444';err.textContent='❌ '+e.message;});
