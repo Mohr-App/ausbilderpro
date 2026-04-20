@@ -541,16 +541,32 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <!-- Nachträge-Bereich (bidirektional) -->
     <div class="aufd-pane" id="aufd-nach">
       <div style="padding:10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;margin-bottom:10px">
-        <textarea id="nachTxt" rows="2" style="width:100%;padding:8px;border:1.5px solid #fed7aa;border-radius:8px;font-size:.74rem;font-family:'Sora',sans-serif;resize:vertical;background:#fff" placeholder="Nachtrag für deinen Chef — z.B. zusätzliche Arbeit, Hinweis, Frage…"></textarea>
+        <div style="font-size:.68rem;color:#92400e;font-weight:700;margin-bottom:6px">➕ Nachtrag = Zusatzauftrag vom Kunden</div>
+        <textarea id="nachTxt" rows="2" style="width:100%;padding:8px;border:1.5px solid #fed7aa;border-radius:8px;font-size:.74rem;font-family:'Sora',sans-serif;resize:vertical;background:#fff" placeholder="z.B. zusätzlich Steckdose im Flur"></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <div style="flex:1">
+            <div style="font-size:.58rem;color:var(--mu);font-weight:700;margin-bottom:2px">⏱ ZUSATZ-STUNDEN</div>
+            <input type="number" id="nachStunden" min="0" step="0.25" placeholder="z.B. 0.5" style="width:100%;padding:7px;border:1.5px solid #fed7aa;border-radius:8px;font-size:.74rem;font-family:'JetBrains Mono',monospace;background:#fff">
+          </div>
+        </div>
+        <div style="margin-top:6px">
+          <div style="font-size:.58rem;color:var(--mu);font-weight:700;margin-bottom:2px">🧱 ZUSATZ-MATERIAL</div>
+          <div style="display:flex;gap:4px">
+            <input type="text" id="nachMatInput" list="nachMatList" placeholder="z.B. Steckdose UP" style="flex:1;padding:7px;border:1.5px solid #fed7aa;border-radius:8px;font-size:.72rem;font-family:'Sora',sans-serif;background:#fff" onkeydown="if(event.key==='Enter'){event.preventDefault();nachAddMat();}">
+            <datalist id="nachMatList"></datalist>
+            <button onclick="nachAddMat()" style="padding:7px 12px;background:#d97706;color:#fff;border:none;border-radius:8px;font-size:.75rem;font-weight:700;cursor:pointer">+</button>
+          </div>
+          <div id="nachMatTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
+        </div>
         <div id="nachPhotosPreview" style="display:none;margin-top:6px"></div>
-        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-          <label style="flex:1;min-width:90px;padding:8px;background:#fff;border:1.5px solid #fed7aa;border-radius:8px;font-size:.7rem;font-weight:700;color:#d97706;cursor:pointer;text-align:center;font-family:'Sora',sans-serif">📷 Kamera
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <label style="flex:1;min-width:80px;padding:8px;background:#fff;border:1.5px solid #fed7aa;border-radius:8px;font-size:.68rem;font-weight:700;color:#d97706;cursor:pointer;text-align:center;font-family:'Sora',sans-serif">📷 Kamera
             <input type="file" id="nachCamFile" accept="image/*" capture="environment" onchange="_onNachPhotos(event)" style="display:none" multiple>
           </label>
-          <label style="flex:1;min-width:90px;padding:8px;background:#fff;border:1.5px solid #fed7aa;border-radius:8px;font-size:.7rem;font-weight:700;color:#d97706;cursor:pointer;text-align:center;font-family:'Sora',sans-serif">🖼 Foto
+          <label style="flex:1;min-width:80px;padding:8px;background:#fff;border:1.5px solid #fed7aa;border-radius:8px;font-size:.68rem;font-weight:700;color:#d97706;cursor:pointer;text-align:center;font-family:'Sora',sans-serif">🖼 Foto
             <input type="file" id="nachGalFile" accept="image/*" onchange="_onNachPhotos(event)" style="display:none" multiple>
           </label>
-          <button onclick="saveNachtragMa()" style="flex:1;min-width:90px;padding:8px;background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;border:none;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✓ Senden</button>
+          <button onclick="saveNachtragMa()" style="flex:1.5;min-width:100px;padding:8px;background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;border:none;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✓ Nachtrag speichern</button>
         </div>
         <div class="err" id="nachErr" style="margin-top:6px"></div>
       </div>
@@ -1875,31 +1891,76 @@ function showAufdTab(tab){
   if(tab==='nach'){
     const a=_auftraege.find(x=>x.id===_aufdAufId);
     if(a) _renderNachListe(a);
+    _populateNachMatList();
   }
 }
 // ─── Nachträge ───────────────────────────────────────────────
-let _pendingNachPhotos=[];
+let _pendingNachPhotos=[], _pendingNachMat=[];
+function nachAddMat(){
+  const inp=document.getElementById('nachMatInput');
+  const v=(inp.value||'').trim();
+  if(!v) return;
+  if(!_pendingNachMat.includes(v)) _pendingNachMat.push(v);
+  inp.value='';
+  _nachRenderMat();
+}
+function _nachRenderMat(){
+  const el=document.getElementById('nachMatTags');
+  if(!el) return;
+  el.innerHTML=_pendingNachMat.map((m,i)=>
+    '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:#fff7ed;border:1px solid rgba(245,158,11,.4);border-radius:4px;font-size:.62rem;font-weight:600;color:#92400e">'
+    +esc(m)
+    +' <button onclick="_pendingNachMat.splice('+i+',1);_nachRenderMat()" style="background:none;border:none;color:#d97706;cursor:pointer;font-weight:800;padding:0;font-size:.8rem;line-height:1">×</button>'
+    +'</span>'
+  ).join('');
+}
+function _populateNachMatList(){
+  const dl=document.getElementById('nachMatList');
+  if(!dl) return;
+  const seen=new Set();
+  _auftraege.forEach(a=>{
+    (a.material||[]).forEach(m=>seen.add(m));
+    (a.nachtraege||[]).forEach(n=>(n.material||[]).forEach(m=>seen.add(m)));
+  });
+  dl.innerHTML=Array.from(seen).sort().map(m=>'<option value="'+esc(m)+'">').join('');
+}
 function _renderNachListe(a){
   const el=document.getElementById('aufdNachListe');
   if(!el) return;
   const nList=(a.nachtraege||[]).slice().sort((x,y)=>(x.erstelltAm||0)-(y.erstelltAm||0));
   if(!nList.length){el.innerHTML='<div class="empty">Noch keine Nachträge</div>';return;}
-  el.innerHTML=nList.map(n=>{
+  let sumStd=0, sumMat=0;
+  nList.forEach(n=>{if(n.stunden) sumStd+=Number(n.stunden)||0; if(n.material) sumMat+=n.material.length;});
+  let html='';
+  nList.forEach(n=>{
     const d=new Date(n.erstelltAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-    const photos=(n.fotos&&n.fotos.length)
-      ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">'
-        +n.fotos.map(f=>'<a href="'+f+'" target="_blank"><img src="'+f+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid rgba(245,158,11,.3)"></a>').join('')
-        +'</div>'
-      : '';
     const mine=n.erstelltVonUid===_uid;
-    const bg=mine?'rgba(37,99,235,.05)':'rgba(245,158,11,.06)';
-    const brd=mine?'rgba(37,99,235,.25)':'rgba(245,158,11,.3)';
     const col=mine?'#2563eb':'#d97706';
-    return '<div style="margin:6px 0;padding:8px 10px;background:'+bg+';border-left:3px solid '+col+';border-radius:6px">'
-      +'<div style="font-size:.58rem;color:'+col+';font-weight:700;margin-bottom:3px">➕ '+esc(n.erstelltVon||'')+' <span style="color:var(--mu);font-family:\'JetBrains Mono\',monospace;font-weight:500">· '+d+'</span></div>'
-      +'<div style="font-size:.72rem;line-height:1.5;white-space:pre-wrap">'+esc(n.text||'')+'</div>'
-      +photos+'</div>';
-  }).join('');
+    const bg=mine?'rgba(37,99,235,.04)':'rgba(245,158,11,.05)';
+    html+='<div style="border-left:3px solid '+col+';background:'+bg+';padding:10px 12px;border-radius:6px;margin-bottom:8px">';
+    html+='<div style="display:flex;justify-content:space-between;font-size:.58rem;color:'+col+';font-weight:700;margin-bottom:4px"><span>➕ '+esc(n.erstelltVon||(mine?'Ich':'AG'))+'</span><span style="color:var(--mu);font-family:\'JetBrains Mono\',monospace;font-weight:500">'+d+'</span></div>';
+    html+='<div style="font-size:.74rem;line-height:1.5;font-weight:600;white-space:pre-wrap;margin-bottom:6px">'+esc(n.text||'')+'</div>';
+    if(n.stunden) html+='<div style="margin-bottom:6px"><span style="display:inline-block;padding:2px 8px;background:#fff;border:1px solid '+col+'40;border-radius:10px;font-size:.62rem;font-weight:700;color:'+col+';font-family:\'JetBrains Mono\',monospace">⏱ '+n.stunden+' h</span></div>';
+    if(n.material&&n.material.length){
+      html+='<div style="margin-bottom:6px">';
+      n.material.forEach(m=>{html+='<span style="display:inline-block;padding:2px 6px;background:#fff;border:1px solid '+col+'30;border-radius:4px;font-size:.6rem;margin:1px;color:var(--tx)">'+esc(m)+'</span>';});
+      html+='</div>';
+    }
+    if(n.fotos&&n.fotos.length){
+      html+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">';
+      n.fotos.forEach(f=>{html+='<a href="'+f+'" target="_blank"><img src="'+f+'" style="width:50px;height:50px;object-fit:cover;border-radius:4px;border:1px solid '+col+'40"></a>';});
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  if(nList.length>1||sumStd>0){
+    html+='<div style="padding:8px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:6px;font-size:.68rem;color:#92400e;display:flex;gap:12px;margin-top:4px">'
+      +'<span><b>'+nList.length+'</b> Nachtrag'+(nList.length>1?'e':'')+'</span>'
+      +(sumStd>0?'<span><b>'+sumStd+' h</b> Zusatz</span>':'')
+      +(sumMat>0?'<span><b>'+sumMat+'</b> Materialien</span>':'')
+      +'</div>';
+  }
+  el.innerHTML=html;
 }
 function _onNachPhotos(ev){
   const files=Array.from(ev.target.files||[]);
@@ -1947,22 +2008,31 @@ function _nachRenderPhotos(){
 function saveNachtragMa(){
   if(!_aufdAufId||!_tnId) return;
   const txt=document.getElementById('nachTxt').value.trim();
+  const stdRaw=document.getElementById('nachStunden').value.trim();
+  const std=stdRaw?parseFloat(stdRaw.replace(',','.')):0;
   const err=document.getElementById('nachErr');
   err.textContent='';err.style.color='#ef4444';
-  if(!txt){err.textContent='Bitte Text eingeben';return;}
+  if(!txt){err.textContent='Bitte Beschreibung eingeben';return;}
   err.style.color='var(--acc)';err.textContent='Wird gespeichert…';
   const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||_email||'Mitarbeiter';
   const n={text:txt,erstelltAm:Date.now(),erstelltVon:name,erstelltVonUid:_uid};
+  if(std>0) n.stunden=std;
+  if(_pendingNachMat.length) n.material=_pendingNachMat.slice();
   if(_pendingNachPhotos.length) n.fotos=_pendingNachPhotos.slice();
   const aufRef=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_aufdAufId);
   aufRef.update({nachtraege:firebase.firestore.FieldValue.arrayUnion(n)}).then(()=>{
     err.textContent='';
-    toast('➕ Nachtrag gesendet');
+    toast('➕ Nachtrag gespeichert');
     document.getElementById('nachTxt').value='';
-    _pendingNachPhotos=[];_nachRenderPhotos();
+    document.getElementById('nachStunden').value='';
+    _pendingNachPhotos=[];_pendingNachMat=[];
+    _nachRenderPhotos();_nachRenderMat();
     const a=_auftraege.find(x=>x.id===_aufdAufId);
     if(a){a.nachtraege=(a.nachtraege||[]).concat([n]); _renderNachListe(a);}
-    aufRef.collection('messages').add({text:'➕ Nachtrag: '+txt,von:'ma',vonUid:_uid,vonName:name,erstelltAm:Date.now(),system:true}).catch(()=>{});
+    const msgParts=['➕ Nachtrag: '+txt];
+    if(std>0) msgParts.push(std+'h');
+    if(_pendingNachMat.length) msgParts.push(_pendingNachMat.length+' Material');
+    aufRef.collection('messages').add({text:msgParts.join(' · '),von:'ma',vonUid:_uid,vonName:name,erstelltAm:Date.now(),system:true}).catch(()=>{});
     aufRef.update({lastMessageAt:Date.now(),lastMessageVon:'ma'}).catch(()=>{});
   }).catch(e=>{err.style.color='#ef4444';err.textContent='❌ '+e.message;});
 }
@@ -2018,6 +2088,18 @@ function _renderAufdProtokoll(a){
     h+='</div>';
   } else {
     h+='<div class="empty" style="margin-top:10px">Noch keine Erledigungsdaten</div>';
+  }
+    // Gesamtsummen wenn Nachträge vorhanden
+  if(a.nachtraege&&a.nachtraege.length){
+    let nSumStd=0;
+    a.nachtraege.forEach(n=>{if(n.stunden) nSumStd+=Number(n.stunden)||0;});
+    const hauptStd=Number(a.stunden)||0;
+    if(hauptStd>0||nSumStd>0){
+      h+='<div style="margin-top:10px;padding:10px 12px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.2);border-radius:8px">'
+        +'<div style="font-size:.65rem;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">💰 Gesamtaufwand</div>'
+        +'<div style="font-size:.78rem;color:var(--tx);line-height:1.6"><b>'+hauptStd+' h</b> Hauptauftrag + <b>'+nSumStd+' h</b> Nachträge ('+a.nachtraege.length+') = <b style="color:var(--acc);font-size:.9rem">'+(hauptStd+nSumStd)+' h</b></div>'
+        +'</div>';
+    }
   }
   body.innerHTML=h;
 }

@@ -624,11 +624,24 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="mdl" id="nachtragModal">
   <div class="mdl-box">
     <div class="mdl-head">
-      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(245,158,11,.12);color:#d97706;display:flex;align-items:center;justify-content:center">➕</span>Nachtrag hinzufügen</div>
+      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(245,158,11,.12);color:#d97706;display:flex;align-items:center;justify-content:center">➕</span>Nachtrag (Zusatzauftrag)</div>
       <button class="mdl-x" onclick="closeNachtragModal()" title="Schließen">✕</button>
     </div>
-    <div><label class="fl">Nachtrag / Ergänzung</label><textarea class="fi" id="nachTxt" rows="3" placeholder="z.B. Bitte zusätzlich die Steckdose im Flur mitmachen" style="font-size:.8rem;resize:vertical;min-height:70px;font-family:'Sora',sans-serif"></textarea></div>
-    <label class="fl" style="margin-top:8px">Bilder (optional)</label>
+    <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Zusätzlich vom Kunden beauftragte Arbeit. Wird getrennt vom Hauptauftrag dokumentiert (für Rechnung/Abrechnung).</div>
+    <div><label class="fl">Beschreibung *</label><textarea class="fi" id="nachTxt" rows="2" placeholder="z.B. zusätzlich Steckdose im Flur montieren" style="font-size:.8rem;resize:vertical;min-height:50px;font-family:'Sora',sans-serif"></textarea></div>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <div style="flex:1"><label class="fl">⏱ Zusatz-Stunden</label><input class="fi" type="number" id="nachStunden" min="0" step="0.25" placeholder="z.B. 0.5" style="font-size:.8rem;font-family:'JetBrains Mono',monospace"></div>
+    </div>
+    <div style="margin-top:6px">
+      <label class="fl">🧱 Zusatz-Material</label>
+      <div style="display:flex;gap:4px">
+        <input type="text" id="nachMatInput" list="nachMatList" placeholder="z.B. Steckdose UP" style="flex:1;padding:8px;border:1.5px solid var(--brd);border-radius:8px;font-size:.76rem;font-family:'Sora',sans-serif" onkeydown="if(event.key==='Enter'){event.preventDefault();nachAddMat();}">
+        <datalist id="nachMatList"></datalist>
+        <button onclick="nachAddMat()" style="padding:8px 14px;background:#d97706;color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer">+</button>
+      </div>
+      <div id="nachMatTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"></div>
+    </div>
+    <label class="fl" style="margin-top:10px">📸 Bilder (optional, max. 3)</label>
     <div style="display:flex;gap:6px;margin-bottom:6px">
       <label style="flex:1;padding:10px;background:rgba(245,158,11,.08);color:#d97706;border:1.5px solid rgba(245,158,11,.3);border-radius:10px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
         📷 Kamera
@@ -3078,6 +3091,18 @@ function _renderAufdProtokoll(a){
   } else {
     h+='<div class="empty" style="margin-top:10px">Noch keine Erledigungsdaten</div>';
   }
+  // Gesamtsummen wenn Nachträge vorhanden
+  if(a.nachtraege&&a.nachtraege.length){
+    let nSumStd=0;
+    a.nachtraege.forEach(n=>{if(n.stunden) nSumStd+=Number(n.stunden)||0;});
+    const hauptStd=Number(a.stunden)||0;
+    if(hauptStd>0||nSumStd>0){
+      h+='<div style="margin-top:10px;padding:10px 12px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.2);border-radius:8px">'
+        +'<div style="font-size:.65rem;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">💰 Gesamtaufwand</div>'
+        +'<div style="font-size:.78rem;color:var(--tx);line-height:1.6"><b>'+hauptStd+' h</b> Hauptauftrag + <b>'+nSumStd+' h</b> Nachträge ('+a.nachtraege.length+') = <b style="color:var(--acc);font-size:.9rem">'+(hauptStd+nSumStd)+' h</b></div>'
+        +'</div>';
+    }
+  }
   body.innerHTML=h;
   actions.style.display=isErledigt?'':'none';
 }
@@ -3171,28 +3196,92 @@ function _renderNachListe(a){
   if(!el) return;
   const nList=(a.nachtraege||[]).slice().sort((x,y)=>(x.erstelltAm||0)-(y.erstelltAm||0));
   if(!nList.length){el.innerHTML='<div class="empty">Noch keine Nachträge</div>';return;}
-  el.innerHTML=nList.map(n=>{
+  // Summen
+  let sumStd=0, sumMat=0;
+  nList.forEach(n=>{if(n.stunden) sumStd+=Number(n.stunden)||0; if(n.material) sumMat+=n.material.length;});
+  let html='';
+  nList.forEach(n=>{
     const d=new Date(n.erstelltAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-    const photos=(n.fotos&&n.fotos.length)
-      ? '<div class="nachtrag-ph">'+n.fotos.map(f=>'<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')">').join('')+'</div>'
-      : '';
     const mine=n.erstelltVonUid===_uid;
     const col=mine?'#2563eb':'#d97706';
-    return '<div class="nachtrag-card" style="border-left:3px solid '+col+'"><div class="nachtrag-head"><span style="color:'+col+'">➕ '+esc(n.erstelltVon||(mine?'AG':'Mitarbeiter'))+'</span><span>'+d+'</span></div><div class="nachtrag-tx">'+esc(n.text||'')+'</div>'+photos+'</div>';
-  }).join('');
+    const bg=mine?'rgba(37,99,235,.04)':'rgba(245,158,11,.05)';
+    html+='<div class="nachtrag-card" style="border-left:3px solid '+col+';background:'+bg+';padding:10px 12px;border-radius:6px;margin-bottom:8px">';
+    html+='<div class="nachtrag-head" style="display:flex;justify-content:space-between;font-size:.58rem;color:'+col+';font-weight:700;margin-bottom:4px"><span>➕ '+esc(n.erstelltVon||(mine?'AG':'Mitarbeiter'))+'</span><span style="color:var(--mu);font-family:\'JetBrains Mono\',monospace;font-weight:500">'+d+'</span></div>';
+    html+='<div class="nachtrag-tx" style="font-size:.74rem;line-height:1.5;font-weight:600;white-space:pre-wrap;margin-bottom:6px">'+esc(n.text||'')+'</div>';
+    // Stunden + Material in einer Zeile
+    let meta=[];
+    if(n.stunden) meta.push('<span style="display:inline-block;padding:2px 8px;background:#fff;border:1px solid '+col+'40;border-radius:10px;font-size:.62rem;font-weight:700;color:'+col+';font-family:\'JetBrains Mono\',monospace">⏱ '+n.stunden+' h</span>');
+    if(meta.length) html+='<div style="margin-bottom:6px">'+meta.join(' ')+'</div>';
+    if(n.material&&n.material.length){
+      html+='<div style="margin-bottom:6px">';
+      n.material.forEach(m=>{html+='<span style="display:inline-block;padding:2px 6px;background:#fff;border:1px solid '+col+'30;border-radius:4px;font-size:.6rem;margin:1px;color:var(--tx)">'+esc(m)+'</span>';});
+      html+='</div>';
+    }
+    if(n.fotos&&n.fotos.length){
+      html+='<div class="nachtrag-ph" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">';
+      n.fotos.forEach(f=>{html+='<img src="'+f+'" style="width:50px;height:50px;object-fit:cover;border-radius:4px;border:1px solid '+col+'40;cursor:pointer" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')">';});
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  // Summary-Footer wenn mehrere
+  if(nList.length>1||sumStd>0){
+    html+='<div style="padding:8px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:6px;font-size:.68rem;color:#92400e;display:flex;gap:12px;margin-top:4px">'
+      +'<span><b>'+nList.length+'</b> Nachtrag'+(nList.length>1?'e':'')+'</span>'
+      +(sumStd>0?'<span><b>'+sumStd+' h</b> Zusatz</span>':'')
+      +(sumMat>0?'<span><b>'+sumMat+'</b> Materialien</span>':'')
+      +'</div>';
+  }
+  el.innerHTML=html;
 }
 // Nachtrag-Modal
+let _pendingNachMat=[];
 function openNachtragModal(){
   if(!_aufdTn||!_aufdAufId) return;
   document.getElementById('nachTxt').value='';
+  document.getElementById('nachStunden').value='';
+  document.getElementById('nachMatInput').value='';
   document.getElementById('nachErr').textContent='';
   _pendingNachPhotos=[];
+  _pendingNachMat=[];
   _nachRenderPhotos();
+  _nachRenderMat();
+  // Material-Vorschläge aus früheren Aufträgen/Nachträgen befüllen
+  _populateNachMatList();
   const cf=document.getElementById('nachCamFile'); if(cf) cf.value='';
   const gf=document.getElementById('nachGalFile'); if(gf) gf.value='';
   document.getElementById('nachtragModal').classList.add('open');
 }
 function closeNachtragModal(){document.getElementById('nachtragModal').classList.remove('open');}
+function _populateNachMatList(){
+  const dl=document.getElementById('nachMatList');
+  if(!dl) return;
+  const seen=new Set();
+  // Material aus Hauptaufträgen + Nachträgen
+  _agAuftraege.forEach(a=>{
+    (a.material||[]).forEach(m=>seen.add(m));
+    (a.nachtraege||[]).forEach(n=>(n.material||[]).forEach(m=>seen.add(m)));
+  });
+  dl.innerHTML=Array.from(seen).sort().map(m=>'<option value="'+esc(m)+'">').join('');
+}
+function nachAddMat(){
+  const inp=document.getElementById('nachMatInput');
+  const v=(inp.value||'').trim();
+  if(!v) return;
+  if(!_pendingNachMat.includes(v)) _pendingNachMat.push(v);
+  inp.value='';
+  _nachRenderMat();
+}
+function _nachRenderMat(){
+  const el=document.getElementById('nachMatTags');
+  if(!el) return;
+  el.innerHTML=_pendingNachMat.map((m,i)=>
+    '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:#fff7ed;border:1px solid rgba(245,158,11,.4);border-radius:4px;font-size:.65rem;font-weight:600;color:#92400e">'
+    +esc(m)
+    +' <button onclick="_pendingNachMat.splice('+i+',1);_nachRenderMat()" style="background:none;border:none;color:#d97706;cursor:pointer;font-weight:800;padding:0;font-size:.85rem;line-height:1">×</button>'
+    +'</span>'
+  ).join('');
+}
 function _onNachPhotos(ev){
   const files=Array.from(ev.target.files||[]);
   if(!files.length) return;
@@ -3227,22 +3316,27 @@ function _nachRenderPhotos(){
 function saveNachtrag(){
   if(!_aufdTn||!_aufdAufId) return;
   const txt=document.getElementById('nachTxt').value.trim();
+  const stdRaw=document.getElementById('nachStunden').value.trim();
+  const std=stdRaw?parseFloat(stdRaw.replace(',','.')):0;
   const err=document.getElementById('nachErr');
   err.textContent='';
-  if(!txt){err.textContent='Bitte Text eingeben';return;}
+  if(!txt){err.textContent='Bitte Beschreibung eingeben';return;}
   err.textContent='Wird gespeichert…';
   const n={text:txt, erstelltAm:Date.now(), erstelltVon:_firma||_email||'AG', erstelltVonUid:_uid};
+  if(std>0) n.stunden=std;
+  if(_pendingNachMat.length) n.material=_pendingNachMat.slice();
   if(_pendingNachPhotos.length) n.fotos=_pendingNachPhotos.slice();
   db.collection('globalTN').doc(_aufdTn).collection('auftraege').doc(_aufdAufId).update({
     nachtraege:firebase.firestore.FieldValue.arrayUnion(n)
   }).then(()=>{
     closeNachtragModal();
     toast('➕ Nachtrag hinzugefügt');
-    // Lokales Update des cached Auftrags
     const a=_agAuftraege.find(x=>x.tnId===_aufdTn&&x.id===_aufdAufId);
     if(a){a.nachtraege=(a.nachtraege||[]).concat([n]); _renderNachListe(a);}
-    // Auch als System-Chatnachricht posten
-    const msg={text:'➕ Nachtrag: '+txt, von:'ag', vonUid:_uid, vonName:_firma||_email||'AG', erstelltAm:Date.now(), system:true};
+    const msgParts=['➕ Nachtrag: '+txt];
+    if(std>0) msgParts.push(std+'h');
+    if(_pendingNachMat.length) msgParts.push(_pendingNachMat.length+' Material');
+    const msg={text:msgParts.join(' · '), von:'ag', vonUid:_uid, vonName:_firma||_email||'AG', erstelltAm:Date.now(), system:true};
     const aufRef=db.collection('globalTN').doc(_aufdTn).collection('auftraege').doc(_aufdAufId);
     aufRef.collection('messages').add(msg).then(()=>{
       aufRef.update({lastMessageAt:msg.erstelltAm,lastMessagePreview:msg.text.slice(0,60),lastMessageVon:'ag',['lastSeenBy.'+_uid]:msg.erstelltAm}).catch(()=>{});
@@ -3448,15 +3542,24 @@ function exportAuftragsprotokoll(tnId,aufId){
     let fotosAGHtml='';
     if(d.fotosAG&&d.fotosAG.length){fotosAGHtml='<h3>Referenzbilder vom AG</h3><div style="display:flex;gap:4mm;flex-wrap:wrap;margin:3mm 0">';d.fotosAG.forEach(f=>{fotosAGHtml+='<img src="'+f+'" style="width:56mm;height:auto;border-radius:2mm;border:.3mm solid #cbd5e1">';});fotosAGHtml+='</div>';}
     let nachHtml='';
+    let nachSumStd=0;
     if(d.nachtraege&&d.nachtraege.length){
-      nachHtml='<h3>Nachträge</h3>';
-      d.nachtraege.forEach(n=>{
-        const dat=new Date(n.erstelltAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-        nachHtml+='<div style="margin:8px 0;padding:8px 10px;background:#fffbeb;border-left:3px solid #d97706;border-radius:4px">'
-          +'<div style="font-size:9px;color:#78716c;margin-bottom:4px">'+esc(n.erstelltVon||'AG')+' · '+dat+'</div>'
-          +'<div style="font-size:11px;line-height:1.5">'+esc(n.text||'')+'</div>';
+      const nSort=d.nachtraege.slice().sort((x,y)=>(x.erstelltAm||0)-(y.erstelltAm||0));
+      nSort.forEach(n=>{if(n.stunden) nachSumStd+=Number(n.stunden)||0;});
+      nachHtml='<h3>Nachträge / Zusatzaufträge</h3>';
+      nSort.forEach((n,idx)=>{
+        const ndat=new Date(n.erstelltAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        nachHtml+='<div style="margin:4mm 0;padding:3mm 4mm;background:#fffbeb;border-left:.7mm solid #d97706;border-radius:1mm;page-break-inside:avoid">'
+          +'<div style="font-size:9pt;color:#78716c;margin-bottom:1.5mm;font-weight:600">Nachtrag '+(idx+1)+' · '+esc(n.erstelltVon||'')+' · '+ndat+'</div>'
+          +'<div style="font-size:10pt;line-height:1.4;font-weight:600;margin-bottom:2mm">'+esc(n.text||'')+'</div>';
+        if(n.stunden) nachHtml+='<div style="font-size:9pt;margin-bottom:1mm"><b>⏱ Zusatz-Stunden:</b> '+n.stunden+' h</div>';
+        if(n.material&&n.material.length){
+          nachHtml+='<div style="font-size:9pt;margin-bottom:1.5mm"><b>🧱 Zusatz-Material:</b> ';
+          nachHtml+=n.material.map(m=>'<span class="mat">'+esc(m)+'</span>').join('');
+          nachHtml+='</div>';
+        }
         if(n.fotos&&n.fotos.length){
-          nachHtml+='<div style="display:flex;gap:3mm;flex-wrap:wrap;margin-top:3mm">';
+          nachHtml+='<div style="display:flex;gap:3mm;flex-wrap:wrap;margin-top:2mm">';
           n.fotos.forEach(f=>{nachHtml+='<img src="'+f+'" style="width:44mm;height:auto;border-radius:1.5mm;border:.3mm solid #cbd5e1">';});
           nachHtml+='</div>';
         }
@@ -3486,6 +3589,7 @@ function exportAuftragsprotokoll(tnId,aufId){
       +(d.stunden?'<div class="row"><span class="label">Stundenaufwand:</span><span class="val">'+d.stunden+' Stunden</span></div>':'')
       +(d.material&&d.material.length?'<h3>Verwendetes Material</h3><div style="margin:8px 0">'+d.material.map(m=>'<span class="mat">'+esc(m)+'</span>').join('')+'</div>':'')
       +fotosAGHtml+nachHtml+fotosHtml+sigHtml
+      +(nachSumStd>0?'<div style="margin-top:6mm;padding:3mm 4mm;background:#eff6ff;border:.3mm solid #bfdbfe;border-radius:1.5mm;font-size:10pt;page-break-inside:avoid"><b>Gesamtaufwand:</b> '+(Number(d.stunden)||0)+' h Hauptauftrag + '+nachSumStd+' h Nachträge = <b>'+((Number(d.stunden)||0)+nachSumStd)+' h</b></div>':'')
       +'<div style="margin-top:30px;font-size:9px;color:#94a3b8">Erledigt am: '+dat+'</div>'
       +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
     const w=window.open('','_blank');
