@@ -3169,14 +3169,16 @@ function sendAufChatMsg(){
 function _renderNachListe(a){
   const el=document.getElementById('aufdNachListe');
   if(!el) return;
-  const nList=a.nachtraege||[];
+  const nList=(a.nachtraege||[]).slice().sort((x,y)=>(x.erstelltAm||0)-(y.erstelltAm||0));
   if(!nList.length){el.innerHTML='<div class="empty">Noch keine Nachträge</div>';return;}
   el.innerHTML=nList.map(n=>{
     const d=new Date(n.erstelltAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
     const photos=(n.fotos&&n.fotos.length)
       ? '<div class="nachtrag-ph">'+n.fotos.map(f=>'<img src="'+f+'" onclick="document.getElementById(\'dvFullImgSrc\').src=this.src;document.getElementById(\'dvFullImg\').classList.add(\'open\')">').join('')+'</div>'
       : '';
-    return '<div class="nachtrag-card"><div class="nachtrag-head"><span>➕ '+esc(n.erstelltVon||'AG')+'</span><span>'+d+'</span></div><div class="nachtrag-tx">'+esc(n.text||'')+'</div>'+photos+'</div>';
+    const mine=n.erstelltVonUid===_uid;
+    const col=mine?'#2563eb':'#d97706';
+    return '<div class="nachtrag-card" style="border-left:3px solid '+col+'"><div class="nachtrag-head"><span style="color:'+col+'">➕ '+esc(n.erstelltVon||(mine?'AG':'Mitarbeiter'))+'</span><span>'+d+'</span></div><div class="nachtrag-tx">'+esc(n.text||'')+'</div>'+photos+'</div>';
   }).join('');
 }
 // Nachtrag-Modal

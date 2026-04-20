@@ -639,6 +639,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="aufd-tab">
       <button class="stab" id="aufdTabProt" onclick="showAufdTab('prot')">📋 Protokoll</button>
       <button class="stab active" id="aufdTabChat" onclick="showAufdTab('chat')">💬 Chat</button>
+      <button class="stab" id="aufdTabNach" onclick="showAufdTab('nach')">➕ Nachträge</button>
     </div>
     <!-- Protokoll-Bereich (read-only) -->
     <div class="aufd-pane" id="aufd-prot">
@@ -652,6 +653,24 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="chat-send" onclick="sendAzChatMsg()">Senden</button>
       </div>
       <div class="err" id="aufdChatErr" style="margin-top:6px"></div>
+    </div>
+    <!-- Nachträge-Bereich (bidirektional) -->
+    <div class="aufd-pane" id="aufd-nach">
+      <div style="padding:10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;margin-bottom:10px">
+        <textarea id="nachTxt" rows="2" style="width:100%;padding:8px;border:1.5px solid #fed7aa;border-radius:8px;font-size:.74rem;font-family:'Sora',sans-serif;resize:vertical;background:#fff" placeholder="Nachtrag für deinen Chef — z.B. zusätzliche Arbeit, Hinweis, Frage…"></textarea>
+        <div id="nachPhotosPreview" style="display:none;margin-top:6px"></div>
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <label style="flex:1;min-width:90px;padding:8px;background:#fff;border:1.5px solid #fed7aa;border-radius:8px;font-size:.7rem;font-weight:700;color:#d97706;cursor:pointer;text-align:center;font-family:'Sora',sans-serif">📷 Kamera
+            <input type="file" id="nachCamFile" accept="image/*" capture="environment" onchange="_onNachPhotos(event)" style="display:none" multiple>
+          </label>
+          <label style="flex:1;min-width:90px;padding:8px;background:#fff;border:1.5px solid #fed7aa;border-radius:8px;font-size:.7rem;font-weight:700;color:#d97706;cursor:pointer;text-align:center;font-family:'Sora',sans-serif">🖼 Foto
+            <input type="file" id="nachGalFile" accept="image/*" onchange="_onNachPhotos(event)" style="display:none" multiple>
+          </label>
+          <button onclick="saveNachtragAz()" style="flex:1;min-width:90px;padding:8px;background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;border:none;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✓ Senden</button>
+        </div>
+        <div class="err" id="nachErr" style="margin-top:6px"></div>
+      </div>
+      <div id="aufdNachListe"><div class="empty">Noch keine Nachträge</div></div>
     </div>
   </div>
 </div>
@@ -2556,8 +2575,104 @@ function showAufdTab(tab){
   document.querySelectorAll('#aufDetailsModal .aufd-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('#aufDetailsModal .aufd-tab .stab').forEach(t=>t.classList.remove('active'));
   const pane=document.getElementById('aufd-'+tab); if(pane) pane.classList.add('active');
-  const btnMap={prot:'aufdTabProt',chat:'aufdTabChat'};
+  const btnMap={prot:'aufdTabProt',chat:'aufdTabChat',nach:'aufdTabNach'};
   const btn=document.getElementById(btnMap[tab]); if(btn) btn.classList.add('active');
+  if(tab==='nach'){
+    const a=_auftraege.find(x=>x.id===_aufdAufId);
+    if(a) _renderNachListe(a);
+  }
+}
+// ─── Nachträge ───────────────────────────────────────────────
+let _pendingNachPhotos=[];
+function _renderNachListe(a){
+  const el=document.getElementById('aufdNachListe');
+  if(!el) return;
+  const nList=(a.nachtraege||[]).slice().sort((x,y)=>(x.erstelltAm||0)-(y.erstelltAm||0));
+  if(!nList.length){el.innerHTML='<div class="empty">Noch keine Nachträge</div>';return;}
+  el.innerHTML=nList.map(n=>{
+    const d=new Date(n.erstelltAm).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const photos=(n.fotos&&n.fotos.length)
+      ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">'
+        +n.fotos.map(f=>'<a href="'+f+'" target="_blank"><img src="'+f+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid rgba(245,158,11,.3)"></a>').join('')
+        +'</div>'
+      : '';
+    // Eigener Nachtrag (vom aktuellen User) vs. vom Gegenüber
+    const mine=n.erstelltVonUid===_uid;
+    const bg=mine?'rgba(37,99,235,.05)':'rgba(245,158,11,.06)';
+    const brd=mine?'rgba(37,99,235,.25)':'rgba(245,158,11,.3)';
+    const col=mine?'#2563eb':'#d97706';
+    return '<div style="margin:6px 0;padding:8px 10px;background:'+bg+';border-left:3px solid '+col+';border-radius:6px">'
+      +'<div style="font-size:.58rem;color:'+col+';font-weight:700;margin-bottom:3px">➕ '+esc(n.erstelltVon||'')+' <span style="color:var(--mu);font-family:\'JetBrains Mono\',monospace;font-weight:500">· '+d+'</span></div>'
+      +'<div style="font-size:.72rem;line-height:1.5;white-space:pre-wrap">'+esc(n.text||'')+'</div>'
+      +photos+'</div>';
+  }).join('');
+}
+function _onNachPhotos(ev){
+  const files=Array.from(ev.target.files||[]);
+  if(!files.length) return;
+  const slots=3-_pendingNachPhotos.length;
+  if(slots<=0){toast('Max. 3 Bilder pro Nachtrag','bad');ev.target.value='';return;}
+  const use=files.slice(0,slots);
+  if(files.length>slots) toast('Nur '+slots+' Bild(er) angefügt','bad');
+  let done=0;
+  use.forEach(f=>{
+    const fr=new FileReader();
+    fr.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const maxW=600;
+        let w=img.width,h=img.height;
+        if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
+        const cv=document.createElement('canvas');
+        cv.width=w;cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        _pendingNachPhotos.push(cv.toDataURL('image/jpeg',0.5));
+        done++;
+        if(done===use.length) _nachRenderPhotos();
+      };
+      img.src=e.target.result;
+    };
+    fr.readAsDataURL(f);
+  });
+  ev.target.value='';
+}
+function _nachRenderPhotos(){
+  const el=document.getElementById('nachPhotosPreview');
+  if(!el) return;
+  if(!_pendingNachPhotos.length){el.style.display='none';el.innerHTML='';return;}
+  el.style.display='';
+  el.innerHTML='<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +_pendingNachPhotos.map((p,i)=>
+      '<div style="position:relative;width:60px;height:60px;border-radius:6px;overflow:hidden;border:1.5px solid rgba(245,158,11,.3)">'
+      +'<img src="'+p+'" style="width:100%;height:100%;object-fit:cover">'
+      +'<button onclick="_pendingNachPhotos.splice('+i+',1);_nachRenderPhotos()" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(220,38,38,.92);color:#fff;border:none;font-size:.6rem;font-weight:700;cursor:pointer;line-height:1;padding:0">✕</button>'
+      +'</div>'
+    ).join('')
+    +'</div>';
+}
+function saveNachtragAz(){
+  if(!_aufdAufId||!_tnId) return;
+  const txt=document.getElementById('nachTxt').value.trim();
+  const err=document.getElementById('nachErr');
+  err.textContent='';err.style.color='#ef4444';
+  if(!txt){err.textContent='Bitte Text eingeben';return;}
+  err.style.color='var(--acc)';err.textContent='Wird gespeichert…';
+  const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||_email||'Mitarbeiter';
+  const n={text:txt,erstelltAm:Date.now(),erstelltVon:name,erstelltVonUid:_uid};
+  if(_pendingNachPhotos.length) n.fotos=_pendingNachPhotos.slice();
+  const aufRef=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_aufdAufId);
+  aufRef.update({nachtraege:firebase.firestore.FieldValue.arrayUnion(n)}).then(()=>{
+    err.textContent='';
+    toast('➕ Nachtrag gesendet');
+    document.getElementById('nachTxt').value='';
+    _pendingNachPhotos=[];_nachRenderPhotos();
+    // Lokales Update
+    const a=_auftraege.find(x=>x.id===_aufdAufId);
+    if(a){a.nachtraege=(a.nachtraege||[]).concat([n]); _renderNachListe(a);}
+    // System-Chatnachricht für AG
+    aufRef.collection('messages').add({text:'➕ Nachtrag: '+txt,von:'ma',vonUid:_uid,vonName:name,erstelltAm:Date.now(),system:true}).catch(()=>{});
+    aufRef.update({lastMessageAt:Date.now(),lastMessageVon:'ma'}).catch(()=>{});
+  }).catch(e=>{err.style.color='#ef4444';err.textContent='❌ '+e.message;});
 }
 function _renderAufdProtokoll(a){
   const body=document.getElementById('aufdProtBody');
