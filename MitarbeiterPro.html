@@ -1852,6 +1852,11 @@ function _maAufUnread(a){
   const seen=(a.lastSeenBy&&a.lastSeenBy[_uid])||0;
   return a.lastMessageAt>seen?1:0;
 }
+function _maAufNachUnread(a){
+  if(!a||!a.lastNachtragAt||a.lastNachtragVon==='ma') return 0;
+  const seen=(a.lastNachtragSeenBy&&a.lastNachtragSeenBy[_uid])||0;
+  return a.lastNachtragAt>seen?1:0;
+}
 function openAufDetails(aufId){
   _aufdAufId=aufId;
   const a=_auftraege.find(x=>x.id===aufId);
@@ -1905,6 +1910,10 @@ function showAufdTab(tab){
     if(a) _renderNachListe(a);
     _populateNachMatList();
     setTimeout(nachSigInit,50);
+    if(_tnId&&_aufdAufId){
+      db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_aufdAufId)
+        .update({['lastNachtragSeenBy.'+_uid]:Date.now()}).catch(()=>{});
+    }
   }
 }
 // ─── Nachtrag-Signature ─────────────────────────────────────
@@ -2082,7 +2091,12 @@ function saveNachtragMa(){
   if(sigData) n.unterschrift=sigData;
   else if(sigVerweigert){n.unterschriftVerweigert=true;n.unterschriftVerweigertAm=Date.now();}
   const aufRef=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_aufdAufId);
-  aufRef.update({nachtraege:firebase.firestore.FieldValue.arrayUnion(n)}).then(()=>{
+  aufRef.update({
+    nachtraege:firebase.firestore.FieldValue.arrayUnion(n),
+    lastNachtragAt:n.erstelltAm,
+    lastNachtragVon:'ma',
+    ['lastNachtragSeenBy.'+_uid]:n.erstelltAm
+  }).then(()=>{
     err.textContent='';
     toast('➕ Nachtrag gespeichert');
     document.getElementById('nachTxt').value='';
@@ -2224,14 +2238,23 @@ function renderAuftraege(){
       const nachList=a.nachtraege||[];
       let nachStd=0, nachMat=0, nachSig=0;
       nachList.forEach(n=>{if(n.stunden)nachStd+=Number(n.stunden)||0; if(n.material)nachMat+=n.material.length; if(n.unterschrift)nachSig++;});
+      const nachUnread=_maAufNachUnread(a);
       const nachBlock=nachList.length
-        ? '<button onclick="openAufDetails(\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:6px;padding:8px 10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-left:3px solid #d97706;border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:8px">'
-          +'<span style="font-size:.68rem;font-weight:800;color:#92400e">➕ '+nachList.length+' Nachtrag'+(nachList.length>1?'e':'')+'</span>'
-          +(nachStd>0?'<span style="font-size:.6rem;color:#92400e;font-family:\'JetBrains Mono\',monospace">'+nachStd+'h</span>':'')
-          +(nachMat>0?'<span style="font-size:.6rem;color:#92400e">🧱'+nachMat+'</span>':'')
-          +(nachSig>0?'<span style="font-size:.6rem;color:#92400e">✍'+nachSig+'</span>':'')
-          +'<span style="margin-left:auto;font-size:.6rem;color:#92400e">→ anzeigen</span>'
-          +'</button>'
+        ? (()=>{
+            const bg=nachUnread?'rgba(239,68,68,.08)':'rgba(245,158,11,.08)';
+            const bc=nachUnread?'rgba(239,68,68,.4)':'rgba(245,158,11,.3)';
+            const lc=nachUnread?'#ef4444':'#d97706';
+            const tc=nachUnread?'#991b1b':'#92400e';
+            const badge=nachUnread?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.54rem;font-weight:800;border-radius:50%;padding:0 4px">!</span>':'';
+            return '<button onclick="openAufDetails(\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:6px;padding:8px 10px;background:'+bg+';border:1px solid '+bc+';border-left:3px solid '+lc+';border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:8px">'
+              +'<span style="font-size:.68rem;font-weight:800;color:'+tc+'">➕ '+nachList.length+' Nachtrag'+(nachList.length>1?'e':'')+'</span>'
+              +badge
+              +(nachStd>0?'<span style="font-size:.6rem;color:'+tc+';font-family:\'JetBrains Mono\',monospace">'+nachStd+'h</span>':'')
+              +(nachMat>0?'<span style="font-size:.6rem;color:'+tc+'">🧱'+nachMat+'</span>':'')
+              +(nachSig>0?'<span style="font-size:.6rem;color:'+tc+'">✍'+nachSig+'</span>':'')
+              +'<span style="margin-left:auto;font-size:.6rem;color:'+tc+'">→ anzeigen</span>'
+              +'</button>';
+          })()
         : '';
       const unread=_maAufUnread(a);
       const chatBadge=unread?'<span class="chat-fab-badge">'+unread+'</span>':'';
@@ -2266,13 +2289,22 @@ function renderAuftraege(){
       const hauptStd=Number(a.stunden)||0;
       const gesamtStd=hauptStd+nachStd;
       const nachTeaser=nachCount
-        ? '<button onclick="openAufDetails(\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:6px;padding:6px 10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-left:3px solid #d97706;border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:6px">'
-          +'<span style="font-size:.62rem;font-weight:700;color:#92400e">➕ '+nachCount+' Nachtrag'+(nachCount>1?'e':'')+'</span>'
-          +(nachStd>0?'<span style="font-size:.58rem;color:#92400e;font-family:\'JetBrains Mono\',monospace">'+nachStd+'h</span>':'')
-          +(nachMat>0?'<span style="font-size:.58rem;color:#92400e">🧱'+nachMat+'</span>':'')
-          +(nachSig>0?'<span style="font-size:.58rem;color:#92400e">✍'+nachSig+'</span>':'')
-          +'<span style="margin-left:auto;font-size:.55rem;color:#92400e">→</span>'
-          +'</button>'
+        ? (()=>{
+            const nachUnread=_maAufNachUnread(a);
+            const bg=nachUnread?'rgba(239,68,68,.08)':'rgba(245,158,11,.08)';
+            const bc=nachUnread?'rgba(239,68,68,.4)':'rgba(245,158,11,.3)';
+            const lc=nachUnread?'#ef4444':'#d97706';
+            const tc=nachUnread?'#991b1b':'#92400e';
+            const badge=nachUnread?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;padding:0 3px">!</span>':'';
+            return '<button onclick="openAufDetails(\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:6px;padding:6px 10px;background:'+bg+';border:1px solid '+bc+';border-left:3px solid '+lc+';border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:6px">'
+              +'<span style="font-size:.62rem;font-weight:700;color:'+tc+'">➕ '+nachCount+' Nachtrag'+(nachCount>1?'e':'')+'</span>'
+              +badge
+              +(nachStd>0?'<span style="font-size:.58rem;color:'+tc+';font-family:\'JetBrains Mono\',monospace">'+nachStd+'h</span>':'')
+              +(nachMat>0?'<span style="font-size:.58rem;color:'+tc+'">🧱'+nachMat+'</span>':'')
+              +(nachSig>0?'<span style="font-size:.58rem;color:'+tc+'">✍'+nachSig+'</span>':'')
+              +'<span style="margin-left:auto;font-size:.55rem;color:'+tc+'">→</span>'
+              +'</button>';
+          })()
         : '';
       const unread=_maAufUnread(a);
       const chatBadge=unread?'<span class="chat-fab-badge">'+unread+'</span>':'';

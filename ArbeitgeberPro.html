@@ -323,6 +323,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto" id="agAusTabs">
         <button class="stab active" data-tab="monat" title="Monat" onclick="showAgAusTab('monat')">Monat</button>
+        <button class="stab" data-tab="auftraege" title="Aufträge" onclick="showAgAusTab('auftraege')">Aufträge</button>
         <button class="stab" data-tab="urlaub" title="Urlaub" onclick="showAgAusTab('urlaub')">Urlaub</button>
       </div>
 
@@ -337,6 +338,21 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             </div>
           </div>
           <div id="agZeitenListe"><div class="empty">Lädt…</div></div>
+        </div>
+      </div>
+
+      <!-- AUSWERTUNG: Aufträge (Kunden-Abrechnungsstunden) -->
+      <div class="abtab" id="abtab-auftraege">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px;flex-wrap:wrap">
+            <div class="card-title" style="margin:0">📋 Auftragsstunden</div>
+            <div style="display:flex;gap:4px;align-items:center">
+              <button onclick="exportAgAuftragsAuswertung()" style="padding:4px 10px;background:#fff;border:1.5px solid #059669;border-radius:6px;color:#059669;font-size:.58rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📊 CSV</button>
+              <select id="agAuftragsMonat" onchange="loadAgAuftragsAuswertung()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+            </div>
+          </div>
+          <div style="font-size:.62rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Auswertung pro Mitarbeiter: Stunden aus erledigten Aufträgen dieses Monats. Hauptauftrag und Nachträge (Zusatzaufträge) werden getrennt ausgewiesen — relevant für Kundenabrechnung und Deckungsbeitrag.</div>
+          <div id="agAuftragsListe"><div class="empty">Lädt…</div></div>
         </div>
       </div>
 
@@ -573,7 +589,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="aufd-pane" id="aufd-prot">
       <div id="aufdProtBody"><div class="empty">Lädt…</div></div>
       <div id="aufdProtActions" style="margin-top:12px;display:none">
-        <button onclick="exportCurrentAufdPdf()" style="width:100%;padding:10px;background:#fff;border:1.5px solid #2563eb;color:#2563eb;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📄 Als PDF (DIN A4) öffnen</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onclick="exportCurrentAufdPdf()" style="flex:1;min-width:130px;padding:10px;background:#fff;border:1.5px solid #2563eb;color:#2563eb;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📄 Protokoll PDF</button>
+          <button onclick="exportCurrentAufdLeistung()" style="flex:1;min-width:130px;padding:10px;background:linear-gradient(135deg,#2563eb,#1e40af);border:none;color:#fff;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📋 Leistungsübersicht</button>
+        </div>
       </div>
     </div>
     <!-- Chat-Bereich -->
@@ -789,6 +808,7 @@ const db=firebase.firestore();
 db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 
 let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};
+let _briefkopf='';  // Frei definierbarer Briefkopf für PDF-Exports (aus users/{uid}.briefkopf)
 
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function fmtDE(d){if(!d||d.length<10)return d||'?';const p=d.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
@@ -929,6 +949,7 @@ function loadUserData(){
     if(d.role!=='arbeitgeber'){toast('Kein Arbeitgeber-Zugang','bad');auth.signOut();return;}
     _firma=d.firma||'';
     _firmaCode=d.firmaCode||'';
+    _briefkopf=d.briefkopf||'';
     // Firmencode generieren falls noch keiner existiert (Bestandskunden)
     if(!_firmaCode){
       _firmaCode=_generateFirmaCode(_firma);
@@ -2017,6 +2038,7 @@ function showAgAusTab(tab){
   const btn=document.querySelector('#agAusTabs [data-tab="'+tab+'"]');
   if(btn) btn.classList.add('active');
   if(tab==='monat'){fillAgMonatSelect('agZeitMonat');loadAgZeiten();}
+  if(tab==='auftraege'){fillAgMonatSelect('agAuftragsMonat');loadAgAuftragsAuswertung();}
   if(tab==='urlaub') loadAgUrlaub();
 }
 // Legacy-Wrapper robust gegen Tab-Reorder (nutzt data-attrs statt Indizes)
@@ -2037,8 +2059,10 @@ function initAgLive(){
 }
 function initAgAuswertung(){
   fillAgMonatSelect('agZeitMonat');
+  fillAgMonatSelect('agAuftragsMonat');
   const active=document.querySelector('#agpage-auswertung .abtab.active');
   if(!active||active.id==='abtab-monat') loadAgZeiten();
+  else if(active.id==='abtab-auftraege') loadAgAuftragsAuswertung();
   else if(active.id==='abtab-urlaub') loadAgUrlaub();
 }
 function initAgEinstellungen(){
@@ -2700,7 +2724,9 @@ function renderAgAuftraege(){
         : '';
       const nachCount=(a.nachtraege&&a.nachtraege.length)||0;
       const unread=_aufdUnread(a);
+      const nachUnread=_aufdNachUnread(a);
       const chatBadge=unread?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.52rem;font-weight:800;border-radius:50%;padding:0 4px;margin-left:4px">'+unread+'</span>':'';
+      const nachBadge=nachUnread?' <span style="display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;padding:0 3px;margin-left:2px">!</span>':'';
       h+='<div onclick="openAufDetails(\''+a.tnId+'\',\''+a.id+'\')" style="padding:10px;border:1.5px solid rgba(37,99,235,.2);border-radius:10px;margin-bottom:8px;background:rgba(37,99,235,.03);cursor:pointer">'
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
         +'<span style="font-size:.82rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
@@ -2709,7 +2735,7 @@ function renderAgAuftraege(){
         +(a.beschreibung?'<div style="font-size:.68rem;color:var(--mu)">'+esc(a.beschreibung)+'</div>':'')
         +'<div style="font-size:.6rem;color:var(--acc);margin-top:4px">👤 '+esc(a.tnName)
           +(a.fotosAG&&a.fotosAG.length?' · 📎 '+a.fotosAG.length:'')
-          +(nachCount?' · ➕ '+nachCount+' Nachtrag'+(nachCount>1?'e':''):'')
+          +(nachCount?' · ➕ '+nachCount+' Nachtrag'+(nachCount>1?'e':'')+nachBadge:'')
           +' · 💬'+chatBadge
           +'</div>'
         +(a.frist?'<div style="font-size:.58rem;margin-top:2px;'+(a.frist<localDate()?'color:#dc2626;font-weight:700':'color:#d97706')+'">📅 Frist: '+new Date(a.frist+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})+(a.frist<localDate()?' ⚠ ÜBERFÄLLIG':'')+'</div>':'')
@@ -2732,13 +2758,22 @@ function renderAgAuftraege(){
       const unread=_aufdUnread(a);
       const chatBadge=unread?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;padding:0 3px;margin-left:3px">'+unread+'</span>':'';
       const nachTeaser=nachCount
-        ? '<button onclick="event.stopPropagation();openAufDetails(\''+a.tnId+'\',\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:4px;padding:5px 8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-left:3px solid #d97706;border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:6px">'
-          +'<span style="font-size:.58rem;font-weight:700;color:#92400e">➕ '+nachCount+' Nachtrag'+(nachCount>1?'e':'')+'</span>'
-          +(nachStd>0?'<span style="font-size:.56rem;color:#92400e;font-family:\'JetBrains Mono\',monospace">'+nachStd+'h</span>':'')
-          +(nachMat>0?'<span style="font-size:.56rem;color:#92400e">🧱'+nachMat+'</span>':'')
-          +(nachSig>0?'<span style="font-size:.56rem;color:#92400e">✍'+nachSig+'</span>':'')
-          +'<span style="margin-left:auto;font-size:.54rem;color:#92400e">→</span>'
-          +'</button>'
+        ? (()=>{
+            const nachUnread=_aufdNachUnread(a);
+            const bg=nachUnread?'rgba(239,68,68,.08)':'rgba(245,158,11,.08)';
+            const bc=nachUnread?'rgba(239,68,68,.4)':'rgba(245,158,11,.3)';
+            const lc=nachUnread?'#ef4444':'#d97706';
+            const tc=nachUnread?'#991b1b':'#92400e';
+            const badge=nachUnread?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;padding:0 3px;margin-left:3px">!</span>':'';
+            return '<button onclick="event.stopPropagation();openAufDetails(\''+a.tnId+'\',\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:4px;padding:5px 8px;background:'+bg+';border:1px solid '+bc+';border-left:3px solid '+lc+';border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:6px">'
+              +'<span style="font-size:.58rem;font-weight:700;color:'+tc+'">➕ '+nachCount+' Nachtrag'+(nachCount>1?'e':'')+'</span>'
+              +badge
+              +(nachStd>0?'<span style="font-size:.56rem;color:'+tc+';font-family:\'JetBrains Mono\',monospace">'+nachStd+'h</span>':'')
+              +(nachMat>0?'<span style="font-size:.56rem;color:'+tc+'">🧱'+nachMat+'</span>':'')
+              +(nachSig>0?'<span style="font-size:.56rem;color:'+tc+'">✍'+nachSig+'</span>':'')
+              +'<span style="margin-left:auto;font-size:.54rem;color:'+tc+'">→</span>'
+              +'</button>';
+          })()
         : '';
       h+='<div onclick="openAufDetails(\''+a.tnId+'\',\''+a.id+'\')" style="padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor=\'#2563eb\'" onmouseout="this.style.borderColor=\'\'">'
         +'<div style="display:flex;justify-content:space-between">'
@@ -2757,8 +2792,9 @@ function renderAgAuftraege(){
         +'💬'+chatBadge
         +'</div>'
         +nachTeaser
-        +'<button onclick="event.stopPropagation();exportAuftragsprotokoll(\''+a.tnId+'\',\''+a.id+'\')" style="margin-top:6px;padding:5px 12px;background:#fff;border:1px solid #2563eb;border-radius:6px;color:#2563eb;font-size:.6rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📄 PDF</button>'
-        +' <button onclick="event.stopPropagation();agAuftragWiedereroeffnen(\''+a.tnId+'\',\''+a.id+'\')" style="padding:5px 12px;background:#fff;border:1px solid #d97706;border-radius:6px;color:#d97706;font-size:.6rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">↩ Nacharbeit</button>'
+        +'<button onclick="event.stopPropagation();exportAuftragsprotokoll(\''+a.tnId+'\',\''+a.id+'\')" style="margin-top:6px;padding:5px 10px;background:#fff;border:1px solid #2563eb;border-radius:6px;color:#2563eb;font-size:.58rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📄 PDF</button>'
+        +' <button onclick="event.stopPropagation();exportLeistungsuebersicht(\''+a.tnId+'\',\''+a.id+'\')" style="margin-top:6px;padding:5px 10px;background:linear-gradient(135deg,#2563eb,#1e40af);border:none;border-radius:6px;color:#fff;font-size:.58rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif" title="Rechnungs-Übersicht mit Hauptauftrag + Nachträgen">📋 Leistungen</button>'
+        +' <button onclick="event.stopPropagation();agAuftragWiedereroeffnen(\''+a.tnId+'\',\''+a.id+'\')" style="padding:5px 10px;background:#fff;border:1px solid #d97706;border-radius:6px;color:#d97706;font-size:.58rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">↩ Nacharbeit</button>'
         +'</div>';
     });
     elE.innerHTML=h;
@@ -2994,6 +3030,11 @@ function _aufdUnread(a){
   const seen=(a.lastSeenBy&&a.lastSeenBy[_uid])||0;
   return a.lastMessageAt>seen?1:0;
 }
+function _aufdNachUnread(a){
+  if(!a||!a.lastNachtragAt||a.lastNachtragVon==='ag') return 0;
+  const seen=(a.lastNachtragSeenBy&&a.lastNachtragSeenBy[_uid])||0;
+  return a.lastNachtragAt>seen?1:0;
+}
 function openAufDetails(tnId, aufId){
   _aufdTn=tnId; _aufdAufId=aufId;
   const a=_agAuftraege.find(x=>x.tnId===tnId&&x.id===aufId);
@@ -3052,6 +3093,11 @@ function showAufdTab(tab){
   const btnMap={prot:'aufdTabProt',chat:'aufdTabChat',nach:'aufdTabNach',kunde:'aufdTabKunde'};
   const btn=document.getElementById(btnMap[tab]); if(btn) btn.classList.add('active');
   if(tab==='kunde') _renderAufdKundeTab();
+  if(tab==='nach'&&_aufdTn&&_aufdAufId){
+    // Als gelesen markieren
+    db.collection('globalTN').doc(_aufdTn).collection('auftraege').doc(_aufdAufId)
+      .update({['lastNachtragSeenBy.'+_uid]:Date.now()}).catch(()=>{});
+  }
 }
 function _renderAufdProtokoll(a){
   const body=document.getElementById('aufdProtBody');
@@ -3134,6 +3180,9 @@ function _renderAufdProtokoll(a){
 }
 function exportCurrentAufdPdf(){
   if(_aufdTn&&_aufdAufId) exportAuftragsprotokoll(_aufdTn,_aufdAufId);
+}
+function exportCurrentAufdLeistung(){
+  if(_aufdTn&&_aufdAufId) exportLeistungsuebersicht(_aufdTn,_aufdAufId);
 }
 function _renderAufdKundeTab(){
   if(!_aufdTn||!_aufdAufId) return;
@@ -3400,7 +3449,10 @@ function saveNachtrag(){
   if(sigData) n.unterschrift=sigData;
   else if(sigVerweigert){n.unterschriftVerweigert=true;n.unterschriftVerweigertAm=Date.now();}
   db.collection('globalTN').doc(_aufdTn).collection('auftraege').doc(_aufdAufId).update({
-    nachtraege:firebase.firestore.FieldValue.arrayUnion(n)
+    nachtraege:firebase.firestore.FieldValue.arrayUnion(n),
+    lastNachtragAt:n.erstelltAm,
+    lastNachtragVon:'ag',
+    ['lastNachtragSeenBy.'+_uid]:n.erstelltAm
   }).then(()=>{
     closeNachtragModal();
     toast('➕ Nachtrag hinzugefügt');
@@ -3606,6 +3658,115 @@ function monatsAbschluss(tnId,name,ym){
   });
 }
 
+function exportLeistungsuebersicht(tnId,aufId){
+  toast('📋 Leistungsübersicht wird erstellt…');
+  db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).get().then(doc=>{
+    if(!doc.exists){toast('Auftrag nicht gefunden','bad');return;}
+    const d=doc.data();
+    const az=_azubis.find(a=>a.id===tnId);
+    const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
+    const erledigt=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+    const heute=new Date().toLocaleDateString('de-DE');
+    // Positionen als Array aufbauen: Haupt + Nachträge in Reihenfolge
+    const positionen=[];
+    positionen.push({
+      nr:1,
+      titel:'Hauptauftrag',
+      beschr:d.beschreibung||'',
+      taetigkeit:d.taetigkeit||'',
+      stunden:Number(d.stunden)||0,
+      material:d.material||[],
+      unterschrift:d.unterschrift||null,
+      unterschriftVerweigert:d.unterschriftVerweigert||false,
+      unterschriftVerweigertGrund:d.unterschriftVerweigertGrund||'',
+      datum:erledigt
+    });
+    const nachList=(d.nachtraege||[]).slice().sort((x,y)=>(x.erstelltAm||0)-(y.erstelltAm||0));
+    nachList.forEach((n,idx)=>{
+      positionen.push({
+        nr:idx+2,
+        titel:'Nachtrag '+(idx+1),
+        beschr:n.text||'',
+        taetigkeit:'',
+        stunden:Number(n.stunden)||0,
+        material:n.material||[],
+        unterschrift:n.unterschrift||null,
+        unterschriftVerweigert:n.unterschriftVerweigert||false,
+        unterschriftVerweigertGrund:n.unterschriftVerweigertGrund||'',
+        datum:n.erstelltAm?new Date(n.erstelltAm).toLocaleDateString('de-DE'):''
+      });
+    });
+    const gesamtStd=positionen.reduce((s,p)=>s+p.stunden,0);
+    const gesamtMat=positionen.reduce((s,p)=>s+p.material.length,0);
+    const brief=_briefkopf||null;
+    const briefHtml=brief
+      ? '<div style="white-space:pre-wrap;font-size:9pt;line-height:1.5;color:#1e293b;margin-bottom:3mm">'+esc(brief)+'</div>'
+      : '<div style="font-size:11pt;font-weight:700;margin-bottom:1mm">'+esc(_firma||'')+'</div>';
+    let posHtml='';
+    positionen.forEach(p=>{
+      posHtml+='<div style="margin:4mm 0;padding:3mm 4mm;border:.3mm solid #e2e8f0;border-radius:1.5mm;page-break-inside:avoid">';
+      posHtml+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2mm">';
+      posHtml+='<div style="font-size:11pt;font-weight:800;color:#2563eb">'+p.nr+'. '+p.titel+'</div>';
+      if(p.datum) posHtml+='<div style="font-size:8pt;color:#64748b">'+p.datum+'</div>';
+      posHtml+='</div>';
+      if(p.beschr) posHtml+='<div style="font-size:10pt;margin-bottom:2mm;line-height:1.4">'+esc(p.beschr)+'</div>';
+      if(p.taetigkeit) posHtml+='<div style="font-size:10pt;margin-bottom:2mm;line-height:1.4;color:#334155"><b>Ausgeführt:</b> '+esc(p.taetigkeit)+'</div>';
+      // Stunden + Material als Tabelle
+      posHtml+='<table style="width:100%;border-collapse:collapse;font-size:9pt;margin-top:2mm"><tr><td style="padding:1mm 2mm;background:#f8fafc;border:.2mm solid #e2e8f0;font-weight:700;width:35mm">Arbeitszeit</td><td style="padding:1mm 2mm;border:.2mm solid #e2e8f0">'+(p.stunden||0)+' h</td></tr>';
+      if(p.material.length){
+        posHtml+='<tr><td style="padding:1mm 2mm;background:#f8fafc;border:.2mm solid #e2e8f0;font-weight:700;vertical-align:top">Material</td><td style="padding:1mm 2mm;border:.2mm solid #e2e8f0">';
+        posHtml+=p.material.map(m=>'<span class="mat">'+esc(m)+'</span>').join(' ');
+        posHtml+='</td></tr>';
+      }
+      posHtml+='</table>';
+      // Unterschrift pro Position
+      posHtml+='<div style="margin-top:2mm;display:flex;gap:3mm;align-items:flex-start">';
+      if(p.unterschrift){
+        posHtml+='<div style="font-size:8pt;color:#64748b">✍ Kunde:</div>';
+        posHtml+='<div style="border:.2mm solid #cbd5e1;border-radius:1mm;padding:1mm"><img src="'+p.unterschrift+'" style="height:14mm"></div>';
+      } else if(p.unterschriftVerweigert){
+        posHtml+='<div style="font-size:9pt;color:#b91c1c;font-weight:600;padding:1.5mm 3mm;background:#fef2f2;border:.3mm solid #fecaca;border-radius:1mm">⚠ Unterschrift verweigert'+(p.unterschriftVerweigertGrund?' — '+esc(p.unterschriftVerweigertGrund):'')+'</div>';
+      } else {
+        posHtml+='<div style="font-size:9pt;color:#94a3b8;font-style:italic">Keine Unterschrift</div>';
+      }
+      posHtml+='</div>';
+      posHtml+='</div>';
+    });
+    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Leistungsübersicht '+esc(d.kunde||'')+'</title>'
+      +'<style>@page{size:A4;margin:18mm 15mm}*{margin:0;padding:0;box-sizing:border-box}'
+      +'html,body{width:210mm}body{font-family:Arial,sans-serif;padding:0;font-size:10pt;color:#1e293b;line-height:1.4}'
+      +'h1{font-size:18pt;margin-bottom:2mm}'
+      +'.mat{display:inline-block;padding:1pt 5pt;background:#eff6ff;border:.2mm solid #bfdbfe;border-radius:2pt;font-size:9pt;margin:1pt}'
+      +'@media print{button{display:none}}</style></head><body>'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:.5mm solid #2563eb;padding-bottom:3mm;margin-bottom:5mm">'
+      +'<div>'+briefHtml+'</div>'
+      +'<div style="text-align:right;font-size:9pt;color:#64748b">Datum: '+heute+'<br>Nr. auf Anfrage</div>'
+      +'</div>'
+      +'<h1>Leistungsübersicht</h1>'
+      +'<div style="font-size:10pt;color:#64748b;margin-bottom:5mm">Hauptauftrag'+(nachList.length?' + '+nachList.length+' Nachtrag'+(nachList.length>1?'e':''):'')+'</div>'
+      +'<div style="padding:3mm 4mm;background:#f8fafc;border-radius:1.5mm;margin-bottom:5mm;font-size:10pt">'
+      +'<div style="margin-bottom:1mm"><b>Kunde:</b> '+esc(d.kunde||'')+'</div>'
+      +(d.adresse?'<div style="margin-bottom:1mm"><b>Adresse:</b> '+esc(d.adresse)+'</div>':'')
+      +(maName?'<div><b>Ausgeführt von:</b> '+esc(maName)+'</div>':'')
+      +'</div>'
+      +'<div style="font-size:11pt;font-weight:700;margin-bottom:2mm">Leistungspositionen</div>'
+      +posHtml
+      // Summen-Box
+      +'<div style="margin-top:6mm;padding:4mm 5mm;background:#eff6ff;border:.3mm solid #bfdbfe;border-radius:2mm;page-break-inside:avoid">'
+      +'<div style="font-size:11pt;font-weight:800;margin-bottom:2mm;color:#1e40af">Gesamtsumme</div>'
+      +'<table style="width:100%;font-size:10pt">'
+      +'<tr><td style="padding:1mm 0;color:#64748b">Positionen:</td><td style="text-align:right;font-weight:700">'+positionen.length+'</td></tr>'
+      +'<tr><td style="padding:1mm 0;color:#64748b">Arbeitszeit gesamt:</td><td style="text-align:right;font-weight:800;font-size:12pt;color:#1e40af">'+gesamtStd+' h</td></tr>'
+      +(gesamtMat>0?'<tr><td style="padding:1mm 0;color:#64748b">Materialpositionen:</td><td style="text-align:right;font-weight:700">'+gesamtMat+'</td></tr>':'')
+      +'</table>'
+      +'</div>'
+      +'<div style="margin-top:8mm;font-size:8pt;color:#94a3b8;line-height:1.5">Die vorstehenden Leistungen wurden vom Kunden durch Unterschrift der jeweiligen Einzelposition bestätigt. Diese Übersicht dient als Grundlage für die Rechnungsstellung.</div>'
+      +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
+    const w=window.open('','_blank');
+    w.document.write(html);w.document.close();
+  });
+}
+
 function exportAuftragsprotokoll(tnId,aufId){
   toast('📄 Protokoll wird erstellt…');
   db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).get().then(doc=>{
@@ -3738,6 +3899,153 @@ function removeGeofence(){
     toast('Geofencing deaktiviert');
     loadGeofence();
   });
+}
+
+// AG: AUFTRAGS-AUSWERTUNG (Monat)
+function loadAgAuftragsAuswertung(){
+  const ymSel=document.getElementById('agAuftragsMonat');
+  const ym=ymSel?ymSel.value:localYM();
+  const el=document.getElementById('agAuftragsListe');
+  if(!el) return;
+  if(!_azubis.length){el.innerHTML='<div class="empty">Keine Mitarbeiter</div>';return;}
+  el.innerHTML='<div class="empty">Lädt…</div>';
+  // Für jeden MA alle erledigten Aufträge im Monat holen
+  const [year,month]=ym.split('-').map(Number);
+  const monatStart=new Date(year,month-1,1).getTime();
+  const monatEnd=new Date(year,month,1).getTime();
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('auftraege')
+      .where('status','==','erledigt').get()
+      .then(snap=>{
+        const auftraege=snap.docs
+          .map(d=>({id:d.id,...d.data()}))
+          .filter(a=>a.erledigtAm&&a.erledigtAm>=monatStart&&a.erledigtAm<monatEnd);
+        return {az, auftraege};
+      })
+      .catch(()=>({az, auftraege:[]}))
+  );
+  Promise.all(promises).then(results=>{
+    // Pro MA zusammenrechnen
+    let gesamtHauptStd=0, gesamtNachStd=0, gesamtAuf=0, gesamtNach=0, gesamtMat=0;
+    const maBloecke=[];
+    results.forEach(r=>{
+      if(!r.auftraege.length) return;
+      let maHaupt=0, maNach=0, maNachCount=0, maMat=0;
+      let rows='';
+      r.auftraege.sort((a,b)=>(a.erledigtAm||0)-(b.erledigtAm||0)).forEach(a=>{
+        const hauptStd=Number(a.stunden)||0;
+        const nachList=(a.nachtraege||[]);
+        let nStd=0, nMat=0, nCount=nachList.length;
+        nachList.forEach(n=>{if(n.stunden)nStd+=Number(n.stunden)||0; if(n.material)nMat+=n.material.length;});
+        const hauptMat=(a.material||[]).length;
+        maHaupt+=hauptStd; maNach+=nStd; maNachCount+=nCount; maMat+=hauptMat+nMat;
+        const dat=new Date(a.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+        const kunde=a.kunde||'(ohne Kunde)';
+        const gesamt=hauptStd+nStd;
+        rows+='<tr style="border-top:1px solid var(--brd)">'
+          +'<td style="padding:6px 8px;font-family:\'JetBrains Mono\',monospace;font-size:.6rem;color:var(--mu)">'+dat+'</td>'
+          +'<td style="padding:6px 8px;font-size:.68rem">'+esc(kunde)+(a.beschreibung?'<div style="font-size:.56rem;color:var(--mu);margin-top:1px">'+esc(a.beschreibung.slice(0,50))+(a.beschreibung.length>50?'…':'')+'</div>':'')+'</td>'
+          +'<td style="padding:6px 8px;text-align:right;font-size:.66rem;font-family:\'JetBrains Mono\',monospace">'+hauptStd+'</td>'
+          +'<td style="padding:6px 8px;text-align:right;font-size:.66rem;font-family:\'JetBrains Mono\',monospace;color:'+(nStd>0?'#d97706':'var(--mu)')+'">'+(nStd>0?'+'+nStd:'–')+(nCount>0?'<div style="font-size:.5rem;color:var(--mu)">('+nCount+')</div>':'')+'</td>'
+          +'<td style="padding:6px 8px;text-align:right;font-size:.68rem;font-family:\'JetBrains Mono\',monospace;font-weight:700;color:var(--acc)">'+gesamt+'</td>'
+          +'</tr>';
+      });
+      const maName=((r.az.vorname||'')+' '+(r.az.nachname||'')).trim();
+      gesamtHauptStd+=maHaupt; gesamtNachStd+=maNach; gesamtAuf+=r.auftraege.length; gesamtNach+=maNachCount; gesamtMat+=maMat;
+      maBloecke.push('<div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">'
+        +'<div style="padding:8px 12px;background:rgba(37,99,235,.05);border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
+        +'<div><span style="font-weight:800;font-size:.82rem">👤 '+esc(maName)+'</span> <span style="font-size:.6rem;color:var(--mu)">· '+r.auftraege.length+' Auftrag'+(r.auftraege.length>1?'"e':'')+'</span></div>'
+        +'<div style="font-size:.68rem;font-family:\'JetBrains Mono\',monospace;display:flex;gap:10px">'
+        +'<span style="color:var(--tx)"><b>'+maHaupt+'h</b> Haupt</span>'
+        +'<span style="color:'+(maNach>0?'#d97706':'var(--mu)')+'"><b>'+(maNach>0?'+'+maNach:'0')+'h</b> Nachtrag</span>'
+        +'<span style="color:var(--acc);font-weight:800">= '+(maHaupt+maNach)+'h</span>'
+        +'</div>'
+        +'</div>'
+        +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
+        +'<thead><tr style="background:var(--sur2)">'
+        +'<th style="padding:6px 8px;text-align:left;font-size:.55rem;color:var(--mu);font-weight:700;text-transform:uppercase">Datum</th>'
+        +'<th style="padding:6px 8px;text-align:left;font-size:.55rem;color:var(--mu);font-weight:700;text-transform:uppercase">Kunde</th>'
+        +'<th style="padding:6px 8px;text-align:right;font-size:.55rem;color:var(--mu);font-weight:700;text-transform:uppercase">Haupt</th>'
+        +'<th style="padding:6px 8px;text-align:right;font-size:.55rem;color:var(--mu);font-weight:700;text-transform:uppercase">Nacht.</th>'
+        +'<th style="padding:6px 8px;text-align:right;font-size:.55rem;color:var(--mu);font-weight:700;text-transform:uppercase">Σ h</th>'
+        +'</tr></thead>'
+        +'<tbody>'+rows+'</tbody>'
+        +'</table></div>'
+        +'</div>');
+    });
+    if(!maBloecke.length){
+      el.innerHTML='<div class="empty">Keine erledigten Aufträge in diesem Monat</div>';
+      return;
+    }
+    // Gesamtsumme oben
+    const summary='<div style="padding:10px 14px;background:linear-gradient(135deg,rgba(37,99,235,.08),rgba(16,185,129,.08));border:1px solid rgba(37,99,235,.2);border-radius:10px;margin-bottom:12px">'
+      +'<div style="font-size:.6rem;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">📊 Monatsübersicht '+ym+'</div>'
+      +'<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.75rem;align-items:baseline">'
+      +'<div><span style="color:var(--mu)">Aufträge:</span> <b>'+gesamtAuf+'</b></div>'
+      +'<div><span style="color:var(--mu)">Nachträge:</span> <b>'+gesamtNach+'</b></div>'
+      +'<div><span style="color:var(--mu)">Material-Pos:</span> <b>'+gesamtMat+'</b></div>'
+      +'<div style="margin-left:auto;font-family:\'JetBrains Mono\',monospace">'
+      +'<span style="color:var(--mu);font-size:.66rem">Σ:</span> <b style="font-size:1rem;color:var(--acc)">'+(gesamtHauptStd+gesamtNachStd)+'h</b>'
+      +' <span style="font-size:.56rem;color:var(--mu)">('+gesamtHauptStd+' Haupt + '+gesamtNachStd+' Nacht.)</span>'
+      +'</div>'
+      +'</div>'
+      +'</div>';
+    el.innerHTML=summary+maBloecke.join('');
+  }).catch(e=>{
+    el.innerHTML='<div class="err">Fehler: '+esc(e.message)+'</div>';
+  });
+}
+
+function exportAgAuftragsAuswertung(){
+  const ymSel=document.getElementById('agAuftragsMonat');
+  const ym=ymSel?ymSel.value:localYM();
+  if(!_azubis.length){toast('Keine Mitarbeiter','bad');return;}
+  toast('📊 CSV wird erstellt…');
+  const [year,month]=ym.split('-').map(Number);
+  const monatStart=new Date(year,month-1,1).getTime();
+  const monatEnd=new Date(year,month,1).getTime();
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('auftraege')
+      .where('status','==','erledigt').get()
+      .then(snap=>{
+        const auftraege=snap.docs
+          .map(d=>({id:d.id,...d.data()}))
+          .filter(a=>a.erledigtAm&&a.erledigtAm>=monatStart&&a.erledigtAm<monatEnd);
+        return {az, auftraege};
+      }).catch(()=>({az, auftraege:[]}))
+  );
+  Promise.all(promises).then(results=>{
+    const rows=[['Mitarbeiter','Datum','Kunde','Adresse','Beschreibung','Hauptstunden','Hauptmaterial','Nachtraege','Nachtragsstunden','Nachtragsmaterial','Gesamtstunden','Unterschrift'].join(';')];
+    let totalStd=0;
+    results.forEach(r=>{
+      const maName=((r.az.vorname||'')+' '+(r.az.nachname||'')).trim();
+      r.auftraege.forEach(a=>{
+        const dat=new Date(a.erledigtAm).toLocaleDateString('de-DE');
+        const hauptStd=Number(a.stunden)||0;
+        const hauptMat=(a.material||[]).length;
+        const nachList=a.nachtraege||[];
+        let nStd=0, nMat=0;
+        nachList.forEach(n=>{if(n.stunden)nStd+=Number(n.stunden)||0; if(n.material)nMat+=n.material.length;});
+        const gesamt=hauptStd+nStd;
+        totalStd+=gesamt;
+        const sigStatus=a.unterschrift?'Ja':(a.unterschriftVerweigert?'Verweigert':'Nein');
+        const csvEsc=s=>{s=String(s||'').replace(/"/g,'""'); return s.includes(';')||s.includes('"')||s.includes('\n')?'"'+s+'"':s;};
+        rows.push([
+          csvEsc(maName),csvEsc(dat),csvEsc(a.kunde||''),csvEsc(a.adresse||''),csvEsc(a.beschreibung||''),
+          hauptStd,hauptMat,nachList.length,nStd,nMat,gesamt,sigStatus
+        ].join(';'));
+      });
+    });
+    rows.push(['','','','','','','','','','','Gesamt:',totalStd+'h'].join(';'));
+    const csv='\ufeff'+rows.join('\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='Auftragsstunden_'+(_firma||'Export').replace(/\s/g,'_')+'_'+ym+'.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('✓ CSV heruntergeladen');
+  }).catch(e=>toast('❌ '+e.message,'bad'));
 }
 
 // AG: URLAUB
