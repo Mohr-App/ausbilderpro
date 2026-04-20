@@ -123,7 +123,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .aufd-tab .stab{flex:1}
 .aufd-pane{display:none}.aufd-pane.active{display:block}
 .stab-dd{position:relative;display:inline-block}
-.stab-dd-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1.5px solid var(--brd);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:200;min-width:170px;padding:4px;animation:fadeInDown .15s ease}
+.stab-dd-menu{display:none;position:fixed;background:#fff;border:1.5px solid var(--brd);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.12);z-index:9999;min-width:170px;padding:4px;animation:fadeInDown .15s ease}
 .stab-dd-menu.open{display:block}
 .stab-dd-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:600;color:var(--tx);transition:background .12s;user-select:none}
 .stab-dd-item:hover{background:var(--sur2)}
@@ -135,6 +135,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .tab-order-btn{width:30px;height:30px;border-radius:6px;background:#fff;border:1.5px solid var(--brd);cursor:pointer;font-size:.85rem;color:var(--mu);display:flex;align-items:center;justify-content:center;font-weight:700}
 .tab-order-btn:hover:not(:disabled){border-color:var(--acc);color:var(--acc)}
 .tab-order-btn:disabled{opacity:.3;cursor:not-allowed}
+.coll-card{background:var(--sur);border:1px solid var(--brd);border-radius:12px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.02)}
+.coll-card summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:10px;font-weight:800;font-size:.9rem;color:var(--tx);user-select:none;transition:background .12s}
+.coll-card summary::-webkit-details-marker,.coll-card summary::marker{display:none;content:''}
+.coll-card summary::after{content:'▾';margin-left:auto;font-size:.85rem;color:var(--mu);transition:transform .2s;flex-shrink:0}
+.coll-card[open]>summary::after{transform:rotate(180deg)}
+.coll-card summary:hover{background:var(--sur2)}
+.coll-card>.coll-body{padding:0 16px 16px;animation:fadeInDown .18s ease}
 </style>
 <script src="https://js-de.sentry-cdn.com/954a236264f49755ae54bc9f69f05762.min.js" crossorigin="anonymous"></script>
 </head>
@@ -364,14 +371,15 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
       <!-- Reiter-Reihenfolge -->
       <div class="card">
-        <div class="card-title">🔀 Reiter-Reihenfolge (Live)</div>
+        <div class="card-title">🔀 Reiter-Reihenfolge</div>
         <div id="agTabOrderSettings"></div>
       </div>
       </div>
 
       <!-- Arbeitszeiten / Gleitzeit -->
-      <div class="card">
-        <div class="card-title">⏱ Arbeitszeiten / Gleitzeit</div>
+      <details class="coll-card">
+        <summary>⏱ Arbeitszeiten / Gleitzeit</summary>
+        <div class="coll-body">
         <div><label class="fl">Mitarbeiter / Azubi</label><select class="fi" id="agPlanAzubi" onchange="loadAgPlanForAzubi()" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
         <div id="agPlanCurrent" style="font-size:.72rem;color:var(--mu);margin-bottom:6px"></div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
@@ -397,11 +405,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
         <button class="btn" title="✓ Arbeitszeit speichern" onclick="saveAgPlan()" style="margin-top:6px;width:100%;font-size:.75rem;padding:8px">✓ Arbeitszeit speichern</button>
         <div class="err" id="agPlanErr" style="margin-top:4px"></div>
-      </div>
+        </div>
+      </details>
 
       <!-- Geofencing -->
-      <div class="card">
-        <div class="card-title">📍 Geofencing (Standort-Kontrolle)</div>
+      <details class="coll-card">
+        <summary>📍 Geofencing (Standort-Kontrolle)</summary>
+        <div class="coll-body">
         <div style="font-size:.62rem;color:var(--mu);margin-bottom:6px">Stempeln nur innerhalb des definierten Radius möglich.</div>
         <div><label class="fl">Mitarbeiter / Azubi</label><select class="fi" id="geoAzubi" onchange="loadGeoForAzubi()" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
         <div id="geoCurrent" style="font-size:.68rem;color:var(--mu);margin:6px 0"></div>
@@ -423,11 +433,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <label class="fl">Radius: <span id="geoRadiusVal">200</span>m</label>
           <input type="range" id="geoRadius" min="50" max="1000" step="50" value="200" oninput="document.getElementById('geoRadiusVal').textContent=this.value" style="width:100%">
         </div>
-      </div>
+        </div>
+      </details>
 
       <!-- Zeit nachtragen -->
-      <div class="card">
-        <div class="card-title">✏ Zeit nachtragen (als AG)</div>
+      <details class="coll-card">
+        <summary>✏ Zeit nachtragen (als AG)</summary>
+        <div class="coll-body">
         <div><label class="fl">Mitarbeiter / Azubi</label><select class="fi" id="agNachAzubi" style="font-size:.76rem"><option value="">Bitte wählen…</option></select></div>
         <div><label class="fl">Datum</label><input class="fi" type="date" id="agNachDatum" style="font-size:.76rem"></div>
         <div style="display:flex;gap:6px;margin-bottom:6px">
@@ -436,21 +448,26 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
         <button class="btn" title="✏ Nachtragen" onclick="agZeitNachtragen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px">✏ Nachtragen</button>
         <div class="err" id="agNachErr" style="margin-top:4px"></div>
-      </div>
+        </div>
+      </details>
 
       <!-- Info -->
-      <div class="card">
-        <div class="card-title">📞 Kontakt Verwaltung</div>
+      <details class="coll-card">
+        <summary>📞 Kontakt Verwaltung</summary>
+        <div class="coll-body">
         <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
-      </div>
+        </div>
+      </details>
 
-      <div class="card">
-        <div class="card-title">📱 App installieren</div>
+      <details class="coll-card">
+        <summary>📱 App installieren</summary>
+        <div class="coll-body">
         <div style="font-size:.75rem;color:var(--mu);line-height:1.6">
           <b>iPhone:</b> Safari → Teilen → „Zum Home-Bildschirm"<br>
           <b>Android:</b> Chrome → Menü → „App installieren"
         </div>
-      </div>
+        </div>
+      </details>
 
       <div style="font-size:.82rem;font-weight:800;margin:14px 0 10px">❓ Anleitung</div>
       <div class="help-section"><div class="help-section-header" onclick="this.parentElement.classList.toggle('open')"><div class="section-icon icon-slate">👥</div><div class="section-title">Mitarbeiter</div><span class="section-count">2</span><span class="section-arrow">▾</span></div><div class="help-section-body"><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Azubi oder Arbeitnehmer anlegen</b> – Typ wählen, Name, E-Mail, Passwort vergeben. Azubis loggen sich in AzubiPro ein, Arbeitnehmer in MitarbeiterPro.</div></div><div class="help-item"><div class="item-dot"></div><div class="item-text"><b>Berufsgruppe und Fachrichtung</b> – Bei Azubis den Beruf und die Fachrichtung auswählen.</div></div></div></div>
@@ -1796,10 +1813,17 @@ let _agMaType=localStorage.getItem('ag_ma_type')||'arbeitnehmer';
 function toggleMaDropdown(ev){
   if(ev){ev.stopPropagation();}
   const dd=document.getElementById('agMaDropdown');
+  const btn=document.getElementById('agMaTabBtn');
   const wasOpen=dd.classList.contains('open');
   // Alle anderen Dropdowns schließen
   document.querySelectorAll('.stab-dd-menu.open').forEach(d=>d.classList.remove('open'));
-  if(!wasOpen) dd.classList.add('open');
+  if(!wasOpen){
+    // Position unter dem Button berechnen (position:fixed)
+    const r=btn.getBoundingClientRect();
+    dd.style.top=(r.bottom+4)+'px';
+    dd.style.left=r.left+'px';
+    dd.classList.add('open');
+  }
   // Tab aktivieren (mit Inhalt)
   showAgLiveTab('mitarbeiter');
 }
