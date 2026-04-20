@@ -81,6 +81,25 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .stab.active{background:linear-gradient(135deg,#2563eb,#059669);color:#fff;}
 .abtab{display:none;}.abtab.active{display:block;}
 .ag-badge{position:absolute;top:2px;right:8px;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 2px 6px rgba(239,68,68,.4);animation:pulseRed 1.5s infinite;}
+.mdl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.mdl.open{display:flex}
+.mdl-box{background:#fff;border-radius:16px;width:100%;max-width:480px;padding:22px 22px 18px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.mdl-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.mdl-title{font-size:1rem;font-weight:800;display:flex;align-items:center;gap:10px}
+.mdl-x{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--mu);padding:2px 6px;line-height:1}
+.mdl-x:hover{color:var(--tx)}
+.ava-upload{position:relative;width:64px;height:64px;border-radius:50%;background:var(--sur2);border:2px dashed var(--brd);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;transition:border-color .15s}
+.ava-upload:hover{border-color:var(--acc)}
+.ava-upload img{width:100%;height:100%;object-fit:cover}
+.ava-upload .ava-ph{font-size:.55rem;color:var(--mu);font-weight:600;text-align:center;padding:4px}
+.ava-upload input{display:none}
+.big-btn{display:flex;align-items:center;gap:10px;width:100%;padding:14px 16px;background:#fff;border:1.5px solid var(--brd);border-radius:12px;cursor:pointer;font-family:'Sora',sans-serif;color:var(--tx);text-align:left;transition:all .12s}
+.big-btn:hover{border-color:var(--acc);background:rgba(37,99,235,.03);box-shadow:0 2px 8px rgba(37,99,235,.08)}
+.big-btn .bb-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+.big-btn .bb-tx{flex:1}
+.big-btn .bb-t{font-size:.82rem;font-weight:700}
+.big-btn .bb-s{font-size:.6rem;color:var(--mu);margin-top:2px}
+.big-btn .bb-arr{color:var(--mu);font-size:.9rem}
 </style>
 <script src="https://js-de.sentry-cdn.com/954a236264f49755ae54bc9f69f05762.min.js" crossorigin="anonymous"></script>
 </head>
@@ -170,16 +189,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
       <!-- LIVE: Aufträge -->
       <div class="abtab" id="abtab-auftraege">
-        <div class="card">
-          <div class="card-title">+ Neuen Auftrag erstellen</div>
-          <div><label class="fl">Kunde</label><input class="fi" id="aufKunde" placeholder="z.B. Familie Müller" style="font-size:.76rem"></div>
-          <div><label class="fl">Adresse</label><input class="fi" id="aufAdresse" placeholder="Straße, PLZ Ort" style="font-size:.76rem"></div>
-          <div><label class="fl">Beschreibung</label><input class="fi" id="aufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.76rem"></div>
-          <div><label class="fl">Frist (optional)</label><input class="fi" type="date" id="aufFrist" style="font-size:.76rem"></div>
-          <div><label class="fl">Zuweisen an</label><select class="fi" id="aufMa" multiple style="font-size:.76rem;min-height:60px"><option value="" disabled>Bitte wählen (Mehrfach möglich)…</option></select></div>
-          <button class="btn" title="📋 Auftrag erstellen" onclick="agAuftragErstellen()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px">📋 Auftrag erstellen</button>
-          <div class="err" id="aufErr" style="margin-top:4px"></div>
-        </div>
+        <button class="big-btn" onclick="openAuftragModal()" style="margin-bottom:12px">
+          <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">+</span>
+          <span class="bb-tx"><span class="bb-t">Neuen Auftrag erstellen</span><span class="bb-s">Kunde, Adresse, Zuweisung</span></span>
+          <span class="bb-arr">›</span>
+        </button>
         <div class="card">
           <div class="card-title">📋 Offene Aufträge</div>
           <div id="agAufOffen"><div class="empty">Keine offenen Aufträge</div></div>
@@ -319,31 +333,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
 
-      <!-- MA/Azubi anlegen -->
+      <!-- Meine Mitarbeiter + Anlegen-Button -->
       <div class="card">
-        <div class="card-title">+ Mitarbeiter / Azubi anlegen</div>
-        <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Erstellt einen Zugang für MitarbeiterPro oder AzubiPro.</div>
-        <div style="display:flex;gap:6px;margin-bottom:6px">
-          <button id="typBtnAn" title="👤 Arbeitnehmer" onclick="setMaTyp('arbeitnehmer')" style="flex:1;padding:10px;border:2px solid #2563eb;border-radius:8px;background:rgba(37,99,235,.08);color:#2563eb;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">👤 Arbeitnehmer</button>
-          <button id="typBtnAz" title="🎓 Azubi" onclick="setMaTyp('azubi')" style="flex:1;padding:10px;border:2px solid var(--brd);border-radius:8px;background:#fff;color:var(--mu);font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">🎓 Azubi</button>
+        <div class="card-title" style="justify-content:space-between">
+          <span style="display:flex;align-items:center;gap:8px">👥 Meine Mitarbeiter</span>
         </div>
-        <div id="berufRow" style="display:none;margin-bottom:6px">
-          <div><label class="fl">Berufsgruppe</label><select class="fi" id="newMaBerufGruppe" onchange="agFillFachrichtungen()" style="font-size:.76rem"><option value="">– Beruf wählen –</option></select></div>
-          <div id="newMaFachRow" style="display:none;margin-top:4px"><label class="fl">Fachrichtung</label><select class="fi" id="newMaFachrichtung" style="font-size:.76rem"><option value="">– erst Beruf wählen –</option></select></div>
-        </div>
-        <div style="display:flex;gap:6px;margin-bottom:6px">
-          <div style="flex:1"><label class="fl">Vorname</label><input class="fi" id="newMaVorname" style="font-size:.76rem"></div>
-          <div style="flex:1"><label class="fl">Nachname</label><input class="fi" id="newMaNachname" style="font-size:.76rem"></div>
-        </div>
-        <div><label class="fl">E-Mail</label><input class="fi" type="email" id="newMaEmail" style="font-size:.76rem"></div>
-        <div><label class="fl">Passwort (min. 6 Zeichen)</label><input class="fi" type="text" id="newMaPw" style="font-size:.76rem" placeholder="Wird dem Mitarbeiter mitgeteilt"></div>
-        <button class="btn" title="👤+ Arbeitnehmer anlegen" onclick="agCreateMitarbeiter()" style="margin-top:6px;width:100%;font-size:.78rem;padding:10px" id="createMaBtn">👤+ Arbeitnehmer anlegen</button>
-        <div class="err" id="newMaErr" style="margin-top:4px"></div>
-      </div>
-
-      <!-- MA-Kontakte-Liste -->
-      <div class="card">
-        <div class="card-title">👥 Meine Mitarbeiter</div>
+        <button class="big-btn" onclick="openMaAnlegenModal()" style="margin-bottom:10px">
+          <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">+</span>
+          <span class="bb-tx"><span class="bb-t">Mitarbeiter / Azubi anlegen</span><span class="bb-s">Zugang für MitarbeiterPro oder AzubiPro</span></span>
+          <span class="bb-arr">›</span>
+        </button>
         <div id="agAzubiKontakte"><div class="empty">Lädt…</div></div>
       </div>
 
@@ -361,17 +360,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
 
       <!-- ÜBL-Kurse -->
-      <div class="card">
-        <div class="card-title">🎓 ÜBL-Kurse</div>
-        <div class="stat-row" style="margin-bottom:10px">
-          <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Auszubildende</div></div>
-          <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Lehrgängen</div></div>
-          <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
-        </div>
-        <div id="agNotifBanner"></div>
-        <div id="firmaCodeBanner"></div>
-        <div id="azubiList"><div class="empty">Lädt…</div></div>
-      </div>
+      <button class="big-btn" onclick="openUeblModal()" style="margin-bottom:12px">
+        <span class="bb-ic" style="background:rgba(245,158,11,.1);color:#d97706">🎓</span>
+        <span class="bb-tx"><span class="bb-t">ÜBL-Kurse</span><span class="bb-s" id="ueblBtnSub">Auszubildende und Lehrgänge</span></span>
+        <span class="bb-arr">›</span>
+      </button>
 
       <!-- Info -->
       <div class="card">
@@ -408,6 +401,101 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </button>
   </div>
   <div class="toast" id="toast"></div>
+
+<!-- AUFTRAG ANLEGEN MODAL -->
+<div class="mdl" id="auftragModal">
+  <div class="mdl-box">
+    <div class="mdl-head">
+      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center">📋</span>Neuen Auftrag erstellen</div>
+      <button class="mdl-x" onclick="closeAuftragModal()" title="Schließen">✕</button>
+    </div>
+    <div><label class="fl">Kunde</label><input class="fi" id="aufKunde" placeholder="z.B. Familie Müller" style="font-size:.8rem"></div>
+    <div><label class="fl">Adresse</label><input class="fi" id="aufAdresse" placeholder="Straße, PLZ Ort" style="font-size:.8rem"></div>
+    <div><label class="fl">Beschreibung</label><input class="fi" id="aufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.8rem"></div>
+    <div><label class="fl">Frist (optional)</label><input class="fi" type="date" id="aufFrist" style="font-size:.8rem"></div>
+    <div><label class="fl">Zuweisen an (Mehrfach möglich)</label><select class="fi" id="aufMa" multiple style="font-size:.8rem;min-height:80px"><option value="" disabled>Bitte wählen…</option></select></div>
+    <button class="btn" title="📋 Auftrag erstellen" onclick="agAuftragErstellen()" style="margin-top:10px;width:100%;font-size:.85rem;padding:12px">📋 Auftrag erstellen</button>
+    <div class="err" id="aufErr" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<!-- MITARBEITER / AZUBI ANLEGEN MODAL -->
+<div class="mdl" id="maAnlegenModal">
+  <div class="mdl-box">
+    <div class="mdl-head">
+      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center">+</span>Mitarbeiter / Azubi anlegen</div>
+      <button class="mdl-x" onclick="closeMaAnlegenModal()" title="Schließen">✕</button>
+    </div>
+    <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px">Erstellt einen Zugang für MitarbeiterPro oder AzubiPro.</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button id="typBtnAn" title="👤 Arbeitnehmer" onclick="setMaTyp('arbeitnehmer')" style="flex:1;padding:10px;border:2px solid #2563eb;border-radius:8px;background:rgba(37,99,235,.08);color:#2563eb;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">👤 Arbeitnehmer</button>
+      <button id="typBtnAz" title="🎓 Azubi" onclick="setMaTyp('azubi')" style="flex:1;padding:10px;border:2px solid var(--brd);border-radius:8px;background:#fff;color:var(--mu);font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">🎓 Azubi</button>
+    </div>
+    <!-- Profilbild-Upload -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px;background:var(--sur2);border-radius:10px">
+      <label class="ava-upload" id="newMaAvaWrap" title="Profilbild wählen">
+        <div class="ava-ph" id="newMaAvaPh">📷<br>Foto</div>
+        <img id="newMaAvaImg" style="display:none">
+        <input type="file" id="newMaPhotoFile" accept="image/*" onchange="_onNewMaPhoto(event)">
+      </label>
+      <div style="flex:1;font-size:.68rem;color:var(--mu);line-height:1.45">Profilbild (optional) – wird auf 200×200 px skaliert.<br><span id="newMaPhotoHint" style="color:var(--acc);font-weight:700;display:none">✓ Foto gewählt</span></div>
+    </div>
+    <div id="berufRow" style="display:none;margin-bottom:6px">
+      <div><label class="fl">Berufsgruppe</label><select class="fi" id="newMaBerufGruppe" onchange="agFillFachrichtungen()" style="font-size:.8rem"><option value="">– Beruf wählen –</option></select></div>
+      <div id="newMaFachRow" style="display:none;margin-top:4px"><label class="fl">Fachrichtung</label><select class="fi" id="newMaFachrichtung" style="font-size:.8rem"><option value="">– erst Beruf wählen –</option></select></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <div style="flex:1"><label class="fl">Vorname</label><input class="fi" id="newMaVorname" style="font-size:.8rem"></div>
+      <div style="flex:1"><label class="fl">Nachname</label><input class="fi" id="newMaNachname" style="font-size:.8rem"></div>
+    </div>
+    <div><label class="fl">E-Mail</label><input class="fi" type="email" id="newMaEmail" style="font-size:.8rem"></div>
+    <div><label class="fl">Passwort (min. 6 Zeichen)</label><input class="fi" type="text" id="newMaPw" style="font-size:.8rem" placeholder="Wird dem Mitarbeiter mitgeteilt"></div>
+    <button class="btn" title="👤+ Arbeitnehmer anlegen" onclick="agCreateMitarbeiter()" style="margin-top:10px;width:100%;font-size:.85rem;padding:12px" id="createMaBtn">👤+ Arbeitnehmer anlegen</button>
+    <div class="err" id="newMaErr" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<!-- ÜBL-KURSE MODAL -->
+<div class="mdl" id="ueblModal">
+  <div class="mdl-box" style="max-width:560px">
+    <div class="mdl-head">
+      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(245,158,11,.1);color:#d97706;display:flex;align-items:center;justify-content:center">🎓</span>ÜBL-Kurse</div>
+      <button class="mdl-x" onclick="closeUeblModal()" title="Schließen">✕</button>
+    </div>
+    <div class="stat-row" style="margin-bottom:12px">
+      <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Auszubildende</div></div>
+      <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Lehrgängen</div></div>
+      <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
+    </div>
+    <div id="agNotifBanner"></div>
+    <div id="firmaCodeBanner"></div>
+    <div id="azubiList"><div class="empty">Lädt…</div></div>
+  </div>
+</div>
+
+<!-- PROFILBILD ÄNDERN MODAL (für bestehende MAs) -->
+<div class="mdl" id="avaEditModal">
+  <div class="mdl-box" style="max-width:360px">
+    <div class="mdl-head">
+      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center">📷</span>Profilbild</div>
+      <button class="mdl-x" onclick="closeAvaEditModal()" title="Schließen">✕</button>
+    </div>
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:.82rem;font-weight:700;margin-bottom:10px" id="avaEditName">Mitarbeiter</div>
+      <div style="width:140px;height:140px;border-radius:50%;background:var(--sur2);border:2px solid var(--brd);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;overflow:hidden" id="avaEditPreview">
+        <span style="font-size:2rem;color:var(--mu)" id="avaEditPh">👤</span>
+        <img id="avaEditImg" style="display:none;width:100%;height:100%;object-fit:cover">
+      </div>
+    </div>
+    <label class="btn" style="display:block;text-align:center;margin-bottom:6px;cursor:pointer">
+      📷 Neues Bild wählen
+      <input type="file" id="avaEditFile" accept="image/*" onchange="_onAvaEditFile(event)" style="display:none">
+    </label>
+    <button onclick="_saveAvaEdit()" id="avaEditSaveBtn" class="btn" style="background:linear-gradient(135deg,#059669,#10b981);display:none;margin-bottom:6px">✓ Speichern</button>
+    <button onclick="_removeAvaEdit()" id="avaEditRemoveBtn" class="btn" style="background:#fff;color:#ef4444;border:1.5px solid #ef4444;box-shadow:none;display:none">🗑 Bild entfernen</button>
+    <div class="err" id="avaEditErr" style="margin-top:6px"></div>
+  </div>
+</div>
 <!-- MA Share Modal -->
 <div id="maShareModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center;padding:16px">
   <div style="background:#fff;border-radius:16px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden">
@@ -1210,6 +1298,7 @@ function agCreateMitarbeiter(){
     secDb.collection('users').doc(uid).set({email,role:rolle,firma:_firma});
     const tnData={vorname,nachname,email,firma:_firma,firmaUid:_uid,typ:rolle,erstelltAm:Date.now(),erstelltVon:_firma||_email};
     if(isAzubi&&beruf) tnData.beruf=beruf;
+    if(_pendingNewMaPhoto) tnData.photoUrl=_pendingNewMaPhoto;
     db.collection('globalTN').doc(uid).set(tnData);
     secAuth.signOut();
     document.getElementById('newMaVorname').value='';
@@ -1219,7 +1308,9 @@ function agCreateMitarbeiter(){
     if(berufSel) berufSel.value='';
     if(fachSel) fachSel.value='';
     if(document.getElementById('newMaFachRow')) document.getElementById('newMaFachRow').style.display='none';
+    _pendingNewMaPhoto=null;
     err.textContent='';
+    closeMaAnlegenModal();
     const appUrl=isAzubi?'https://ausbilderpro.de/AzubiPro.html':'https://ausbilderpro.de/MitarbeiterPro.html';
     const shareText='Hallo '+vorname+', du wurdest bei '+(_firma||'AusbilderPro')+' als '+(isAzubi?'Azubi':'Mitarbeiter')+' angelegt.\n\nDeine Zugangsdaten:\nE-Mail: '+email+'\nPasswort: '+pw+'\n\nApp: '+appUrl+'\n\nBitte nach dem ersten Login das Passwort ändern.';
     showMaShareModal(vorname+' '+nachname, app, appUrl, email, pw, shareText);
@@ -1297,8 +1388,14 @@ function renderAgAzubiKontakte(){
     const avatarBg=isMA?'rgba(217,119,6,.1)':'rgba(37,99,235,.1)';
     const avatarBorder=isMA?'rgba(217,119,6,.25)':'rgba(37,99,235,.25)';
     const avatarColor=isMA?'#d97706':'var(--acc)';
+    const avaInner=az.photoUrl
+      ? '<img src="'+esc(az.photoUrl)+'" style="width:100%;height:100%;object-fit:cover">'
+      : initials;
     html+='<div class="card" style="display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:6px">'
-      +'<div style="width:44px;height:44px;border-radius:50%;background:'+avatarBg+';border:2px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:'+avatarColor+';flex-shrink:0">'+initials+'</div>'
+      +'<div onclick="openAvaEditModal(\''+esc(az.id)+'\')" title="Profilbild ändern" style="position:relative;width:48px;height:48px;border-radius:50%;background:'+avatarBg+';border:2px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:'+avatarColor+';flex-shrink:0;cursor:pointer;overflow:hidden">'
+      +avaInner
+      +'<div style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:#fff;border:1.5px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.58rem">📷</div>'
+      +'</div>'
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-size:.88rem;font-weight:800;display:flex;align-items:center;flex-wrap:wrap">'+esc(name)+typBadge+'</div>'
       +(beruf||lj?'<div style="font-size:.65rem;color:var(--mu)">'+esc([beruf,lj].filter(Boolean).join(' · '))+'</div>':'')
@@ -1308,6 +1405,131 @@ function renderAgAzubiKontakte(){
       +'</div></div>';
   });
   el.innerHTML=html;
+}
+
+// ─── Foto-Resize zu 200×200 JPEG base64 ───────────────────────
+function _resizePhoto(file, cb){
+  if(!file){cb(null);return;}
+  const fr=new FileReader();
+  fr.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const s=Math.min(img.width,img.height);
+      const sx=(img.width-s)/2, sy=(img.height-s)/2;
+      const c=document.createElement('canvas');
+      c.width=200; c.height=200;
+      const ctx=c.getContext('2d');
+      ctx.drawImage(img, sx, sy, s, s, 0, 0, 200, 200);
+      cb(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror=()=>cb(null);
+    img.src=e.target.result;
+  };
+  fr.onerror=()=>cb(null);
+  fr.readAsDataURL(file);
+}
+
+// ─── Modals: Öffnen / Schließen ───────────────────────────────
+function openAuftragModal(){
+  document.getElementById('aufKunde').value='';
+  document.getElementById('aufAdresse').value='';
+  document.getElementById('aufBeschr').value='';
+  document.getElementById('aufFrist').value='';
+  document.getElementById('aufErr').textContent='';
+  fillAgAzubiSelect();
+  document.getElementById('auftragModal').classList.add('open');
+}
+function closeAuftragModal(){document.getElementById('auftragModal').classList.remove('open');}
+
+let _pendingNewMaPhoto=null;
+function openMaAnlegenModal(){
+  document.getElementById('newMaVorname').value='';
+  document.getElementById('newMaNachname').value='';
+  document.getElementById('newMaEmail').value='';
+  document.getElementById('newMaPw').value='';
+  document.getElementById('newMaErr').textContent='';
+  _pendingNewMaPhoto=null;
+  const ph=document.getElementById('newMaAvaPh'); if(ph) ph.style.display='';
+  const im=document.getElementById('newMaAvaImg'); if(im){im.style.display='none';im.src='';}
+  const hi=document.getElementById('newMaPhotoHint'); if(hi) hi.style.display='none';
+  const ff=document.getElementById('newMaPhotoFile'); if(ff) ff.value='';
+  setMaTyp(_maTyp||'arbeitnehmer');
+  document.getElementById('maAnlegenModal').classList.add('open');
+}
+function closeMaAnlegenModal(){document.getElementById('maAnlegenModal').classList.remove('open');}
+function _onNewMaPhoto(ev){
+  const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+  _resizePhoto(f,d=>{
+    if(!d){toast('Bild konnte nicht geladen werden','bad');return;}
+    _pendingNewMaPhoto=d;
+    document.getElementById('newMaAvaPh').style.display='none';
+    const im=document.getElementById('newMaAvaImg'); im.src=d; im.style.display='';
+    document.getElementById('newMaPhotoHint').style.display='';
+  });
+}
+
+function openUeblModal(){
+  loadAzubis();
+  document.getElementById('ueblModal').classList.add('open');
+}
+function closeUeblModal(){document.getElementById('ueblModal').classList.remove('open');}
+
+// ─── Profilbild ändern bei bestehendem MA ─────────────────────
+let _avaEditTn=null, _avaEditNewPhoto=null;
+function openAvaEditModal(tnId){
+  _avaEditTn=tnId; _avaEditNewPhoto=null;
+  const az=_azubis.find(a=>a.id===tnId); if(!az) return;
+  const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
+  document.getElementById('avaEditName').textContent=name;
+  document.getElementById('avaEditErr').textContent='';
+  document.getElementById('avaEditSaveBtn').style.display='none';
+  document.getElementById('avaEditFile').value='';
+  const im=document.getElementById('avaEditImg');
+  const ph=document.getElementById('avaEditPh');
+  const rm=document.getElementById('avaEditRemoveBtn');
+  if(az.photoUrl){
+    im.src=az.photoUrl; im.style.display=''; ph.style.display='none';
+    rm.style.display='';
+  }else{
+    im.style.display='none'; im.src=''; ph.style.display='';
+    rm.style.display='none';
+  }
+  document.getElementById('avaEditModal').classList.add('open');
+}
+function closeAvaEditModal(){document.getElementById('avaEditModal').classList.remove('open'); _avaEditTn=null; _avaEditNewPhoto=null;}
+function _onAvaEditFile(ev){
+  const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+  _resizePhoto(f,d=>{
+    if(!d){document.getElementById('avaEditErr').textContent='Bild konnte nicht geladen werden';return;}
+    _avaEditNewPhoto=d;
+    const im=document.getElementById('avaEditImg'); im.src=d; im.style.display='';
+    document.getElementById('avaEditPh').style.display='none';
+    document.getElementById('avaEditSaveBtn').style.display='';
+  });
+}
+function _saveAvaEdit(){
+  if(!_avaEditTn||!_avaEditNewPhoto) return;
+  const tn=_avaEditTn, photo=_avaEditNewPhoto;
+  document.getElementById('avaEditErr').textContent='Wird gespeichert…';
+  db.collection('globalTN').doc(tn).update({photoUrl:photo}).then(()=>{
+    const az=_azubis.find(a=>a.id===tn); if(az) az.photoUrl=photo;
+    toast('✓ Profilbild gespeichert');
+    closeAvaEditModal();
+    renderAgAzubiKontakte();
+    loadAzubis();
+  }).catch(e=>{document.getElementById('avaEditErr').textContent='❌ '+e.message;});
+}
+function _removeAvaEdit(){
+  if(!_avaEditTn) return;
+  if(!confirm('Profilbild entfernen?')) return;
+  const tn=_avaEditTn;
+  db.collection('globalTN').doc(tn).update({photoUrl:firebase.firestore.FieldValue.delete()}).then(()=>{
+    const az=_azubis.find(a=>a.id===tn); if(az) delete az.photoUrl;
+    toast('✓ Profilbild entfernt');
+    closeAvaEditModal();
+    renderAgAzubiKontakte();
+    loadAzubis();
+  }).catch(e=>{document.getElementById('avaEditErr').textContent='❌ '+e.message;});
 }
 // Live-Sub-Tabs: Heute / Aufträge / Meldungen
 function showAgLiveTab(tab){
@@ -1983,6 +2205,7 @@ function agAuftragErstellen(){
     document.getElementById('aufBeschr').value='';
     document.getElementById('aufFrist').value='';
     sel.selectedIndex=-1;
+    closeAuftragModal();
     toast('📋 Auftrag an '+maIds.length+' Mitarbeiter erstellt');
     loadAgAuftraege();
   }).catch(e=>{err.textContent='❌ '+e.message;});
