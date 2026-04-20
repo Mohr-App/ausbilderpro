@@ -175,6 +175,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto" id="agLiveTabs">
         <button class="stab active" title="Heute" onclick="showAgLiveTab('heute')">Heute</button>
+        <button class="stab" title="Mitarbeiter" onclick="showAgLiveTab('mitarbeiter')">Mitarbeiter</button>
         <button class="stab" title="Aufträge" onclick="showAgLiveTab('auftraege')">Aufträge</button>
         <button class="stab" title="Meldungen" onclick="showAgLiveTab('meldungen')">Meldungen</button>
       </div>
@@ -185,6 +186,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div class="card-title">📡 Wer arbeitet gerade</div>
           <div id="agZeitLive"><div class="empty">Lädt…</div></div>
         </div>
+      </div>
+
+      <!-- LIVE: Mitarbeiter -->
+      <div class="abtab" id="abtab-mitarbeiter">
+        <button class="big-btn" onclick="openMaAnlegenModal()" style="margin-bottom:12px">
+          <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">+</span>
+          <span class="bb-tx"><span class="bb-t">Mitarbeiter / Azubi anlegen</span><span class="bb-s">Zugang für MitarbeiterPro oder AzubiPro</span></span>
+          <span class="bb-arr">›</span>
+        </button>
+        <div id="agAzubiKontakte"><div class="empty">Lädt…</div></div>
       </div>
 
       <!-- LIVE: Aufträge -->
@@ -333,19 +344,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
 
-      <!-- Meine Mitarbeiter + Anlegen-Button -->
-      <div class="card">
-        <div class="card-title" style="justify-content:space-between">
-          <span style="display:flex;align-items:center;gap:8px">👥 Meine Mitarbeiter</span>
-        </div>
-        <button class="big-btn" onclick="openMaAnlegenModal()" style="margin-bottom:10px">
-          <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">+</span>
-          <span class="bb-tx"><span class="bb-t">Mitarbeiter / Azubi anlegen</span><span class="bb-s">Zugang für MitarbeiterPro oder AzubiPro</span></span>
-          <span class="bb-arr">›</span>
-        </button>
-        <div id="agAzubiKontakte"><div class="empty">Lädt…</div></div>
-      </div>
-
       <!-- Zeit nachtragen -->
       <div class="card">
         <div class="card-title">✏ Zeit nachtragen (als AG)</div>
@@ -358,13 +356,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="btn" title="✏ Nachtragen" onclick="agZeitNachtragen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px">✏ Nachtragen</button>
         <div class="err" id="agNachErr" style="margin-top:4px"></div>
       </div>
-
-      <!-- ÜBL-Kurse -->
-      <button class="big-btn" onclick="openUeblModal()" style="margin-bottom:12px">
-        <span class="bb-ic" style="background:rgba(245,158,11,.1);color:#d97706">🎓</span>
-        <span class="bb-tx"><span class="bb-t">ÜBL-Kurse</span><span class="bb-s" id="ueblBtnSub">Auszubildende und Lehrgänge</span></span>
-        <span class="bb-arr">›</span>
-      </button>
 
       <!-- Info -->
       <div class="card">
@@ -452,24 +443,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div><label class="fl">Passwort (min. 6 Zeichen)</label><input class="fi" type="text" id="newMaPw" style="font-size:.8rem" placeholder="Wird dem Mitarbeiter mitgeteilt"></div>
     <button class="btn" title="👤+ Arbeitnehmer anlegen" onclick="agCreateMitarbeiter()" style="margin-top:10px;width:100%;font-size:.85rem;padding:12px" id="createMaBtn">👤+ Arbeitnehmer anlegen</button>
     <div class="err" id="newMaErr" style="margin-top:6px"></div>
-  </div>
-</div>
-
-<!-- ÜBL-KURSE MODAL -->
-<div class="mdl" id="ueblModal">
-  <div class="mdl-box" style="max-width:560px">
-    <div class="mdl-head">
-      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(245,158,11,.1);color:#d97706;display:flex;align-items:center;justify-content:center">🎓</span>ÜBL-Kurse</div>
-      <button class="mdl-x" onclick="closeUeblModal()" title="Schließen">✕</button>
-    </div>
-    <div class="stat-row" style="margin-bottom:12px">
-      <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Auszubildende</div></div>
-      <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Lehrgängen</div></div>
-      <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
-    </div>
-    <div id="agNotifBanner"></div>
-    <div id="firmaCodeBanner"></div>
-    <div id="azubiList"><div class="empty">Lädt…</div></div>
   </div>
 </div>
 
@@ -807,9 +780,11 @@ function renderAusfallBanner(){
 }
 
 function renderStats(){
-  document.getElementById('statAzubis').textContent=_azubis.length;
+  const elA=document.getElementById('statAzubis');
+  if(!elA) return; // ÜBL-Modal ist nicht mehr Teil von AG
+  elA.textContent=_azubis.length;
   const inKurs=_azubis.filter(a=>a.aktiverKursId).length;
-  document.getElementById('statAktiv').textContent=inKurs;
+  const elK=document.getElementById('statAktiv'); if(elK) elK.textContent=inKurs;
   let tp=0,cp=0;
   _azubis.forEach(a=>{
     if(!a.aktiverKursId)return;
@@ -818,7 +793,7 @@ function renderStats(){
     const t=kd.tnData[a.id];
     if(t.attPercent!=null){tp+=t.attPercent;cp++;}
   });
-  document.getElementById('statAnw').textContent=cp?Math.round(tp/cp)+'%':'–';
+  const elAnw=document.getElementById('statAnw'); if(elAnw) elAnw.textContent=cp?Math.round(tp/cp)+'%':'–';
   // ÜBL-Hinweis wenn keine Azubis in Kursen
   const banner=document.getElementById('agNotifBanner');
   if(banner&&_azubis.length>0&&inKurs===0&&!banner.innerHTML.includes('kurs_ausfall')){
@@ -828,6 +803,7 @@ function renderStats(){
 
 function renderAzubiList(){
   const el=document.getElementById('azubiList');
+  if(!el) return; // ÜBL-Modal ist nicht mehr Teil von AG
   if(!_azubis.length){el.innerHTML='<div class="empty">Noch keine Mitarbeiter angelegt.<br>Legen Sie im Betrieb-Tab unter Zeiten Ihre Mitarbeiter an.</div>';return;}
   const openIds=new Set();
   document.querySelectorAll('.azubi-card.expanded').forEach(c=>{if(c.dataset.tnId)openIds.add(c.dataset.tnId);});
@@ -1468,11 +1444,8 @@ function _onNewMaPhoto(ev){
   });
 }
 
-function openUeblModal(){
-  loadAzubis();
-  document.getElementById('ueblModal').classList.add('open');
-}
-function closeUeblModal(){document.getElementById('ueblModal').classList.remove('open');}
+function openUeblModal(){/* ÜBL nur noch in AzubiPro einsehbar */}
+function closeUeblModal(){}
 
 // ─── Profilbild ändern bei bestehendem MA ─────────────────────
 let _avaEditTn=null, _avaEditNewPhoto=null;
@@ -1531,13 +1504,14 @@ function _removeAvaEdit(){
     loadAzubis();
   }).catch(e=>{document.getElementById('avaEditErr').textContent='❌ '+e.message;});
 }
-// Live-Sub-Tabs: Heute / Aufträge / Meldungen
+// Live-Sub-Tabs: Heute / Mitarbeiter / Aufträge / Meldungen
 function showAgLiveTab(tab){
   document.querySelectorAll('#agpage-live .abtab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('#agLiveTabs .stab').forEach(t=>t.classList.remove('active'));
   const pane=document.getElementById('abtab-'+tab); if(pane) pane.classList.add('active');
   if(event&&event.target) event.target.classList.add('active');
   if(tab==='heute') startAgZeitLive();
+  if(tab==='mitarbeiter'){ loadAzubis(); renderAgAzubiKontakte(); }
   if(tab==='auftraege') loadAgAuftraege();
   if(tab==='meldungen') loadAgMeldungen();
 }
@@ -1562,6 +1536,7 @@ function initAgLive(){
   fillAgAzubiSelect();
   const active=document.querySelector('#agpage-live .abtab.active');
   if(!active||active.id==='abtab-heute') startAgZeitLive();
+  else if(active.id==='abtab-mitarbeiter'){ loadAzubis(); renderAgAzubiKontakte(); }
   else if(active.id==='abtab-auftraege') loadAgAuftraege();
   else if(active.id==='abtab-meldungen') loadAgMeldungen();
 }
@@ -1576,9 +1551,6 @@ function initAgEinstellungen(){
   // Firmencode anzeigen
   const codeEl=document.getElementById('firmaCodeDisplay');
   if(codeEl&&_firmaCode) codeEl.textContent=_firmaCode;
-  // ÜBL + Mitarbeiterkontakte laden
-  loadAzubis();
-  renderAgAzubiKontakte();
 }
 // Legacy-Alias falls altes initAgBetrieb noch gerufen wird
 function initAgBetrieb(){ initAgLive(); initAgAuswertung(); initAgEinstellungen(); }
