@@ -585,7 +585,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .mat-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
 .mat-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:6px;font-size:.68rem;font-weight:600;color:#2563eb}
 .mat-tag button{background:none;border:none;color:#ef4444;cursor:pointer;font-size:.7rem;padding:0}
+.aufimg-full{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1001;align-items:center;justify-content:center;padding:20px;cursor:pointer}
+.aufimg-full.open{display:flex}
+.aufimg-full img{max-width:100%;max-height:92vh;border-radius:8px}
+.aufimg-ag{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding:8px;background:rgba(37,99,235,.04);border:1px dashed rgba(37,99,235,.3);border-radius:8px}
+.aufimg-ag-title{width:100%;font-size:.58rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.aufimg-ag img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid rgba(37,99,235,.2);cursor:pointer}
 </style>
+<div class="aufimg-full" id="aufImgFull" onclick="this.classList.remove('open')"><img id="aufImgFullSrc"></div>
 <div class="as-overlay" id="asModal">
   <div class="as-box">
     <div class="as-title" id="asTitle">⏹ Ausstempeln</div>
@@ -2345,6 +2352,13 @@ function loadAuftraege(){
     });
 }
 
+function showAufImgFull(src){
+  const el=document.getElementById('aufImgFull');
+  const im=document.getElementById('aufImgFullSrc');
+  if(im) im.src=src;
+  if(el) el.classList.add('open');
+}
+
 function renderAuftraege(){
   const offen=_auftraege.filter(a=>a.status==='offen');
   const inArbeit=_auftraege.filter(a=>a.status==='inArbeit');
@@ -2365,6 +2379,11 @@ function renderAuftraege(){
       const bgCol=isRunning?'rgba(16,185,129,.04)':'rgba(37,99,235,.03)';
       let seit='';
       if(isRunning&&a.gestartetAm){const min=Math.round((Date.now()-a.gestartetAm)/60000);seit=min<60?min+'min':Math.floor(min/60)+'h '+min%60+'min';}
+      const refBilder=(a.fotosAG&&a.fotosAG.length)
+        ? '<div class="aufimg-ag"><div class="aufimg-ag-title">📎 Referenzbilder vom Arbeitgeber ('+a.fotosAG.length+')</div>'
+          +a.fotosAG.map(f=>'<img src="'+f+'" onclick="showAufImgFull(this.src)" loading="lazy">').join('')
+          +'</div>'
+        : '';
       h+='<div style="padding:12px;border:1.5px solid '+borderCol+';border-radius:10px;margin-bottom:8px;background:'+bgCol+'">'
         +(isRunning?'<div style="font-size:.6rem;font-weight:700;color:#059669;margin-bottom:4px">▶ In Arbeit'+(seit?' seit '+seit:'')+'</div>':'')
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
@@ -2372,6 +2391,7 @@ function renderAuftraege(){
         +'<span style="font-size:.58rem;color:var(--mu)">'+dat+'</span></div>'
         +(a.adresse?'<a href="'+mapsUrl+'" target="_blank" style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:8px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:8px;text-decoration:none;font-size:.72rem;color:#2563eb;font-weight:600">📍 '+esc(a.adresse)+' <span style="margin-left:auto;font-size:.65rem">→ Maps</span></a>':'')
         +(a.beschreibung?'<div style="font-size:.78rem;color:var(--tx);margin-top:8px;padding:8px 10px;background:rgba(0,0,0,.02);border-radius:6px;line-height:1.5">'+esc(a.beschreibung)+'</div>':'')
+        +refBilder
         +(a.erstelltVon&&a.erstelltVon!=='selbst'?'<div style="font-size:.58rem;color:var(--mu);margin-top:4px">Von: '+esc(a.erstelltVon)+'</div>':'')
         +(a.frist?'<div style="font-size:.62rem;margin-top:2px;'+(a.frist<localDate()?'color:#dc2626;font-weight:700':'color:#d97706')+'">📅 Frist: '+new Date(a.frist+"T12:00").toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"2-digit"})+(a.frist<localDate()?' ⚠ ÜBERFÄLLIG':'')+'</div>':'')
         +(isRunning
@@ -2391,7 +2411,7 @@ function renderAuftraege(){
         +'<span style="font-size:.78rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
         +'<span style="font-size:.55rem;color:#059669;font-weight:600">✅ '+dat+'</span></div>'
         +(a.adresse?'<div style="font-size:.65rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
-        +((a.fotos||a.unterschrift)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(a.fotos?'📸 '+a.fotos.length+' Foto(s)':'')+(a.unterschrift?' · ✍ Unterschrift':'')+'</div>':'')
+        +((a.fotosAG||a.fotos||a.unterschrift)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(a.fotosAG?'📎 '+a.fotosAG.length+' ':'')+(a.fotos?'📸 '+a.fotos.length+' ':'')+(a.unterschrift?'✍ ':'')+'</div>':'')
         +'</div>';
     });
     elE.innerHTML=h;
