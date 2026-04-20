@@ -491,6 +491,21 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </details>
 
       <details class="coll-card">
+        <summary>📋 Briefkopf (für PDF-Exports)</summary>
+        <div class="coll-body">
+          <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px;line-height:1.5">Erscheint oben auf Auftragsprotokollen und Leistungsübersichten. Freie Gestaltung — trage alles ein was auf Ihre Rechnungen/Protokolle soll (Firmenname, Adresse, Telefon, E-Mail, USt-ID, Steuernummer, IBAN, Webseite). Zeilenumbrüche werden erhalten.</div>
+          <textarea id="briefkopfTxt" rows="7" style="width:100%;padding:10px;border:1.5px solid var(--brd);border-radius:8px;font-size:.74rem;font-family:'Sora',sans-serif;resize:vertical;line-height:1.5;background:#fff" placeholder="Beispiel:&#10;Elektro-Service Mohr&#10;Musterstraße 12 · 53111 Bonn&#10;Tel. 0228 / 123456 · info@elektro-mohr.de&#10;USt-IdNr. DE123456789 · Steuer-Nr. 123/456/78901&#10;IBAN DE12 3456 7890 1234 5678 90"></textarea>
+          <div style="font-size:.6rem;color:var(--mu);margin-top:4px;font-style:italic">Leer lassen = Fallback auf Firmenname aus Ihrem Profil</div>
+          <button class="btn" onclick="saveBriefkopf()" style="margin-top:8px;width:100%;font-size:.78rem;padding:10px">✓ Briefkopf speichern</button>
+          <div class="err" id="briefkopfErr" style="margin-top:6px"></div>
+          <div style="margin-top:12px;padding:8px 10px;background:var(--sur2);border-radius:8px">
+            <div style="font-size:.58rem;color:var(--mu);font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Vorschau im PDF</div>
+            <div id="briefkopfPreview" style="font-size:.68rem;line-height:1.5;white-space:pre-wrap;color:var(--tx);padding:8px;background:#fff;border:1px solid var(--brd);border-radius:6px;min-height:40px;font-family:Arial,sans-serif"></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="coll-card">
         <summary>🔀 Reiter-Reihenfolge</summary>
         <div class="coll-body">
           <div id="agTabOrderSettings"></div>
@@ -2074,6 +2089,40 @@ function initAgEinstellungen(){
   renderAgTabOrderSettings();
   // Firmenlogo-Preview laden
   _refreshFirmenlogoPreview();
+  // Briefkopf laden
+  _refreshBriefkopfUI();
+}
+
+function _refreshBriefkopfUI(){
+  const txt=document.getElementById('briefkopfTxt');
+  const prev=document.getElementById('briefkopfPreview');
+  if(txt) txt.value=_briefkopf||'';
+  if(prev) prev.textContent=_briefkopf||'(Firmenname: '+(_firma||'—')+')';
+  // Live-Preview bei Tippen
+  if(txt&&!txt._liveHandler){
+    txt._liveHandler=true;
+    txt.addEventListener('input',()=>{
+      const v=txt.value;
+      if(prev) prev.textContent=v||'(Firmenname: '+(_firma||'—')+')';
+    });
+  }
+}
+
+function saveBriefkopf(){
+  if(!_uid) return;
+  const txt=document.getElementById('briefkopfTxt');
+  const err=document.getElementById('briefkopfErr');
+  if(!txt||!err) return;
+  const val=txt.value.trim();
+  err.textContent='Wird gespeichert…'; err.style.color='var(--acc)';
+  const update=val
+    ? {briefkopf:val}
+    : {briefkopf:firebase.firestore.FieldValue.delete()};
+  db.collection('users').doc(_uid).update(update).then(()=>{
+    _briefkopf=val;
+    err.textContent='';
+    toast(val?'📋 Briefkopf gespeichert':'🗑 Briefkopf entfernt');
+  }).catch(e=>{err.style.color='#ef4444';err.textContent='❌ '+e.message;});
 }
 
 function _refreshFirmenlogoPreview(){
@@ -3822,7 +3871,9 @@ function exportAuftragsprotokoll(tnId,aufId){
       +'img{max-width:100%;page-break-inside:avoid}'
       +'@media print{body{padding:0}button{display:none}}</style></head><body>'
       +'<h1>Auftragsprotokoll</h1>'
-      +'<div style="color:#64748b;font-size:10px;margin-bottom:16px">'+esc(_firma||'')+' · Erstellt am '+(new Date().toLocaleDateString('de-DE'))+'</div>'
+      +(_briefkopf
+        ? '<div style="white-space:pre-wrap;font-size:9pt;line-height:1.5;color:#1e293b;border-bottom:.3mm solid #e2e8f0;padding-bottom:4mm;margin-bottom:5mm">'+esc(_briefkopf)+'</div>'
+        : '<div style="color:#64748b;font-size:10px;margin-bottom:16px">'+esc(_firma||'')+' · Erstellt am '+(new Date().toLocaleDateString('de-DE'))+'</div>')
       +'<div class="row"><span class="label">Kunde:</span><span class="val">'+esc(d.kunde||'')+'</span></div>'
       +(d.adresse?'<div class="row"><span class="label">Adresse:</span><span class="val">'+esc(d.adresse)+'</span></div>':'')
       +(d.beschreibung?'<div class="row"><span class="label">Auftrag:</span><span class="val">'+esc(d.beschreibung)+'</span></div>':'')
