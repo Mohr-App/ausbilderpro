@@ -1246,11 +1246,75 @@ function asConfirm(){
     if(gps) update.gpsErledigt=gps;
     ref.update(update).then(()=>{
       saveMaterialien();
-      asClose();_auftragId=null;
+      asClose();
+      const savedAufId=_auftragId; _auftragId=null;
       toast('Auftrag erledigt');
+      setTimeout(()=>maybeSendBescheinigung(savedAufId), 400);
     });
   }).catch(e=>{toast('Fehler: '+e.message,'bad');});
 }
+
+// ─── Kunden-Bescheinigung (nach Erledigung) ──────────────────
+function maybeSendBescheinigung(aufId){
+  db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).get().then(doc=>{
+    if(!doc.exists) return;
+    const d=doc.data();
+    let email=d.kundeEmail;
+    if(!email){
+      const ask=confirm('Auftragsbescheinigung jetzt per E-Mail an den Kunden senden?\n\nEs wurde noch keine Kunden-E-Mail hinterlegt.');
+      if(!ask) return;
+      email=prompt('E-Mail-Adresse des Kunden:','');
+      if(!email) return;
+      email=email.trim().toLowerCase();
+      db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).update({kundeEmail:email}).catch(()=>{});
+    } else {
+      if(!confirm('Auftragsbescheinigung jetzt an '+email+' senden?')) return;
+    }
+    sendBescheinigungMail(aufId, email, d);
+  });
+}
+function sendBescheinigungMail(aufId, email, d){
+  const firma=(_tnData&&_tnData.firma)||'';
+  const maName=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim();
+  const dat=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+  const html=_kundenBescheinigungHtml(d, firma, maName, dat);
+  db.collection('mail').add({
+    to:email,
+    message:{subject:'Auftragsbescheinigung '+(d.kunde?'· '+d.kunde:'')+' · '+firma, html}
+  }).then(()=>{
+    db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).update({bescheinigungMailAt:Date.now()}).catch(()=>{});
+    toast('📧 Bescheinigung an '+email+' gesendet');
+  }).catch(e=>toast('❌ Mail fehlgeschlagen: '+e.message,'bad'));
+}
+function _kundenBescheinigungHtml(d, firma, maName, dat){
+  let h='<div style="font-family:Arial,sans-serif;max-width:680px;padding:24px;color:#1e293b">'
+    +'<div style="border-bottom:2px solid #2563eb;padding-bottom:12px;margin-bottom:20px"><h1 style="margin:0;color:#2563eb;font-size:22px">Auftragsbescheinigung</h1>'
+    +'<div style="color:#64748b;font-size:12px;margin-top:4px">'+esc(firma||'')+(dat?' · Erstellt am '+dat:'')+'</div></div>'
+    +'<table style="border-collapse:collapse;width:100%;font-size:13px;margin-bottom:16px"><tbody>'
+    +(d.kunde?'<tr><td style="padding:4px 0;color:#64748b;width:120px">Kunde</td><td style="padding:4px 0;font-weight:700">'+esc(d.kunde)+'</td></tr>':'')
+    +(d.adresse?'<tr><td style="padding:4px 0;color:#64748b">Adresse</td><td style="padding:4px 0">'+esc(d.adresse)+'</td></tr>':'')
+    +(d.beschreibung?'<tr><td style="padding:4px 0;color:#64748b">Auftrag</td><td style="padding:4px 0">'+esc(d.beschreibung)+'</td></tr>':'')
+    +(maName?'<tr><td style="padding:4px 0;color:#64748b">Mitarbeiter</td><td style="padding:4px 0">'+esc(maName)+'</td></tr>':'')
+    +'</tbody></table>';
+  if(d.taetigkeit){h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Durchgeführte Arbeiten</h3><div style="font-size:13px;line-height:1.6;white-space:pre-wrap">'+esc(d.taetigkeit)+'</div>';}
+  if(d.stunden){h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Stundenaufwand</h3><div style="font-size:13px">'+d.stunden+' Stunden</div>';}
+  if(d.material&&d.material.length){
+    h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Verwendetes Material</h3><div style="font-size:12px">';
+    d.material.forEach(m=>{h+='<span style="display:inline-block;padding:3px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;margin:2px">'+esc(m)+'</span>';});
+    h+='</div>';
+  }
+  if(d.fotos&&d.fotos.length){
+    h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Fotodokumentation</h3><div style="display:flex;gap:8px;flex-wrap:wrap">';
+    d.fotos.forEach(f=>{h+='<img src="'+f+'" style="width:200px;border-radius:6px;border:1px solid #cbd5e1">';});
+    h+='</div>';
+  }
+  if(d.unterschrift){
+    h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Kundenunterschrift</h3><div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px;display:inline-block"><img src="'+d.unterschrift+'" style="height:80px"></div>';
+  }
+  h+='<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="font-size:11px;color:#94a3b8">Diese Bescheinigung wurde elektronisch erstellt.</p></div>';
+  return h;
+}
+function resendBescheinigung(aufId){maybeSendBescheinigung(aufId);}
 
 function b64toBlob(b64){
   const parts=b64.split(',');
@@ -1870,6 +1934,7 @@ function renderAuftraege(){
         +(a.taetigkeit?'<div style="font-size:.6rem;color:var(--mu)">🔧 '+esc(a.taetigkeit)+'</div>':'')
         +((a.fotosAG||a.fotos||a.unterschrift||nachCount)?'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(a.stunden?'⏱ '+a.stunden+'h ':'')+(a.fotosAG?'📎 '+a.fotosAG.length+' ':'')+(a.fotos?'📸 '+a.fotos.length+' ':'')+(a.unterschrift?'✍ ':'')+(nachCount?'➕ '+nachCount+' ':'')+'</div>':'')
         +'<button class="chat-fab" onclick="openAufDetails(\''+a.id+'\')" style="padding:6px 10px;font-size:.68rem;margin-top:6px">💬 Chat'+chatBadge+'</button>'
+        +' <button onclick="resendBescheinigung(\''+a.id+'\')" style="padding:6px 10px;margin-top:6px;background:#fff;border:1.5px solid #059669;color:#059669;border-radius:8px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📧 Kunde</button>'
         +'</div>';
     });
     elE.innerHTML=h;

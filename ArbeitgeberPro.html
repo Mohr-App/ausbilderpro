@@ -462,7 +462,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </div>
     <div><label class="fl">Kunde</label><input class="fi" id="aufKunde" placeholder="z.B. Familie Müller" style="font-size:.8rem"></div>
     <div><label class="fl">Adresse</label><input class="fi" id="aufAdresse" placeholder="Straße, PLZ Ort" style="font-size:.8rem"></div>
+    <div><label class="fl">E-Mail Kunde (optional, für Terminbestätigung + Bescheinigung)</label><input class="fi" type="email" id="aufKundeEmail" placeholder="kunde@example.com" style="font-size:.8rem"></div>
     <div><label class="fl">Beschreibung</label><input class="fi" id="aufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.8rem"></div>
+    <div style="display:flex;gap:6px">
+      <div style="flex:1"><label class="fl">Termin (optional)</label><input class="fi" type="date" id="aufTerminDatum" style="font-size:.8rem"></div>
+      <div style="flex:1"><label class="fl">Uhrzeit</label><input class="fi" type="time" id="aufTerminUhrzeit" style="font-size:.8rem"></div>
+    </div>
     <div><label class="fl">Frist (optional)</label><input class="fi" type="date" id="aufFrist" style="font-size:.8rem"></div>
     <div><label class="fl">Zuweisen an (Mehrfach möglich)</label><select class="fi" id="aufMa" multiple style="font-size:.8rem;min-height:80px"><option value="" disabled>Bitte wählen…</option></select></div>
     <label class="fl" style="margin-top:8px">Bilder anfügen (optional)</label>
@@ -493,6 +498,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="aufd-tab">
       <button class="stab active" id="aufdTabChat" onclick="showAufdTab('chat')">💬 Chat</button>
       <button class="stab" id="aufdTabNach" onclick="showAufdTab('nach')">➕ Nachträge</button>
+      <button class="stab" id="aufdTabKunde" onclick="showAufdTab('kunde')">👤 Kunde</button>
     </div>
     <!-- Chat-Bereich -->
     <div class="aufd-pane active" id="aufd-chat">
@@ -511,6 +517,25 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <span class="bb-arr">›</span>
       </button>
       <div id="aufdNachListe"><div class="empty">Noch keine Nachträge</div></div>
+    </div>
+    <!-- Kunde-Bereich -->
+    <div class="aufd-pane" id="aufd-kunde">
+      <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px;line-height:1.5">Kundendaten und Termin. Bei Änderung wird der Kunde automatisch per E-Mail informiert (wenn E-Mail-Adresse gesetzt ist). Chat und Nachträge werden <b>nicht</b> an den Kunden übermittelt.</div>
+      <div><label class="fl">E-Mail Kunde</label><input class="fi" type="email" id="aufdKundeEmail" placeholder="kunde@example.com" style="font-size:.8rem"></div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <div style="flex:1"><label class="fl">Termin-Datum</label><input class="fi" type="date" id="aufdTerminDatum" style="font-size:.8rem"></div>
+        <div style="flex:1"><label class="fl">Uhrzeit</label><input class="fi" type="time" id="aufdTerminUhrzeit" style="font-size:.8rem"></div>
+      </div>
+      <button class="btn" onclick="saveAufdKundeTermin()" style="margin-top:10px;width:100%;font-size:.82rem;padding:10px">✓ Speichern (Kunde wird benachrichtigt)</button>
+      <div class="err" id="aufdKundeErr" style="margin-top:6px"></div>
+      <div id="aufdKundeStatus" style="margin-top:12px;font-size:.7rem;color:var(--mu);line-height:1.5"></div>
+      <div id="aufdKundeActions" style="margin-top:10px;display:none">
+        <div style="font-size:.7rem;font-weight:700;color:var(--tx);margin-bottom:6px">Kundenbescheinigung</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onclick="sendKundenBescheinigungFromDetails()" style="flex:1;min-width:140px;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📧 Per Mail senden</button>
+          <button onclick="exportKundenBescheinigungFromDetails()" style="flex:1;min-width:140px;padding:10px;background:#fff;border:1.5px solid #2563eb;color:#2563eb;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📄 Als PDF öffnen</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1619,7 +1644,10 @@ function _aufRemovePhoto(idx){_pendingAufPhotos.splice(idx,1);_aufRenderPhotos()
 function openAuftragModal(){
   document.getElementById('aufKunde').value='';
   document.getElementById('aufAdresse').value='';
+  document.getElementById('aufKundeEmail').value='';
   document.getElementById('aufBeschr').value='';
+  document.getElementById('aufTerminDatum').value='';
+  document.getElementById('aufTerminUhrzeit').value='';
   document.getElementById('aufFrist').value='';
   document.getElementById('aufErr').textContent='';
   _pendingAufPhotos=[];
@@ -2393,7 +2421,10 @@ function renderAgAuftraege(){
 function agAuftragErstellen(){
   const kunde=document.getElementById('aufKunde').value.trim();
   const adresse=document.getElementById('aufAdresse').value.trim();
+  const kundeEmail=document.getElementById('aufKundeEmail').value.trim().toLowerCase();
   const beschr=document.getElementById('aufBeschr').value.trim();
+  const terminDatum=document.getElementById('aufTerminDatum').value;
+  const terminUhrzeit=document.getElementById('aufTerminUhrzeit').value;
   const frist=document.getElementById('aufFrist').value;
   const sel=document.getElementById('aufMa');
   const maIds=Array.from(sel.selectedOptions).map(o=>o.value).filter(Boolean);
@@ -2402,23 +2433,137 @@ function agAuftragErstellen(){
   if(!kunde){err.textContent='Bitte Kunde eingeben';return;}
   if(!maIds.length){err.textContent='Bitte mind. einen Mitarbeiter auswählen';return;}
   err.textContent='Wird erstellt…';
-  const data={kunde, adresse, beschreibung:beschr, status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma};
-  if(frist) data.frist=frist;
-  if(_pendingAufPhotos.length) data.fotosAG=_pendingAufPhotos.slice();
-  const promises=maIds.map(id=>db.collection('globalTN').doc(id).collection('auftraege').add(data));
-  Promise.all(promises).then(()=>{
+  const baseData={kunde, adresse, beschreibung:beschr, status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma};
+  if(kundeEmail) baseData.kundeEmail=kundeEmail;
+  if(terminDatum) baseData.terminDatum=terminDatum;
+  if(terminUhrzeit) baseData.terminUhrzeit=terminUhrzeit;
+  if(frist) baseData.frist=frist;
+  if(_pendingAufPhotos.length) baseData.fotosAG=_pendingAufPhotos.slice();
+  const promises=maIds.map(id=>{
+    const az=_azubis.find(a=>a.id===id);
+    const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'Mitarbeiter';
+    return db.collection('globalTN').doc(id).collection('auftraege').add(baseData).then(ref=>({id:ref.id,tnId:id,maName}));
+  });
+  Promise.all(promises).then(refs=>{
     err.textContent='';
     document.getElementById('aufKunde').value='';
     document.getElementById('aufAdresse').value='';
+    document.getElementById('aufKundeEmail').value='';
     document.getElementById('aufBeschr').value='';
+    document.getElementById('aufTerminDatum').value='';
+    document.getElementById('aufTerminUhrzeit').value='';
     document.getElementById('aufFrist').value='';
     sel.selectedIndex=-1;
     _pendingAufPhotos=[];
     _aufRenderPhotos();
     closeAuftragModal();
-    toast('📋 Auftrag an '+maIds.length+' Mitarbeiter erstellt');
+    // Termin-Mail an Kunde wenn Email + Termin vorhanden
+    if(kundeEmail&&terminDatum){
+      refs.forEach(r=>sendTerminMailToKunde({...baseData,...r}));
+    }
+    toast('📋 Auftrag an '+maIds.length+' Mitarbeiter erstellt'+(kundeEmail&&terminDatum?' · 📧 Kunde benachrichtigt':''));
     loadAgAuftraege();
   }).catch(e=>{err.textContent='❌ '+e.message;});
+}
+
+// ─── Kunden-Mails ──────────────────────────────────────────────
+function sendTerminMailToKunde(a){
+  if(!a.kundeEmail||!a.terminDatum) return;
+  const dTag=new Date(a.terminDatum+'T12:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const zeit=a.terminUhrzeit?' um '+a.terminUhrzeit+' Uhr':'';
+  const firma=_firma||'Ihr Betrieb';
+  const html='<div style="font-family:Arial,sans-serif;max-width:600px;padding:20px;color:#1e293b">'
+    +'<h2 style="color:#2563eb;margin-bottom:16px">📅 Terminbestätigung</h2>'
+    +'<p>Sehr geehrte Damen und Herren,</p>'
+    +'<p>hiermit bestätigen wir Ihren Termin:</p>'
+    +'<table style="border-collapse:collapse;margin:12px 0;font-size:14px"><tbody>'
+    +'<tr><td style="padding:6px 12px;color:#64748b">Datum</td><td style="padding:6px 12px;font-weight:700">'+dTag+zeit+'</td></tr>'
+    +'<tr><td style="padding:6px 12px;color:#64748b">Mitarbeiter</td><td style="padding:6px 12px;font-weight:700">'+esc(a.maName||'')+'</td></tr>'
+    +(a.beschreibung?'<tr><td style="padding:6px 12px;color:#64748b">Auftrag</td><td style="padding:6px 12px">'+esc(a.beschreibung)+'</td></tr>':'')
+    +(a.adresse?'<tr><td style="padding:6px 12px;color:#64748b">Adresse</td><td style="padding:6px 12px">'+esc(a.adresse)+'</td></tr>':'')
+    +'</tbody></table>'
+    +'<p>Bei Fragen oder Verschiebung bitte melden.</p>'
+    +'<p>Mit freundlichen Grüßen<br><b>'+esc(firma)+'</b></p>'
+    +'<hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"><p style="font-size:11px;color:#94a3b8">Diese E-Mail wurde automatisch durch ArbeitgeberPro versendet.</p>'
+    +'</div>';
+  db.collection('mail').add({
+    to:a.kundeEmail,
+    message:{subject:'Terminbestätigung '+dTag+' · '+firma, html}
+  }).catch(e=>console.warn('Mail fehlgeschlagen:',e));
+}
+
+function sendKundenBescheinigungMail(tnId, aufId){
+  db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).get().then(doc=>{
+    if(!doc.exists){toast('Auftrag nicht gefunden','bad');return;}
+    const d=doc.data();
+    let email=d.kundeEmail;
+    if(!email){
+      email=prompt('E-Mail-Adresse des Kunden für die Bescheinigung:','');
+      if(!email) return;
+      email=email.trim().toLowerCase();
+      // Mailadresse auch speichern
+      db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).update({kundeEmail:email}).catch(()=>{});
+    }
+    const az=_azubis.find(a=>a.id===tnId);
+    const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
+    const firma=_firma||'Ihr Betrieb';
+    const dat=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+    const html=_kundenBescheinigungHtml(d, firma, maName, dat);
+    db.collection('mail').add({
+      to:email,
+      message:{subject:'Auftragsbescheinigung '+(d.kunde?'· '+d.kunde:'')+' · '+firma, html}
+    }).then(()=>{
+      toast('📧 Bescheinigung an '+email+' gesendet');
+    }).catch(e=>toast('❌ Mail fehlgeschlagen: '+e.message,'bad'));
+  });
+}
+
+function _kundenBescheinigungHtml(d, firma, maName, dat){
+  // SAUBER — KEIN Chat, KEINE Nachträge, nur Kundenbeleg
+  let h='<div style="font-family:Arial,sans-serif;max-width:680px;padding:24px;color:#1e293b">'
+    +'<div style="border-bottom:2px solid #2563eb;padding-bottom:12px;margin-bottom:20px"><h1 style="margin:0;color:#2563eb;font-size:22px">Auftragsbescheinigung</h1>'
+    +'<div style="color:#64748b;font-size:12px;margin-top:4px">'+esc(firma)+(dat?' · Erstellt am '+dat:'')+'</div></div>'
+    +'<table style="border-collapse:collapse;width:100%;font-size:13px;margin-bottom:16px"><tbody>'
+    +(d.kunde?'<tr><td style="padding:4px 0;color:#64748b;width:120px">Kunde</td><td style="padding:4px 0;font-weight:700">'+esc(d.kunde)+'</td></tr>':'')
+    +(d.adresse?'<tr><td style="padding:4px 0;color:#64748b">Adresse</td><td style="padding:4px 0">'+esc(d.adresse)+'</td></tr>':'')
+    +(d.beschreibung?'<tr><td style="padding:4px 0;color:#64748b">Auftrag</td><td style="padding:4px 0">'+esc(d.beschreibung)+'</td></tr>':'')
+    +(maName?'<tr><td style="padding:4px 0;color:#64748b">Mitarbeiter</td><td style="padding:4px 0">'+esc(maName)+'</td></tr>':'')
+    +'</tbody></table>';
+  if(d.taetigkeit){h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Durchgeführte Arbeiten</h3><div style="font-size:13px;line-height:1.6;white-space:pre-wrap">'+esc(d.taetigkeit)+'</div>';}
+  if(d.stunden){h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Stundenaufwand</h3><div style="font-size:13px">'+d.stunden+' Stunden</div>';}
+  if(d.material&&d.material.length){
+    h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Verwendetes Material</h3><div style="font-size:12px">';
+    d.material.forEach(m=>{h+='<span style="display:inline-block;padding:3px 8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;margin:2px">'+esc(m)+'</span>';});
+    h+='</div>';
+  }
+  if(d.fotos&&d.fotos.length){
+    h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Fotodokumentation</h3><div style="display:flex;gap:8px;flex-wrap:wrap">';
+    d.fotos.forEach(f=>{h+='<img src="'+f+'" style="width:200px;border-radius:6px;border:1px solid #cbd5e1">';});
+    h+='</div>';
+  }
+  if(d.unterschrift){
+    h+='<h3 style="color:#2563eb;font-size:14px;margin:16px 0 6px">Kundenunterschrift</h3><div style="border:1px solid #cbd5e1;border-radius:6px;padding:8px;display:inline-block"><img src="'+d.unterschrift+'" style="height:80px"></div>';
+  }
+  h+='<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"><p style="font-size:11px;color:#94a3b8">Diese Bescheinigung wurde elektronisch erstellt und ist ohne Unterschrift gültig.</p></div>';
+  return h;
+}
+
+function exportKundenBescheinigung(tnId, aufId){
+  toast('📄 Bescheinigung wird erstellt…');
+  db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).get().then(doc=>{
+    if(!doc.exists){toast('Auftrag nicht gefunden','bad');return;}
+    const d=doc.data();
+    const az=_azubis.find(a=>a.id===tnId);
+    const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
+    const firma=_firma||'';
+    const dat=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+    const body=_kundenBescheinigungHtml(d, firma, maName, dat);
+    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bescheinigung '+esc(d.kunde||'')+'</title>'
+      +'<style>@media print{body{padding:0}}</style></head><body>'+body
+      +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
+    const w=window.open('','_blank');
+    w.document.write(html);w.document.close();
+  });
 }
 
 // AG: Auftrags-Doku anzeigen (reuse showDoku for auftraege)
@@ -2530,7 +2675,70 @@ function showAufdTab(tab){
   document.querySelectorAll('#aufDetailsModal .aufd-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('#aufDetailsModal .aufd-tab .stab').forEach(t=>t.classList.remove('active'));
   document.getElementById('aufd-'+tab).classList.add('active');
-  document.getElementById('aufdTab'+(tab==='chat'?'Chat':'Nach')).classList.add('active');
+  const btnMap={chat:'aufdTabChat',nach:'aufdTabNach',kunde:'aufdTabKunde'};
+  const btn=document.getElementById(btnMap[tab]); if(btn) btn.classList.add('active');
+  if(tab==='kunde') _renderAufdKundeTab();
+}
+function _renderAufdKundeTab(){
+  if(!_aufdTn||!_aufdAufId) return;
+  const a=_agAuftraege.find(x=>x.tnId===_aufdTn&&x.id===_aufdAufId);
+  if(!a) return;
+  document.getElementById('aufdKundeEmail').value=a.kundeEmail||'';
+  document.getElementById('aufdTerminDatum').value=a.terminDatum||'';
+  document.getElementById('aufdTerminUhrzeit').value=a.terminUhrzeit||'';
+  document.getElementById('aufdKundeErr').textContent='';
+  // Status-Info
+  const status=document.getElementById('aufdKundeStatus');
+  let statusTxt='';
+  if(a.terminMailAt) statusTxt+='📧 Terminmail gesendet am '+new Date(a.terminMailAt).toLocaleString('de-DE')+'<br>';
+  if(a.bescheinigungMailAt) statusTxt+='📧 Bescheinigung gesendet am '+new Date(a.bescheinigungMailAt).toLocaleString('de-DE')+'<br>';
+  status.innerHTML=statusTxt||'Noch keine Mails an Kunde gesendet.';
+  // Bescheinigungs-Buttons nur bei erledigten Aufträgen
+  const actions=document.getElementById('aufdKundeActions');
+  actions.style.display=a.status==='erledigt'?'':'none';
+}
+function saveAufdKundeTermin(){
+  if(!_aufdTn||!_aufdAufId) return;
+  const email=document.getElementById('aufdKundeEmail').value.trim().toLowerCase();
+  const terminDatum=document.getElementById('aufdTerminDatum').value;
+  const terminUhrzeit=document.getElementById('aufdTerminUhrzeit').value;
+  const err=document.getElementById('aufdKundeErr');
+  err.textContent='Wird gespeichert…';
+  const a=_agAuftraege.find(x=>x.tnId===_aufdTn&&x.id===_aufdAufId);
+  const termChanged=(a.terminDatum!==terminDatum)||(a.terminUhrzeit!==terminUhrzeit);
+  const update={};
+  if(email!==(a.kundeEmail||'')) update.kundeEmail=email||firebase.firestore.FieldValue.delete();
+  if(terminDatum!==(a.terminDatum||'')) update.terminDatum=terminDatum||firebase.firestore.FieldValue.delete();
+  if(terminUhrzeit!==(a.terminUhrzeit||'')) update.terminUhrzeit=terminUhrzeit||firebase.firestore.FieldValue.delete();
+  if(!Object.keys(update).length){err.textContent='';toast('Keine Änderung');return;}
+  db.collection('globalTN').doc(_aufdTn).collection('auftraege').doc(_aufdAufId).update(update).then(()=>{
+    // Lokales Update
+    Object.assign(a, {kundeEmail:email, terminDatum, terminUhrzeit});
+    err.textContent='';
+    // Wenn Termin gesetzt + Email vorhanden + termChanged → Mail senden
+    if(email && terminDatum && termChanged){
+      const az=_azubis.find(x=>x.id===_aufdTn);
+      const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
+      sendTerminMailToKunde({...a, kundeEmail:email, terminDatum, terminUhrzeit, maName});
+      db.collection('globalTN').doc(_aufdTn).collection('auftraege').doc(_aufdAufId).update({terminMailAt:Date.now()}).catch(()=>{});
+      a.terminMailAt=Date.now();
+      toast('✓ Gespeichert · 📧 Kunde benachrichtigt');
+    } else {
+      toast('✓ Gespeichert');
+    }
+    _renderAufdKundeTab();
+  }).catch(e=>{err.textContent='❌ '+e.message;});
+}
+function sendKundenBescheinigungFromDetails(){
+  if(!_aufdTn||!_aufdAufId) return;
+  sendKundenBescheinigungMail(_aufdTn, _aufdAufId);
+  db.collection('globalTN').doc(_aufdTn).collection('auftraege').doc(_aufdAufId).update({bescheinigungMailAt:Date.now()}).catch(()=>{});
+  const a=_agAuftraege.find(x=>x.tnId===_aufdTn&&x.id===_aufdAufId); if(a) a.bescheinigungMailAt=Date.now();
+  setTimeout(_renderAufdKundeTab, 500);
+}
+function exportKundenBescheinigungFromDetails(){
+  if(!_aufdTn||!_aufdAufId) return;
+  exportKundenBescheinigung(_aufdTn, _aufdAufId);
 }
 function sendAufChatMsg(){
   if(!_aufdTn||!_aufdAufId) return;
