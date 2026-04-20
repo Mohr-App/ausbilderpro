@@ -453,6 +453,28 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
       <!-- Gruppe: Info & Hilfe -->
       <details class="coll-card">
+        <summary>🖼 Firmenlogo</summary>
+        <div class="coll-body">
+          <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px;line-height:1.5">Wird in AzubiPro und MitarbeiterPro oben im Kopf neben dem App-Namen angezeigt. Empfehlung: quadratisch, schlichtes Symbol.</div>
+          <div id="firmaLogoPreview" style="text-align:center;padding:12px;background:var(--sur2);border-radius:10px;margin-bottom:8px;min-height:90px;display:flex;align-items:center;justify-content:center">
+            <span style="color:var(--mu);font-size:.65rem">Kein Logo gesetzt</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <label style="flex:1;padding:10px;background:rgba(37,99,235,.08);color:var(--acc);border:1.5px solid rgba(37,99,235,.25);border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
+              📷 Kamera
+              <input type="file" id="firmaLogoCam" accept="image/*" capture="environment" onchange="_uploadFirmenlogo(event)" style="display:none">
+            </label>
+            <label style="flex:1;padding:10px;background:rgba(37,99,235,.08);color:var(--acc);border:1.5px solid rgba(37,99,235,.25);border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
+              🖼 Datei
+              <input type="file" id="firmaLogoFile" accept="image/*" onchange="_uploadFirmenlogo(event)" style="display:none">
+            </label>
+            <button onclick="_removeFirmenlogo()" id="firmaLogoRemoveBtn" style="display:none;padding:10px 14px;background:#fff;border:1.5px solid #ef4444;color:#ef4444;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✗</button>
+          </div>
+          <div class="err" id="firmaLogoErr" style="margin-top:6px"></div>
+        </div>
+      </details>
+
+      <details class="coll-card">
         <summary>🔀 Reiter-Reihenfolge</summary>
         <div class="coll-body">
           <div id="agTabOrderSettings"></div>
@@ -1993,6 +2015,67 @@ function initAgEinstellungen(){
   if(codeEl&&_firmaCode) codeEl.textContent=_firmaCode;
   // Reiter-Reihenfolge-Einstellungen rendern
   renderAgTabOrderSettings();
+  // Firmenlogo-Preview laden
+  _refreshFirmenlogoPreview();
+}
+
+function _refreshFirmenlogoPreview(){
+  if(!_uid) return;
+  db.collection('users').doc(_uid).get().then(doc=>{
+    if(!doc.exists) return;
+    const logo=doc.data().firmaLogo;
+    const prev=document.getElementById('firmaLogoPreview');
+    const remBtn=document.getElementById('firmaLogoRemoveBtn');
+    if(!prev||!remBtn) return;
+    if(logo){
+      prev.innerHTML='<img src="'+logo+'" style="max-width:120px;max-height:120px;border-radius:10px;border:1px solid var(--brd);object-fit:contain">';
+      remBtn.style.display='';
+    } else {
+      prev.innerHTML='<span style="color:var(--mu);font-size:.65rem">Kein Logo gesetzt</span>';
+      remBtn.style.display='none';
+    }
+  }).catch(()=>{});
+}
+
+function _uploadFirmenlogo(ev){
+  const f=ev.target.files&&ev.target.files[0];
+  if(!f) return;
+  const err=document.getElementById('firmaLogoErr');
+  err.textContent='Wird hochgeladen…';
+  err.style.color='var(--acc)';
+  // Resize auf 300x300 max (aspect-ratio erhalten), JPEG q=0.85
+  const fr=new FileReader();
+  fr.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const maxD=300;
+      let w=img.width, h=img.height;
+      if(w>=h && w>maxD){h=Math.round(h*maxD/w); w=maxD;}
+      else if(h>maxD){w=Math.round(w*maxD/h); h=maxD;}
+      const c=document.createElement('canvas');
+      c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      const dataUrl=c.toDataURL('image/jpeg',0.85);
+      db.collection('users').doc(_uid).update({firmaLogo:dataUrl}).then(()=>{
+        err.textContent='';
+        toast('🖼 Logo gespeichert');
+        _refreshFirmenlogoPreview();
+      }).catch(e=>{err.style.color='#ef4444';err.textContent='❌ '+e.message;});
+    };
+    img.onerror=()=>{err.style.color='#ef4444';err.textContent='❌ Bild ungültig';};
+    img.src=e.target.result;
+  };
+  fr.onerror=()=>{err.style.color='#ef4444';err.textContent='❌ Datei-Fehler';};
+  fr.readAsDataURL(f);
+  ev.target.value='';
+}
+
+function _removeFirmenlogo(){
+  if(!confirm('Logo entfernen?')) return;
+  db.collection('users').doc(_uid).update({firmaLogo:firebase.firestore.FieldValue.delete()}).then(()=>{
+    toast('✓ Logo entfernt');
+    _refreshFirmenlogoPreview();
+  }).catch(e=>toast('❌ '+e.message,'bad'));
 }
 // Legacy-Alias falls altes initAgBetrieb noch gerufen wird
 function initAgBetrieb(){ initAgLive(); initAgAuswertung(); initAgEinstellungen(); }

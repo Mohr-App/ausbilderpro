@@ -39,6 +39,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .hdr{background:linear-gradient(135deg,#2563eb,#059669);border-bottom:none;padding:14px 18px;display:flex;align-items:center;gap:12px;flex-shrink:0;box-shadow:0 2px 12px rgba(37,99,235,.15);}
 .hdr-logo{font-size:1rem;font-weight:800;}.hdr-logo span{color:rgba(255,255,255,.8);}
 .hdr-user{margin-left:auto;font-size:.62rem;color:rgba(255,255,255,.7);font-family:'JetBrains Mono',monospace;}
+.hdr-firma-logo{width:30px;height:30px;border-radius:6px;object-fit:contain;background:rgba(255,255,255,.92);padding:3px;border:1.5px solid rgba(255,255,255,.35);flex-shrink:0}
 /* Main scrollable */
 .main{flex:1;overflow-y:auto;padding:16px 16px 90px;-webkit-overflow-scrolling:touch;}
 /* Bottom nav */
@@ -171,6 +172,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="app" id="app">
   <div class="hdr">
     <div class="hdr-logo">Mitarbeiter<span>Pro</span></div>
+    <img class="hdr-firma-logo" id="hdrFirmaLogo" alt="" style="display:none">
     <div class="hdr-user" id="hdrUser">—</div>
   </div>
 
@@ -2120,7 +2122,20 @@ function checkFirmaCodeUI(){
       +'<span style="color:var(--mu)">Verknüpft mit</span>'
       +'<span style="font-weight:700;color:var(--tx);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(_tnData.firma||'Betrieb')+'</span>'
       +'</div>';
+    _loadFirmaLogo();
   }
+}
+
+function _loadFirmaLogo(){
+  if(!_tnData||!_tnData.firmaUid) return;
+  const el=document.getElementById('hdrFirmaLogo');
+  if(!el) return;
+  db.collection('users').doc(_tnData.firmaUid).get().then(doc=>{
+    if(!doc.exists) return;
+    const logo=doc.data().firmaLogo;
+    if(logo){ el.src=logo; el.style.display=''; }
+    else { el.style.display='none'; }
+  }).catch(()=>{});
 }
 
 function submitFirmaCode(){
