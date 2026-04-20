@@ -2327,24 +2327,39 @@ function startAgZeitLive(){
   const today=localDate();
   const liveData={};
   const el=document.getElementById('agZeitLive');
+  // Arbeitsbeginn aus Plan ableiten: kernVon > rahmenVon > Default 08:00
+  function getArbeitsbeginn(plan){
+    if(!plan) return '08:00';
+    return plan.kernVon || plan.rahmenVon || '08:00';
+  }
   function render(){
     if(!el) return;
+    const now=new Date();
+    const nowMin=now.getHours()*60+now.getMinutes();
     let html='';
     _azubis.forEach(az=>{
       const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Azubi';
       const d=liveData[az.id];
-      if(!d){
+      if(!d || (!d.eingang && !d.ausgang)){
+        // Nicht eingestempelt: prüfen ob Arbeitsbeginn schon überschritten
+        const ab=getArbeitsbeginn(az.arbeitszeitPlan);
+        const [abH,abM]=ab.split(':').map(Number);
+        const abMin=abH*60+abM;
+        const istZuSpaet=nowMin>abMin;
+        const icon=istZuSpaet?'❌':'⚪';
+        const txt=istZuSpaet?'Nicht eingestempelt (ab '+ab+')':'Noch nicht eingestempelt';
+        const col=istZuSpaet?'#ef4444':'var(--mu)';
         html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.05)">'
-          +'<span style="font-size:1rem">❌</span>'
-          +'<span style="font-size:.78rem;font-weight:600;color:var(--mu)">'+esc(name)+'</span>'
-          +'<span style="margin-left:auto;font-size:.65rem;color:var(--mu)">Nicht eingestempelt</span></div>';
+          +'<span style="font-size:1rem">'+icon+'</span>'
+          +'<span style="font-size:.78rem;font-weight:'+(istZuSpaet?'700':'600')+';color:'+(istZuSpaet?'var(--tx)':'var(--mu)')+'">'+esc(name)+'</span>'
+          +'<span style="margin-left:auto;font-size:.65rem;color:'+col+';font-weight:'+(istZuSpaet?'700':'500')+'">'+txt+'</span></div>';
         return;
       }
       const pLog=d.pauseLog||[];
       const offenePause=pLog.find(p=>p.start&&!p.ende);
       let status='',statusCol='',icon='';
       if(d.ausgang){
-        icon='❌';status='Feierabend · '+d.eingang+' – '+d.ausgang;statusCol='var(--mu)';
+        icon='🔴';status='Feierabend · '+d.eingang+' – '+d.ausgang;statusCol='var(--mu)';
       } else if(offenePause){
         icon='⏸';status='Pause seit '+offenePause.start+' · Eingang '+d.eingang;statusCol='#d97706';
       } else {
@@ -2359,6 +2374,9 @@ function startAgZeitLive(){
     });
     el.innerHTML=html||'<div class="empty">Keine Azubis</div>';
   }
+  // Minütlich neu rendern damit Arbeitsbeginn-Check aktuell bleibt
+  const interval=setInterval(render,60000);
+  _agZeitLiveUnsubs.push(()=>clearInterval(interval));
   // Für jeden Azubi einen Listener auf heute
   _azubis.forEach(az=>{
     const unsub=db.collection('globalTN').doc(az.id).collection('zeiterfassung').doc(today)
