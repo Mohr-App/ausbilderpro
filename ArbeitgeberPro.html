@@ -278,6 +278,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div class="card-title">👥 Azubi-Kontakte</div>
             <div id="agAzubiListe"><div class="empty">Lädt…</div></div>
           </div>
+          <details class="coll-card" id="agHVKontaktCard" style="display:none">
+            <summary>📞 Kontakt Verwaltung (HBZ)</summary>
+            <div class="coll-body">
+              <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -463,14 +469,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
       <!-- Gruppe: Info & Hilfe -->
       <div style="font-size:.7rem;font-weight:800;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;padding-left:4px">ℹ Info & Hilfe</div>
-
-      <!-- Info -->
-      <details class="coll-card">
-        <summary>📞 Kontakt Verwaltung</summary>
-        <div class="coll-body">
-        <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
-        </div>
-      </details>
 
       <details class="coll-card">
         <summary>📱 App installieren</summary>
@@ -911,6 +909,13 @@ function loadAzubis(){
     checkAgBadges();
     setupLiveMeldungen();
     _showFirmaCodeBanner();
+    // Kontakt-Verwaltung nur wenn echte Azubis (nicht nur Arbeitnehmer) vorhanden
+    const kontaktCard=document.getElementById('agHVKontaktCard');
+    if(kontaktCard){
+      const hasAzubis=_azubis.some(a=>a.typ!=='arbeitnehmer');
+      kontaktCard.style.display=hasAzubis?'':'none';
+      if(hasAzubis) loadHVKontakt();
+    }
   });
 }
 
