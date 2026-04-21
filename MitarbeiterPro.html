@@ -790,24 +790,120 @@ function showAdminInfoScreen(){
   if(!box){
     box=document.createElement('div');
     box.id='adminInfoScreen';
-    box.style.cssText='position:fixed;inset:0;background:linear-gradient(135deg,#2563eb,#059669);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Sora\',sans-serif';
-    box.innerHTML='<div style="max-width:420px;width:100%;background:#fff;border-radius:16px;padding:26px;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
-      +'<div style="font-size:2rem;text-align:center;margin-bottom:6px">⚡</div>'
-      +'<div style="font-size:1.15rem;font-weight:800;text-align:center;margin-bottom:6px">Admin-Modus</div>'
-      +'<div style="font-size:.72rem;color:#64748b;text-align:center;line-height:1.5;margin-bottom:18px">Du bist als Admin angemeldet (<b id="adminInfoEmail"></b>).<br>MitarbeiterPro ist für Mitarbeiter — wähle eine andere App:</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-      +'<a href="HBZVerwaltung.html" style="text-decoration:none;display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;color:#1e293b"><span style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#d97706,#b45309);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">VP</span><span><div style="font-size:.72rem;font-weight:700">VerwaltungPro</div><div style="font-size:.56rem;color:#64748b;margin-top:2px">HBZ · Kurse</div></span></a>'
-      +'<a href="ArbeitgeberPro.html" style="text-decoration:none;display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;color:#1e293b"><span style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">AG</span><span><div style="font-size:.72rem;font-weight:700">ArbeitgeberPro</div><div style="font-size:.56rem;color:#64748b;margin-top:2px">Betrieb</div></span></a>'
-      +'<a href="AzubiPro.html" style="text-decoration:none;display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;color:#1e293b"><span style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">AZ</span><span><div style="font-size:.72rem;font-weight:700">AzubiPro</div><div style="font-size:.56rem;color:#64748b;margin-top:2px">Auszub.</div></span></a>'
-      +'<a href="AusbilderPro.html" style="text-decoration:none;display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;color:#1e293b"><span style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">AB</span><span><div style="font-size:.72rem;font-weight:700">AusbilderPro</div><div style="font-size:.56rem;color:#64748b;margin-top:2px">Sitzplan</div></span></a>'
+    box.style.cssText='position:fixed;inset:0;background:linear-gradient(135deg,#2563eb,#059669);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Sora\',sans-serif;overflow-y:auto';
+    box.innerHTML=
+      '<div style="max-width:440px;width:100%;background:#fff;border-radius:16px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.3);max-height:calc(100vh - 40px);display:flex;flex-direction:column">'
+      +'<div style="font-size:1.6rem;text-align:center;margin-bottom:2px">⚡</div>'
+      +'<div style="font-size:1.05rem;font-weight:800;text-align:center;margin-bottom:4px">Admin-Modus</div>'
+      +'<div style="font-size:.66rem;color:#64748b;text-align:center;line-height:1.4;margin-bottom:14px">Angemeldet als <b id="adminInfoEmail"></b></div>'
+
+      +'<div style="font-size:.6rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">👁 Als Mitarbeiter reinschauen</div>'
+      +'<div style="font-size:.62rem;color:#64748b;margin-bottom:6px;line-height:1.4">Wähle einen Mitarbeiter, um die App aus dessen Sicht zu sehen (Simulations-Modus, rotes Banner oben):</div>'
+      +'<input id="adminTnSearch" type="text" placeholder="🔍 Name oder E-Mail suchen…" oninput="_filterAdminTnList()" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.72rem;font-family:\'Sora\',sans-serif;margin-bottom:6px">'
+      +'<div id="adminTnList" style="max-height:180px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:14px;background:#f8fafc"><div style="padding:14px;font-size:.68rem;color:#94a3b8;text-align:center">Lädt…</div></div>'
+
+      +'<div style="font-size:.6rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">🚀 Zu anderer App wechseln</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">'
+      +'<a href="HBZVerwaltung.html" style="text-decoration:none;display:flex;align-items:center;gap:8px;padding:9px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;color:#1e293b"><span style="width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,#d97706,#b45309);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.66rem">VP</span><span style="font-size:.66rem;font-weight:700">VerwaltungPro</span></a>'
+      +'<a href="ArbeitgeberPro.html" style="text-decoration:none;display:flex;align-items:center;gap:8px;padding:9px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;color:#1e293b"><span style="width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.66rem">AG</span><span style="font-size:.66rem;font-weight:700">ArbeitgeberPro</span></a>'
+      +'<a href="AzubiPro.html" style="text-decoration:none;display:flex;align-items:center;gap:8px;padding:9px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;color:#1e293b"><span style="width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.66rem">AZ</span><span style="font-size:.66rem;font-weight:700">AzubiPro</span></a>'
+      +'<a href="AusbilderPro.html" style="text-decoration:none;display:flex;align-items:center;gap:8px;padding:9px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;color:#1e293b"><span style="width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.66rem">AB</span><span style="font-size:.66rem;font-weight:700">AusbilderPro</span></a>'
       +'</div>'
-      +'<button onclick="auth.signOut()" style="margin-top:14px;width:100%;padding:10px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;color:#64748b;font-size:.7rem;font-weight:600;cursor:pointer;font-family:\'Sora\',sans-serif">← Abmelden</button>'
+      +'<button onclick="auth.signOut()" style="width:100%;padding:8px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;color:#64748b;font-size:.68rem;font-weight:600;cursor:pointer;font-family:\'Sora\',sans-serif">← Abmelden</button>'
       +'</div>';
     document.body.appendChild(box);
   }
   const emailEl=box.querySelector('#adminInfoEmail');
   if(emailEl) emailEl.textContent=_email||'';
   box.style.display='flex';
+  _loadAdminTnList();
+}
+
+// Teilnehmer-Liste fuer Admin-Simulation (MitarbeiterPro: alle TN)
+let _adminTnCache=[];
+function _loadAdminTnList(){
+  const listEl=document.getElementById('adminTnList');
+  if(!listEl) return;
+  db.collection('globalTN').orderBy('name').limit(500).get().then(snap=>{
+    _adminTnCache=[];
+    snap.forEach(doc=>{
+      const d=doc.data();
+      _adminTnCache.push({id:doc.id,name:d.name||'(ohne Name)',email:d.email||'',firma:d.firma||''});
+    });
+    _renderAdminTnList(_adminTnCache);
+  }).catch(e=>{
+    listEl.innerHTML='<div style="padding:14px;font-size:.68rem;color:#ef4444;text-align:center">Fehler: '+(e.message||'Konnte TN nicht laden')+'</div>';
+  });
+}
+function _filterAdminTnList(){
+  const q=(document.getElementById('adminTnSearch').value||'').toLowerCase().trim();
+  if(!q){_renderAdminTnList(_adminTnCache);return;}
+  const filtered=_adminTnCache.filter(t=>
+    (t.name||'').toLowerCase().includes(q)||
+    (t.email||'').toLowerCase().includes(q)||
+    (t.firma||'').toLowerCase().includes(q)
+  );
+  _renderAdminTnList(filtered);
+}
+function _renderAdminTnList(list){
+  const el=document.getElementById('adminTnList');
+  if(!el) return;
+  if(!list.length){
+    el.innerHTML='<div style="padding:14px;font-size:.68rem;color:#94a3b8;text-align:center">Keine Mitarbeiter gefunden</div>';
+    return;
+  }
+  el.innerHTML=list.slice(0,100).map(t=>
+    '<div onclick="_enterAdminSimulation(\''+t.id+'\',\''+(t.name||'').replace(/\'/g,"\\'")+'\')" style="padding:8px 10px;border-bottom:1px solid #e2e8f0;cursor:pointer;transition:background .12s" onmouseover="this.style.background=\'rgba(37,99,235,.06)\'" onmouseout="this.style.background=\'\'">'
+    +'<div style="font-size:.72rem;font-weight:700;color:#1e293b">'+(t.name||'(ohne Name)')+'</div>'
+    +'<div style="font-size:.56rem;color:#64748b;margin-top:1px">'+(t.email||'')+(t.firma?' · '+t.firma:'')+'</div>'
+    +'</div>'
+  ).join('');
+}
+
+let _adminSimMode=false;
+let _adminSimTnName='';
+function _enterAdminSimulation(tnId,tnName){
+  _adminSimMode=true;
+  _adminSimTnName=tnName;
+  _tnId=tnId;
+  db.collection('globalTN').doc(tnId).get().then(doc=>{
+    if(!doc.exists){alert('Mitarbeiter nicht gefunden');return;}
+    _tnData=doc.data();
+    const box=document.getElementById('adminInfoScreen');
+    if(box) box.style.display='none';
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('app').classList.add('show');
+    document.getElementById('hdrUser').textContent=(_tnData.name||_tnData.email||'').split('@')[0];
+    _showAdminSimBanner();
+    if(typeof loadData==='function') loadData();
+  }).catch(e=>{
+    alert('Fehler beim Laden: '+(e.message||e));
+  });
+}
+function _showAdminSimBanner(){
+  let b=document.getElementById('adminSimBanner');
+  if(!b){
+    b=document.createElement('div');
+    b.id='adminSimBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;background:linear-gradient(90deg,#dc2626,#b91c1c);color:#fff;padding:6px 14px;font-size:.68rem;font-weight:700;text-align:center;z-index:9999;font-family:\'Sora\',sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;gap:10px';
+    b.innerHTML='<span>⚡ Admin-Sicht als <b id="adminSimName"></b> — nur lesen empfohlen</span><button onclick="_exitAdminSimulation()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;padding:3px 9px;border-radius:5px;font-size:.62rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">← Zurück</button>';
+    document.body.appendChild(b);
+    document.body.style.paddingTop='30px';
+  }
+  const nameEl=b.querySelector('#adminSimName');
+  if(nameEl) nameEl.textContent=_adminSimTnName||'';
+  b.style.display='flex';
+}
+function _exitAdminSimulation(){
+  _adminSimMode=false;
+  _adminSimTnName='';
+  _tnId=null;
+  _tnData=null;
+  const b=document.getElementById('adminSimBanner');
+  if(b) b.style.display='none';
+  document.body.style.paddingTop='';
+  document.getElementById('app').classList.remove('show');
+  showAdminInfoScreen();
 }
 function switchRole(){if(!confirm('Zur Rollenauswahl wechseln?'))return;localStorage.removeItem('ausbilderpro_role');auth.signOut();window.location.href='start.html';}
 function showErr(m){ const el=document.getElementById('lErr'); el.style.color='var(--bad)'; el.textContent=m; }
