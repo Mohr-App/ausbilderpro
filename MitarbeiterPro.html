@@ -1269,17 +1269,11 @@ function asConfirm(){
     const path='betriebe/'+_tnId+'/auftraege/'+_auftragId+'/foto_'+i+'.jpg';
     uploads.push(st.ref(path).put(blob,{contentType:'image/jpeg'}).then(()=>st.ref(path).getDownloadURL()));
   });
-  const sigData=sigGetData();
-  let sigUpload=null;
-  if(sigData){
-    const sigBlob=b64toBlob(sigData);
-    const sigPath='betriebe/'+_tnId+'/auftraege/'+_auftragId+'/unterschrift.png';
-    sigUpload=st.ref(sigPath).put(sigBlob,{contentType:'image/png'}).then(()=>st.ref(sigPath).getDownloadURL());
-  }
+  const sigData=sigGetData();  // DataURL direkt verwenden (konsistent mit Nachtraegen, umgeht Storage-Rules-Probleme)
 
-  Promise.all([Promise.all(uploads), sigUpload||Promise.resolve(null), getGPS()]).then(([fotoUrls,sigUrl,gps])=>{
+  Promise.all([Promise.all(uploads), getGPS()]).then(([fotoUrls,gps])=>{
     if(fotoUrls.length) update.fotos=fotoUrls;
-    if(sigUrl) update.unterschrift=sigUrl;
+    if(sigData) update.unterschrift=sigData;  // DataURL direkt ins Firestore-Doc
     if(gps) update.gpsErledigt=gps;
     ref.update(update).then(()=>{
       saveMaterialien();
