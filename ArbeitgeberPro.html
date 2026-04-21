@@ -503,9 +503,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
               <span style="color:var(--mu);font-size:.62rem">Kein Briefkopf-Bild gesetzt</span>
             </div>
             <!-- Vollseitig-Toggle -->
-            <label id="briefkopfVollseitigLabel" style="display:none;align-items:center;gap:8px;padding:8px 10px;background:#fff;border:1.5px solid rgba(37,99,235,.2);border-radius:8px;margin-bottom:8px;cursor:pointer;font-size:.66rem;line-height:1.4">
-              <input type="checkbox" id="briefkopfVollseitig" onchange="saveBriefkopfVollseitig()" style="width:16px;height:16px;accent-color:var(--acc);flex-shrink:0">
-              <span><b>Komplettes DIN A4 Briefpapier</b> (Kopf + Fußzeile) — wird als Seitenhintergrund gerendert, Inhalt darüber mit Rand</span>
+            <label id="briefkopfVollseitigLabel" style="display:none;align-items:flex-start;gap:8px;padding:10px 12px;background:#fffbeb;border:1.5px solid #fbbf24;border-left:3px solid #f59e0b;border-radius:8px;margin-bottom:8px;cursor:pointer;font-size:.68rem;line-height:1.4">
+              <input type="checkbox" id="briefkopfVollseitig" onchange="saveBriefkopfVollseitig()" style="width:18px;height:18px;accent-color:#f59e0b;flex-shrink:0;margin-top:1px">
+              <span><b>📄 Komplettes DIN A4 Briefpapier</b> (mit Kopf <u>und</u> Fußzeile)<br><span style="font-size:.6rem;color:#78716c;display:block;margin-top:3px">Das Bild wird als Seitenhintergrund auf die ganze A4-Seite gelegt. Der Auftragstext erscheint mit Abstand darüber (55mm oben, 35mm unten), damit nichts auf Kopfzeile oder Fußzeile stößt.<br><b>Nur aktivieren wenn dein Bild den kompletten Briefbogen zeigt</b> — nicht bei reinen Kopfzeilen-Bildern.</span></span>
             </label>
             <div style="display:flex;gap:6px">
               <label style="flex:1;padding:9px;background:#fff;color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
@@ -859,6 +859,7 @@ db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};
 let _briefkopf='';  // Frei definierbarer Briefkopf-TEXT (Fallback)
 let _briefkopfImg='';  // Briefkopf als Bild (DataURL) — hat Vorrang vor Text
+let _briefkopfImgMode='kopf';  // 'kopf' = nur Kopfzeile oben, 'voll' = ganzes A4-Briefpapier als Hintergrund
 let _briefkopfImgVoll=false;  // Bild ist komplettes A4 (wird als Hintergrund gerendert, sonst nur oben platziert)
 
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
@@ -1002,6 +1003,7 @@ function loadUserData(){
     _firmaCode=d.firmaCode||'';
     _briefkopf=d.briefkopf||'';
     _briefkopfImg=d.briefkopfImg||'';
+    _briefkopfImgMode=d.briefkopfImgMode||'kopf';
     _briefkopfImgVoll=!!d.briefkopfImgVoll;
     // Firmencode generieren falls noch keiner existiert (Bestandskunden)
     if(!_firmaCode){
@@ -3135,7 +3137,7 @@ function exportKundenBescheinigung(tnId, aufId){
     const body=_kundenBescheinigungHtml(d, firma, maName, dat);
     const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bescheinigung '+esc(d.kunde||'')+'</title>'
       +'<style>@media print{body{padding:0}}</style></head><body>'+body
-      +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
+      +'<script>(function(){var imgs=document.querySelectorAll(\'img\');if(!imgs.length){setTimeout(()=>window.print(),200);return;}var done=0;var fire=function(){done++;if(done>=imgs.length){setTimeout(()=>window.print(),200);}};imgs.forEach(function(i){if(i.complete&&i.naturalWidth>0){fire();}else{i.onload=fire;i.onerror=fire;}});setTimeout(function(){if(done<imgs.length){window.print();}},5000);})();<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
   });
@@ -3755,7 +3757,7 @@ function exportStundenzettel(tnId,name,ym,format){
       +'<div class="summary"><b>Zusammenfassung:</b> 🤒 Krank: '+krankCount+' · 🏖 Urlaub: '+urlaubCount+' · 🎌 Feiertage: '+feiertagCount
       +(plan?' · Soll: '+minToStr(totalSoll)+' · Ist: '+minToStr(totalIst)+' · <b style="color:'+(totalDiff>=0?'#059669':'#ef4444')+'">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</b>':'')+'</div>'
       +'<div class="sig"><div>Datum, Unterschrift Arbeitnehmer</div><div>Datum, Unterschrift Arbeitgeber</div></div>'
-      +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
+      +'<script>(function(){var imgs=document.querySelectorAll(\'img\');if(!imgs.length){setTimeout(()=>window.print(),200);return;}var done=0;var fire=function(){done++;if(done>=imgs.length){setTimeout(()=>window.print(),200);}};imgs.forEach(function(i){if(i.complete&&i.naturalWidth>0){fire();}else{i.onload=fire;i.onerror=fire;}});setTimeout(function(){if(done<imgs.length){window.print();}},5000);})();<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
   });
@@ -3973,7 +3975,7 @@ function exportLeistungsuebersicht(tnId,aufId){
       +'</div>'
       +'<div style="margin-top:8mm;font-size:8pt;color:#94a3b8;line-height:1.5">Die vorstehenden Leistungen wurden vom Kunden durch Unterschrift der jeweiligen Einzelposition bestätigt. Diese Übersicht dient als Grundlage für die Rechnungsstellung.</div>'
       +contentWrapClose
-      +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
+      +'<script>(function(){var imgs=document.querySelectorAll(\'img\');if(!imgs.length){setTimeout(()=>window.print(),200);return;}var done=0;var fire=function(){done++;if(done>=imgs.length){setTimeout(()=>window.print(),200);}};imgs.forEach(function(i){if(i.complete&&i.naturalWidth>0){fire();}else{i.onload=fire;i.onerror=fire;}});setTimeout(function(){if(done<imgs.length){window.print();}},5000);})();<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
   });
@@ -4069,7 +4071,7 @@ function exportAuftragsprotokoll(tnId,aufId){
       +(nachSumStd>0?'<div style="margin-top:6mm;padding:3mm 4mm;background:#eff6ff;border:.3mm solid #bfdbfe;border-radius:1.5mm;font-size:10pt;page-break-inside:avoid"><b>Gesamtaufwand:</b> '+(Number(d.stunden)||0)+' h Hauptauftrag + '+nachSumStd+' h Nachträge = <b>'+((Number(d.stunden)||0)+nachSumStd)+' h</b></div>':'')
       +'<div style="margin-top:30px;font-size:9px;color:#94a3b8">Erledigt am: '+dat+'</div>'
       +contentWrapClose
-      +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
+      +'<script>(function(){var imgs=document.querySelectorAll(\'img\');if(!imgs.length){setTimeout(()=>window.print(),200);return;}var done=0;var fire=function(){done++;if(done>=imgs.length){setTimeout(()=>window.print(),200);}};imgs.forEach(function(i){if(i.complete&&i.naturalWidth>0){fire();}else{i.onload=fire;i.onerror=fire;}});setTimeout(function(){if(done<imgs.length){window.print();}},5000);})();<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
   });
