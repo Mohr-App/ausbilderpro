@@ -1685,12 +1685,19 @@ auth.onAuthStateChanged(u => {
     _uid = u.uid;
     _email = u.email;
     const emailLow = u.email.toLowerCase();
+    // Stefan-Whitelist: Immer Admin-Zugang
+    const stefanWhitelist=['stefan.mohr78@googlemail.com','s.mohr@ish.de'];
     // 1. Prüfe bestehende Rolle
     db.collection('users').doc(_uid).get().then(doc => {
       const role = doc.exists ? doc.data().role : null;
       if(role === 'admin' || role === 'verwaltung'){
         // Zugang OK
         grantAccess(u, role);
+        return;
+      }
+      // Stefan-Bypass: Wenn E-Mail in Whitelist, Admin-Zugang auch ohne role-Feld
+      if(stefanWhitelist.includes(emailLow)){
+        grantAccess(u, 'admin');
         return;
       }
       // 2. Keine Rolle → prüfe ob E-Mail als Verwaltung hinterlegt
@@ -1751,7 +1758,14 @@ function grantAccess(u, role){
   }
   loadAll();
   loadAusbilderEmails();
-  db.collection('users').doc(_uid).set({email:u.email, role:role},{merge:true}).catch(()=>{});
+  // Stefan-Accounts haben ggf. andere primaere Rolle (z.B. arbeitgeber fuer AG).
+  // Diese nicht ueberschreiben — nur lastActive aktualisieren.
+  const stefanWhitelistForRoleWrite=['stefan.mohr78@googlemail.com','s.mohr@ish.de'];
+  if(stefanWhitelistForRoleWrite.includes((_email||'').toLowerCase())){
+    db.collection('users').doc(_uid).set({email:u.email},{merge:true}).catch(()=>{});
+  } else {
+    db.collection('users').doc(_uid).set({email:u.email, role:role},{merge:true}).catch(()=>{});
+  }
   checkBackupReminder();
   loadUrlaubBadge();
   checkDsgvoConsent();

@@ -6359,6 +6359,13 @@ try{
     trashPurge();
     renderAll(); // UI sofort leeren bevor Firestore lädt
     const email = user.email.toLowerCase();
+    // Stefan-Whitelist: Direkter Admin-Zugang
+    const stefanWhitelist=['stefan.mohr78@googlemail.com','s.mohr@ish.de'];
+    if(stefanWhitelist.includes(email)){
+      _isAdmin=true;
+      showRoleChoice(user.email);
+      return;
+    }
     // 1. Rolle prüfen (Admin?)
     _db.collection('users').doc(_fbUid).get().then(doc=>{
       const role = doc.exists ? doc.data().role : null;

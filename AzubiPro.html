@@ -847,6 +847,12 @@ auth.onAuthStateChanged(u=>{
     _email=u.email.toLowerCase();
     // Admin-Launcher-Check
     _checkAdminShowLauncher(u.uid);
+    // Stefan-Whitelist: Zeige Admin-Info mit App-Links
+    const stefanWhitelist=['stefan.mohr78@googlemail.com','s.mohr@ish.de'];
+    if(stefanWhitelist.includes(_email)){
+      showAdminInfoScreen();
+      return;
+    }
     // Prüfe ob TN existiert
     findTN(_email).then(found=>{
       if(_registering) return;
@@ -930,6 +936,35 @@ function _checkAdminShowLauncher(uid){
       if(el) el.style.display='inline-block';
     }
   }).catch(()=>{});
+}
+
+function showAdminInfoScreen(){
+  // Baut Admin-Info direkt im Body — ueberschreibt Login-Screen
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('joinWrap').style.display='none';
+  document.getElementById('app').classList.remove('show');
+  let box=document.getElementById('adminInfoScreen');
+  if(!box){
+    box=document.createElement('div');
+    box.id='adminInfoScreen';
+    box.style.cssText='position:fixed;inset:0;background:linear-gradient(135deg,#2563eb,#059669);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Sora\',sans-serif';
+    box.innerHTML='<div style="max-width:420px;width:100%;background:#fff;border-radius:16px;padding:26px;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
+      +'<div style="font-size:2rem;text-align:center;margin-bottom:6px">⚡</div>'
+      +'<div style="font-size:1.15rem;font-weight:800;text-align:center;margin-bottom:6px">Admin-Modus</div>'
+      +'<div style="font-size:.72rem;color:#64748b;text-align:center;line-height:1.5;margin-bottom:18px">Du bist als Admin angemeldet (<b id="adminInfoEmail"></b>).<br>AzubiPro ist für Auszubildende — wähle eine andere App:</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      +'<a href="HBZVerwaltung.html" style="text-decoration:none;display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;color:#1e293b"><span style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#d97706,#b45309);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">VP</span><span><div style="font-size:.72rem;font-weight:700">VerwaltungPro</div><div style="font-size:.56rem;color:#64748b;margin-top:2px">HBZ · Kurse</div></span></a>'
+      +'<a href="ArbeitgeberPro.html" style="text-decoration:none;display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;color:#1e293b"><span style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">AG</span><span><div style="font-size:.72rem;font-weight:700">ArbeitgeberPro</div><div style="font-size:.56rem;color:#64748b;margin-top:2px">Betrieb</div></span></a>'
+      +'<a href="MitarbeiterPro.html" style="text-decoration:none;display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;color:#1e293b"><span style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#059669,#047857);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">MA</span><span><div style="font-size:.72rem;font-weight:700">MitarbeiterPro</div><div style="font-size:.56rem;color:#64748b;margin-top:2px">Zeit</div></span></a>'
+      +'<a href="AusbilderPro.html" style="text-decoration:none;display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;color:#1e293b"><span style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">AB</span><span><div style="font-size:.72rem;font-weight:700">AusbilderPro</div><div style="font-size:.56rem;color:#64748b;margin-top:2px">Sitzplan</div></span></a>'
+      +'</div>'
+      +'<button onclick="auth.signOut()" style="margin-top:14px;width:100%;padding:10px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;color:#64748b;font-size:.7rem;font-weight:600;cursor:pointer;font-family:\'Sora\',sans-serif">← Abmelden</button>'
+      +'</div>';
+    document.body.appendChild(box);
+  }
+  const emailEl=box.querySelector('#adminInfoEmail');
+  if(emailEl) emailEl.textContent=_email||'';
+  box.style.display='flex';
 }
 function showErr(m){ const el=document.getElementById('lErr'); el.style.color='var(--bad)'; el.textContent=m; }
 
