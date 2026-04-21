@@ -342,7 +342,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
 
       <!-- AUSWERTUNG: Aufträge (Kunden-Abrechnungsstunden) -->
-      <div class="abtab" id="abtab-auftraege">
+      <div class="abtab" id="abtab-aus-auftraege">
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px;flex-wrap:wrap">
             <div class="card-title" style="margin:0">📋 Auftragsstunden</div>
@@ -2080,7 +2080,9 @@ function renderAgTabOrderSettings(){
 function showAgAusTab(tab){
   document.querySelectorAll('#agpage-auswertung .abtab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('#agAusTabs .stab').forEach(t=>t.classList.remove('active'));
-  const pane=document.getElementById('abtab-'+tab); if(pane) pane.classList.add('active');
+  // Mapping: 'auftraege' in Auswertung-Tab → Pane-ID abtab-aus-auftraege (nicht abtab-auftraege! Das ist die Live-Seite)
+  const paneIdMap={monat:'abtab-monat', auftraege:'abtab-aus-auftraege', urlaub:'abtab-urlaub'};
+  const pane=document.getElementById(paneIdMap[tab]||'abtab-'+tab); if(pane) pane.classList.add('active');
   const btn=document.querySelector('#agAusTabs [data-tab="'+tab+'"]');
   if(btn) btn.classList.add('active');
   if(tab==='monat'){fillAgMonatSelect('agZeitMonat');loadAgZeiten();}
@@ -2108,7 +2110,7 @@ function initAgAuswertung(){
   fillAgMonatSelect('agAuftragsMonat');
   const active=document.querySelector('#agpage-auswertung .abtab.active');
   if(!active||active.id==='abtab-monat') loadAgZeiten();
-  else if(active.id==='abtab-auftraege') loadAgAuftragsAuswertung();
+  else if(active.id==='abtab-aus-auftraege') loadAgAuftragsAuswertung();
   else if(active.id==='abtab-urlaub') loadAgUrlaub();
 }
 function initAgEinstellungen(){
@@ -4107,7 +4109,7 @@ function loadAgAuftragsAuswertung(){
       gesamtHauptStd+=maHaupt; gesamtNachStd+=maNach; gesamtAuf+=r.auftraege.length; gesamtNach+=maNachCount; gesamtMat+=maMat;
       maBloecke.push('<div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">'
         +'<div style="padding:8px 12px;background:rgba(37,99,235,.05);border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
-        +'<div><span style="font-weight:800;font-size:.82rem">👤 '+esc(maName)+'</span> <span style="font-size:.6rem;color:var(--mu)">· '+r.auftraege.length+' Auftrag'+(r.auftraege.length>1?'"e':'')+'</span></div>'
+        +'<div><span style="font-weight:800;font-size:.82rem">👤 '+esc(maName)+'</span> <span style="font-size:.6rem;color:var(--mu)">· '+r.auftraege.length+' Auftrag'+(r.auftraege.length>1?'e':'')+'</span></div>'
         +'<div style="font-size:.68rem;font-family:\'JetBrains Mono\',monospace;display:flex;gap:10px">'
         +'<span style="color:var(--tx)"><b>'+maHaupt+'h</b> Haupt</span>'
         +'<span style="color:'+(maNach>0?'#d97706':'var(--mu)')+'"><b>'+(maNach>0?'+'+maNach:'0')+'h</b> Nachtrag</span>'
