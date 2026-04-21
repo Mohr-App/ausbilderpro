@@ -758,6 +758,14 @@ document.addEventListener('click',function(ev){
 });
 function _checkAdminShowLauncher(uid){
   if(!uid||!db) return;
+  // Stefan-Whitelist: Diese E-Mails sehen den Launcher immer, egal welche Rolle
+  const stefanWhitelist=['stefan.mohr78@googlemail.com','s.mohr@ish.de'];
+  const curEmail=(_email||'').toLowerCase();
+  if(stefanWhitelist.includes(curEmail)){
+    const el=document.getElementById('appLauncher');
+    if(el) el.style.display='inline-block';
+    return;
+  }
   db.collection('users').doc(uid).get().then(doc=>{
     if(!doc.exists) return;
     const role=doc.data().role;
