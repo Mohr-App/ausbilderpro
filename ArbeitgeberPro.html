@@ -3718,26 +3718,52 @@ function exportStundenzettel(tnId,name,ym,format){
   const plan=az?.arbeitszeitPlan||null;
   const [y,mo]=ym.split('-').map(Number);
   const feiertage=getNRWFeiertage(y);
-  // Parallel: Zeit + Krank + Urlaub
+  // Query erweitert: Alle Tage BIS Monatsende (fuer kumulierten Gleitzeit-Saldo)
   const p1=db.collection('globalTN').doc(tnId).collection('zeiterfassung')
-    .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').get();
+    .where('datum','<=',ym+'-31').get();
   const p2=db.collection('globalTN').doc(tnId).collection('betriebMeldungen')
     .where('type','==','krank').get();
   const p3=db.collection('globalTN').doc(tnId).collection('urlaubsantraege')
     .where('status','==','genehmigt').get();
   Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlaubSnap])=>{
-    const zeitMap={};zeitSnap.forEach(d=>{zeitMap[d.data().datum]={...d.data()};});
-    const krankDates=new Set();
-    krankSnap.forEach(doc=>{const d=doc.data();if(d.datum&&d.datum.startsWith(ym)) krankDates.add(d.datum);});
-    const urlaubDates=new Set();
+    const zeitMap={};
+    zeitSnap.forEach(d=>{const dd=d.data();if(dd.datum) zeitMap[dd.datum]={...dd};});
+    // Krank + Urlaub: ALLE, dann fuer Monatsanzeige filtern
+    const krankDatesAll=new Set();
+    krankSnap.forEach(doc=>{const d=doc.data();if(d.datum) krankDatesAll.add(d.datum);});
+    const krankDates=new Set([...krankDatesAll].filter(d=>d.startsWith(ym)));
+    const urlaubDatesAll=new Set();
     urlaubSnap.forEach(doc=>{
       const d=doc.data();if(!d.von||!d.bis) return;
       const start=new Date(d.von+'T12:00'),end=new Date(d.bis+'T12:00');
       for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){
         const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
-        if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6) urlaubDates.add(ds);
+        if(dt.getDay()!==0&&dt.getDay()!==6) urlaubDatesAll.add(ds);
       }
     });
+    const urlaubDates=new Set([...urlaubDatesAll].filter(d=>d.startsWith(ym)));
+    // Kumulierter Uebertrag aus allen Tagen VOR ym-01
+    let uebertragDiff=0;
+    if(plan){
+      const allKeys=new Set(Object.keys(zeitMap));
+      krankDatesAll.forEach(d=>allKeys.add(d));
+      urlaubDatesAll.forEach(d=>allKeys.add(d));
+      const feiertageAll={};
+      const yearsSeen=new Set();
+      [...allKeys].forEach(ds=>{if(ds<ym+'-01'){yearsSeen.add(parseInt(ds.slice(0,4)));}});
+      yearsSeen.forEach(yr=>{Object.assign(feiertageAll,getNRWFeiertage(yr));});
+      [...allKeys].filter(ds=>ds<ym+'-01').forEach(ds=>{
+        const e=zeitMap[ds];
+        const isK=krankDatesAll.has(ds);
+        const isU=urlaubDatesAll.has(ds);
+        const isFT=!!feiertageAll[ds];
+        const isFrei=isK||isU||isFT;
+        const ist=e?.istMinuten||0;
+        const sollRaw=getAgSollMin(ds,plan);
+        const soll=isFrei?0:sollRaw;
+        uebertragDiff+=(ist-soll);
+      });
+    }
     const tage=new Date(y,mo,0).getDate();
     let rows='',csvRows=[],totalIst=0,totalSoll=0,krankCount=0,urlaubCount=0,feiertagCount=0;
     csvRows.push(['Tag','Datum','Eingang','Ausgang','Pause(min)','Ist(min)','Soll(min)','Diff(min)','Status'].join(';'));
@@ -3773,8 +3799,14 @@ function exportStundenzettel(tnId,name,ym,format){
       csvRows.push([tag,String(d).padStart(2,'0')+'.'+String(mo).padStart(2,'0')+'.'+y,e?.eingang||'',e?.ausgang||'',e?.pauseMinuten||'',istMin,sollMin,diff,status].join(';'));
     }
     const totalDiff=totalIst-totalSoll;
+    const gesamtSaldo=uebertragDiff+totalDiff;
     csvRows.push(['','','','','Gesamt',totalIst,totalSoll,totalDiff,''].join(';'));
     csvRows.push(['','','','','Krank: '+krankCount+', Urlaub: '+urlaubCount+', Feiertage: '+feiertagCount,'','','',''].join(';'));
+    // Gleitzeit-Saldo-Zeilen (nur wenn Plan vorhanden)
+    if(plan){
+      csvRows.push(['','','','','Übertrag Vormonate','','',uebertragDiff,''].join(';'));
+      csvRows.push(['','','','','Gleitzeit-Saldo gesamt','','',gesamtSaldo,''].join(';'));
+    }
 
     if(format==='csv'){
       const blob=new Blob(['\ufeff'+csvRows.join('\n')],{type:'text/csv;charset=utf-8'});
@@ -3802,6 +3834,12 @@ function exportStundenzettel(tnId,name,ym,format){
       +'</tr></tfoot></table>'
       +'<div class="summary"><b>Zusammenfassung:</b> 🤒 Krank: '+krankCount+' · 🏖 Urlaub: '+urlaubCount+' · 🎌 Feiertage: '+feiertagCount
       +(plan?' · Soll: '+minToStr(totalSoll)+' · Ist: '+minToStr(totalIst)+' · <b style="color:'+(totalDiff>=0?'#059669':'#ef4444')+'">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</b>':'')+'</div>'
+      +(plan?'<div class="summary" style="margin-top:6px;background:#f8fafc"><b>Gleitzeit-Konto:</b>'
+        +'<table style="width:100%;margin-top:4px;border:none"><tbody>'
+        +'<tr><td style="border:none;padding:2px 8px;color:#64748b">Übertrag Vormonate</td><td style="border:none;padding:2px 8px;text-align:right;font-weight:700;color:'+(uebertragDiff>=0?'#059669':'#ef4444')+'">'+(uebertragDiff>=0?'+':'')+minToStr(uebertragDiff)+'</td></tr>'
+        +'<tr><td style="border:none;padding:2px 8px;color:#64748b">Saldo '+ym+'</td><td style="border:none;padding:2px 8px;text-align:right;font-weight:700;color:'+(totalDiff>=0?'#059669':'#ef4444')+'">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</td></tr>'
+        +'<tr style="border-top:1px solid #94a3b8"><td style="border:none;padding:4px 8px 2px;font-weight:800">Gesamt-Saldo</td><td style="border:none;padding:4px 8px 2px;text-align:right;font-weight:800;font-size:13px;color:'+(gesamtSaldo>=0?'#059669':'#ef4444')+'">'+(gesamtSaldo>=0?'+':'')+minToStr(gesamtSaldo)+'</td></tr>'
+        +'</tbody></table></div>':'')
       +'<div class="sig"><div>Datum, Unterschrift Arbeitnehmer</div><div>Datum, Unterschrift Arbeitgeber</div></div>'
       +'<script>(function(){var imgs=document.querySelectorAll(\'img\');if(!imgs.length){setTimeout(()=>window.print(),200);return;}var done=0;var fire=function(){done++;if(done>=imgs.length){setTimeout(()=>window.print(),200);}};imgs.forEach(function(i){if(i.complete&&i.naturalWidth>0){fire();}else{i.onload=fire;i.onerror=fire;}});setTimeout(function(){if(done<imgs.length){window.print();}},5000);})();<\/script></body></html>';
     const w=window.open('','_blank');
