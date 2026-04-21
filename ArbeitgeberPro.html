@@ -3960,20 +3960,20 @@ function loadAgAuftragsAuswertung(){
   if(!el) return;
   if(!_azubis.length){el.innerHTML='<div class="empty">Keine Mitarbeiter</div>';return;}
   el.innerHTML='<div class="empty">Lädt…</div>';
-  // Für jeden MA alle erledigten Aufträge im Monat holen
+  // Für jeden MA alle Aufträge holen (orderBy statt where-status — robuster, kein Index-Bedarf)
   const [year,month]=ym.split('-').map(Number);
   const monatStart=new Date(year,month-1,1).getTime();
   const monatEnd=new Date(year,month,1).getTime();
   const promises=_azubis.map(az=>
     db.collection('globalTN').doc(az.id).collection('auftraege')
-      .where('status','==','erledigt').get()
+      .orderBy('erstelltAm','desc').get()
       .then(snap=>{
         const auftraege=snap.docs
           .map(d=>({id:d.id,...d.data()}))
-          .filter(a=>a.erledigtAm&&a.erledigtAm>=monatStart&&a.erledigtAm<monatEnd);
-        return {az, auftraege};
+          .filter(a=>a.status==='erledigt'&&a.erledigtAm&&a.erledigtAm>=monatStart&&a.erledigtAm<monatEnd);
+        return {az, auftraege, err:null};
       })
-      .catch(()=>({az, auftraege:[]}))
+      .catch(e=>({az, auftraege:[], err:e.message}))
   );
   Promise.all(promises).then(results=>{
     // Pro MA zusammenrechnen
@@ -4025,7 +4025,12 @@ function loadAgAuftragsAuswertung(){
         +'</div>');
     });
     if(!maBloecke.length){
-      el.innerHTML='<div class="empty">Keine erledigten Aufträge in diesem Monat</div>';
+      const errs=results.filter(r=>r.err).map(r=>r.err);
+      if(errs.length){
+        el.innerHTML='<div class="err">Fehler beim Laden: '+esc(errs[0])+'</div>';
+      } else {
+        el.innerHTML='<div class="empty">Keine erledigten Aufträge in diesem Monat</div>';
+      }
       return;
     }
     // Gesamtsumme oben
@@ -4057,11 +4062,11 @@ function exportAgAuftragsAuswertung(){
   const monatEnd=new Date(year,month,1).getTime();
   const promises=_azubis.map(az=>
     db.collection('globalTN').doc(az.id).collection('auftraege')
-      .where('status','==','erledigt').get()
+      .orderBy('erstelltAm','desc').get()
       .then(snap=>{
         const auftraege=snap.docs
           .map(d=>({id:d.id,...d.data()}))
-          .filter(a=>a.erledigtAm&&a.erledigtAm>=monatStart&&a.erledigtAm<monatEnd);
+          .filter(a=>a.status==='erledigt'&&a.erledigtAm&&a.erledigtAm>=monatStart&&a.erledigtAm<monatEnd);
         return {az, auftraege};
       }).catch(()=>({az, auftraege:[]}))
   );
