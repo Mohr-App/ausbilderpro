@@ -1,4 +1,4 @@
-const CACHE = 'azubipro-v140';
+const CACHE = 'azubipro-v141';
 const ASSETS = [
   './AzubiPro.html',
   './manifest-azubi.json',

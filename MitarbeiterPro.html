@@ -647,6 +647,7 @@ const db=firebase.firestore();
 db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
 const st=firebase.storage();
 let _uid=null, _email=null, _tnId=null, _tnData=null;
+let _firmaEmail='';  // E-Mail des verknuepften Betriebs (fuer replyTo in Kunden-Mails)
 
 // ISO → deutsch
 function fmtDE(d){ if(!d||d.length<10) return d||'?'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
@@ -935,6 +936,7 @@ function _fireMeldMail(email, type, text, name){
   const zeit=new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   db.collection('mail').add({
     to: email,
+    replyTo: _email||'',
     message: {
       subject: subject,
       html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
@@ -1323,6 +1325,7 @@ function sendBescheinigungMail(aufId, email, d){
   const html=_kundenBescheinigungHtml(d, firma, maName, dat);
   db.collection('mail').add({
     to:email,
+    replyTo:_firmaEmail||'',  // Kunde antwortet an Betrieb, nicht an ausbilderpro.de
     message:{subject:'Auftragsbescheinigung '+(d.kunde?'· '+d.kunde:'')+' · '+firma, html}
   }).then(()=>{
     db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).update({bescheinigungMailAt:Date.now()}).catch(()=>{});
@@ -2522,12 +2525,14 @@ function checkFirmaCodeUI(){
 function _loadFirmaLogo(){
   if(!_tnData||!_tnData.firmaUid) return;
   const el=document.getElementById('hdrFirmaLogo');
-  if(!el) return;
   db.collection('users').doc(_tnData.firmaUid).get().then(doc=>{
     if(!doc.exists) return;
-    const logo=doc.data().firmaLogo;
-    if(logo){ el.src=logo; el.style.display=''; }
-    else { el.style.display='none'; }
+    const d=doc.data();
+    if(el){
+      if(d.firmaLogo){ el.src=d.firmaLogo; el.style.display=''; }
+      else { el.style.display='none'; }
+    }
+    _firmaEmail=d.email||'';
   }).catch(()=>{});
 }
 
