@@ -3845,11 +3845,67 @@ function monatsAbschluss(tnId,name,ym){
   });
 }
 
+// Helper: externe Bild-URLs (z.B. Firebase Storage) in DataURLs konvertieren.
+// Notwendig fuer PDF-Exports in window.open — sonst scheitert der Image-Load
+// wegen Auth/CORS-Probleme oder Timing.
+function _urlToDataUrl(url){
+  if(!url) return Promise.resolve(null);
+  if(url.startsWith('data:')) return Promise.resolve(url);  // schon DataURL
+  return fetch(url,{mode:'cors'})
+    .then(r=>{
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.blob();
+    })
+    .then(blob=>new Promise((resolve,reject)=>{
+      const fr=new FileReader();
+      fr.onload=()=>resolve(fr.result);
+      fr.onerror=reject;
+      fr.readAsDataURL(blob);
+    }))
+    .catch(e=>{
+      console.warn('[PDF] Konnte Bild nicht zu DataURL konvertieren:',url,e);
+      return url;  // Fallback: Original-URL — Browser versucht trotzdem zu laden
+    });
+}
+
+// Helper: alle externen Bilder in einem Auftrag-Doc in DataURLs konvertieren.
+// Mutiert das Doc-Objekt direkt (Kopie wird vorher gemacht). Gibt Promise<void>.
+function _resolveAufImages(d){
+  const tasks=[];
+  if(d.unterschrift){
+    tasks.push(_urlToDataUrl(d.unterschrift).then(u=>{d.unterschrift=u;}));
+  }
+  if(d.fotos&&d.fotos.length){
+    tasks.push(Promise.all(d.fotos.map(f=>_urlToDataUrl(f))).then(arr=>{d.fotos=arr;}));
+  }
+  if(d.fotosAG&&d.fotosAG.length){
+    tasks.push(Promise.all(d.fotosAG.map(f=>_urlToDataUrl(f))).then(arr=>{d.fotosAG=arr;}));
+  }
+  // Nachtraege haben meist schon DataURLs, aber defensiv trotzdem konvertieren
+  if(d.nachtraege&&d.nachtraege.length){
+    d.nachtraege.forEach(n=>{
+      if(n.unterschrift&&!n.unterschrift.startsWith('data:')){
+        tasks.push(_urlToDataUrl(n.unterschrift).then(u=>{n.unterschrift=u;}));
+      }
+      if(n.fotos&&n.fotos.length){
+        tasks.push(Promise.all(n.fotos.map(f=>_urlToDataUrl(f))).then(arr=>{n.fotos=arr;}));
+      }
+    });
+  }
+  return Promise.all(tasks);
+}
+
 function exportLeistungsuebersicht(tnId,aufId){
   toast('📋 Leistungsübersicht wird erstellt…');
   db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).get().then(doc=>{
     if(!doc.exists){toast('Auftrag nicht gefunden','bad');return;}
     const d=doc.data();
+    // Externe Bild-URLs (Storage) in DataURLs konvertieren fuer PDF-Fenster
+    return _resolveAufImages(d).then(()=>_buildLeistungsuebersichtHtml(d,tnId,aufId));
+  }).catch(e=>{toast('❌ '+e.message,'bad');console.error(e);});
+}
+
+function _buildLeistungsuebersichtHtml(d,tnId,aufId){
     const az=_azubis.find(a=>a.id===tnId);
     const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
     const erledigt=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
@@ -3978,7 +4034,6 @@ function exportLeistungsuebersicht(tnId,aufId){
       +'<script>(function(){var imgs=document.querySelectorAll(\'img\');if(!imgs.length){setTimeout(()=>window.print(),200);return;}var done=0;var fire=function(){done++;if(done>=imgs.length){setTimeout(()=>window.print(),200);}};imgs.forEach(function(i){if(i.complete&&i.naturalWidth>0){fire();}else{i.onload=fire;i.onerror=fire;}});setTimeout(function(){if(done<imgs.length){window.print();}},5000);})();<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
-  });
 }
 
 function exportAuftragsprotokoll(tnId,aufId){
@@ -3986,6 +4041,11 @@ function exportAuftragsprotokoll(tnId,aufId){
   db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).get().then(doc=>{
     if(!doc.exists){toast('Auftrag nicht gefunden','bad');return;}
     const d=doc.data();
+    return _resolveAufImages(d).then(()=>_buildAuftragsprotokollHtml(d,tnId,aufId));
+  }).catch(e=>{toast('❌ '+e.message,'bad');console.error(e);});
+}
+
+function _buildAuftragsprotokollHtml(d,tnId,aufId){
     const az=_azubis.find(a=>a.id===tnId);
     const maName=az?((az.vorname||'')+' '+(az.nachname||'')).trim():'';
     const dat=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
@@ -4074,7 +4134,6 @@ function exportAuftragsprotokoll(tnId,aufId){
       +'<script>(function(){var imgs=document.querySelectorAll(\'img\');if(!imgs.length){setTimeout(()=>window.print(),200);return;}var done=0;var fire=function(){done++;if(done>=imgs.length){setTimeout(()=>window.print(),200);}};imgs.forEach(function(i){if(i.complete&&i.naturalWidth>0){fire();}else{i.onload=fire;i.onerror=fire;}});setTimeout(function(){if(done<imgs.length){window.print();}},5000);})();<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
-  });
 }
 
 // GEOFENCING
