@@ -72,6 +72,23 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .hdr-sep{flex:1}
 .hdr-user{font-size:.7rem;color:#fff;font-family:'JetBrains Mono',monospace;}
 .hdr-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:8px;color:#fff;font-family:'Sora',sans-serif;font-size:.72rem;padding:6px 12px;cursor:pointer;transition:all .12s;}
+/* App-Launcher (nur fuer Admins/Verwaltung sichtbar) */
+.app-launcher-wrap{position:relative;display:none;}
+.app-launcher-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:8px;color:#fff;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s;padding:0;}
+.app-launcher-btn:hover{background:rgba(255,255,255,.25);}
+.app-launcher-btn svg{width:18px;height:18px;fill:#fff;}
+.app-launcher-dd{position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 8px 28px rgba(15,23,42,.15);padding:10px;min-width:280px;z-index:200;display:none;}
+.app-launcher-dd.open{display:block;animation:appFade .15s ease-out;}
+@keyframes appFade{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+.app-launcher-title{font-size:.58rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;padding:4px 8px 8px;}
+.app-launcher-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.app-launcher-item{display:flex;align-items:center;gap:10px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;text-decoration:none;color:#1e293b;font-family:'Sora',sans-serif;transition:all .12s;}
+.app-launcher-item:hover{background:#f1f5f9;border-color:#cbd5e1;transform:translateY(-1px);}
+.app-launcher-item.current{background:linear-gradient(135deg,rgba(37,99,235,.08),rgba(5,150,105,.08));border-color:#2563eb;cursor:default;}
+.app-launcher-item.current:hover{transform:none;}
+.app-launcher-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:1rem;font-weight:800;}
+.app-launcher-label{flex:1;min-width:0;font-size:.68rem;font-weight:700;line-height:1.2;}
+.app-launcher-label small{display:block;font-size:.54rem;font-weight:500;color:#64748b;margin-top:2px;}
 .hdr-btn:hover{border-color:#fff;background:rgba(255,255,255,.25);}
 
 .body{display:flex;flex:1;}
@@ -588,6 +605,21 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <button class="hdr-btn" onclick="document.getElementById('restoreFileIn').click()" title="JSON-Backup wiederherstellen" style="opacity:.7"><span class="hdr-btn-text">Restore</span></button>
     <input type="file" id="restoreFileIn" accept=".json" style="display:none" onchange="doRestore(event)">
     <button class="hdr-btn" onclick="showHVHilfe()" style="opacity:.7" title="Anleitungen und FAQ"><span class="hdr-btn-text">Hilfe</span></button>
+    <div class="app-launcher-wrap" id="appLauncher">
+      <button class="app-launcher-btn" onclick="toggleAppLauncher(event)" title="App wechseln (Admin)">
+        <svg viewBox="0 0 24 24"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>
+      </button>
+      <div class="app-launcher-dd" id="appLauncherDD">
+        <div class="app-launcher-title">⚡ App wechseln</div>
+        <div class="app-launcher-grid">
+          <a href="ArbeitgeberPro.html" class="app-launcher-item" data-app="ag"><div class="app-launcher-icon" style="background:linear-gradient(135deg,#2563eb,#1d4ed8)">AG</div><div class="app-launcher-label">ArbeitgeberPro<small>Betrieb · Aufträge</small></div></a>
+          <a href="MitarbeiterPro.html" class="app-launcher-item" data-app="ma"><div class="app-launcher-icon" style="background:linear-gradient(135deg,#059669,#047857)">MA</div><div class="app-launcher-label">MitarbeiterPro<small>Zeiterfassung</small></div></a>
+          <a href="AzubiPro.html" class="app-launcher-item" data-app="azubi"><div class="app-launcher-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7)">AZ</div><div class="app-launcher-label">AzubiPro<small>Auszubildende</small></div></a>
+          <a href="AusbilderPro.html" class="app-launcher-item" data-app="ausbilder"><div class="app-launcher-icon" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">AB</div><div class="app-launcher-label">AusbilderPro<small>Sitzplan · Noten</small></div></a>
+          <a href="HBZVerwaltung.html" class="app-launcher-item current" data-app="verwaltung" style="grid-column:span 2"><div class="app-launcher-icon" style="background:linear-gradient(135deg,#d97706,#b45309)">VP</div><div class="app-launcher-label">VerwaltungPro<small>HBZ · Kursverwaltung · Statistik</small></div></a>
+        </div>
+      </div>
+    </div>
     <button class="hdr-btn" onclick="doLogout()" title="Session beenden und abmelden">⎋ <span class="hdr-btn-text">Abmelden</span></button>
   </div>
   <div class="body">
@@ -1670,6 +1702,9 @@ function grantAccess(u, role){
   document.getElementById('loginWrap').style.display = 'none';
   document.getElementById('appWrap').style.display = 'flex';
   document.getElementById('hdrUser').textContent = _email;
+  // Admin-Launcher: VerwaltungPro ist per Definition Admin/Verwaltung, also immer anzeigen
+  const launcher=document.getElementById('appLauncher');
+  if(launcher) launcher.style.display='';
   // Activity tracking
   if(_uid) db.collection('users').doc(_uid).set({lastActive:Date.now(),lastApp:'VerwaltungPro',email:_email||'',role:_userRole||'admin',sessionStart:Date.now()},{merge:true}).catch(()=>{});
   if(!window._heartbeat) window._heartbeat=setInterval(()=>{
@@ -1753,6 +1788,29 @@ function doLogin(){
   });
 }
 function doLogout(){ auth.signOut(); }
+
+// ═══ App-Launcher (nur fuer Admin/Verwaltung) ═══
+function toggleAppLauncher(ev){
+  if(ev) ev.stopPropagation();
+  const dd=document.getElementById('appLauncherDD');
+  if(dd) dd.classList.toggle('open');
+}
+document.addEventListener('click',function(ev){
+  const dd=document.getElementById('appLauncherDD');
+  const wrap=document.getElementById('appLauncher');
+  if(dd&&wrap&&!wrap.contains(ev.target)) dd.classList.remove('open');
+});
+function _checkAdminShowLauncher(uid){
+  if(!uid) return;
+  db.collection('users').doc(uid).get().then(doc=>{
+    if(!doc.exists) return;
+    const role=doc.data().role;
+    if(role==='admin'||role==='verwaltung'){
+      const el=document.getElementById('appLauncher');
+      if(el) el.style.display='';
+    }
+  }).catch(()=>{});
+}
 function showErr(m){ document.getElementById('lErr').textContent = m; }
 
 // ── Navigation ──
