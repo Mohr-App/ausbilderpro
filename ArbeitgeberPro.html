@@ -3199,10 +3199,16 @@ function openAufDetails(tnId, aufId){
   const seenKey='lastSeenBy.'+_uid;
   db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).update({[seenKey]:Date.now()}).catch(()=>{});
   // Subscribe to chat
+  _subscribeAufdChat();
+  document.getElementById('aufDetailsModal').classList.add('open');
+}
+function _subscribeAufdChat(){
+  if(!_aufdTn||!_aufdAufId) return;
   if(_aufdChatUnsub){_aufdChatUnsub();_aufdChatUnsub=null;}
-  _aufdChatUnsub=db.collection('globalTN').doc(tnId).collection('auftraege').doc(aufId).collection('messages')
+  _aufdChatUnsub=db.collection('globalTN').doc(_aufdTn).collection('auftraege').doc(_aufdAufId).collection('messages')
     .orderBy('erstelltAm','asc').onSnapshot(snap=>{
       const box=document.getElementById('aufdChatBox');
+      if(!box) return;
       if(!snap.size){box.innerHTML='<div class="chat-empty">Noch keine Nachrichten</div>';return;}
       let html='';
       snap.forEach(doc=>{
@@ -3222,9 +3228,9 @@ function openAufDetails(tnId, aufId){
       box.innerHTML=html;
       box.scrollTop=box.scrollHeight;
     },err=>{
-      document.getElementById('aufdChatBox').innerHTML='<div class="chat-empty">Fehler: '+esc(err.message)+'</div>';
+      const box=document.getElementById('aufdChatBox');
+      if(box) box.innerHTML='<div class="chat-empty">Fehler: '+esc(err.message)+'</div>';
     });
-  document.getElementById('aufDetailsModal').classList.add('open');
 }
 function closeAufDetails(){
   if(_aufdChatUnsub){_aufdChatUnsub();_aufdChatUnsub=null;}
@@ -3239,6 +3245,13 @@ function showAufdTab(tab){
   const btnMap={prot:'aufdTabProt',chat:'aufdTabChat',nach:'aufdTabNach',kunde:'aufdTabKunde'};
   const btn=document.getElementById(btnMap[tab]); if(btn) btn.classList.add('active');
   if(tab==='kunde') _renderAufdKundeTab();
+  if(tab==='chat'&&_aufdTn&&_aufdAufId){
+    // Listener neu aufsetzen — heilt falls er aus irgendeinem Grund stillgelegt wurde
+    _subscribeAufdChat();
+    // Als gelesen markieren
+    db.collection('globalTN').doc(_aufdTn).collection('auftraege').doc(_aufdAufId)
+      .update({['lastSeenBy.'+_uid]:Date.now()}).catch(()=>{});
+  }
   if(tab==='nach'&&_aufdTn&&_aufdAufId){
     // Als gelesen markieren
     db.collection('globalTN').doc(_aufdTn).collection('auftraege').doc(_aufdAufId)
