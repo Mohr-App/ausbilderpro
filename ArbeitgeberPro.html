@@ -493,15 +493,44 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <details class="coll-card">
         <summary>📋 Briefkopf (für PDF-Exports)</summary>
         <div class="coll-body">
-          <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px;line-height:1.5">Erscheint oben auf Auftragsprotokollen und Leistungsübersichten. Freie Gestaltung — trage alles ein was auf Ihre Rechnungen/Protokolle soll (Firmenname, Adresse, Telefon, E-Mail, USt-ID, Steuernummer, IBAN, Webseite). Zeilenumbrüche werden erhalten.</div>
-          <textarea id="briefkopfTxt" rows="7" style="width:100%;padding:10px;border:1.5px solid var(--brd);border-radius:8px;font-size:.74rem;font-family:'Sora',sans-serif;resize:vertical;line-height:1.5;background:#fff" placeholder="Beispiel:&#10;Elektro-Service Mohr&#10;Musterstraße 12 · 53111 Bonn&#10;Tel. 0228 / 123456 · info@elektro-mohr.de&#10;USt-IdNr. DE123456789 · Steuer-Nr. 123/456/78901&#10;IBAN DE12 3456 7890 1234 5678 90"></textarea>
-          <div style="font-size:.6rem;color:var(--mu);margin-top:4px;font-style:italic">Leer lassen = Fallback auf Firmenname aus Ihrem Profil</div>
-          <button class="btn" onclick="saveBriefkopf()" style="margin-top:8px;width:100%;font-size:.78rem;padding:10px">✓ Briefkopf speichern</button>
-          <div class="err" id="briefkopfErr" style="margin-top:6px"></div>
-          <div style="margin-top:12px;padding:8px 10px;background:var(--sur2);border-radius:8px">
-            <div style="font-size:.58rem;color:var(--mu);font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Vorschau im PDF</div>
-            <div id="briefkopfPreview" style="font-size:.68rem;line-height:1.5;white-space:pre-wrap;color:var(--tx);padding:8px;background:#fff;border:1px solid var(--brd);border-radius:6px;min-height:40px;font-family:Arial,sans-serif"></div>
+          <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Erscheint oben auf Auftragsprotokollen und Leistungsübersichten. <b>Zwei Möglichkeiten</b> — entweder vorhandenes Briefpapier als Bild hochladen (empfohlen, sieht professioneller aus) oder Text eintragen.</div>
+
+          <!-- Option 1: Bild-Upload -->
+          <div style="padding:10px;background:rgba(37,99,235,.04);border:1.5px solid rgba(37,99,235,.15);border-radius:10px;margin-bottom:10px">
+            <div style="font-size:.66rem;font-weight:700;color:var(--acc);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">🖼 Option 1: Briefkopf als Bild (empfohlen)</div>
+            <div style="font-size:.6rem;color:var(--mu);margin-bottom:8px;line-height:1.5">Vorhandenes Firmenpapier abfotografieren oder als PNG/JPG scannen. Breitformat wird im PDF auf volle Seitenbreite skaliert.</div>
+            <div id="briefkopfImgPreview" style="text-align:center;padding:12px;background:#fff;border:1px solid var(--brd);border-radius:8px;margin-bottom:8px;min-height:80px;display:flex;align-items:center;justify-content:center">
+              <span style="color:var(--mu);font-size:.62rem">Kein Briefkopf-Bild gesetzt</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <label style="flex:1;padding:9px;background:#fff;color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
+                📷 Kamera
+                <input type="file" id="briefkopfImgCam" accept="image/*" capture="environment" onchange="_uploadBriefkopfImg(event)" style="display:none">
+              </label>
+              <label style="flex:1;padding:9px;background:#fff;color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
+                🖼 Datei hochladen
+                <input type="file" id="briefkopfImgFile" accept="image/*" onchange="_uploadBriefkopfImg(event)" style="display:none">
+              </label>
+              <button onclick="_removeBriefkopfImg()" id="briefkopfImgRemoveBtn" style="display:none;padding:9px 14px;background:#fff;border:1.5px solid #ef4444;color:#ef4444;border-radius:8px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✗</button>
+            </div>
+            <div class="err" id="briefkopfImgErr" style="margin-top:6px"></div>
           </div>
+
+          <!-- Option 2: Text -->
+          <div style="padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px">
+            <div style="font-size:.66rem;font-weight:700;color:var(--mu);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">✏ Option 2: Briefkopf als Text</div>
+            <div style="font-size:.6rem;color:var(--mu);margin-bottom:6px;line-height:1.5">Wird nur verwendet wenn kein Bild hochgeladen ist. Freie Gestaltung, Zeilenumbrüche erhalten.</div>
+            <textarea id="briefkopfTxt" rows="6" style="width:100%;padding:10px;border:1.5px solid var(--brd);border-radius:8px;font-size:.74rem;font-family:'Sora',sans-serif;resize:vertical;line-height:1.5;background:#fff" placeholder="Beispiel:&#10;Elektro-Service Mohr&#10;Musterstraße 12 · 53111 Bonn&#10;Tel. 0228 / 123456 · info@elektro-mohr.de&#10;USt-IdNr. DE123456789 · Steuer-Nr. 123/456/78901&#10;IBAN DE12 3456 7890 1234 5678 90"></textarea>
+            <div style="font-size:.58rem;color:var(--mu);margin-top:4px;font-style:italic">Leer lassen = Fallback auf Firmenname</div>
+            <button class="btn" onclick="saveBriefkopf()" style="margin-top:6px;width:100%;font-size:.72rem;padding:8px">✓ Text speichern</button>
+            <div class="err" id="briefkopfErr" style="margin-top:6px"></div>
+            <div style="margin-top:10px">
+              <div style="font-size:.56rem;color:var(--mu);font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Text-Vorschau</div>
+              <div id="briefkopfPreview" style="font-size:.65rem;line-height:1.5;white-space:pre-wrap;color:var(--tx);padding:8px;background:#fff;border:1px solid var(--brd);border-radius:6px;min-height:40px;font-family:Arial,sans-serif"></div>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:.6rem;color:#92400e;line-height:1.5"><b>Reihenfolge im PDF:</b> Bild (wenn gesetzt) → Text (wenn gesetzt) → Firmenname (Fallback)</div>
         </div>
       </details>
 
@@ -823,7 +852,8 @@ const db=firebase.firestore();
 db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 
 let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};
-let _briefkopf='';  // Frei definierbarer Briefkopf für PDF-Exports (aus users/{uid}.briefkopf)
+let _briefkopf='';  // Frei definierbarer Briefkopf-TEXT (Fallback)
+let _briefkopfImg='';  // Briefkopf als Bild (DataURL) — hat Vorrang vor Text
 
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function fmtDE(d){if(!d||d.length<10)return d||'?';const p=d.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
@@ -965,6 +995,7 @@ function loadUserData(){
     _firma=d.firma||'';
     _firmaCode=d.firmaCode||'';
     _briefkopf=d.briefkopf||'';
+    _briefkopfImg=d.briefkopfImg||'';
     // Firmencode generieren falls noch keiner existiert (Bestandskunden)
     if(!_firmaCode){
       _firmaCode=_generateFirmaCode(_firma);
@@ -2089,8 +2120,9 @@ function initAgEinstellungen(){
   renderAgTabOrderSettings();
   // Firmenlogo-Preview laden
   _refreshFirmenlogoPreview();
-  // Briefkopf laden
+  // Briefkopf laden (Text + Bild)
   _refreshBriefkopfUI();
+  _refreshBriefkopfImgPreview();
 }
 
 function _refreshBriefkopfUI(){
@@ -2123,6 +2155,69 @@ function saveBriefkopf(){
     err.textContent='';
     toast(val?'📋 Briefkopf gespeichert':'🗑 Briefkopf entfernt');
   }).catch(e=>{err.style.color='#ef4444';err.textContent='❌ '+e.message;});
+}
+
+function _refreshBriefkopfImgPreview(){
+  const prev=document.getElementById('briefkopfImgPreview');
+  const remBtn=document.getElementById('briefkopfImgRemoveBtn');
+  if(!prev||!remBtn) return;
+  if(_briefkopfImg){
+    prev.innerHTML='<img src="'+_briefkopfImg+'" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid var(--brd);object-fit:contain">';
+    remBtn.style.display='';
+  } else {
+    prev.innerHTML='<span style="color:var(--mu);font-size:.62rem">Kein Briefkopf-Bild gesetzt</span>';
+    remBtn.style.display='none';
+  }
+}
+
+function _uploadBriefkopfImg(ev){
+  const f=ev.target.files&&ev.target.files[0];
+  if(!f) return;
+  const err=document.getElementById('briefkopfImgErr');
+  err.textContent='Wird hochgeladen…';
+  err.style.color='var(--acc)';
+  // Resize max 1600px Breite (A4-Seitenbreite mit guter Print-Auflösung bei 150dpi ≈ 1240px, wir lassen etwas Reserve)
+  // JPEG q=0.85 — gute Qualität für gescannte/fotografierte Briefkopfe
+  const fr=new FileReader();
+  fr.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const maxW=1600;
+      let w=img.width, h=img.height;
+      if(w>maxW){h=Math.round(h*maxW/w); w=maxW;}
+      const c=document.createElement('canvas');
+      c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      const dataUrl=c.toDataURL('image/jpeg',0.85);
+      // Größencheck: Firestore-Dokumentlimit = 1 MiB. DataURL-Base64-Overhead ~33%.
+      // 1600px-Briefkopf ~ 200-400KB → OK. Warnung ab 800KB.
+      if(dataUrl.length>900000){
+        err.style.color='#ef4444';
+        err.textContent='❌ Bild zu groß ('+Math.round(dataUrl.length/1024)+' KB). Bitte kleiner scannen oder Qualität reduzieren.';
+        return;
+      }
+      db.collection('users').doc(_uid).update({briefkopfImg:dataUrl}).then(()=>{
+        _briefkopfImg=dataUrl;
+        err.textContent='';
+        toast('🖼 Briefkopf-Bild gespeichert ('+Math.round(dataUrl.length/1024)+' KB)');
+        _refreshBriefkopfImgPreview();
+      }).catch(e=>{err.style.color='#ef4444';err.textContent='❌ '+e.message;});
+    };
+    img.onerror=()=>{err.style.color='#ef4444';err.textContent='❌ Bild ungültig';};
+    img.src=e.target.result;
+  };
+  fr.onerror=()=>{err.style.color='#ef4444';err.textContent='❌ Datei-Fehler';};
+  fr.readAsDataURL(f);
+  ev.target.value='';
+}
+
+function _removeBriefkopfImg(){
+  if(!confirm('Briefkopf-Bild entfernen?')) return;
+  db.collection('users').doc(_uid).update({briefkopfImg:firebase.firestore.FieldValue.delete()}).then(()=>{
+    _briefkopfImg='';
+    toast('✓ Briefkopf-Bild entfernt');
+    _refreshBriefkopfImgPreview();
+  }).catch(e=>toast('❌ '+e.message,'bad'));
 }
 
 function _refreshFirmenlogoPreview(){
@@ -3748,9 +3843,11 @@ function exportLeistungsuebersicht(tnId,aufId){
     const gesamtStd=positionen.reduce((s,p)=>s+p.stunden,0);
     const gesamtMat=positionen.reduce((s,p)=>s+p.material.length,0);
     const brief=_briefkopf||null;
-    const briefHtml=brief
-      ? '<div style="white-space:pre-wrap;font-size:9pt;line-height:1.5;color:#1e293b;margin-bottom:3mm">'+esc(brief)+'</div>'
-      : '<div style="font-size:11pt;font-weight:700;margin-bottom:1mm">'+esc(_firma||'')+'</div>';
+    const briefHtml=_briefkopfImg
+      ? '<img src="'+_briefkopfImg+'" style="max-width:100%;max-height:50mm;object-fit:contain;display:block">'
+      : brief
+        ? '<div style="white-space:pre-wrap;font-size:9pt;line-height:1.5;color:#1e293b;margin-bottom:3mm">'+esc(brief)+'</div>'
+        : '<div style="font-size:11pt;font-weight:700;margin-bottom:1mm">'+esc(_firma||'')+'</div>';
     let posHtml='';
     positionen.forEach(p=>{
       posHtml+='<div style="margin:4mm 0;padding:3mm 4mm;border:.3mm solid #e2e8f0;border-radius:1.5mm;page-break-inside:avoid">';
@@ -3787,10 +3884,13 @@ function exportLeistungsuebersicht(tnId,aufId){
       +'h1{font-size:18pt;margin-bottom:2mm}'
       +'.mat{display:inline-block;padding:1pt 5pt;background:#eff6ff;border:.2mm solid #bfdbfe;border-radius:2pt;font-size:9pt;margin:1pt}'
       +'@media print{button{display:none}}</style></head><body>'
-      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:.5mm solid #2563eb;padding-bottom:3mm;margin-bottom:5mm">'
-      +'<div>'+briefHtml+'</div>'
-      +'<div style="text-align:right;font-size:9pt;color:#64748b">Datum: '+heute+'<br>Nr. auf Anfrage</div>'
-      +'</div>'
+      +(_briefkopfImg
+        ? '<div style="margin-bottom:3mm">'+briefHtml+'</div>'
+          +'<div style="text-align:right;font-size:9pt;color:#64748b;border-bottom:.5mm solid #2563eb;padding-bottom:3mm;margin-bottom:5mm">Datum: '+heute+'</div>'
+        : '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:.5mm solid #2563eb;padding-bottom:3mm;margin-bottom:5mm">'
+          +'<div>'+briefHtml+'</div>'
+          +'<div style="text-align:right;font-size:9pt;color:#64748b">Datum: '+heute+'<br>Nr. auf Anfrage</div>'
+          +'</div>')
       +'<h1>Leistungsübersicht</h1>'
       +'<div style="font-size:10pt;color:#64748b;margin-bottom:5mm">Hauptauftrag'+(nachList.length?' + '+nachList.length+' Nachtrag'+(nachList.length>1?'e':''):'')+'</div>'
       +'<div style="padding:3mm 4mm;background:#f8fafc;border-radius:1.5mm;margin-bottom:5mm;font-size:10pt">'
@@ -3871,9 +3971,11 @@ function exportAuftragsprotokoll(tnId,aufId){
       +'img{max-width:100%;page-break-inside:avoid}'
       +'@media print{body{padding:0}button{display:none}}</style></head><body>'
       +'<h1>Auftragsprotokoll</h1>'
-      +(_briefkopf
-        ? '<div style="white-space:pre-wrap;font-size:9pt;line-height:1.5;color:#1e293b;border-bottom:.3mm solid #e2e8f0;padding-bottom:4mm;margin-bottom:5mm">'+esc(_briefkopf)+'</div>'
-        : '<div style="color:#64748b;font-size:10px;margin-bottom:16px">'+esc(_firma||'')+' · Erstellt am '+(new Date().toLocaleDateString('de-DE'))+'</div>')
+      +(_briefkopfImg
+        ? '<div style="margin-bottom:6mm;border-bottom:.3mm solid #e2e8f0;padding-bottom:4mm"><img src="'+_briefkopfImg+'" style="max-width:100%;max-height:50mm;object-fit:contain;display:block"></div>'
+        : _briefkopf
+          ? '<div style="white-space:pre-wrap;font-size:9pt;line-height:1.5;color:#1e293b;border-bottom:.3mm solid #e2e8f0;padding-bottom:4mm;margin-bottom:5mm">'+esc(_briefkopf)+'</div>'
+          : '<div style="color:#64748b;font-size:10px;margin-bottom:16px">'+esc(_firma||'')+' · Erstellt am '+(new Date().toLocaleDateString('de-DE'))+'</div>')
       +'<div class="row"><span class="label">Kunde:</span><span class="val">'+esc(d.kunde||'')+'</span></div>'
       +(d.adresse?'<div class="row"><span class="label">Adresse:</span><span class="val">'+esc(d.adresse)+'</span></div>':'')
       +(d.beschreibung?'<div class="row"><span class="label">Auftrag:</span><span class="val">'+esc(d.beschreibung)+'</span></div>':'')
