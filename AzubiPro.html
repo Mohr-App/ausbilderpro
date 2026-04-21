@@ -2577,10 +2577,16 @@ function openAufDetails(aufId){
   const seenKey='lastSeenBy.'+_uid;
   db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).update({[seenKey]:Date.now()}).catch(()=>{});
   // Live-Subscription
+  _subscribeAufdChat();
+  document.getElementById('aufDetailsModal').classList.add('open');
+}
+function _subscribeAufdChat(){
+  if(!_tnId||!_aufdAufId) return;
   if(_aufdChatUnsub){_aufdChatUnsub();_aufdChatUnsub=null;}
-  _aufdChatUnsub=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).collection('messages')
+  _aufdChatUnsub=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_aufdAufId).collection('messages')
     .orderBy('erstelltAm','asc').onSnapshot(snap=>{
       const box=document.getElementById('aufdChatBox');
+      if(!box) return;
       if(!snap.size){box.innerHTML='<div class="chat-empty">Noch keine Nachrichten</div>';return;}
       let html='';
       snap.forEach(doc=>{
@@ -2600,9 +2606,9 @@ function openAufDetails(aufId){
       box.innerHTML=html;
       box.scrollTop=box.scrollHeight;
     },err=>{
-      document.getElementById('aufdChatBox').innerHTML='<div class="chat-empty">Fehler: '+esc(err.message)+'</div>';
+      const box=document.getElementById('aufdChatBox');
+      if(box) box.innerHTML='<div class="chat-empty">Fehler: '+esc(err.message)+'</div>';
     });
-  document.getElementById('aufDetailsModal').classList.add('open');
 }
 function showAufdTab(tab){
   document.querySelectorAll('#aufDetailsModal .aufd-pane').forEach(p=>p.classList.remove('active'));
@@ -2610,6 +2616,11 @@ function showAufdTab(tab){
   const pane=document.getElementById('aufd-'+tab); if(pane) pane.classList.add('active');
   const btnMap={prot:'aufdTabProt',chat:'aufdTabChat',nach:'aufdTabNach'};
   const btn=document.getElementById(btnMap[tab]); if(btn) btn.classList.add('active');
+  if(tab==='chat'&&_tnId&&_aufdAufId){
+    _subscribeAufdChat();
+    db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_aufdAufId)
+      .update({['lastSeenBy.'+_uid]:Date.now()}).catch(()=>{});
+  }
   if(tab==='nach'){
     const a=_auftraege.find(x=>x.id===_aufdAufId);
     if(a) _renderNachListe(a);
