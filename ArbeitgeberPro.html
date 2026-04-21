@@ -502,6 +502,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div id="briefkopfImgPreview" style="text-align:center;padding:12px;background:#fff;border:1px solid var(--brd);border-radius:8px;margin-bottom:8px;min-height:80px;display:flex;align-items:center;justify-content:center">
               <span style="color:var(--mu);font-size:.62rem">Kein Briefkopf-Bild gesetzt</span>
             </div>
+            <!-- Vollseitig-Toggle -->
+            <label id="briefkopfVollseitigLabel" style="display:none;align-items:center;gap:8px;padding:8px 10px;background:#fff;border:1.5px solid rgba(37,99,235,.2);border-radius:8px;margin-bottom:8px;cursor:pointer;font-size:.66rem;line-height:1.4">
+              <input type="checkbox" id="briefkopfVollseitig" onchange="saveBriefkopfVollseitig()" style="width:16px;height:16px;accent-color:var(--acc);flex-shrink:0">
+              <span><b>Komplettes DIN A4 Briefpapier</b> (Kopf + Fußzeile) — wird als Seitenhintergrund gerendert, Inhalt darüber mit Rand</span>
+            </label>
             <div style="display:flex;gap:6px">
               <label style="flex:1;padding:9px;background:#fff;color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
                 📷 Kamera
@@ -854,6 +859,7 @@ db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};
 let _briefkopf='';  // Frei definierbarer Briefkopf-TEXT (Fallback)
 let _briefkopfImg='';  // Briefkopf als Bild (DataURL) — hat Vorrang vor Text
+let _briefkopfImgVoll=false;  // Bild ist komplettes A4 (wird als Hintergrund gerendert, sonst nur oben platziert)
 
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function fmtDE(d){if(!d||d.length<10)return d||'?';const p=d.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
@@ -996,6 +1002,7 @@ function loadUserData(){
     _firmaCode=d.firmaCode||'';
     _briefkopf=d.briefkopf||'';
     _briefkopfImg=d.briefkopfImg||'';
+    _briefkopfImgVoll=!!d.briefkopfImgVoll;
     // Firmencode generieren falls noch keiner existiert (Bestandskunden)
     if(!_firmaCode){
       _firmaCode=_generateFirmaCode(_firma);
@@ -2162,14 +2169,29 @@ function saveBriefkopf(){
 function _refreshBriefkopfImgPreview(){
   const prev=document.getElementById('briefkopfImgPreview');
   const remBtn=document.getElementById('briefkopfImgRemoveBtn');
+  const vollLabel=document.getElementById('briefkopfVollseitigLabel');
+  const vollChk=document.getElementById('briefkopfVollseitig');
   if(!prev||!remBtn) return;
   if(_briefkopfImg){
-    prev.innerHTML='<img src="'+_briefkopfImg+'" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid var(--brd);object-fit:contain">';
+    prev.innerHTML='<img src="'+_briefkopfImg+'" style="max-width:100%;max-height:240px;border-radius:6px;border:1px solid var(--brd);object-fit:contain">';
     remBtn.style.display='';
+    if(vollLabel) vollLabel.style.display='flex';
+    if(vollChk) vollChk.checked=_briefkopfImgVoll;
   } else {
     prev.innerHTML='<span style="color:var(--mu);font-size:.62rem">Kein Briefkopf-Bild gesetzt</span>';
     remBtn.style.display='none';
+    if(vollLabel) vollLabel.style.display='none';
   }
+}
+
+function saveBriefkopfVollseitig(){
+  if(!_uid) return;
+  const chk=document.getElementById('briefkopfVollseitig');
+  const val=!!(chk&&chk.checked);
+  db.collection('users').doc(_uid).update({briefkopfImgVoll:val}).then(()=>{
+    _briefkopfImgVoll=val;
+    toast(val?'📄 Vollseitig-Modus aktiviert':'↩ Nur als Kopfzeile');
+  }).catch(e=>{toast('❌ '+e.message,'bad'); if(chk) chk.checked=_briefkopfImgVoll;});
 }
 
 function _uploadBriefkopfImg(ev){
@@ -2215,8 +2237,12 @@ function _uploadBriefkopfImg(ev){
 
 function _removeBriefkopfImg(){
   if(!confirm('Briefkopf-Bild entfernen?')) return;
-  db.collection('users').doc(_uid).update({briefkopfImg:firebase.firestore.FieldValue.delete()}).then(()=>{
+  db.collection('users').doc(_uid).update({
+    briefkopfImg:firebase.firestore.FieldValue.delete(),
+    briefkopfImgVoll:firebase.firestore.FieldValue.delete()
+  }).then(()=>{
     _briefkopfImg='';
+    _briefkopfImgVoll=false;
     toast('✓ Briefkopf-Bild entfernt');
     _refreshBriefkopfImgPreview();
   }).catch(e=>toast('❌ '+e.message,'bad'));
@@ -3893,19 +3919,41 @@ function exportLeistungsuebersicht(tnId,aufId){
       posHtml+='</div>';
       posHtml+='</div>';
     });
-    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Leistungsübersicht '+esc(d.kunde||'')+'</title>'
-      +'<style>@page{size:A4;margin:18mm 15mm}*{margin:0;padding:0;box-sizing:border-box}'
-      +'html,body{width:210mm}body{font-family:Arial,sans-serif;padding:0;font-size:10pt;color:#1e293b;line-height:1.4}'
-      +'h1{font-size:18pt;margin-bottom:2mm}'
-      +'.mat{display:inline-block;padding:1pt 5pt;background:#eff6ff;border:.2mm solid #bfdbfe;border-radius:2pt;font-size:9pt;margin:1pt}'
-      +'@media print{button{display:none}}</style></head><body>'
-      +(_briefkopfImg
+    const useFullBg=_briefkopfImg && _briefkopfImgVoll;
+    const pageCss=useFullBg
+      ? '@page{size:A4;margin:0}'
+      : '@page{size:A4;margin:18mm 15mm}';
+    const bodyCss=useFullBg
+      ? 'body{font-family:Arial,sans-serif;padding:0;margin:0;font-size:10pt;color:#1e293b;line-height:1.4;position:relative}'
+      : 'html,body{width:210mm}body{font-family:Arial,sans-serif;padding:0;font-size:10pt;color:#1e293b;line-height:1.4}';
+    // Bei Vollseitig: Bild als position:fixed Hintergrund (alle Seiten), Content in Container mit Rand
+    const bgImgHtml=useFullBg
+      ? '<img src="'+_briefkopfImg+'" style="position:fixed;top:0;left:0;width:210mm;height:297mm;z-index:-1;object-fit:cover;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+      : '';
+    const contentWrapOpen=useFullBg
+      ? '<div style="padding:55mm 20mm 35mm 20mm;position:relative">'
+      : '';
+    const contentWrapClose=useFullBg?'</div>':'';
+    // Bei Vollseitig-Briefpapier: Keine zusätzliche Briefkopf-Anzeige — das Briefpapier selbst hat sie ja. Nur Datum dezent.
+    const headerBlock=useFullBg
+      ? '<div style="text-align:right;font-size:9pt;color:#64748b;margin-bottom:5mm">Datum: '+heute+'</div>'
+      : (_briefkopfImg
         ? '<div style="margin-bottom:3mm">'+briefHtml+'</div>'
           +'<div style="text-align:right;font-size:9pt;color:#64748b;border-bottom:.5mm solid #2563eb;padding-bottom:3mm;margin-bottom:5mm">Datum: '+heute+'</div>'
         : '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:.5mm solid #2563eb;padding-bottom:3mm;margin-bottom:5mm">'
           +'<div>'+briefHtml+'</div>'
           +'<div style="text-align:right;font-size:9pt;color:#64748b">Datum: '+heute+'<br>Nr. auf Anfrage</div>'
-          +'</div>')
+          +'</div>');
+    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Leistungsübersicht '+esc(d.kunde||'')+'</title>'
+      +'<style>'+pageCss+'*{margin:0;padding:0;box-sizing:border-box}'
+      +bodyCss
+      +'h1{font-size:18pt;margin-bottom:2mm}'
+      +'.mat{display:inline-block;padding:1pt 5pt;background:#eff6ff;border:.2mm solid #bfdbfe;border-radius:2pt;font-size:9pt;margin:1pt}'
+      +'@media print{button{display:none}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}'
+      +'</style></head><body>'
+      +bgImgHtml
+      +contentWrapOpen
+      +headerBlock
       +'<h1>Leistungsübersicht</h1>'
       +'<div style="font-size:10pt;color:#64748b;margin-bottom:5mm">Hauptauftrag'+(nachList.length?' + '+nachList.length+' Nachtrag'+(nachList.length>1?'e':''):'')+'</div>'
       +'<div style="padding:3mm 4mm;background:#f8fafc;border-radius:1.5mm;margin-bottom:5mm;font-size:10pt">'
@@ -3915,7 +3963,6 @@ function exportLeistungsuebersicht(tnId,aufId){
       +'</div>'
       +'<div style="font-size:11pt;font-weight:700;margin-bottom:2mm">Leistungspositionen</div>'
       +posHtml
-      // Summen-Box
       +'<div style="margin-top:6mm;padding:4mm 5mm;background:#eff6ff;border:.3mm solid #bfdbfe;border-radius:2mm;page-break-inside:avoid">'
       +'<div style="font-size:11pt;font-weight:800;margin-bottom:2mm;color:#1e40af">Gesamtsumme</div>'
       +'<table style="width:100%;font-size:10pt">'
@@ -3925,6 +3972,7 @@ function exportLeistungsuebersicht(tnId,aufId){
       +'</table>'
       +'</div>'
       +'<div style="margin-top:8mm;font-size:8pt;color:#94a3b8;line-height:1.5">Die vorstehenden Leistungen wurden vom Kunden durch Unterschrift der jeweiligen Einzelposition bestätigt. Diese Übersicht dient als Grundlage für die Rechnungsstellung.</div>'
+      +contentWrapClose
       +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
@@ -3976,21 +4024,40 @@ function exportAuftragsprotokoll(tnId,aufId){
     if(d.fotos&&d.fotos.length){fotosHtml='<h3>Fotodokumentation</h3><div style="display:flex;gap:4mm;flex-wrap:wrap;margin:3mm 0">';d.fotos.forEach(f=>{fotosHtml+='<img src="'+f+'" style="width:56mm;height:auto;border-radius:2mm;border:.3mm solid #cbd5e1">';});fotosHtml+='</div>';}
     let sigHtml='';
     if(d.unterschrift){sigHtml='<h3>Kundenunterschrift</h3><div style="border:.3mm solid #cbd5e1;border-radius:2mm;padding:2mm;display:inline-block;margin:3mm 0"><img src="'+d.unterschrift+'" style="height:25mm"></div>';}
+    const useFullBg=_briefkopfImg && _briefkopfImgVoll;
+    const pageCss=useFullBg
+      ? '@page{size:A4;margin:0}'
+      : '@page{size:A4;margin:18mm 15mm}';
+    const bodyCss=useFullBg
+      ? 'body{font-family:Arial,sans-serif;padding:0;margin:0;font-size:11pt;color:#1e293b;line-height:1.45;position:relative}'
+      : 'html,body{width:210mm}body{font-family:Arial,sans-serif;padding:0;font-size:11pt;color:#1e293b;line-height:1.45}';
+    const bgImgHtml=useFullBg
+      ? '<img src="'+_briefkopfImg+'" style="position:fixed;top:0;left:0;width:210mm;height:297mm;z-index:-1;object-fit:cover;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+      : '';
+    const contentWrapOpen=useFullBg?'<div style="padding:55mm 20mm 35mm 20mm;position:relative">':'';
+    const contentWrapClose=useFullBg?'</div>':'';
+    // Bei Vollseitig: KEIN Briefkopf-Block (Papier hat ihn schon)
+    const headerBlock=useFullBg
+      ? ''
+      : (_briefkopfImg
+        ? '<div style="margin-bottom:6mm;border-bottom:.3mm solid #e2e8f0;padding-bottom:4mm"><img src="'+_briefkopfImg+'" style="max-width:100%;max-height:50mm;object-fit:contain;display:block"></div>'
+        : _briefkopf
+          ? '<div style="white-space:pre-wrap;font-size:9pt;line-height:1.5;color:#1e293b;border-bottom:.3mm solid #e2e8f0;padding-bottom:4mm;margin-bottom:5mm">'+esc(_briefkopf)+'</div>'
+          : '<div style="color:#64748b;font-size:10px;margin-bottom:16px">'+esc(_firma||'')+' · Erstellt am '+(new Date().toLocaleDateString('de-DE'))+'</div>');
     const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Auftragsprotokoll '+esc(d.kunde||'')+'</title>'
-      +'<style>@page{size:A4;margin:18mm 15mm}*{margin:0;padding:0;box-sizing:border-box}'
-      +'html,body{width:210mm}body{font-family:Arial,sans-serif;padding:0;font-size:11pt;color:#1e293b;line-height:1.45}'
+      +'<style>'+pageCss+'*{margin:0;padding:0;box-sizing:border-box}'
+      +bodyCss
       +'h1{font-size:18pt;margin-bottom:4px}h3{font-size:11pt;margin-top:14pt;color:#2563eb;page-break-after:avoid}'
       +'.row{display:flex;gap:16pt;margin:3pt 0}'
       +'.label{color:#64748b;min-width:85pt;font-size:9pt;font-weight:700}.val{font-weight:600}'
       +'.mat{display:inline-block;padding:2pt 6pt;background:#eff6ff;border:1px solid #bfdbfe;border-radius:3pt;font-size:9pt;margin:1pt}'
       +'img{max-width:100%;page-break-inside:avoid}'
-      +'@media print{body{padding:0}button{display:none}}</style></head><body>'
+      +'@media print{body{padding:0}button{display:none}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}}'
+      +'</style></head><body>'
+      +bgImgHtml
+      +contentWrapOpen
       +'<h1>Auftragsprotokoll</h1>'
-      +(_briefkopfImg
-        ? '<div style="margin-bottom:6mm;border-bottom:.3mm solid #e2e8f0;padding-bottom:4mm"><img src="'+_briefkopfImg+'" style="max-width:100%;max-height:50mm;object-fit:contain;display:block"></div>'
-        : _briefkopf
-          ? '<div style="white-space:pre-wrap;font-size:9pt;line-height:1.5;color:#1e293b;border-bottom:.3mm solid #e2e8f0;padding-bottom:4mm;margin-bottom:5mm">'+esc(_briefkopf)+'</div>'
-          : '<div style="color:#64748b;font-size:10px;margin-bottom:16px">'+esc(_firma||'')+' · Erstellt am '+(new Date().toLocaleDateString('de-DE'))+'</div>')
+      +headerBlock
       +'<div class="row"><span class="label">Kunde:</span><span class="val">'+esc(d.kunde||'')+'</span></div>'
       +(d.adresse?'<div class="row"><span class="label">Adresse:</span><span class="val">'+esc(d.adresse)+'</span></div>':'')
       +(d.beschreibung?'<div class="row"><span class="label">Auftrag:</span><span class="val">'+esc(d.beschreibung)+'</span></div>':'')
@@ -4001,6 +4068,7 @@ function exportAuftragsprotokoll(tnId,aufId){
       +fotosAGHtml+nachHtml+fotosHtml+sigHtml
       +(nachSumStd>0?'<div style="margin-top:6mm;padding:3mm 4mm;background:#eff6ff;border:.3mm solid #bfdbfe;border-radius:1.5mm;font-size:10pt;page-break-inside:avoid"><b>Gesamtaufwand:</b> '+(Number(d.stunden)||0)+' h Hauptauftrag + '+nachSumStd+' h Nachträge = <b>'+((Number(d.stunden)||0)+nachSumStd)+' h</b></div>':'')
       +'<div style="margin-top:30px;font-size:9px;color:#94a3b8">Erledigt am: '+dat+'</div>'
+      +contentWrapClose
       +'<script>setTimeout(()=>window.print(),500)<\/script></body></html>';
     const w=window.open('','_blank');
     w.document.write(html);w.document.close();
