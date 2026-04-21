@@ -2200,32 +2200,37 @@ function loadZeitkonto(){
   const sel=document.getElementById('zeitMonat');
   const ym=sel?sel.value:localYM();
   el.innerHTML='<div class="empty">Lädt…</div>';
-  // Parallel: Zeiterfassung + Krankmeldungen + Urlaub
+  // Query erweitert: Alle Tage BIS Monatsende (fuer kumulierten Gleitzeit-Saldo)
   const p1=db.collection('globalTN').doc(_tnId).collection('zeiterfassung')
-    .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31')
+    .where('datum','<=',ym+'-31')
     .orderBy('datum').get();
   const p2=db.collection('globalTN').doc(_tnId).collection('betriebMeldungen')
     .where('type','==','krank').get();
   const p3=db.collection('globalTN').doc(_tnId).collection('urlaubsantraege')
     .where('status','==','genehmigt').get();
   Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlaubSnap])=>{
-    // Krank-Tage sammeln
-    const krankDates=new Set();
-    krankSnap.forEach(doc=>{const d=doc.data();if(d.datum&&d.datum.startsWith(ym)) krankDates.add(d.datum);});
-    // Urlaub-Tage sammeln (alle Tage im Bereich expandieren)
-    const urlaubDates=new Set();
+    // Krank-Tage: ALLE (nicht nur ym) — fuer Uebertragskonto
+    const krankDatesAll=new Set();
+    krankSnap.forEach(doc=>{const d=doc.data();if(d.datum) krankDatesAll.add(d.datum);});
+    const krankDates=new Set([...krankDatesAll].filter(d=>d.startsWith(ym)));
+    // Urlaub-Tage: ALLE (nicht nur ym)
+    const urlaubDatesAll=new Set();
     urlaubSnap.forEach(doc=>{
       const d=doc.data();
       if(!d.von||!d.bis) return;
       const start=new Date(d.von+'T12:00'), end=new Date(d.bis+'T12:00');
       for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){
         const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
-        if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6) urlaubDates.add(ds);
+        if(dt.getDay()!==0&&dt.getDay()!==6) urlaubDatesAll.add(ds);
       }
     });
-    // Zeiterfassung-Map
+    const urlaubDates=new Set([...urlaubDatesAll].filter(d=>d.startsWith(ym)));
+    // Zeiterfassung-Map (alle, inkl. Vormonate)
     const zeitMap={};
-    zeitSnap.forEach(doc=>{zeitMap[doc.data().datum]=doc.data();});
+    zeitSnap.forEach(doc=>{
+      const dd=doc.data();
+      if(dd.datum) zeitMap[dd.datum]=dd;  // Abschluss-Docs filtern (kein "datum"-Feld)
+    });
     // Alle Tage des Monats (inkl. Sa/So wenn konfiguriert)
     const allDays=[];
     const mStart=new Date(ym+'-01T12:00');
@@ -2286,7 +2291,32 @@ function loadZeitkonto(){
       }
     });
     const totalDiff=totalIst-totalSoll;
+    // Kumulierter Gleitzeit-Uebertrag aus allen Tagen VOR ym-01
+    let uebertragDiff=0;
+    if(_azPlan){
+      const allKeys=new Set(Object.keys(zeitMap));
+      krankDatesAll.forEach(d=>allKeys.add(d));
+      urlaubDatesAll.forEach(d=>allKeys.add(d));
+      const feiertageAll={};
+      const yearsSeen=new Set();
+      [...allKeys].forEach(ds=>{if(ds<ym+'-01'){yearsSeen.add(parseInt(ds.slice(0,4)));}});
+      yearsSeen.forEach(y=>{Object.assign(feiertageAll,getNRWFeiertage(y));});
+      [...allKeys].filter(ds=>ds<ym+'-01').forEach(ds=>{
+        const e=zeitMap[ds];
+        const isKrank=krankDatesAll.has(ds);
+        const isUrlaub=urlaubDatesAll.has(ds);
+        const isFeiertag=!!feiertageAll[ds];
+        const isFrei=isKrank||isUrlaub||isFeiertag;
+        const ist=e?.istMinuten||0;
+        const sollRaw=getSollMin(ds);
+        const soll=isFrei?0:sollRaw;
+        uebertragDiff+=(ist-soll);
+      });
+    }
+    const gesamtSaldo=uebertragDiff+totalDiff;
     const diffCol=totalDiff>=0?'#059669':'#ef4444';
+    const gesCol=gesamtSaldo>=0?'#059669':'#ef4444';
+    const uebCol=uebertragDiff>=0?'#059669':'#ef4444';
     html+='<div style="margin-top:10px;padding:10px;background:var(--sur2);border-radius:8px">';
     if(_azPlan){
       html+='<div style="display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:3px"><span>🤒 Krank-Tage</span><span style="font-weight:700">'+krankDates.size+'</span></div>'
@@ -2295,7 +2325,9 @@ function loadZeitkonto(){
         +'<div style="border-top:1px solid var(--brd);margin:6px 0"></div>'
         +'<div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:3px"><span>Ist ('+tage+' Tage)</span><span style="font-weight:800;font-family:\'JetBrains Mono\',monospace">'+minToStr(totalIst)+'</span></div>'
         +'<div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:3px"><span>Soll (ohne Krank/Urlaub/Feiertage)</span><span style="font-weight:700;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+minToStr(totalSoll)+'</span></div>'
-        +'<div style="display:flex;justify-content:space-between;font-size:.85rem;padding-top:6px;border-top:1px solid var(--brd)"><span style="font-weight:800">'+(totalDiff>=0?'📈 Überstunden':'📉 Fehlstunden')+'</span><span style="font-weight:800;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace;font-size:.95rem">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</span></div>';
+        +'<div style="display:flex;justify-content:space-between;font-size:.75rem;padding-top:6px;border-top:1px solid var(--brd)"><span style="font-weight:700">Saldo '+ym+'</span><span style="font-weight:800;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(totalDiff>=0?'+':'')+minToStr(totalDiff)+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.72rem;margin-top:3px"><span style="color:var(--mu)">Übertrag Vormonate</span><span style="font-weight:700;color:'+uebCol+';font-family:\'JetBrains Mono\',monospace">'+(uebertragDiff>=0?'+':'')+minToStr(uebertragDiff)+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.9rem;padding-top:8px;margin-top:6px;border-top:1.5px solid var(--brd)"><span style="font-weight:800">'+(gesamtSaldo>=0?'📈 Gleitzeit-Saldo':'📉 Gleitzeit-Saldo')+'</span><span style="font-weight:800;color:'+gesCol+';font-family:\'JetBrains Mono\',monospace;font-size:1rem">'+(gesamtSaldo>=0?'+':'')+minToStr(gesamtSaldo)+'</span></div>';
     } else {
       html+='<div style="display:flex;justify-content:space-between"><span style="font-size:.78rem;font-weight:700">Gesamt ('+tage+' Tage)</span><span style="font-size:.85rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+minToStr(totalIst)+'</span></div>';
     }

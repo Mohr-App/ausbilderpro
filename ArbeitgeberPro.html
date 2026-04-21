@@ -2666,28 +2666,37 @@ function loadAgZeiten(){
     allDays.push(ds);
   }
   const promises=_azubis.map(az=>{
+    // Query erweitert: Alle Tage BIS Monatsende (fuer kumulierten Gleitzeit-Saldo inkl. Vormonate)
     const p1=db.collection('globalTN').doc(az.id).collection('zeiterfassung')
-      .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').orderBy('datum').get();
+      .where('datum','<=',ym+'-31').orderBy('datum').get();
     const p2=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
       .where('type','==','krank').get();
     const p3=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
       .where('status','==','genehmigt').get();
     return Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlSnap])=>{
       const zeitMap={};
-      zeitSnap.forEach(d=>{zeitMap[d.data().datum]={id:d.id,...d.data()};});
-      const krankDates=new Set();
-      krankSnap.forEach(d=>{const dd=d.data();if(dd.datum&&dd.datum.startsWith(ym))krankDates.add(dd.datum);});
-      const urlaubDates=new Set();
+      zeitSnap.forEach(d=>{
+        const dd=d.data();
+        // Abschluss-Docs ausfiltern (die haben kein "datum"-Feld, sondern nur "abgeschlossen")
+        if(dd.datum) zeitMap[dd.datum]={id:d.id,...dd};
+      });
+      // Krank + Urlaub: Alle Daten, nicht nur aktueller Monat
+      const krankDatesAll=new Set();
+      krankSnap.forEach(d=>{const dd=d.data();if(dd.datum)krankDatesAll.add(dd.datum);});
+      const urlaubDatesAll=new Set();
       urlSnap.forEach(d=>{
         const dd=d.data();if(!dd.von||!dd.bis)return;
         const s=new Date(dd.von+'T12:00'),e=new Date(dd.bis+'T12:00');
         for(let dt=new Date(s);dt<=e;dt.setDate(dt.getDate()+1)){
           const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
-          if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6)urlaubDates.add(ds);
+          if(dt.getDay()!==0&&dt.getDay()!==6)urlaubDatesAll.add(ds);
         }
       });
-      return {az, zeitMap, krankDates, urlaubDates};
-    }).catch(()=>({az, zeitMap:{}, krankDates:new Set(), urlaubDates:new Set()}));
+      // Gefilterte Sets nur fuer aktuellen Monat (fuer Tag-Anzeige wie bisher)
+      const krankDates=new Set([...krankDatesAll].filter(d=>d.startsWith(ym)));
+      const urlaubDates=new Set([...urlaubDatesAll].filter(d=>d.startsWith(ym)));
+      return {az, zeitMap, krankDates, urlaubDates, krankDatesAll, urlaubDatesAll};
+    }).catch(()=>({az, zeitMap:{}, krankDates:new Set(), urlaubDates:new Set(), krankDatesAll:new Set(), urlaubDatesAll:new Set()}));
   });
   Promise.all(promises).then(results=>{
     // Sortieren: Azubis zuerst, dann Arbeitnehmer
@@ -2698,10 +2707,35 @@ function loadAgZeiten(){
     function renderGroup(label,icon,items){
       if(!items.length) return;
       html+='<div style="font-size:.7rem;font-weight:700;color:var(--mu);margin:10px 0 6px;letter-spacing:.04em">'+icon+' '+label+' ('+items.length+')</div>';
-      items.forEach(({az, zeitMap, krankDates, urlaubDates})=>{
+      items.forEach(({az, zeitMap, krankDates, urlaubDates, krankDatesAll, urlaubDatesAll})=>{
       const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
       const plan=az.arbeitszeitPlan||null;
       let totalIst=0,totalSoll=0,tage=0;
+      // Kumulierter Gleitzeit-Uebertrag aus allen Tagen VOR ym-01
+      let uebertragDiff=0;
+      if(plan){
+        // Iteriere durch alle Zeiterfassungs-Keys + Urlaub/Krank vor ym-01
+        const allKeys=new Set(Object.keys(zeitMap));
+        krankDatesAll.forEach(d=>allKeys.add(d));
+        urlaubDatesAll.forEach(d=>allKeys.add(d));
+        // Feiertage brauchen wir pro Jahr im Uebertragszeitraum
+        const feiertageAll={};
+        const yearsSeen=new Set();
+        [...allKeys].forEach(ds=>{if(ds<ym+'-01'){yearsSeen.add(parseInt(ds.slice(0,4)));}});
+        yearsSeen.forEach(y=>{Object.assign(feiertageAll,getNRWFeiertage(y));});
+        // Nur Tage VOR ym-01 ins Uebertragskonto
+        [...allKeys].filter(ds=>ds<ym+'-01').forEach(ds=>{
+          const e=zeitMap[ds];
+          const isKrank=krankDatesAll.has(ds);
+          const isUrlaub=urlaubDatesAll.has(ds);
+          const isFeiertag=!!feiertageAll[ds];
+          const isFrei=isKrank||isUrlaub||isFeiertag;
+          const ist=e?.istMinuten||0;
+          const sollRaw=getAgSollMin(ds,plan);
+          const soll=isFrei?0:sollRaw;
+          uebertragDiff+=(ist-soll);
+        });
+      }
       const feiertage=getNRWFeiertage(parseInt(ym));
       let dayHtml='';
       allDays.forEach(ds=>{
@@ -2761,16 +2795,22 @@ function loadAgZeiten(){
       else {todayStatus='❌ Nicht eingestempelt';}
       // Überstunden
       const totalDiff=totalIst-totalSoll;
+      const gesamtSaldo=uebertragDiff+totalDiff;  // Übertrag + aktueller Monat = Gesamt-Gleitzeitstand
       const diffCol=totalDiff>=0?'#059669':'#ef4444';
+      const gesCol=gesamtSaldo>=0?'#059669':'#ef4444';
+      const uebCol=uebertragDiff>=0?'#059669':'#ef4444';
       const diffStr=plan?(totalDiff>=0?'+':'')+minToStr(totalDiff):'';
+      const gesamtStr=plan?(gesamtSaldo>=0?'+':'')+minToStr(gesamtSaldo):'';
+      const uebStr=plan?(uebertragDiff>=0?'+':'')+minToStr(uebertragDiff):'';
       const cid='agZeitDetail'+idx++;
-      // Header (immer sichtbar)
+      // Header (immer sichtbar) — Gesamt-Saldo groß, Monats-Diff klein daneben
       html+='<div style="margin-bottom:8px;border:1px solid var(--brd);border-radius:10px;overflow:hidden">'
         +'<div onclick="document.getElementById(\''+cid+'\').style.display=document.getElementById(\''+cid+'\').style.display===\'none\'?\'block\':\'none\'" style="padding:10px;cursor:pointer;display:flex;align-items:center;gap:10px">'
         +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:800">'+esc(name)+'</div>'
         +'<div style="font-size:.65rem;color:'+todayCol+';font-weight:700;margin-top:2px">'+todayStatus+'</div></div>'
         +'<div style="text-align:right">';
-      if(plan) html+='<div style="font-size:.78rem;font-weight:800;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+diffStr+'</div>'
+      if(plan) html+='<div style="font-size:.78rem;font-weight:800;color:'+gesCol+';font-family:\'JetBrains Mono\',monospace">'+gesamtStr+'</div>'
+        +'<div style="font-size:.52rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">Monat: <span style="color:'+diffCol+';font-weight:700">'+diffStr+'</span></div>'
         +'<div style="font-size:.5rem;color:var(--mu)">🤒'+krankDates.size+' 🏖'+urlaubDates.size+' · '+tage+'T</div>';
       else html+='<div style="font-size:.72rem;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+minToStr(totalIst)+'</div>';
       html+='</div><span style="color:var(--mu);font-size:.8rem">▼</span></div>'
@@ -2778,9 +2818,13 @@ function loadAgZeiten(){
         +'<div id="'+cid+'" style="display:none;padding:0 10px 10px;border-top:1px solid var(--brd)">'
         +dayHtml;
       if(plan){
-        html+='<div style="margin-top:6px;padding:6px;background:var(--sur2);border-radius:6px;display:flex;justify-content:space-between;font-size:.7rem">'
-          +'<span>Ist: <b>'+minToStr(totalIst)+'</b> · Soll: <b>'+minToStr(totalSoll)+'</b></span>'
-          +'<span style="font-weight:800;color:'+diffCol+'">'+(totalDiff>=0?'📈 +':'📉 ')+minToStr(totalDiff)+'</span></div>';
+        html+='<div style="margin-top:6px;padding:8px;background:var(--sur2);border-radius:6px;font-size:.68rem">'
+          +'<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--mu)">Übertrag Vormonate:</span><span style="font-weight:700;color:'+uebCol+';font-family:\'JetBrains Mono\',monospace">'+uebStr+'</span></div>'
+          +'<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--mu)">Ist '+ym+':</span><span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+minToStr(totalIst)+'</span></div>'
+          +'<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--mu)">Soll '+ym+':</span><span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+minToStr(totalSoll)+'</span></div>'
+          +'<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:var(--mu)">Saldo '+ym+':</span><span style="font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(totalDiff>=0?'📈 +':'📉 ')+minToStr(totalDiff)+'</span></div>'
+          +'<div style="display:flex;justify-content:space-between;padding:4px 0 2px;margin-top:4px;border-top:1.5px solid var(--brd)"><span style="font-weight:800">Gleitzeit-Saldo gesamt:</span><span style="font-weight:800;font-size:.78rem;color:'+gesCol+';font-family:\'JetBrains Mono\',monospace">'+gesamtStr+'</span></div>'
+          +'</div>';
       }
       html+='<div style="display:flex;gap:4px;margin-top:8px">'
         +'<button title="📄 PDF" onclick="exportStundenzettel(\''+az.id+'\',\''+esc(name)+'\',\''+ym+'\')" style="flex:1;padding:8px;background:#fff;border:1.5px solid #2563eb;border-radius:8px;color:#2563eb;font-size:.68rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">📄 PDF</button>'
