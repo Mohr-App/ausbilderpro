@@ -2532,16 +2532,21 @@ function renderTNBreakdown(){
   const p=document.getElementById('tnBreakdownPanel');
   if(!p) return;
   const f=window._tnFilter||{beruf:null,lj:null};
-  // Oberberufe sammeln
+  // Oberberufe sammeln — ueber getBerufKey auch manuell angelegte TN matchen
   const berufe=new Map();
   _globalTN.forEach(t=>{
-    const b=t.beruf?(t.beruf.split(' – ')[0].trim()):'Kein Beruf';
-    berufe.set(b,(berufe.get(b)||0)+1);
+    const key=getBerufKey(t.beruf, t.berufGruppeId);
+    const label=(BERUFE[key]?.label)||(BERUFE[key]?.name)||(t.beruf?t.beruf.split(' – ')[0].trim():'Kein Beruf');
+    berufe.set(label,(berufe.get(label)||0)+1);
   });
   const berufSorted=[...berufe.entries()].sort((a,b)=>b[1]-a[1]);
-  // Gefilterte TN
+  // Gefilterte TN — ebenfalls ueber getBerufKey
   let filtered=_globalTN;
-  if(f.beruf) filtered=filtered.filter(t=>(t.beruf?(t.beruf.split(' – ')[0].trim()):'Kein Beruf')===f.beruf);
+  if(f.beruf) filtered=filtered.filter(t=>{
+    const key=getBerufKey(t.beruf, t.berufGruppeId);
+    const label=(BERUFE[key]?.label)||(BERUFE[key]?.name)||(t.beruf?t.beruf.split(' – ')[0].trim():'Kein Beruf');
+    return label===f.beruf;
+  });
   if(f.lj) filtered=filtered.filter(t=>(t.ausbjahr||'')=== f.lj);
   // Lehrjahre aus gefilterter Liste
   const ljMap={'1':0,'2':0,'3':0,'4':0};
@@ -5564,8 +5569,24 @@ function buildBEREUFEFromDocs(docs){
 function getBerufKey(beruf, berufGruppeId){
   // Direkter Match über berufGruppeId
   if(berufGruppeId && BERUFE[berufGruppeId]) return berufGruppeId;
-  // Fallback: Keyword-Matching
-  const b=(beruf||'').toLowerCase();
+  if(!beruf) return 'andere';
+  // Fallback: mehrstufiges Matching
+  const b=String(beruf).toLowerCase().trim();
+  // Priorität 1: Gruppenname matched ganz oder teilweise
+  for(const [key,def] of Object.entries(BERUFE)){
+    const groupName=(def.name||def.label||'').toLowerCase();
+    if(groupName && (b===groupName || b.includes(groupName) || groupName.includes(b))) return key;
+  }
+  // Priorität 2: einer der Fachrichtungs-Strings matched
+  for(const [key,def] of Object.entries(BERUFE)){
+    if(def.berufe && Array.isArray(def.berufe)){
+      for(const f of def.berufe){
+        const fl=String(f).toLowerCase();
+        if(b===fl || b.includes(fl) || fl.includes(b)) return key;
+      }
+    }
+  }
+  // Priorität 3: Keyword-Regex
   for(const [key,def] of Object.entries(BERUFE)){
     if(def.keys && def.keys.test(b)) return key;
   }
