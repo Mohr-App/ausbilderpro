@@ -1896,28 +1896,42 @@ function agCreateMitarbeiter(){
   secAuth.createUserWithEmailAndPassword(email,pw).then(cred=>{
     const uid=cred.user.uid;
     const secDb=_secondaryApp.firestore();
-    secDb.collection('users').doc(uid).set({email,role:rolle,firma:_firma});
     const tnData={vorname,nachname,email,firma:_firma,firmaUid:_uid,typ:rolle,erstelltAm:Date.now(),erstelltVon:_firma||_email};
     if(isAzubi&&beruf) tnData.beruf=beruf;
     if(_pendingNewMaPhoto) tnData.photoUrl=_pendingNewMaPhoto;
-    db.collection('globalTN').doc(uid).set(tnData);
-    secAuth.signOut();
-    document.getElementById('newMaVorname').value='';
-    document.getElementById('newMaNachname').value='';
-    document.getElementById('newMaEmail').value='';
-    document.getElementById('newMaPw').value='';
-    if(berufSel) berufSel.value='';
-    if(fachSel) fachSel.value='';
-    if(document.getElementById('newMaFachRow')) document.getElementById('newMaFachRow').style.display='none';
-    _pendingNewMaPhoto=null;
-    err.textContent='';
-    closeMaAnlegenModal();
-    const appUrl=isAzubi?'https://ausbilderpro.de/AzubiPro.html':'https://ausbilderpro.de/MitarbeiterPro.html';
-    const shareText='Hallo '+vorname+', du wurdest bei '+(_firma||'AusbilderPro')+' als '+(isAzubi?'Azubi':'Mitarbeiter')+' angelegt.\n\nDeine Zugangsdaten:\nE-Mail: '+email+'\nPasswort: '+pw+'\n\nApp: '+appUrl+'\n\nBitte nach dem ersten Login das Passwort ändern.';
-    showMaShareModal(vorname+' '+nachname, app, appUrl, email, pw, shareText);
+    // Beide Writes synchron abschliessen BEVOR signOut() triggert
+    // (sonst bricht die Auth-Session mitten im Write ab und Rules blockieren)
+    return Promise.all([
+      secDb.collection('users').doc(uid).set({email,role:rolle,firma:_firma}),
+      db.collection('globalTN').doc(uid).set(tnData)
+    ]).then(()=>{
+      // Jetzt erst signOut der Secondary-Auth-Session
+      return secAuth.signOut();
+    }).then(()=>{
+      // UI zuruecksetzen
+      document.getElementById('newMaVorname').value='';
+      document.getElementById('newMaNachname').value='';
+      document.getElementById('newMaEmail').value='';
+      document.getElementById('newMaPw').value='';
+      if(berufSel) berufSel.value='';
+      if(fachSel) fachSel.value='';
+      if(document.getElementById('newMaFachRow')) document.getElementById('newMaFachRow').style.display='none';
+      _pendingNewMaPhoto=null;
+      err.textContent='';
+      closeMaAnlegenModal();
+      const appUrl=isAzubi?'https://ausbilderpro.de/AzubiPro.html':'https://ausbilderpro.de/MitarbeiterPro.html';
+      const shareText='Hallo '+vorname+', du wurdest bei '+(_firma||'AusbilderPro')+' als '+(isAzubi?'Azubi':'Mitarbeiter')+' angelegt.\n\nDeine Zugangsdaten:\nE-Mail: '+email+'\nPasswort: '+pw+'\n\nApp: '+appUrl+'\n\nBitte nach dem ersten Login das Passwort ändern.';
+      showMaShareModal(vorname+' '+nachname, app, appUrl, email, pw, shareText);
+    });
   }).catch(e=>{
-    const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach'};
-    err.textContent='❌ '+(msgs[e.code]||e.message);
+    console.error('MA-Anlage Fehler:',e);
+    const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach','permission-denied':'Keine Berechtigung (Firestore Rules pruefen)'};
+    err.textContent='❌ '+(msgs[e.code]||e.message||'Unbekannter Fehler');
+    // Wenn Auth-User bereits erstellt wurde aber Firestore-Write fehlschlug:
+    // Auth-User wieder loeschen um Inkonsistenz zu vermeiden
+    if(secAuth.currentUser){
+      secAuth.currentUser.delete().catch(()=>{});
+    }
   });
 }
 
