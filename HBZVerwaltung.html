@@ -716,10 +716,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <!-- Kursfortschritt Warnung -->
         <div id="dashCurrWarning" style="display:none;margin-bottom:20px"></div>
 
-        <!-- Letzte Aktivitäten (nur Admin) -->
-        <div class="card" style="margin-bottom:14px;display:none" id="dashActivityCard">
-          <div class="card-title"><span class="card-icon slate" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>Letzte Aktivitäten</div>
-          <div id="dashActivity"><div class="empty">Lädt…</div></div>
+        <!-- Letzte Aktivitäten (nur Admin, aufklappbar) -->
+        <div class="card scard" style="margin-bottom:14px;display:none" id="dashActivityCard" onclick="toggleSCard(this)" title="Aufklappen / Zuklappen">
+          <div class="scard-hdr">
+            <div class="card-title" style="margin:0"><span class="card-icon slate" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>Letzte Aktivitäten</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span class="scard-cnt" id="dashActivityCnt">—</span>
+              <span class="scard-arr">▸</span>
+            </div>
+          </div>
+          <div class="scard-body">
+            <div id="dashActivity"><div class="empty">Lädt…</div></div>
+          </div>
         </div>
 
         <!-- Urlaub Badge -->
@@ -2756,9 +2764,15 @@ function loadActivity(){
   clearInterval(window._activityRefresh);
   window._activityRefresh=setInterval(()=>{if(document.getElementById('page-dashboard')?.classList.contains('active'))loadActivity();},60000);
   db.collection('users').where('lastActive','>',0).orderBy('lastActive','desc').limit(20).get().then(snap=>{
-    if(snap.empty){el.innerHTML='<div class="empty">Keine Aktivitäten</div>';return;}
+    const cntEl=document.getElementById('dashActivityCnt');
+    if(snap.empty){
+      el.innerHTML='<div class="empty">Keine Aktivitäten</div>';
+      if(cntEl) cntEl.textContent='0';
+      return;
+    }
     let html='';
     const now=Date.now();
+    let onlineCnt=0;
     snap.forEach(doc=>{
       const d=doc.data();
       const rawName=d.name||d.firma||d.email||doc.id;
@@ -2767,6 +2781,7 @@ function loadActivity(){
       const app=d.lastApp||'–';
       const ago=d.lastActive?timeAgo(d.lastActive):'–';
       const isOnline=d.lastActive&&(now-d.lastActive)<120000;
+      if(isOnline) onlineCnt++;
       const sessionMin=d.sessionStart&&d.lastActive?Math.floor(((isOnline?now:d.lastActive)-d.sessionStart)/60000):0;
       const sessionTxt=sessionMin>0?(sessionMin<60?sessionMin+'min':Math.floor(sessionMin/60)+'h '+sessionMin%60+'min'):'';
       const sessionCol=isOnline?'#22c55e':'#94a3b8';
@@ -2784,6 +2799,7 @@ function loadActivity(){
         +'</div>';
     });
     el.innerHTML=html;
+    if(cntEl) cntEl.innerHTML=onlineCnt>0?('<span style="color:#22c55e;font-weight:700">'+onlineCnt+' online</span> · '+snap.size):snap.size;
   }).catch(()=>{el.innerHTML='<div class="empty">Fehler beim Laden</div>';});
 }
 
