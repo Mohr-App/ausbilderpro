@@ -1181,24 +1181,23 @@ function doRegister(){
     const uid=cred.user.uid;
     return db.collection('users').doc(uid).set({
       email, role:'arbeitgeber', firma, vorname, nachname, tel,
-      agStatus:'pending', registriertAm:Date.now(),
+      agStatus:'aktiv', registriertAm:Date.now(),
       firmaCode: _generateFirmaCode(firma)
     }).then(()=>{
-      // Admin per E-Mail benachrichtigen
+      // Admin per E-Mail informieren (nicht mehr zur Freischaltung, nur zur Info)
       db.collection('mail').add({
         to:'info@ausbilderpro.de',
         message:{
-          subject:'🏭 Neue Betrieb-Registrierung: '+firma,
-          html:'<b>'+firma+'</b> hat sich als Arbeitgeber registriert.<br><br>'+
+          subject:'🏭 Neuer Betrieb registriert: '+firma,
+          html:'<b>'+firma+'</b> hat sich als Arbeitgeber registriert und ist aktiv.<br><br>'+
             'Ansprechpartner: '+vorname+' '+nachname+'<br>'+
-            'E-Mail: '+email+'<br>'+(tel?'Telefon: '+tel+'<br>':'')+
-            '<br>Bitte in VerwaltungPro → Betriebe freischalten.'
+            'E-Mail: '+email+'<br>'+(tel?'Telefon: '+tel+'<br>':'')
         }
       });
     });
   }).then(()=>{
     err.textContent='';
-    // Auth state change will handle the pending screen
+    // Auth state change leitet direkt in die App (nicht mehr Pending-Screen)
   }).catch(e=>{
     const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach'};
     err.textContent=msgs[e.code]||e.message;
@@ -1216,13 +1215,11 @@ auth.onAuthStateChanged(user=>{
       if(!doc.exists){toast('Kein Zugang','bad');auth.signOut();return;}
       const d=doc.data();
       if(d.role!=='arbeitgeber'&&d.role!=='admin'&&d.role!=='verwaltung'){toast('Kein Arbeitgeber-Zugang','bad');auth.signOut();return;}
+      // Gesperrte User: Zugang verweigern
+      if(d.agStatus==='gesperrt'){toast('Konto gesperrt – bitte info@ausbilderpro.de kontaktieren','bad');auth.signOut();return;}
+      // Alte pending-User automatisch auf aktiv setzen (Migration nach Pending-Flow-Abschaffung)
       if(d.agStatus==='pending'){
-        // Pending screen zeigen
-        document.getElementById('loginWrap').style.display='';
-        document.getElementById('loginForm').style.display='none';
-        document.getElementById('regForm').style.display='none';
-        document.getElementById('pendingScreen').style.display='';
-        return;
+        db.collection('users').doc(user.uid).update({agStatus:'aktiv'}).catch(()=>{});
       }
       // Freigeschaltet → App laden
       document.getElementById('appWrap').style.display='';
