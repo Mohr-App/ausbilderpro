@@ -964,8 +964,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="fg"><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="mtVorname" placeholder="Max"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="mtNachname" placeholder="Mustermann"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Betrieb</label><input class="fi" id="mtBetrieb" placeholder="Firma GmbH"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">Beruf</label><input class="fi" id="mtBeruf" placeholder="Elektroniker"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">Lehrjahr</label><select class="fi" id="mtLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+<div class="fg" style="margin-top:6px"><label class="fl">Berufsgruppe <span style="color:#ef4444">*</span></label><select class="fi" id="mtBerufGruppe" onchange="mtUpdateFachrichtungen()" style="cursor:pointer"><option value="">– Berufsgruppe wählen –</option></select></div>
+<div class="fg" style="margin-top:6px;display:none" id="mtFachWrap"><label class="fl">Fachrichtung</label><select class="fi" id="mtFachrichtung" style="cursor:pointer"><option value="">– Fachrichtung wählen –</option></select></div>
+<div class="fg" style="margin-top:6px"><label class="fl">Lehrjahr <span style="color:#ef4444">*</span></label><select class="fi" id="mtLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
 <div style="display:flex;gap:8px;margin-top:6px">
 <div class="fg" style="flex:1"><label class="fl">E-Mail</label><input class="fi" id="mtEmail" type="email" placeholder="max@firma.de"></div>
 <div class="fg" style="flex:1"><label class="fl">Telefon</label><input class="fi" id="mtTelefon" type="tel" placeholder="0170..."></div>
@@ -4450,11 +4451,15 @@ function openManualTNModal(){
   document.getElementById('mtVorname').value='';
   document.getElementById('mtNachname').value='';
   document.getElementById('mtBetrieb').value='';
-  document.getElementById('mtBeruf').value='';
+  document.getElementById('mtBerufGruppe').value='';
+  document.getElementById('mtFachrichtung').value='';
+  document.getElementById('mtFachWrap').style.display='none';
   document.getElementById('mtLehrjahr').value='';
   document.getElementById('mtEmail').value='';
   document.getElementById('mtTelefon').value='';
   document.getElementById('mtSitzplatz').value='';
+  // Berufsgruppen-Dropdown befuellen (aus Firestore shared/kursSettings/berufe)
+  mtPopulateBerufe();
   document.getElementById('manualTNModal').classList.add('open');
 }
 
@@ -4466,8 +4471,17 @@ function saveManualTN(){
   const nachname=(document.getElementById('mtNachname').value||'').trim();
   if(!vorname||!nachname){toast('Bitte Vor- und Nachname eingeben','bad');return;}
   const firma=(document.getElementById('mtBetrieb').value||'').trim();
-  const beruf=(document.getElementById('mtBeruf').value||'').trim();
+  // Neue Dropdown-Logik: Berufsgruppe + optional Fachrichtung
+  const berufGruppeSel=document.getElementById('mtBerufGruppe');
+  const berufGruppeOpt=berufGruppeSel.selectedOptions[0];
+  const berufGruppeId=berufGruppeOpt?.dataset?.id||'';
+  const berufGruppeName=berufGruppeSel.value||'';
+  const fachrichtung=(document.getElementById('mtFachrichtung').value||'').trim();
+  if(!berufGruppeName){toast('Bitte Berufsgruppe wählen','bad');return;}
+  // Vollständiger Beruf-String: "Elektroniker – Energie- und Gebäudetechnik"
+  const beruf=fachrichtung?(berufGruppeName+' – '+fachrichtung):berufGruppeName;
   const ausbjahr=document.getElementById('mtLehrjahr').value||'';
+  if(!ausbjahr){toast('Bitte Lehrjahr wählen','bad');return;}
   const kontaktEmail=(document.getElementById('mtEmail').value||'').trim();
   const kontaktTelefon=(document.getElementById('mtTelefon').value||'').trim();
   const wunschSitzplatz=(document.getElementById('mtSitzplatz').value||'').trim();
@@ -4476,8 +4490,9 @@ function saveManualTN(){
 
   // globalTN-Dokument erstellen
   const tnData={
-    vorname, nachname, firma, beruf, ausbjahr,
+    vorname, nachname, firma, beruf, berufGruppeId, ausbjahr,
     kontaktEmail, kontaktTelefon, wunschSitzplatz,
+    typ: 'azubi',
     aktiverKursId: kursId,
     kursHistory: [{
       kursId: kursId,
@@ -4494,7 +4509,7 @@ function saveManualTN(){
     // In Kurs-TN-Subcollection eintragen
     return _db.collection('shared').doc('kurse').collection('list').doc(kursId)
       .collection('teilnehmer').doc(ref.id).set({
-        vorname, nachname, firma, beruf, ausbjahr,
+        vorname, nachname, firma, beruf, berufGruppeId, ausbjahr,
         kontaktEmail, kontaktTelefon, wunschSitzplatz,
         status: 'active',
         addedAt: Date.now()
@@ -4504,6 +4519,47 @@ function saveManualTN(){
     toast(vorname+' '+nachname+' hinzugefügt ✓');
     loadPool();
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// Manuell-Modal: Berufsgruppen-Dropdown befüllen (wird beim Öffnen aufgerufen)
+function mtPopulateBerufe(){
+  const sel=document.getElementById('mtBerufGruppe');
+  if(!sel) return;
+  sel.innerHTML='<option value="">– Berufsgruppe wählen –</option>';
+  // Aus Firestore-Daten: shared/kursSettings/berufe
+  if(!_db){ return; }
+  _db.collection('shared').doc('kursSettings').collection('berufe')
+    .orderBy('order').get().then(snap=>{
+      snap.forEach(doc=>{
+        const d=doc.data();
+        if(!d.name) return;
+        const o=document.createElement('option');
+        o.value=d.name;
+        o.textContent=(d.emoji?d.emoji+' ':'')+d.name;
+        o.dataset.id=doc.id;
+        // Fachrichtungen als JSON im data-Attribut zwischenspeichern
+        if(d.berufe&&Array.isArray(d.berufe)) o.dataset.fachs=JSON.stringify(d.berufe);
+        sel.appendChild(o);
+      });
+    }).catch(()=>{});
+}
+
+function mtUpdateFachrichtungen(){
+  const sel=document.getElementById('mtBerufGruppe');
+  const opt=sel.selectedOptions[0];
+  const wrap=document.getElementById('mtFachWrap');
+  const fachSel=document.getElementById('mtFachrichtung');
+  fachSel.innerHTML='<option value="">– Fachrichtung wählen –</option>';
+  if(!opt||!opt.dataset.fachs){ wrap.style.display='none'; return; }
+  let fachs=[];
+  try{ fachs=JSON.parse(opt.dataset.fachs); }catch(e){ fachs=[]; }
+  if(!fachs.length){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  fachs.forEach(f=>{
+    const o=document.createElement('option');
+    o.value=f; o.textContent=f;
+    fachSel.appendChild(o);
+  });
 }
 
 function kursAusfall(){
