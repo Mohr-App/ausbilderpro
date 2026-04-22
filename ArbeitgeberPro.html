@@ -365,7 +365,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px;flex-wrap:wrap">
             <div class="card-title" style="margin:0">⏱ Monatsübersicht</div>
             <div style="display:flex;gap:4px;align-items:center">
-              <button title="📊 DATEV-Export" onclick="exportDATEV()" style="padding:4px 10px;background:#fff;border:1.5px solid #6366f1;border-radius:6px;color:#6366f1;font-size:.58rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📊 DATEV</button>
+              <button title="DATEV-CSV für Lohnbüro: Lohnarten 200/210/220/230/240/250 (Normal, Überstunden, Samstag, Sonntag, Feiertag, Nacht), Pausen, Gleitzeit-Saldo inkl. Übertrag" onclick="exportDATEV()" style="padding:4px 10px;background:#fff;border:1.5px solid #6366f1;border-radius:6px;color:#6366f1;font-size:.58rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📊 DATEV</button>
               <select id="agZeitMonat" onchange="loadAgZeiten()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
             </div>
           </div>
@@ -3917,46 +3917,96 @@ function exportStundenzettel(tnId,name,ym,format){
 function exportDATEV(){
   const ym=document.getElementById('agZeitMonat')?.value||localYM();
   const [y,mo]=ym.split('-').map(Number);
+  // Feiertage auch fuer Vorjahr (wegen Saldo-Uebertrag)
   const feiertage=getNRWFeiertage(y);
+  const feiertageVorjahr=getNRWFeiertage(y-1);
+  const feiertageKombiniert={...feiertageVorjahr,...feiertage};
   toast('📊 DATEV-Export wird erstellt…');
   const tage=new Date(y,mo,0).getDate();
+  const monatsStart=ym+'-01';
+  const monatsEnde=ym+'-'+String(tage).padStart(2,'0');
   const promises=_azubis.map(az=>{
     const plan=az.arbeitszeitPlan||null;
+    // Alle Zeiterfassung bis inkl. Monatsende holen (fuer Saldo-Uebertrag)
     const p1=db.collection('globalTN').doc(az.id).collection('zeiterfassung')
-      .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').get();
+      .where('datum','<=',monatsEnde).get();
     const p2=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
       .where('type','==','krank').get();
     const p3=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
       .where('status','==','genehmigt').get();
     return Promise.all([p1,p2,p3]).then(([zSnap,kSnap,uSnap])=>{
-      const zeitMap={};zSnap.forEach(d=>{zeitMap[d.data().datum]=d.data();});
-      const krankDates=new Set();kSnap.forEach(doc=>{const d=doc.data();if(d.datum&&d.datum.startsWith(ym)) krankDates.add(d.datum);});
+      // Map: datum → eintrag (Abschluss-Docs ohne datum-Feld ueberspringen)
+      const zeitMap={};
+      zSnap.forEach(d=>{
+        const data=d.data();
+        if(data.datum) zeitMap[data.datum]=data;
+      });
+      const krankDates=new Set();kSnap.forEach(doc=>{const d=doc.data();if(d.datum) krankDates.add(d.datum);});
       const urlaubDates=new Set();
       uSnap.forEach(doc=>{
         const d=doc.data();if(!d.von||!d.bis) return;
         const start=new Date(d.von+'T12:00'),end=new Date(d.bis+'T12:00');
         for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){
           const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
-          if(ds.startsWith(ym)&&dt.getDay()!==0&&dt.getDay()!==6) urlaubDates.add(ds);
+          if(dt.getDay()!==0&&dt.getDay()!==6) urlaubDates.add(ds);
         }
       });
-      let istMin=0,sollMin=0,arbeitstage=0;
+
+      // ── SALDO-UEBERTRAG: alle Tage VOR diesem Monat durchrechnen ──
+      let uebertragDiff=0;
+      const alleDaten=Object.keys(zeitMap).sort();
+      alleDaten.forEach(ds=>{
+        if(ds>=monatsStart) return;
+        const e=zeitMap[ds];
+        const ist=e.istMinuten||0;
+        const dow=new Date(ds+'T12:00').getDay();
+        const isWE=dow===0||dow===6;
+        const isFT=!!feiertageKombiniert[ds];
+        const isK=krankDates.has(ds);
+        const isU=urlaubDates.has(ds);
+        let soll=0;
+        if(!isWE&&!isFT&&!isK&&!isU&&plan){
+          const map={0:'so',1:'mo',2:'di',3:'mi',4:'do',5:'fr',6:'sa'};
+          soll=(plan[map[dow]]||0)*60;
+        }
+        uebertragDiff+=(ist-soll);
+      });
+
+      // ── AKTUELLER MONAT: Ist/Soll + Zuschlag-Kategorien ──
+      let istMin=0, sollMin=0, pauseMin=0, arbeitstage=0;
+      // Zuschlag-Minuten separat
+      let samstagMin=0, sonntagMin=0, feiertagMin=0, nachtMin=0;
       for(let d=1;d<=tage;d++){
         const ds=ym+'-'+String(d).padStart(2,'0');
         const e=zeitMap[ds];
         const dow=new Date(ds+'T12:00').getDay();
-        const isWE=dow===0||dow===6;
+        const isSa=dow===6, isSo=dow===0;
         const isFT=!!feiertage[ds];
         const isK=krankDates.has(ds);
         const isU=urlaubDates.has(ds);
         if(e?.istMinuten) istMin+=e.istMinuten;
+        if(e?.pauseMinuten) pauseMin+=e.pauseMinuten;
         if(e?.ausgang) arbeitstage++;
-        if(!isWE&&!isFT&&!isK&&!isU&&plan){
+        if(!isSa&&!isSo&&!isFT&&!isK&&!isU&&plan){
           const map={0:'so',1:'mo',2:'di',3:'mi',4:'do',5:'fr',6:'sa'};
           sollMin+=(plan[map[dow]]||0)*60;
         }
+        // Zuschlag-Kategorisierung: gearbeitete Minuten pro Tag
+        if(e?.istMinuten){
+          if(isFT) feiertagMin+=e.istMinuten;
+          else if(isSo) sonntagMin+=e.istMinuten;
+          else if(isSa) samstagMin+=e.istMinuten;
+          // Nacht-Minuten: Intervall 22:00-06:00 aus eingang/ausgang rechnen
+          if(e.eingang && e.ausgang){
+            nachtMin+=_computeNachtMin(ds, e.eingang, e.ausgang, e.pauseMinuten||0);
+          }
+        }
       }
+
       const name=((az.vorname||'')+' '+(az.nachname||'')).trim();
+      const feierTageMonat=Object.keys(feiertage).filter(d=>d.startsWith(ym)&&new Date(d+'T12:00').getDay()!==0&&new Date(d+'T12:00').getDay()!==6).length;
+      const totalDiff=istMin-sollMin;
+      const gesamtSaldo=uebertragDiff+totalDiff;
       return {
         pnr:az.id.substring(0,8).toUpperCase(),
         name, firma:_firma||'',
@@ -3964,27 +4014,80 @@ function exportDATEV(){
         arbeitstage,
         istStd:(istMin/60).toFixed(2),
         sollStd:(sollMin/60).toFixed(2),
-        diffStd:((istMin-sollMin)/60).toFixed(2),
+        pauseStd:(pauseMin/60).toFixed(2),
+        diffStd:(totalDiff/60).toFixed(2),
+        uebertragStd:(uebertragDiff/60).toFixed(2),
+        gesamtSaldoStd:(gesamtSaldo/60).toFixed(2),
+        samstagStd:(samstagMin/60).toFixed(2),
+        sonntagStd:(sonntagMin/60).toFixed(2),
+        feiertagStd:(feiertagMin/60).toFixed(2),
+        nachtStd:(nachtMin/60).toFixed(2),
         krankTage:krankDates.size,
         urlaubTage:urlaubDates.size,
-        feierTage:Object.keys(feiertage).filter(d=>d.startsWith(ym)&&new Date(d+'T12:00').getDay()!==0&&new Date(d+'T12:00').getDay()!==6).length
+        feierTage:feierTageMonat
       };
     });
   });
   Promise.all(promises).then(rows=>{
-    const header=['Personalnummer','Name','Firma','Zeitraum','Arbeitstage','Ist-Stunden','Soll-Stunden','Differenz','Lohnart 200 (Normal)','Lohnart 210 (Überstd.)','Krankheitstage','Urlaubstage','Feiertage'];
+    const header=[
+      'Personalnummer','Name','Firma','Zeitraum','Arbeitstage',
+      'Ist-Stunden','Pause (Std.)','Soll-Stunden','Differenz',
+      'Saldo-Übertrag','Gesamt-Saldo',
+      'Lohnart 200 (Normal)','Lohnart 210 (Überstd.)',
+      'Lohnart 220 (Samstag)','Lohnart 230 (Sonntag)',
+      'Lohnart 240 (Feiertag)','Lohnart 250 (Nacht 22-6)',
+      'Krankheitstage','Urlaubstage','Feiertage'
+    ];
     const csv=[header.join(';')];
     rows.forEach(r=>{
-      const normal=Math.min(parseFloat(r.istStd),parseFloat(r.sollStd));
+      const normal=Math.max(0,Math.min(parseFloat(r.istStd),parseFloat(r.sollStd)));
       const ueberStd=Math.max(0,parseFloat(r.istStd)-parseFloat(r.sollStd));
-      csv.push([r.pnr,r.name,r.firma,r.zeitraum,r.arbeitstage,r.istStd,r.sollStd,r.diffStd,normal.toFixed(2),ueberStd.toFixed(2),r.krankTage,r.urlaubTage,r.feierTage].join(';'));
+      csv.push([
+        r.pnr,r.name,r.firma,r.zeitraum,r.arbeitstage,
+        r.istStd,r.pauseStd,r.sollStd,r.diffStd,
+        r.uebertragStd,r.gesamtSaldoStd,
+        normal.toFixed(2),ueberStd.toFixed(2),
+        r.samstagStd,r.sonntagStd,r.feiertagStd,r.nachtStd,
+        r.krankTage,r.urlaubTage,r.feierTage
+      ].join(';'));
     });
     const blob=new Blob(['\ufeff'+csv.join('\n')],{type:'text/csv;charset=utf-8'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);
     a.download='DATEV_'+(_firma||'Export').replace(/\s/g,'_')+'_'+ym+'.csv';
     a.click();URL.revokeObjectURL(a.href);
     toast('📊 DATEV-Export heruntergeladen ('+rows.length+' Mitarbeiter)');
-  });
+  }).catch(e=>{toast('Fehler: '+(e.message||e),'bad');});
+}
+
+// Berechnet Nacht-Minuten (22:00-06:00) innerhalb eines Arbeitstags
+// Pausen werden proportional abgezogen (einfache Heuristik)
+function _computeNachtMin(datum, eingang, ausgang, pauseMin){
+  if(!eingang||!ausgang) return 0;
+  const [einH,einM]=eingang.split(':').map(Number);
+  const [ausH,ausM]=ausgang.split(':').map(Number);
+  if(isNaN(einH)||isNaN(ausH)) return 0;
+  let einMin=einH*60+einM;
+  let ausMin=ausH*60+ausM;
+  // Ausgang < Eingang → über Mitternacht
+  if(ausMin<einMin) ausMin+=24*60;
+  // Nacht-Intervalle pro 24h-Fenster: 0-6 und 22-30 (also 22:00 nächster Tag)
+  let nachtMin=0;
+  // Intervall [0,6]
+  const a1=Math.max(einMin,0), b1=Math.min(ausMin,6*60);
+  if(b1>a1) nachtMin+=b1-a1;
+  // Intervall [22,30]
+  const a2=Math.max(einMin,22*60), b2=Math.min(ausMin,30*60);
+  if(b2>a2) nachtMin+=b2-a2;
+  // Intervall [24+0, 24+6] (bei sehr langer Schicht)
+  const a3=Math.max(einMin,24*60), b3=Math.min(ausMin,24*60+6*60);
+  if(b3>a3&&b3-a3>nachtMin) nachtMin=Math.max(nachtMin,b3-a3);
+  // Pause proportional abziehen (vereinfachte Heuristik)
+  const totalMin=ausMin-einMin;
+  if(totalMin>0 && pauseMin>0 && nachtMin>0){
+    const pauseAnteil=Math.round(pauseMin*(nachtMin/totalMin));
+    nachtMin-=pauseAnteil;
+  }
+  return Math.max(0,nachtMin);
 }
 
 function monatsAbschluss(tnId,name,ym){
