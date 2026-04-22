@@ -214,16 +214,69 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="font-size:1.1rem;font-weight:800;margin-bottom:4px" id="greetName">Hallo!</div>
       <div style="font-size:.68rem;color:var(--mu);font-family:'JetBrains Mono',monospace;margin-bottom:16px" id="greetDate"></div>
       <div id="notifBanner"></div>
-      <!-- Kanal-Karten -->
-      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
-        <button onclick="showPage('betrieb')" style="width:100%;padding:20px;background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(16,185,129,.02));border:1.5px solid rgba(16,185,129,.2);border-radius:16px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:14px;font-family:'Sora',sans-serif;color:var(--tx)" title="Mein Betrieb">
-          <span style="font-size:2rem">🏭</span>
-          <div>
-            <div style="font-size:.95rem;font-weight:800">Mein Betrieb</div>
-            <div style="font-size:.65rem;color:var(--mu);margin-top:2px">Zeiten · Aufträge · Urlaub · Meldungen</div>
+
+      <!-- Firmencode eingeben - wenn noch nicht verknüpft -->
+      <div class="card" id="firmaCodeInputHome" style="margin-bottom:10px;display:none">
+        <div class="card-title">🔗 Firmencode eingeben</div>
+        <div id="firmaCodeStatusHome" style="font-size:.72rem;color:var(--mu);margin-bottom:6px;line-height:1.5">Dein Betrieb hat einen Code für dich. Gib ihn hier ein, um dich sicher mit deinem Arbeitgeber zu verknüpfen.</div>
+        <input class="fi" id="firmaCodeInpHome" type="text" placeholder="z.B. ESM-7X3K" maxlength="10" style="width:100%;font-size:1.1rem;padding:14px 16px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.1em;text-align:center;border:2px solid rgba(37,99,235,.3);border-radius:8px;margin-bottom:8px;box-sizing:border-box" autocomplete="off">
+        <button class="btn" onclick="submitFirmaCodeHome()" style="width:100%;padding:12px;font-weight:700;font-size:.88rem">✓ Verknüpfen</button>
+        <div id="firmaCodeErrHome" style="font-size:.68rem;margin-top:4px"></div>
+      </div>
+
+      <!-- AG Hinweis wenn kein Betrieb verknüpft -->
+      <div id="agHintBannerHome" style="display:none">
+        <div style="text-align:center;padding:30px 16px">
+          <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(5,150,105,.1));display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           </div>
-          <span style="margin-left:auto;font-size:1.2rem;color:var(--mu)">→</span>
-        </button>
+          <div style="font-size:1rem;font-weight:800;color:var(--tx);margin-bottom:6px">Betrieb noch nicht verbunden</div>
+          <div style="font-size:.74rem;color:#475569;line-height:1.7;margin-bottom:20px;max-width:300px;margin-left:auto;margin-right:auto">Zeiterfassung, Aufträge, Urlaub und Meldungen stehen dir zur Verfügung, sobald dein Arbeitgeber ebenfalls die App nutzt.</div>
+        </div>
+      </div>
+
+      <!-- ZEIT-STEMPEL (Hauptfunktion) -->
+      <div id="homeZeitContent">
+        <div class="card" id="zeitStempelCard">
+          <div style="text-align:center;margin-bottom:12px">
+            <div style="font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace" id="zeitDatumHeute"></div>
+            <div style="font-size:2.5rem;font-weight:800;font-family:'JetBrains Mono',monospace;margin:8px 0" id="zeitUhr">--:--</div>
+            <div id="zeitStatus" style="font-size:.75rem;color:var(--mu)">Nicht eingestempelt</div>
+          </div>
+          <button id="zeitBtn" style="width:100%;padding:16px;border:none;border-radius:14px;font-size:1rem;font-weight:800;cursor:pointer;font-family:'Sora',sans-serif;background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.3);position:relative;overflow:hidden;user-select:none;-webkit-user-select:none" title="1 Sekunde gedrückt halten zum Stempeln"><span id="zeitBtnBar" style="position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.25);border-radius:14px;transition:none;pointer-events:none"></span><span id="zeitBtnText" style="position:relative">▶ Einstempeln</span></button>
+          <div style="text-align:center;font-size:.58rem;color:var(--mu);margin-top:4px">1 Sekunde gedrückt halten</div>
+          <div id="zeitPauseRow" style="display:none;margin-top:8px">
+            <button onclick="zeitPause()" id="zeitPauseBtn" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;background:rgba(245,158,11,.15);color:#d97706;border:1.5px solid rgba(245,158,11,.3)" title="Pause">⏸ Pause starten</button>
+          </div>
+        </div>
+        <!-- Wochenarbeitszeit (vom AG festgelegt) -->
+        <div class="card" id="azPlanCard">
+          <div class="card-title" style="margin-bottom:6px">⏱ Wochenarbeitszeit</div>
+          <div id="azPlanDisplay" style="font-size:.72rem;color:var(--mu)">Lädt…</div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 Heute</div>
+          <div id="zeitHeute"><div class="empty">Noch keine Einträge</div></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div class="card-title" style="margin:0">📅 Zeitkonto</div>
+            <select id="zeitMonat" onchange="loadZeitkonto()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+          </div>
+          <div id="zeitKonto"><div class="empty">Lädt…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">✏ Zeit nachtragen</div>
+          <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Vergessen einzustempeln? Trage die Zeit manuell nach – dein Betrieb muss den Eintrag bestätigen.</div>
+          <div><label class="fl">Datum</label><input class="fi" type="date" id="zeitNachDatum" style="font-size:.76rem"></div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <div style="flex:1"><label class="fl">Eingang</label><input class="fi" type="time" id="zeitNachEin" style="font-size:.76rem"></div>
+            <div style="flex:1"><label class="fl">Ausgang</label><input class="fi" type="time" id="zeitNachAus" style="font-size:.76rem"></div>
+          </div>
+          <div><label class="fl">Bemerkung (optional)</label><input class="fi" id="zeitNachBem" placeholder="z.B. Stempeln vergessen" style="font-size:.76rem"></div>
+          <button class="btn" onclick="zeitNachtragen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px" title="Zeit nachtragen">✏ Nachtragen (AG-Bestätigung nötig)</button>
+          <div class="err" id="zeitNachErr" style="margin-top:4px"></div>
+        </div>
       </div>
     </div>
 
@@ -322,8 +375,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div id="betriebContent">
       <!-- Sub-Tabs -->
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="betriebTabs">
-        <button class="stab active" onclick="showBetriebTab('zeiten')" title="Zeiten anzeigen">Zeiten</button>
-        <button class="stab" onclick="showBetriebTab('baustellen')" title="Aufträge anzeigen">Aufträge</button>
+        <button class="stab active" onclick="showBetriebTab('baustellen')" title="Aufträge anzeigen">Aufträge</button>
         <button class="stab" onclick="showBetriebTab('urlaub')" title="Urlaub anzeigen">Urlaub</button>
         <button class="stab" onclick="showBetriebTab('meldung')" title="Meldungen anzeigen">Meldungen</button>
       </div>
@@ -347,49 +399,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div id="betriebMeldListe"><div class="empty">Keine Meldungen</div></div>
         </div>
       </div>
-      <!-- Zeiten -->
-      <div class="btab active" id="btab-zeiten">
-        <div class="card" id="zeitStempelCard">
-          <div style="text-align:center;margin-bottom:12px">
-            <div style="font-size:.65rem;color:var(--mu);font-family:'JetBrains Mono',monospace" id="zeitDatumHeute"></div>
-            <div style="font-size:2.5rem;font-weight:800;font-family:'JetBrains Mono',monospace;margin:8px 0" id="zeitUhr">--:--</div>
-            <div id="zeitStatus" style="font-size:.75rem;color:var(--mu)">Nicht eingestempelt</div>
-          </div>
-          <button id="zeitBtn" style="width:100%;padding:16px;border:none;border-radius:14px;font-size:1rem;font-weight:800;cursor:pointer;font-family:'Sora',sans-serif;background:linear-gradient(135deg,#059669,#10b981);color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.3);position:relative;overflow:hidden;user-select:none;-webkit-user-select:none" title="1 Sekunde gedrückt halten zum Stempeln"><span id="zeitBtnBar" style="position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.25);border-radius:14px;transition:none;pointer-events:none"></span><span id="zeitBtnText" style="position:relative">▶ Einstempeln</span></button>
-          <div style="text-align:center;font-size:.58rem;color:var(--mu);margin-top:4px">1 Sekunde gedrückt halten</div>
-          <div id="zeitPauseRow" style="display:none;margin-top:8px">
-            <button onclick="zeitPause()" id="zeitPauseBtn" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;background:rgba(245,158,11,.15);color:#d97706;border:1.5px solid rgba(245,158,11,.3)" title="Pause">⏸ Pause starten</button>
-          </div>
-        </div>
-        <!-- Wochenarbeitszeit (vom AG festgelegt) -->
-        <div class="card" id="azPlanCard">
-          <div class="card-title" style="margin-bottom:6px">⏱ Wochenarbeitszeit</div>
-          <div id="azPlanDisplay" style="font-size:.72rem;color:var(--mu)">Lädt…</div>
-        </div>
-        <div class="card">
-          <div class="card-title">📊 Heute</div>
-          <div id="zeitHeute"><div class="empty">Noch keine Einträge</div></div>
-        </div>
-        <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div class="card-title" style="margin:0">📅 Zeitkonto</div>
-            <select id="zeitMonat" onchange="loadZeitkonto()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
-          </div>
-          <div id="zeitKonto"><div class="empty">Lädt…</div></div>
-        </div>
-        <div class="card">
-          <div class="card-title">✏ Zeit nachtragen</div>
-          <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Vergessen einzustempeln? Trage die Zeit manuell nach – dein Betrieb muss den Eintrag bestätigen.</div>
-          <div><label class="fl">Datum</label><input class="fi" type="date" id="zeitNachDatum" style="font-size:.76rem"></div>
-          <div style="display:flex;gap:6px;margin-bottom:6px">
-            <div style="flex:1"><label class="fl">Eingang</label><input class="fi" type="time" id="zeitNachEin" style="font-size:.76rem"></div>
-            <div style="flex:1"><label class="fl">Ausgang</label><input class="fi" type="time" id="zeitNachAus" style="font-size:.76rem"></div>
-          </div>
-          <div><label class="fl">Bemerkung (optional)</label><input class="fi" id="zeitNachBem" placeholder="z.B. Stempeln vergessen" style="font-size:.76rem"></div>
-          <button class="btn" onclick="zeitNachtragen()" style="margin-top:4px;width:100%;font-size:.78rem;padding:10px" title="Zeit nachtragen">✏ Nachtragen (AG-Bestätigung nötig)</button>
-          <div class="err" id="zeitNachErr" style="margin-top:4px"></div>
-        </div>
-      </div>
+      <!-- Zeiten jetzt auf Home-Seite, nicht mehr hier -->
       <!-- Urlaub -->
       <div class="btab" id="btab-urlaub">
         <div class="card">
@@ -416,7 +426,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
       <!-- Aufträge -->
-      <div class="btab" id="btab-baustellen">
+      <div class="btab active" id="btab-baustellen">
         <div class="card">
           <div class="card-title">+ Eigenen Auftrag anlegen</div>
           <div><label class="fl">Kunde</label><input class="fi" id="selfAufKunde" list="kundenList" placeholder="z.B. Familie Müller" style="font-size:.76rem" onchange="autoFillAdresse(this.value)"><datalist id="kundenList"></datalist></div>
@@ -946,6 +956,7 @@ function showPage(id){
   if(id==='docs') loadDocs();
   if(id==='profil'){ loadProfil(); loadAzubiUrlaub(); }
   if(id==='betrieb') initBetrieb();
+  if(id==='home') initHomeZeiten();
 }
 
 // ── Load Data ──
@@ -967,6 +978,7 @@ function loadData(){
   checkDsgvoConsent();
   checkAzubiBadges();
   checkFirmaCodeUI();
+  initHomeZeiten();
 
   // Live-Listener auf TN-Dokument – Echtzeit-Benachrichtigungen
   if(_tnId&&!_tnDocUnsub){
@@ -980,6 +992,64 @@ function loadData(){
   }
 }
 let _tnDocUnsub=null;
+
+// ═══════════════════════════════════
+// HOME: ZEITERFASSUNG + FIRMENCODE
+// ═══════════════════════════════════
+let _homeZeitInit=false;
+function initHomeZeiten(){
+  const codeCard=document.getElementById('firmaCodeInputHome');
+  const agBanner=document.getElementById('agHintBannerHome');
+  const zeitContent=document.getElementById('homeZeitContent');
+  const hasAG=_tnData&&(_tnData.arbeitgeberId||_tnData.betriebId||_tnData.arbeitszeitPlan||_tnData.firma||_tnData.firmaUid);
+
+  if(hasAG){
+    // Verknüpft → Zeiten-Stempel zeigen, Firmencode/Banner verstecken
+    if(codeCard) codeCard.style.display='none';
+    if(agBanner) agBanner.style.display='none';
+    if(zeitContent) zeitContent.style.display='block';
+    if(!_homeZeitInit){
+      _homeZeitInit=true;
+      if(typeof initZeiten==='function') initZeiten();
+    }
+  } else {
+    // Nicht verknüpft → Firmencode-Eingabe + Hinweis anzeigen, Zeiten verstecken
+    if(codeCard) codeCard.style.display='block';
+    if(agBanner) agBanner.style.display='block';
+    if(zeitContent) zeitContent.style.display='none';
+  }
+}
+
+// Firmencode Home: delegiert an die bestehende submitFirmaCode-Logik mit
+// eigenem Input/Err-Feld
+function submitFirmaCodeHome(){
+  const inp=document.getElementById('firmaCodeInpHome');
+  const err=document.getElementById('firmaCodeErrHome');
+  const code=(inp?.value||'').trim().toUpperCase();
+  if(!code){ if(err) err.textContent='Bitte Firmencode eingeben'; return; }
+  if(err){ err.textContent='Prüfe…'; err.style.color='var(--mu)'; }
+  // Suche users-Doc mit matching firmaCode
+  db.collection('users').where('firmaCode','==',code).limit(1).get().then(snap=>{
+    if(snap.empty){ if(err){err.textContent='❌ Firmencode ungültig';err.style.color='#ef4444';} return; }
+    const agDoc=snap.docs[0];
+    const agUid=agDoc.id;
+    const agFirma=agDoc.data().firma||'';
+    // Teilnehmer-Dokument aktualisieren
+    db.collection('globalTN').doc(_tnId).update({
+      firmaUid:agUid,
+      firma:agFirma
+    }).then(()=>{
+      if(err){err.textContent='✓ Erfolgreich mit '+agFirma+' verknüpft';err.style.color='#059669';}
+      if(inp) inp.value='';
+      // _tnData wird durch onSnapshot automatisch aktualisiert
+      setTimeout(()=>{ initHomeZeiten(); }, 500);
+    }).catch(e=>{
+      if(err){err.textContent='❌ '+e.message;err.style.color='#ef4444';}
+    });
+  }).catch(e=>{
+    if(err){err.textContent='❌ '+e.message;err.style.color='#ef4444';}
+  });
+}
 
 // ═══════════════════════════════════
 // BETRIEB-KANAL
@@ -998,12 +1068,11 @@ function initBetrieb(){
   checkAzubiBadges();
   // Aktuellen Sub-Tab initialisieren
   const active=document.querySelector('.btab.active');
-  if(active&&active.id==='btab-zeiten') initZeiten();
   if(active&&active.id==='btab-urlaub') initUrlaub();
   if(active&&active.id==='btab-baustellen') loadAuftraege();
   if(active&&active.id==='btab-meldung') loadBetriebMeldungen();
-  // Default: Zeiten initialisieren
-  if(!active||active.id==='btab-zeiten') initZeiten();
+  // Default: Auftraege laden
+  if(!active||active.id==='btab-baustellen') loadAuftraege();
 }
 
 function checkAzubiBadges(){
@@ -1051,10 +1120,9 @@ function setAzBadge(elId, count){
 
 function showBetriebTab(tab){
   document.querySelectorAll('.btab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.stab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#betriebTabs .stab').forEach(t=>t.classList.remove('active'));
   document.getElementById('btab-'+tab).classList.add('active');
   event.target.classList.add('active');
-  if(tab==='zeiten') initZeiten();
   if(tab==='urlaub') initUrlaub();
   if(tab==='baustellen') loadAuftraege();
   if(tab==='meldung') loadBetriebMeldungen();
