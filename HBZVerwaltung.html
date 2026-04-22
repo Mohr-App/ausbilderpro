@@ -5630,7 +5630,14 @@ function loadBerufe(){
 function loadGlobalTN(){
   db.collection('globalTN').orderBy('nachname').onSnapshot(snap=>{
     _globalTN=[];
-    snap.forEach(doc=>_globalTN.push({id:doc.id,...doc.data()}));
+    snap.forEach(doc=>{
+      const d=doc.data();
+      // VP zeigt nur Azubis und TN aus Bildungsmaßnahmen.
+      // Arbeitnehmer (typ='arbeitnehmer') gehoeren ausschliesslich zum AG
+      // und werden hier nicht angezeigt.
+      if(d.typ==='arbeitnehmer') return;
+      _globalTN.push({id:doc.id,...d});
+    });
     collectFirmen();
     updateKursTNCounts();
     renderSbTnTree();
