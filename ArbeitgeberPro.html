@@ -356,6 +356,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto" id="agAusTabs">
         <button class="stab active" data-tab="monat" title="Monat" onclick="showAgAusTab('monat')">Monat</button>
         <button class="stab" data-tab="auftraege" title="Aufträge" onclick="showAgAusTab('auftraege')">Aufträge</button>
+        <button class="stab" data-tab="belege" title="Belege" onclick="showAgAusTab('belege')">💶 Belege</button>
         <button class="stab" data-tab="urlaub" title="Urlaub" onclick="showAgAusTab('urlaub')">Urlaub</button>
       </div>
 
@@ -385,6 +386,27 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           </div>
           <div style="font-size:.62rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Auswertung pro Mitarbeiter: Stunden aus erledigten Aufträgen dieses Monats. Hauptauftrag und Nachträge (Zusatzaufträge) werden getrennt ausgewiesen — relevant für Kundenabrechnung und Deckungsbeitrag.</div>
           <div id="agAuftragsListe"><div class="empty">Lädt…</div></div>
+        </div>
+      </div>
+
+      <!-- AUSWERTUNG: Belege (Abrechnungsbelege) -->
+      <div class="abtab" id="abtab-belege">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px;flex-wrap:wrap">
+            <div class="card-title" style="margin:0">💶 Abrechnungsbelege</div>
+            <div style="display:flex;gap:4px;align-items:center">
+              <select id="belegFilter" onchange="loadBelege()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'Sora',sans-serif">
+                <option value="alle">Alle</option>
+                <option value="offen">Offen</option>
+                <option value="bezahlt">Bezahlt</option>
+                <option value="storniert">Storniert</option>
+              </select>
+              <button onclick="openBelegEditor()" style="padding:6px 12px;background:linear-gradient(135deg,#2563eb,#059669);border:none;border-radius:6px;color:#fff;font-size:.65rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">+ Neuer Beleg</button>
+            </div>
+          </div>
+          <div style="font-size:.62rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Belege werden aus erledigten Aufträgen generiert und als PDF/E-Mail verschickt. <b>Keine Rechnungen im Sinne §14 UStG</b> — bitte in Ihr offizielles Fakturaprogramm übernehmen.</div>
+          <div id="belegStats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px"></div>
+          <div id="belegListe"><div class="empty">Lädt…</div></div>
         </div>
       </div>
 
@@ -568,6 +590,73 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           </div>
 
           <div style="margin-top:10px;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:.6rem;color:#92400e;line-height:1.5"><b>Reihenfolge im PDF:</b> Bild (wenn gesetzt) → Text (wenn gesetzt) → Firmenname (Fallback)</div>
+        </div>
+      </details>
+
+      <details class="coll-card">
+        <summary>💶 Abrechnung (Belege &amp; Faktura-Vorbereitung)</summary>
+        <div class="coll-body">
+          <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Grundeinstellungen für die Erzeugung von <b>Abrechnungsbelegen</b>. Die Belege dienen als Vorlage zur Übernahme in dein Fakturaprogramm (lexoffice, DATEV, SevDesk). <i>Keine Rechnung im Sinne des §14 UStG.</i></div>
+
+          <!-- Steuer-Status -->
+          <div style="padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">
+            <div style="font-size:.66rem;font-weight:700;color:var(--mu);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Umsatzsteuer</div>
+            <label style="display:flex;align-items:flex-start;gap:8px;padding:8px;background:#fff;border:1px solid var(--brd);border-radius:6px;margin-bottom:6px;cursor:pointer">
+              <input type="radio" name="abrStatus" value="klein" id="abrStatusKlein" onchange="saveAbrSettings()" style="margin-top:2px">
+              <div><div style="font-size:.72rem;font-weight:700">Kleinunternehmer (§19 UStG)</div><div style="font-size:.6rem;color:var(--mu);margin-top:2px">Kein MwSt-Ausweis. Hinweis wird automatisch auf jedem Beleg vermerkt.</div></div>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:8px;padding:8px;background:#fff;border:1px solid var(--brd);border-radius:6px;cursor:pointer">
+              <input type="radio" name="abrStatus" value="regel" id="abrStatusRegel" onchange="saveAbrSettings()" style="margin-top:2px">
+              <div><div style="font-size:.72rem;font-weight:700">Regelbesteuerung (19% / 7%)</div><div style="font-size:.6rem;color:var(--mu);margin-top:2px">MwSt wird ausgewiesen. Standardsatz einstellbar.</div></div>
+            </label>
+          </div>
+
+          <!-- MwSt-Satz (nur bei Regel) -->
+          <div id="abrMwstWrap" style="padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px;display:none">
+            <div style="font-size:.66rem;font-weight:700;color:var(--mu);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Standard-MwSt-Satz</div>
+            <select id="abrMwstSatz" onchange="saveAbrSettings()" style="width:100%;padding:8px;border:1.5px solid var(--brd);border-radius:6px;font-size:.74rem;font-family:'Sora',sans-serif;background:#fff">
+              <option value="19">19% (Regelsatz – Elektroarbeiten, Handwerk)</option>
+              <option value="7">7% (ermäßigt – z.B. bei bestimmten Lieferungen)</option>
+              <option value="0">0% (steuerfrei, z.B. EU-Lieferung)</option>
+            </select>
+            <div style="font-size:.58rem;color:var(--mu);margin-top:4px;font-style:italic">Pro Beleg überschreibbar.</div>
+          </div>
+
+          <!-- Zahlungsziel -->
+          <div style="padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">
+            <div style="font-size:.66rem;font-weight:700;color:var(--mu);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Standard-Zahlungsziel</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="number" id="abrZahlungsziel" min="0" max="90" onchange="saveAbrSettings()" style="flex:1;padding:8px;border:1.5px solid var(--brd);border-radius:6px;font-size:.74rem;font-family:'JetBrains Mono',monospace;background:#fff" placeholder="14">
+              <span style="font-size:.7rem;color:var(--mu)">Tage nach Belegdatum</span>
+            </div>
+            <div style="font-size:.58rem;color:var(--mu);margin-top:4px;font-style:italic">Pro Beleg überschreibbar. Typisch: 14 oder 30 Tage.</div>
+          </div>
+
+          <!-- Bankdaten -->
+          <div style="padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">
+            <div style="font-size:.66rem;font-weight:700;color:var(--mu);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Bankdaten (werden unten auf Beleg angezeigt)</div>
+            <input type="text" id="abrBankName" onchange="saveAbrSettings()" placeholder="Bankname (z.B. Sparkasse Bonn)" style="width:100%;padding:8px;border:1.5px solid var(--brd);border-radius:6px;font-size:.72rem;font-family:'Sora',sans-serif;background:#fff;margin-bottom:6px">
+            <input type="text" id="abrIBAN" onchange="saveAbrSettings()" placeholder="IBAN (DE12 3456 7890 1234 5678 90)" style="width:100%;padding:8px;border:1.5px solid var(--brd);border-radius:6px;font-size:.72rem;font-family:'JetBrains Mono',monospace;background:#fff;margin-bottom:6px">
+            <input type="text" id="abrBIC" onchange="saveAbrSettings()" placeholder="BIC (optional, z.B. COLSDE33XXX)" style="width:100%;padding:8px;border:1.5px solid var(--brd);border-radius:6px;font-size:.72rem;font-family:'JetBrains Mono',monospace;background:#fff">
+          </div>
+
+          <!-- Standard-Stundensatz -->
+          <div style="padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">
+            <div style="font-size:.66rem;font-weight:700;color:var(--mu);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Stundensatz &amp; Material-Aufschlag</div>
+            <div style="display:flex;gap:8px;margin-bottom:6px">
+              <div style="flex:1">
+                <input type="number" id="abrStundensatz" min="0" step="0.5" onchange="saveAbrSettings()" placeholder="Stundensatz netto" style="width:100%;padding:8px;border:1.5px solid var(--brd);border-radius:6px;font-size:.72rem;font-family:'JetBrains Mono',monospace;background:#fff">
+                <div style="font-size:.55rem;color:var(--mu);margin-top:2px">€ pro Arbeitsstunde (netto)</div>
+              </div>
+              <div style="flex:1">
+                <input type="number" id="abrMaterialAufschlag" min="0" max="100" step="1" onchange="saveAbrSettings()" placeholder="0" style="width:100%;padding:8px;border:1.5px solid var(--brd);border-radius:6px;font-size:.72rem;font-family:'JetBrains Mono',monospace;background:#fff">
+                <div style="font-size:.55rem;color:var(--mu);margin-top:2px">% Aufschlag auf Material</div>
+              </div>
+            </div>
+            <div style="font-size:.58rem;color:var(--mu);font-style:italic">Wird zur automatischen Preisberechnung bei Übernahme aus Aufträgen verwendet.</div>
+          </div>
+
+          <div style="padding:8px 10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:6px;font-size:.6rem;color:#92400e;line-height:1.5"><b>⚠ Wichtig:</b> Das Tool erstellt <b>Abrechnungsbelege</b>, keine rechtsgültigen Rechnungen. Übertrage die Daten in dein offizielles Fakturaprogramm (lexoffice, DATEV, SevDesk) für die finale Rechnung.</div>
         </div>
       </details>
 
@@ -853,7 +942,73 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </div>
   </div>
 </div>
-<!-- DOKU-VIEWER -->
+<!-- BELEG-MODAL (Editor für Abrechnungsbelege) -->
+<div id="belegModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto">
+  <div style="background:#fff;border-radius:16px;max-width:640px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden;margin:auto">
+    <div style="padding:18px 20px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:.95rem;font-weight:800">💶 <span id="belegModalTitle">Neuer Abrechnungsbeleg</span></div>
+      <button onclick="closeBelegModal()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);font-size:.95rem;cursor:pointer;color:#fff;padding:4px 10px;border-radius:6px;font-family:'Sora',sans-serif" title="Schließen">✕</button>
+    </div>
+    <div style="padding:18px 20px;max-height:calc(100vh - 140px);overflow-y:auto">
+
+      <!-- KUNDE -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:.62rem;font-weight:700;color:var(--mu);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">1. Kunde</div>
+        <input type="text" id="belKundeName" placeholder="Kundenname / Firma" style="width:100%;padding:8px 10px;border:1.5px solid var(--brd);border-radius:6px;font-size:.74rem;font-family:'Sora',sans-serif;margin-bottom:6px">
+        <textarea id="belKundeAnschrift" rows="2" placeholder="Straße, PLZ Ort" style="width:100%;padding:8px 10px;border:1.5px solid var(--brd);border-radius:6px;font-size:.74rem;font-family:'Sora',sans-serif;resize:vertical;margin-bottom:6px"></textarea>
+        <div style="display:flex;gap:6px">
+          <input type="email" id="belKundeEmail" placeholder="E-Mail (für Versand)" style="flex:1;padding:8px 10px;border:1.5px solid var(--brd);border-radius:6px;font-size:.72rem;font-family:'Sora',sans-serif">
+          <input type="tel" id="belKundeTel" placeholder="Telefon (optional)" style="flex:1;padding:8px 10px;border:1.5px solid var(--brd);border-radius:6px;font-size:.72rem;font-family:'Sora',sans-serif">
+        </div>
+      </div>
+
+      <!-- AUFTRÄGE AUSWÄHLEN -->
+      <div style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:.62rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em">2. Aus Aufträgen übernehmen</div>
+          <button onclick="_reloadBelegAuftraege()" style="background:none;border:1px solid var(--brd);border-radius:4px;padding:2px 8px;font-size:.56rem;color:var(--mu);cursor:pointer;font-family:'Sora',sans-serif">↻ aktualisieren</button>
+        </div>
+        <div style="font-size:.58rem;color:var(--mu);margin-bottom:6px;line-height:1.4">Erledigte Aufträge, die noch nicht abgerechnet sind. Ausgewählte werden als Positionen übernommen.</div>
+        <div id="belAufListe" style="max-height:180px;overflow-y:auto;border:1.5px solid var(--brd);border-radius:8px;padding:6px;background:#f8fafc"><div style="padding:12px;font-size:.68rem;color:var(--mu);text-align:center">Lädt…</div></div>
+        <button onclick="_importBelegAuftraege()" style="width:100%;margin-top:6px;padding:8px;background:#fff;border:1.5px solid #2563eb;color:#2563eb;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">↓ Ausgewählte als Positionen übernehmen</button>
+      </div>
+
+      <!-- POSITIONEN -->
+      <div style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:.62rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em">3. Positionen</div>
+          <button onclick="_addBelegPos()" style="background:linear-gradient(135deg,#2563eb,#059669);border:none;border-radius:4px;padding:3px 10px;font-size:.6rem;color:#fff;cursor:pointer;font-family:'Sora',sans-serif;font-weight:700">+ Manuell hinzufügen</button>
+        </div>
+        <div id="belPosListe"></div>
+      </div>
+
+      <!-- SUMMEN / EINSTELLUNGEN -->
+      <div style="margin-bottom:14px;padding:12px;background:var(--sur2);border-radius:8px">
+        <div style="font-size:.62rem;font-weight:700;color:var(--mu);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">4. Summen &amp; Datum</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:.66rem;color:var(--mu);flex:1;min-width:120px">Leistungszeitraum von
+            <input type="date" id="belLeistVon" style="width:100%;padding:6px 8px;border:1.5px solid var(--brd);border-radius:5px;font-size:.7rem;font-family:'JetBrains Mono',monospace;background:#fff">
+          </label>
+          <label style="font-size:.66rem;color:var(--mu);flex:1;min-width:120px">bis
+            <input type="date" id="belLeistBis" style="width:100%;padding:6px 8px;border:1.5px solid var(--brd);border-radius:5px;font-size:.7rem;font-family:'JetBrains Mono',monospace;background:#fff">
+          </label>
+          <label style="font-size:.66rem;color:var(--mu);flex:1;min-width:100px">Zahlungsziel
+            <div style="display:flex;align-items:center;gap:3px"><input type="number" id="belZahlungsziel" min="0" max="90" style="flex:1;padding:6px 8px;border:1.5px solid var(--brd);border-radius:5px;font-size:.7rem;font-family:'JetBrains Mono',monospace;background:#fff" placeholder="14"><span style="font-size:.6rem;color:var(--mu)">Tage</span></div>
+          </label>
+        </div>
+        <div id="belSummenBox" style="background:#fff;border:1px solid var(--brd);border-radius:6px;padding:10px;font-size:.75rem;line-height:1.6"></div>
+      </div>
+
+      <!-- AKTIONEN -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button onclick="saveBeleg(false)" style="flex:1;min-width:140px;padding:10px;background:#fff;border:1.5px solid var(--brd);color:var(--tx);border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">💾 Als Entwurf speichern</button>
+        <button onclick="saveBelegAndPdf()" style="flex:1;min-width:140px;padding:10px;background:linear-gradient(135deg,#2563eb,#059669);border:none;color:#fff;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📄 Speichern + PDF</button>
+        <button onclick="saveBelegAndMail()" style="flex:1;min-width:140px;padding:10px;background:#fff;border:1.5px solid #059669;color:#059669;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✉ Speichern + E-Mail</button>
+      </div>
+      <div class="err" id="belErr" style="margin-top:8px;font-size:.66rem"></div>
+    </div>
+  </div>
+</div>
 <style>
 .dv-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:flex-start;padding:20px;overflow-y:auto}
 .dv-overlay.open{display:flex}
@@ -1072,6 +1227,8 @@ function loadUserData(){
     _briefkopfImg=d.briefkopfImg||'';
     _briefkopfImgMode=d.briefkopfImgMode||'kopf';
     _briefkopfImgVoll=!!d.briefkopfImgVoll;
+    // Abrechnungs-Einstellungen laden
+    loadAbrSettings();
     // Firmencode generieren falls noch keiner existiert (Bestandskunden)
     if(!_firmaCode){
       _firmaCode=_generateFirmaCode(_firma);
@@ -2157,13 +2314,14 @@ function showAgAusTab(tab){
   document.querySelectorAll('#agpage-auswertung .abtab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('#agAusTabs .stab').forEach(t=>t.classList.remove('active'));
   // Mapping: 'auftraege' in Auswertung-Tab → Pane-ID abtab-aus-auftraege (nicht abtab-auftraege! Das ist die Live-Seite)
-  const paneIdMap={monat:'abtab-monat', auftraege:'abtab-aus-auftraege', urlaub:'abtab-urlaub'};
+  const paneIdMap={monat:'abtab-monat', auftraege:'abtab-aus-auftraege', urlaub:'abtab-urlaub', belege:'abtab-belege'};
   const pane=document.getElementById(paneIdMap[tab]||'abtab-'+tab); if(pane) pane.classList.add('active');
   const btn=document.querySelector('#agAusTabs [data-tab="'+tab+'"]');
   if(btn) btn.classList.add('active');
   if(tab==='monat'){fillAgMonatSelect('agZeitMonat');loadAgZeiten();}
   if(tab==='auftraege'){fillAgMonatSelect('agAuftragsMonat');loadAgAuftragsAuswertung();}
   if(tab==='urlaub') loadAgUrlaub();
+  if(tab==='belege') loadBelege();
 }
 // Legacy-Wrapper robust gegen Tab-Reorder (nutzt data-attrs statt Indizes)
 function showAgBetriebTab(tab){
@@ -2233,6 +2391,598 @@ function saveBriefkopf(){
     err.textContent='';
     toast(val?'📋 Briefkopf gespeichert':'🗑 Briefkopf entfernt');
   }).catch(e=>{err.style.color='#ef4444';err.textContent='❌ '+e.message;});
+}
+
+// ═════════════════════════════════════════════════════════════════
+// ABRECHNUNG / BELEGE
+// ═════════════════════════════════════════════════════════════════
+let _abrSettings={status:'klein',mwstSatz:19,zahlungsziel:14,bankName:'',iban:'',bic:'',stundensatz:0,materialAufschlag:0};
+
+function loadAbrSettings(){
+  if(!_uid) return;
+  db.collection('users').doc(_uid).get().then(doc=>{
+    if(!doc.exists) return;
+    const d=doc.data();
+    const abr=d.abrechnung||{};
+    _abrSettings={
+      status: abr.status||'klein',
+      mwstSatz: abr.mwstSatz!=null?abr.mwstSatz:19,
+      zahlungsziel: abr.zahlungsziel!=null?abr.zahlungsziel:14,
+      bankName: abr.bankName||'',
+      iban: abr.iban||'',
+      bic: abr.bic||'',
+      stundensatz: abr.stundensatz||0,
+      materialAufschlag: abr.materialAufschlag||0
+    };
+    // UI füllen
+    const radioKlein=document.getElementById('abrStatusKlein');
+    const radioRegel=document.getElementById('abrStatusRegel');
+    if(radioKlein&&radioRegel){
+      if(_abrSettings.status==='regel') radioRegel.checked=true;
+      else radioKlein.checked=true;
+    }
+    const mwstSel=document.getElementById('abrMwstSatz');
+    if(mwstSel) mwstSel.value=String(_abrSettings.mwstSatz);
+    const mwstWrap=document.getElementById('abrMwstWrap');
+    if(mwstWrap) mwstWrap.style.display=_abrSettings.status==='regel'?'block':'none';
+    const zz=document.getElementById('abrZahlungsziel');
+    if(zz) zz.value=_abrSettings.zahlungsziel;
+    const bn=document.getElementById('abrBankName');
+    if(bn) bn.value=_abrSettings.bankName;
+    const iban=document.getElementById('abrIBAN');
+    if(iban) iban.value=_abrSettings.iban;
+    const bic=document.getElementById('abrBIC');
+    if(bic) bic.value=_abrSettings.bic;
+    const ss=document.getElementById('abrStundensatz');
+    if(ss&&_abrSettings.stundensatz) ss.value=_abrSettings.stundensatz;
+    const ma=document.getElementById('abrMaterialAufschlag');
+    if(ma&&_abrSettings.materialAufschlag) ma.value=_abrSettings.materialAufschlag;
+  }).catch(()=>{});
+}
+
+function saveAbrSettings(){
+  if(!_uid) return;
+  const statusRegel=document.getElementById('abrStatusRegel');
+  const mwstSel=document.getElementById('abrMwstSatz');
+  const zz=document.getElementById('abrZahlungsziel');
+  const bn=document.getElementById('abrBankName');
+  const iban=document.getElementById('abrIBAN');
+  const bic=document.getElementById('abrBIC');
+  const ss=document.getElementById('abrStundensatz');
+  const ma=document.getElementById('abrMaterialAufschlag');
+  _abrSettings={
+    status: statusRegel&&statusRegel.checked?'regel':'klein',
+    mwstSatz: parseInt(mwstSel?.value||'19',10),
+    zahlungsziel: parseInt(zz?.value||'14',10),
+    bankName: (bn?.value||'').trim(),
+    iban: (iban?.value||'').trim().replace(/\s+/g,' '),
+    bic: (bic?.value||'').trim(),
+    stundensatz: parseFloat(ss?.value||'0')||0,
+    materialAufschlag: parseFloat(ma?.value||'0')||0
+  };
+  // MwSt-Wrap sichtbar toggeln
+  const mwstWrap=document.getElementById('abrMwstWrap');
+  if(mwstWrap) mwstWrap.style.display=_abrSettings.status==='regel'?'block':'none';
+  db.collection('users').doc(_uid).update({abrechnung:_abrSettings}).then(()=>{
+    toast('💶 Abrechnungs-Einstellungen gespeichert');
+  }).catch(e=>toast('Fehler: '+e.message,'bad'));
+}
+
+// ═════════════════════════════════════════════════════════════════
+// BELEGE — State
+// ═════════════════════════════════════════════════════════════════
+let _belegState={id:null,positionen:[],auftraegeVerfuegbar:[],auftraegeAusgewaehlt:new Set()};
+
+function _belegFmtEur(n){
+  if(!isFinite(n)) n=0;
+  return n.toFixed(2).replace('.',',')+' €';
+}
+function _belegNextNr(){
+  // Pro Jahr einfach fortlaufend: Stefan kann das bei Bedarf im echten Fakturaprogramm neu nummerieren
+  const y=new Date().getFullYear();
+  const ts=Date.now().toString().slice(-5);
+  return 'B-'+y+'-'+ts;
+}
+function _todayIso(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _fmtDE(d){ if(!d||d.length<10) return d||''; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
+
+// ═════════════════════════════════════════════════════════════════
+// BELEGE — Liste laden
+// ═════════════════════════════════════════════════════════════════
+function loadBelege(){
+  if(!_uid) return;
+  const listEl=document.getElementById('belegListe');
+  const statsEl=document.getElementById('belegStats');
+  const filterEl=document.getElementById('belegFilter');
+  if(!listEl) return;
+  const filter=filterEl?filterEl.value:'alle';
+  listEl.innerHTML='<div class="empty">Lädt…</div>';
+  db.collection('users').doc(_uid).collection('belege').orderBy('datum','desc').limit(200).get().then(snap=>{
+    const belege=[];
+    snap.forEach(d=>belege.push({id:d.id,...d.data()}));
+    // Stats
+    let sumOffen=0, sumBezahlt=0, sumYear=0;
+    const thisYear=String(new Date().getFullYear());
+    belege.forEach(b=>{
+      if((b.datum||'').startsWith(thisYear)) sumYear+=(b.bruttosumme||0);
+      if(b.status==='bezahlt') sumBezahlt+=(b.bruttosumme||0);
+      else if(b.status!=='storniert') sumOffen+=(b.bruttosumme||0);
+    });
+    if(statsEl){
+      statsEl.innerHTML=
+        '<div style="padding:10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;text-align:center"><div style="font-size:.56rem;color:#d97706;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Offen</div><div style="font-size:1rem;font-weight:800;color:#d97706">'+_belegFmtEur(sumOffen)+'</div></div>'+
+        '<div style="padding:10px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:8px;text-align:center"><div style="font-size:.56rem;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Bezahlt</div><div style="font-size:1rem;font-weight:800;color:#059669">'+_belegFmtEur(sumBezahlt)+'</div></div>'+
+        '<div style="padding:10px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;text-align:center"><div style="font-size:.56rem;color:#2563eb;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">'+thisYear+'</div><div style="font-size:1rem;font-weight:800;color:#2563eb">'+_belegFmtEur(sumYear)+'</div></div>';
+    }
+    // Filtern
+    const filtered=belege.filter(b=>filter==='alle'||b.status===filter);
+    if(!filtered.length){ listEl.innerHTML='<div class="empty">Keine Belege '+(filter!=='alle'?'mit Status "'+filter+'"':'')+'</div>'; return; }
+    const statusFarbe={offen:'#d97706',bezahlt:'#059669',storniert:'#94a3b8'};
+    const statusLabel={offen:'OFFEN',bezahlt:'BEZAHLT',storniert:'STORNIERT'};
+    listEl.innerHTML=filtered.map(b=>{
+      const col=statusFarbe[b.status]||'#94a3b8';
+      const lbl=statusLabel[b.status]||b.status||'?';
+      const kName=(b.kunde&&b.kunde.name)||'(ohne Kunde)';
+      const posCnt=(b.positionen||[]).length;
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--brd);border-radius:8px;margin-bottom:6px;background:#fff">'
+        +'<div style="width:4px;align-self:stretch;background:'+col+';border-radius:2px"></div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><div style="font-size:.78rem;font-weight:700">'+esc(b.belegnr||'?')+'</div><span style="padding:1px 7px;background:'+col+'20;color:'+col+';border-radius:10px;font-size:.52rem;font-weight:800">'+lbl+'</span></div>'
+        +'<div style="font-size:.66rem;color:var(--mu);margin-top:2px">'+esc(kName)+' · '+_fmtDE(b.datum)+' · '+posCnt+' Positionen</div>'
+        +'</div>'
+        +'<div style="text-align:right"><div style="font-size:.88rem;font-weight:800">'+_belegFmtEur(b.bruttosumme||0)+'</div>'
+        +(b.status==='offen'?'<button onclick="event.stopPropagation();markBelegBezahlt(\''+b.id+'\')" style="margin-top:3px;padding:3px 8px;background:#fff;border:1px solid #059669;color:#059669;border-radius:4px;font-size:.56rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Bezahlt</button>':'')
+        +'</div>'
+        +'<button onclick="event.stopPropagation();openBelegPdfFromList(\''+b.id+'\')" style="padding:6px 10px;background:#fff;border:1.5px solid var(--acc);color:var(--acc);border-radius:6px;font-size:.6rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif" title="PDF öffnen">📄</button>'
+        +'</div>';
+    }).join('');
+  }).catch(e=>{
+    listEl.innerHTML='<div class="empty">Fehler: '+(e.message||e)+'</div>';
+  });
+}
+
+function markBelegBezahlt(id){
+  if(!confirm('Beleg als bezahlt markieren?')) return;
+  db.collection('users').doc(_uid).collection('belege').doc(id).update({status:'bezahlt',bezahltAm:Date.now()}).then(()=>{
+    toast('✓ Als bezahlt markiert');
+    loadBelege();
+  }).catch(e=>toast('Fehler: '+e.message,'bad'));
+}
+
+// ═════════════════════════════════════════════════════════════════
+// BELEGE — Editor öffnen
+// ═════════════════════════════════════════════════════════════════
+function openBelegEditor(belegId){
+  _belegState={id:belegId||null,positionen:[],auftraegeVerfuegbar:[],auftraegeAusgewaehlt:new Set()};
+  document.getElementById('belegModalTitle').textContent=belegId?'Beleg bearbeiten':'Neuer Abrechnungsbeleg';
+  // Clear Felder
+  ['belKundeName','belKundeAnschrift','belKundeEmail','belKundeTel'].forEach(id=>{
+    const el=document.getElementById(id);if(el) el.value='';
+  });
+  document.getElementById('belLeistVon').value=_todayIso();
+  document.getElementById('belLeistBis').value=_todayIso();
+  document.getElementById('belZahlungsziel').value=_abrSettings.zahlungsziel||14;
+  document.getElementById('belErr').textContent='';
+  // Aufträge laden
+  _reloadBelegAuftraege();
+  // Positionen-Liste leeren
+  _renderBelegPosListe();
+  _renderBelegSummen();
+  // Modal anzeigen
+  document.getElementById('belegModal').style.display='flex';
+}
+
+function closeBelegModal(){
+  document.getElementById('belegModal').style.display='none';
+}
+
+// Erledigte Aufträge aller MA zusammensuchen
+function _reloadBelegAuftraege(){
+  const listEl=document.getElementById('belAufListe');
+  if(!listEl) return;
+  listEl.innerHTML='<div style="padding:12px;font-size:.68rem;color:var(--mu);text-align:center">Lädt…</div>';
+  if(!_azubis||!_azubis.length){
+    listEl.innerHTML='<div style="padding:12px;font-size:.68rem;color:var(--mu);text-align:center">Keine Mitarbeiter/Azubis vorhanden</div>';
+    return;
+  }
+  const promises=_azubis.map(a=>
+    db.collection('globalTN').doc(a.id).collection('auftraege')
+      .where('status','==','erledigt').get()
+      .then(snap=>{
+        const items=[];
+        snap.forEach(d=>items.push({id:d.id,tnId:a.id,tnName:((a.vorname||'')+' '+(a.nachname||'')).trim(),...d.data()}));
+        return items;
+      }).catch(()=>[])
+  );
+  Promise.all(promises).then(arr=>{
+    // flatten + sort by erstelltAm desc, filter nicht bereits abgerechnete
+    const alle=arr.flat().filter(a=>!a.belegId).sort((a,b)=>(b.erledigtAm||b.erstelltAm||0)-(a.erledigtAm||a.erstelltAm||0));
+    _belegState.auftraegeVerfuegbar=alle;
+    _belegState.auftraegeAusgewaehlt=new Set();
+    if(!alle.length){
+      listEl.innerHTML='<div style="padding:12px;font-size:.68rem;color:var(--mu);text-align:center">Keine erledigten, noch nicht abgerechneten Aufträge</div>';
+      return;
+    }
+    listEl.innerHTML=alle.map((a,i)=>{
+      const stunden=_auftragGesamtStunden(a);
+      const kunde=(a.kunde||a.kundenName||'(ohne Kunde)');
+      const datum=_fmtDE((a.erledigtAm?new Date(a.erledigtAm).toISOString().slice(0,10):(a.erstelltAm?new Date(a.erstelltAm).toISOString().slice(0,10):'')));
+      return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.04);cursor:pointer;font-size:.7rem" onmouseover="this.style.background=\'rgba(37,99,235,.04)\'" onmouseout="this.style.background=\'\'">'
+        +'<input type="checkbox" data-aufidx="'+i+'" onchange="_toggleBelegAuftrag('+i+',this.checked)" style="margin:0;flex-shrink:0">'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-weight:700">'+esc(kunde)+(datum?' · '+datum:'')+'</div>'
+        +'<div style="font-size:.58rem;color:var(--mu)">'+esc(a.taetigkeit||a.titel||'Auftrag')+' · '+esc(a.tnName||'')+' · '+stunden.toFixed(2)+'h</div>'
+        +'</div>'
+        +'</label>';
+    }).join('');
+  });
+}
+
+function _auftragGesamtStunden(a){
+  let std=0;
+  if(a.stunden) std+=parseFloat(a.stunden)||0;
+  (a.nachtraege||[]).forEach(n=>{ if(n.stunden) std+=parseFloat(n.stunden)||0; });
+  return std;
+}
+function _auftragGesamtMaterial(a){
+  const mat=[];
+  (a.material||[]).forEach(m=>mat.push(m));
+  (a.nachtraege||[]).forEach(n=>(n.material||[]).forEach(m=>mat.push(m)));
+  return mat;
+}
+
+function _toggleBelegAuftrag(idx,checked){
+  if(checked) _belegState.auftraegeAusgewaehlt.add(idx);
+  else _belegState.auftraegeAusgewaehlt.delete(idx);
+  // Bei erster Auswahl Kunden-Feld vorschlagen wenn leer
+  if(checked && !document.getElementById('belKundeName').value){
+    const a=_belegState.auftraegeVerfuegbar[idx];
+    if(a){
+      document.getElementById('belKundeName').value=a.kunde||a.kundenName||'';
+      document.getElementById('belKundeAnschrift').value=a.adresse||'';
+    }
+  }
+}
+
+// Ausgewählte Aufträge als Positionen übernehmen
+function _importBelegAuftraege(){
+  if(!_belegState.auftraegeAusgewaehlt.size){ toast('Bitte Aufträge anhaken','bad'); return; }
+  const stundensatz=_abrSettings.stundensatz||0;
+  const matAufschlag=(_abrSettings.materialAufschlag||0)/100;
+  let minDatum=null, maxDatum=null;
+  _belegState.auftraegeAusgewaehlt.forEach(idx=>{
+    const a=_belegState.auftraegeVerfuegbar[idx];
+    if(!a) return;
+    // Datumsbereich pflegen
+    const adat=a.erledigtAm?new Date(a.erledigtAm).toISOString().slice(0,10):null;
+    if(adat){
+      if(!minDatum||adat<minDatum) minDatum=adat;
+      if(!maxDatum||adat>maxDatum) maxDatum=adat;
+    }
+    // Arbeitsstunden als Position
+    const stunden=_auftragGesamtStunden(a);
+    if(stunden>0){
+      _belegState.positionen.push({
+        quelle:'auftrag', auftragId:a.id, tnId:a.tnId,
+        beschreibung:(a.taetigkeit||a.titel||'Arbeitsleistung')+(a.adresse?' ('+a.adresse.split(',')[0]+')':''),
+        menge:stunden, einheit:'Std.',
+        einzelpreis:stundensatz,
+        gesamtpreis:stunden*stundensatz
+      });
+    }
+    // Material als Positionen
+    const matl=_auftragGesamtMaterial(a);
+    matl.forEach(m=>{
+      const preis=parseFloat(m.preis||m.einzelpreis||0)||0;
+      const menge=parseFloat(m.menge||1)||1;
+      const ep=preis*(1+matAufschlag);
+      _belegState.positionen.push({
+        quelle:'auftrag', auftragId:a.id, tnId:a.tnId,
+        beschreibung:'Material: '+(m.bez||m.bezeichnung||m.name||'Material'),
+        menge, einheit:(m.einheit||'Stück'),
+        einzelpreis:ep, gesamtpreis:menge*ep
+      });
+    });
+  });
+  // Leistungszeitraum vorschlagen
+  if(minDatum){ document.getElementById('belLeistVon').value=minDatum; }
+  if(maxDatum){ document.getElementById('belLeistBis').value=maxDatum; }
+  // Checkboxen zurücksetzen
+  document.querySelectorAll('#belAufListe input[type=checkbox]').forEach(c=>c.checked=false);
+  _belegState.auftraegeAusgewaehlt=new Set();
+  _renderBelegPosListe();
+  _renderBelegSummen();
+  toast('✓ '+_belegState.positionen.length+' Positionen übernommen');
+}
+
+// Manuelle Position hinzufügen
+function _addBelegPos(){
+  _belegState.positionen.push({quelle:'manuell',beschreibung:'',menge:1,einheit:'Stück',einzelpreis:0,gesamtpreis:0});
+  _renderBelegPosListe();
+}
+function _removeBelegPos(idx){
+  _belegState.positionen.splice(idx,1);
+  _renderBelegPosListe();
+  _renderBelegSummen();
+}
+function _updateBelegPos(idx,field,value){
+  const p=_belegState.positionen[idx];
+  if(!p) return;
+  if(field==='beschreibung') p.beschreibung=value;
+  else if(field==='menge'){ p.menge=parseFloat(value)||0; p.gesamtpreis=p.menge*p.einzelpreis; }
+  else if(field==='einheit') p.einheit=value;
+  else if(field==='einzelpreis'){ p.einzelpreis=parseFloat(value)||0; p.gesamtpreis=p.menge*p.einzelpreis; }
+  _renderBelegSummen();
+  // Gesamtpreis-Anzeige updaten
+  const tot=document.querySelector('#belPosListe [data-pos-total="'+idx+'"]');
+  if(tot) tot.textContent=_belegFmtEur(p.gesamtpreis);
+}
+
+function _renderBelegPosListe(){
+  const el=document.getElementById('belPosListe');
+  if(!el) return;
+  if(!_belegState.positionen.length){
+    el.innerHTML='<div style="padding:16px;background:#f8fafc;border:1.5px dashed var(--brd);border-radius:8px;text-align:center;font-size:.7rem;color:var(--mu)">Keine Positionen. Aufträge auswählen oder "+ Manuell hinzufügen".</div>';
+    return;
+  }
+  el.innerHTML=_belegState.positionen.map((p,i)=>
+    '<div style="display:flex;gap:6px;align-items:center;padding:6px;border:1px solid var(--brd);border-radius:6px;margin-bottom:4px;background:'+(p.quelle==='auftrag'?'rgba(37,99,235,.03)':'#fff')+'">'
+    +'<div style="width:3px;align-self:stretch;background:'+(p.quelle==='auftrag'?'#2563eb':'#94a3b8')+';border-radius:2px"></div>'
+    +'<input type="text" value="'+esc(p.beschreibung||'')+'" oninput="_updateBelegPos('+i+',\'beschreibung\',this.value)" placeholder="Beschreibung" style="flex:2;min-width:120px;padding:5px 7px;border:1px solid var(--brd);border-radius:4px;font-size:.68rem;font-family:\'Sora\',sans-serif">'
+    +'<input type="number" step="0.01" value="'+(p.menge||0)+'" oninput="_updateBelegPos('+i+',\'menge\',this.value)" style="width:60px;padding:5px 7px;border:1px solid var(--brd);border-radius:4px;font-size:.68rem;font-family:\'JetBrains Mono\',monospace" title="Menge">'
+    +'<input type="text" value="'+esc(p.einheit||'')+'" oninput="_updateBelegPos('+i+',\'einheit\',this.value)" style="width:54px;padding:5px 7px;border:1px solid var(--brd);border-radius:4px;font-size:.62rem;font-family:\'Sora\',sans-serif" title="Einheit">'
+    +'<input type="number" step="0.01" value="'+(p.einzelpreis||0)+'" oninput="_updateBelegPos('+i+',\'einzelpreis\',this.value)" style="width:70px;padding:5px 7px;border:1px solid var(--brd);border-radius:4px;font-size:.68rem;font-family:\'JetBrains Mono\',monospace" title="Einzelpreis €">'
+    +'<div data-pos-total="'+i+'" style="width:70px;text-align:right;font-size:.68rem;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+_belegFmtEur(p.gesamtpreis||0)+'</div>'
+    +'<button onclick="_removeBelegPos('+i+')" style="padding:3px 7px;background:#fff;border:1px solid #ef4444;color:#ef4444;border-radius:4px;font-size:.6rem;cursor:pointer;font-family:\'Sora\',sans-serif" title="Entfernen">✕</button>'
+    +'</div>'
+  ).join('');
+}
+
+function _renderBelegSummen(){
+  const el=document.getElementById('belSummenBox');
+  if(!el) return;
+  const netto=_belegState.positionen.reduce((s,p)=>s+(p.gesamtpreis||0),0);
+  const isKlein=_abrSettings.status==='klein';
+  const mwstSatz=isKlein?0:(_abrSettings.mwstSatz||19);
+  const mwstBetrag=netto*(mwstSatz/100);
+  const brutto=netto+mwstBetrag;
+  _belegState._netto=netto; _belegState._mwstSatz=mwstSatz; _belegState._mwstBetrag=mwstBetrag; _belegState._brutto=brutto;
+  el.innerHTML=
+    '<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--mu)">Netto</span><span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+_belegFmtEur(netto)+'</span></div>'
+    +(isKlein
+      ? '<div style="font-size:.62rem;color:var(--mu);font-style:italic;padding:4px 0">§ 19 UStG: Kein MwSt-Ausweis (Kleinunternehmer)</div>'
+      : '<div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--mu)">zzgl. '+mwstSatz+'% MwSt</span><span style="font-family:\'JetBrains Mono\',monospace">'+_belegFmtEur(mwstBetrag)+'</span></div>')
+    +'<div style="display:flex;justify-content:space-between;padding-top:6px;border-top:1.5px solid var(--brd);margin-top:4px"><span style="font-weight:800">Brutto</span><span style="font-weight:800;font-size:.95rem;font-family:\'JetBrains Mono\',monospace;color:var(--acc)">'+_belegFmtEur(brutto)+'</span></div>';
+}
+
+// ═════════════════════════════════════════════════════════════════
+// BELEGE — Speichern
+// ═════════════════════════════════════════════════════════════════
+function _buildBelegDoc(){
+  const kName=document.getElementById('belKundeName').value.trim();
+  if(!kName){ throw new Error('Kundenname erforderlich'); }
+  if(!_belegState.positionen.length){ throw new Error('Mindestens eine Position erforderlich'); }
+  const datum=_todayIso();
+  const zz=parseInt(document.getElementById('belZahlungsziel').value||'14',10);
+  const zzDate=new Date(); zzDate.setDate(zzDate.getDate()+zz);
+  const zzIso=zzDate.getFullYear()+'-'+String(zzDate.getMonth()+1).padStart(2,'0')+'-'+String(zzDate.getDate()).padStart(2,'0');
+  // Aufträge-Liste für Verknüpfung
+  const auftragIds=[];
+  _belegState.positionen.forEach(p=>{ if(p.auftragId && !auftragIds.find(x=>x.auftragId===p.auftragId)) auftragIds.push({auftragId:p.auftragId,tnId:p.tnId}); });
+  return {
+    belegnr: _belegState.id ? undefined : _belegNextNr(),
+    variant: 'beleg',
+    datum,
+    status: 'offen',
+    kunde: {
+      name:kName,
+      anschrift:document.getElementById('belKundeAnschrift').value.trim(),
+      email:document.getElementById('belKundeEmail').value.trim(),
+      telefon:document.getElementById('belKundeTel').value.trim()
+    },
+    leistungszeitraum:{
+      von:document.getElementById('belLeistVon').value||datum,
+      bis:document.getElementById('belLeistBis').value||datum
+    },
+    positionen:_belegState.positionen,
+    nettosumme:_belegState._netto||0,
+    mwstSatz:_belegState._mwstSatz||0,
+    mwstBetrag:_belegState._mwstBetrag||0,
+    bruttosumme:_belegState._brutto||0,
+    zahlungsziel:zz,
+    zahlungsziel_datum:zzIso,
+    verknuepfteAuftraege:auftragIds,
+    erstelltAm:Date.now(),
+    erstelltVon:_email||_firma||''
+  };
+}
+
+function saveBeleg(andThen){
+  try{
+    const doc=_buildBelegDoc();
+    const ref=_belegState.id
+      ? db.collection('users').doc(_uid).collection('belege').doc(_belegState.id)
+      : db.collection('users').doc(_uid).collection('belege').doc();
+    if(!_belegState.id){
+      _belegState.id=ref.id;
+      doc.belegnr=doc.belegnr||_belegNextNr();
+    } else {
+      // bei Update: kein neues belegnr
+      delete doc.belegnr;
+    }
+    ref.set(doc,{merge:true}).then(()=>{
+      // Aufträge als abgerechnet markieren (belegId setzen)
+      const belegId=ref.id;
+      const belegNrFinal=doc.belegnr||(_belegState._belegnr||'');
+      const promises=(doc.verknuepfteAuftraege||[]).map(x=>
+        db.collection('globalTN').doc(x.tnId).collection('auftraege').doc(x.auftragId)
+          .update({belegId,belegnr:belegNrFinal}).catch(()=>{})
+      );
+      Promise.all(promises).then(()=>{
+        toast('💾 Beleg '+(doc.belegnr||'')+' gespeichert');
+        loadBelege();
+        if(typeof andThen==='function') andThen(belegId,doc);
+        else closeBelegModal();
+      });
+    }).catch(e=>{
+      document.getElementById('belErr').textContent='❌ '+(e.message||e);
+      document.getElementById('belErr').style.color='#ef4444';
+    });
+  } catch(e){
+    document.getElementById('belErr').textContent='⚠ '+e.message;
+    document.getElementById('belErr').style.color='#ef4444';
+  }
+}
+
+function saveBelegAndPdf(){
+  saveBeleg((id,doc)=>{
+    closeBelegModal();
+    _openBelegPDF(doc);
+  });
+}
+
+function saveBelegAndMail(){
+  saveBeleg((id,doc)=>{
+    if(!doc.kunde||!doc.kunde.email){ toast('Kunden-E-Mail fehlt','bad'); return; }
+    _sendBelegEmail(id,doc);
+  });
+}
+
+function openBelegPdfFromList(id){
+  db.collection('users').doc(_uid).collection('belege').doc(id).get().then(d=>{
+    if(!d.exists){ toast('Beleg nicht gefunden','bad'); return; }
+    _openBelegPDF(d.data());
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════
+// BELEGE — PDF
+// ═════════════════════════════════════════════════════════════════
+function _openBelegPDF(d){
+  const useVoll=_briefkopfImg && _briefkopfImgVoll;
+  const briefkopfHeader = useVoll
+    ? '<img src="'+_briefkopfImg+'" style="position:fixed;top:0;left:0;width:210mm;height:297mm;z-index:-1;object-fit:cover;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+    : (_briefkopfImg
+        ? '<div style="margin-bottom:8mm"><img src="'+_briefkopfImg+'" style="width:100%;max-height:40mm;object-fit:contain"></div>'
+        : (_briefkopf
+            ? '<div style="margin-bottom:8mm;font-size:9pt;line-height:1.5;white-space:pre-wrap;padding-bottom:4mm;border-bottom:.3mm solid #cbd5e1">'+esc(_briefkopf)+'</div>'
+            : '<div style="margin-bottom:8mm;font-size:12pt;font-weight:800">'+esc(_firma)+'</div>'));
+  const contentWrapOpen = useVoll
+    ? '<div style="padding:55mm 20mm 35mm 20mm;min-height:297mm;position:relative;box-sizing:border-box">'
+    : '<div>';
+  const contentWrapClose = useVoll ? '</div>' : '';
+
+  // Positionen-Tabelle
+  const isKlein=(d.mwstSatz||0)===0;
+  let posRows='';
+  (d.positionen||[]).forEach((p,i)=>{
+    posRows+='<tr style="border-bottom:.2mm solid #e2e8f0">'
+      +'<td style="padding:2mm 2mm;font-size:9pt;vertical-align:top">'+(i+1)+'</td>'
+      +'<td style="padding:2mm 2mm;font-size:9pt;vertical-align:top">'+esc(p.beschreibung||'')+'</td>'
+      +'<td style="padding:2mm 2mm;font-size:9pt;text-align:right;vertical-align:top;font-family:\'Courier New\',monospace">'+(p.menge||0).toFixed(2).replace('.',',')+' '+esc(p.einheit||'')+'</td>'
+      +'<td style="padding:2mm 2mm;font-size:9pt;text-align:right;vertical-align:top;font-family:\'Courier New\',monospace">'+_belegFmtEur(p.einzelpreis||0)+'</td>'
+      +'<td style="padding:2mm 2mm;font-size:9pt;text-align:right;vertical-align:top;font-family:\'Courier New\',monospace;font-weight:700">'+_belegFmtEur(p.gesamtpreis||0)+'</td>'
+      +'</tr>';
+  });
+
+  const kunde=d.kunde||{};
+  const lz=d.leistungszeitraum||{};
+  const bankZeile=(_abrSettings.bankName||_abrSettings.iban)
+    ? '<div style="margin-top:6mm;padding:3mm;background:#f8fafc;border-radius:1mm;font-size:8pt;color:#475569"><b>Bankverbindung:</b> '+esc(_abrSettings.bankName||'')+(_abrSettings.iban?' · IBAN '+esc(_abrSettings.iban):'')+(_abrSettings.bic?' · BIC '+esc(_abrSettings.bic):'')+'</div>'
+    : '';
+
+  const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Abrechnungsbeleg '+esc(d.belegnr||'')+'</title>'
+    +'<style>@page{size:A4;margin:'+(useVoll?'0':'15mm 15mm 20mm 15mm')+'}body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#1e293b;background:#fff}table{border-collapse:collapse;width:100%}</style>'
+    +'</head><body>'
+    +briefkopfHeader
+    +contentWrapOpen
+    +'<div style="margin-bottom:6mm;display:flex;justify-content:space-between;align-items:flex-start;gap:10mm">'
+    +'<div style="flex:1">'
+    +'<div style="font-size:8pt;color:#64748b;margin-bottom:1mm">Empfänger</div>'
+    +'<div style="font-size:10pt;font-weight:700">'+esc(kunde.name||'')+'</div>'
+    +(kunde.anschrift?'<div style="font-size:9pt;white-space:pre-line;margin-top:1mm">'+esc(kunde.anschrift)+'</div>':'')
+    +'</div>'
+    +'<div style="text-align:right;font-size:9pt">'
+    +'<div style="font-size:13pt;font-weight:800;color:#2563eb;margin-bottom:2mm">ABRECHNUNGSBELEG</div>'
+    +'<div><b>Beleg-Nr.:</b> '+esc(d.belegnr||'')+'</div>'
+    +'<div><b>Datum:</b> '+_fmtDE(d.datum||'')+'</div>'
+    +(lz.von?'<div><b>Leistung:</b> '+_fmtDE(lz.von)+(lz.bis&&lz.bis!==lz.von?' – '+_fmtDE(lz.bis):'')+'</div>':'')
+    +'</div>'
+    +'</div>'
+    +'<div style="margin-top:4mm"><table>'
+    +'<thead><tr style="background:#eff6ff;border-bottom:.3mm solid #2563eb"><th style="padding:2mm 2mm;font-size:8pt;text-align:left;color:#1e40af">#</th><th style="padding:2mm 2mm;font-size:8pt;text-align:left;color:#1e40af">Beschreibung</th><th style="padding:2mm 2mm;font-size:8pt;text-align:right;color:#1e40af">Menge</th><th style="padding:2mm 2mm;font-size:8pt;text-align:right;color:#1e40af">Einzelpreis</th><th style="padding:2mm 2mm;font-size:8pt;text-align:right;color:#1e40af">Gesamt</th></tr></thead>'
+    +'<tbody>'+posRows+'</tbody>'
+    +'</table></div>'
+    +'<div style="margin-top:6mm;display:flex;justify-content:flex-end"><table style="width:80mm">'
+    +'<tr><td style="padding:1.5mm 2mm;font-size:9pt;color:#64748b">Netto</td><td style="padding:1.5mm 2mm;font-size:9pt;text-align:right;font-family:\'Courier New\',monospace">'+_belegFmtEur(d.nettosumme||0)+'</td></tr>'
+    +(isKlein
+      ? '<tr><td colspan="2" style="padding:1.5mm 2mm;font-size:8pt;color:#64748b;font-style:italic">Gemäß § 19 UStG wird keine Umsatzsteuer ausgewiesen.</td></tr>'
+      : '<tr><td style="padding:1.5mm 2mm;font-size:9pt;color:#64748b">zzgl. '+(d.mwstSatz||19)+'% MwSt</td><td style="padding:1.5mm 2mm;font-size:9pt;text-align:right;font-family:\'Courier New\',monospace">'+_belegFmtEur(d.mwstBetrag||0)+'</td></tr>')
+    +'<tr style="border-top:.3mm solid #1e293b"><td style="padding:2mm;font-size:11pt;font-weight:800">Brutto</td><td style="padding:2mm;font-size:11pt;font-weight:800;text-align:right;font-family:\'Courier New\',monospace;color:#1e40af">'+_belegFmtEur(d.bruttosumme||0)+'</td></tr>'
+    +'</table></div>'
+    +'<div style="margin-top:6mm;padding:3mm;background:#fffbeb;border-left:.5mm solid #f59e0b;border-radius:1mm;font-size:9pt"><b>Zahlungsziel:</b> '+(d.zahlungsziel||14)+' Tage nach Belegdatum, also bis zum <b>'+_fmtDE(d.zahlungsziel_datum||'')+'</b></div>'
+    +bankZeile
+    +'<div style="margin-top:10mm;padding:3mm;background:#f1f5f9;border:.2mm dashed #cbd5e1;border-radius:1mm;font-size:7.5pt;color:#475569;line-height:1.5"><b>Hinweis:</b> Dies ist ein Abrechnungsbeleg zur Weiterverarbeitung in einem Fakturaprogramm. Keine Rechnung im Sinne des §14 UStG. Eine rechtsgültige Rechnung mit fortlaufender Rechnungsnummer erfolgt separat.</div>'
+    +contentWrapClose
+    +'<script>(function(){var imgs=document.querySelectorAll(\'img\');if(!imgs.length){setTimeout(()=>window.print(),200);return;}var done=0;var fire=function(){done++;if(done>=imgs.length){setTimeout(()=>window.print(),200);}};imgs.forEach(function(i){if(i.complete&&i.naturalWidth>0){fire();}else{i.onload=fire;i.onerror=fire;}});setTimeout(function(){if(done<imgs.length){window.print();}},5000);})();<\/script>'
+    +'</body></html>';
+  const w=window.open('','_blank');
+  if(!w){ toast('Popup blockiert. Bitte Popups erlauben.','bad'); return; }
+  w.document.write(html); w.document.close();
+}
+
+// ═════════════════════════════════════════════════════════════════
+// BELEGE — E-Mail-Versand
+// ═════════════════════════════════════════════════════════════════
+function _sendBelegEmail(id,d){
+  if(!d.kunde||!d.kunde.email){ toast('Kunden-E-Mail fehlt','bad'); return; }
+  const firma=_firma||'Ihr Betrieb';
+  const bruttoStr=_belegFmtEur(d.bruttosumme||0);
+  const kName=d.kunde.name||'';
+  const subject='Abrechnungsbeleg '+(d.belegnr||'')+' · '+firma;
+  // Body (HTML-Mail)
+  const lz=d.leistungszeitraum||{};
+  const lzTxt=lz.von?_fmtDE(lz.von)+(lz.bis&&lz.bis!==lz.von?' bis '+_fmtDE(lz.bis):''):'';
+  let posHtml='';
+  (d.positionen||[]).forEach(p=>{
+    posHtml+='<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">'+esc(p.beschreibung||'')+'</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-family:monospace">'+(p.menge||0).toFixed(2).replace('.',',')+' '+esc(p.einheit||'')+'</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-family:monospace">'+_belegFmtEur(p.gesamtpreis||0)+'</td></tr>';
+  });
+  const htmlBody=
+    '<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;color:#1e293b">'
+    +'<div style="background:linear-gradient(135deg,#2563eb,#059669);color:#fff;padding:20px;border-radius:8px 8px 0 0"><div style="font-size:18px;font-weight:800">Abrechnungsbeleg '+esc(d.belegnr||'')+'</div><div style="font-size:13px;opacity:.9;margin-top:4px">von '+esc(firma)+'</div></div>'
+    +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px">'
+    +'<p>Sehr geehrte Damen und Herren'+(kName?' ('+esc(kName)+')':'')+',</p>'
+    +'<p>anbei erhalten Sie Ihren Abrechnungsbeleg Nr. <b>'+esc(d.belegnr||'')+'</b>'+(lzTxt?' für den Leistungszeitraum '+lzTxt:'')+'.</p>'
+    +'<table style="width:100%;border-collapse:collapse;margin:16px 0"><thead><tr><th style="padding:8px 10px;background:#eff6ff;text-align:left;font-size:12px;color:#1e40af">Beschreibung</th><th style="padding:8px 10px;background:#eff6ff;text-align:right;font-size:12px;color:#1e40af">Menge</th><th style="padding:8px 10px;background:#eff6ff;text-align:right;font-size:12px;color:#1e40af">Summe</th></tr></thead><tbody>'+posHtml+'</tbody></table>'
+    +'<div style="background:#f8fafc;padding:14px;border-radius:6px;margin-top:8px"><table style="width:100%"><tr><td style="color:#64748b;font-size:13px">Netto</td><td style="text-align:right;font-family:monospace">'+_belegFmtEur(d.nettosumme||0)+'</td></tr>'
+    +((d.mwstSatz||0)>0?'<tr><td style="color:#64748b;font-size:13px">zzgl. '+d.mwstSatz+'% MwSt</td><td style="text-align:right;font-family:monospace">'+_belegFmtEur(d.mwstBetrag||0)+'</td></tr>':'<tr><td colspan="2" style="font-size:11px;color:#64748b;padding:4px 0;font-style:italic">Gemäß §19 UStG wird keine Umsatzsteuer ausgewiesen.</td></tr>')
+    +'<tr style="border-top:2px solid #1e40af"><td style="padding-top:8px;font-weight:800">Brutto</td><td style="padding-top:8px;text-align:right;font-family:monospace;font-weight:800;color:#1e40af;font-size:16px">'+bruttoStr+'</td></tr></table></div>'
+    +'<p style="margin-top:16px"><b>Zahlungsziel:</b> '+(d.zahlungsziel||14)+' Tage nach Belegdatum, also bis zum <b>'+_fmtDE(d.zahlungsziel_datum||'')+'</b>.</p>'
+    +((_abrSettings.bankName||_abrSettings.iban)?'<p style="background:#f8fafc;padding:10px;border-radius:4px;font-size:13px"><b>Bankverbindung:</b><br>'+esc(_abrSettings.bankName||'')+(_abrSettings.iban?'<br>IBAN: '+esc(_abrSettings.iban):'')+(_abrSettings.bic?'<br>BIC: '+esc(_abrSettings.bic):'')+'</p>':'')
+    +'<p style="font-size:11px;color:#64748b;background:#f1f5f9;padding:10px;border-radius:4px;margin-top:16px">Dies ist ein Abrechnungsbeleg zur Weiterverarbeitung. Keine Rechnung im Sinne des §14 UStG.</p>'
+    +'<p>Bei Rückfragen stehen wir Ihnen gerne zur Verfügung.</p>'
+    +'<p>Mit freundlichen Grüßen<br>'+esc(firma)+'</p>'
+    +'</div></div>';
+
+  db.collection('mail').add({
+    to: d.kunde.email,
+    replyTo: _email||undefined,
+    message: { subject, html: htmlBody }
+  }).then(()=>{
+    // Beleg-Status: gesendet
+    db.collection('users').doc(_uid).collection('belege').doc(id).update({
+      mailVersandAm: Date.now(),
+      mailVersandAn: d.kunde.email
+    }).catch(()=>{});
+    toast('✉ Beleg an '+d.kunde.email+' gesendet');
+    closeBelegModal();
+    loadBelege();
+  }).catch(e=>{
+    toast('❌ Versand fehlgeschlagen: '+(e.message||e),'bad');
+  });
 }
 
 function _refreshBriefkopfImgPreview(){
