@@ -1974,6 +1974,16 @@ function toggleSCard(el){
   if(event.target.closest('.fi,.btn,.btn-sm,.tbtn,.kurs-item,.settings-row,.ov,details,summary,input,select,textarea,a')) return;
   el.classList.toggle('open');
 }
+// Togglet eine Berufsgruppen-Untergruppe (absent/wdh) auf/zu
+function toggleBerufGroup(domId){
+  if(event) event.stopPropagation();
+  const c=document.getElementById(domId);
+  const arr=document.getElementById(domId+'_arr');
+  if(!c) return;
+  const open=c.style.display!=='none';
+  c.style.display=open?'none':'block';
+  if(arr) arr.style.transform=open?'rotate(0deg)':'rotate(90deg)';
+}
 
 // History management for back button
 let _navFromPop=false, _curPage='dashboard';
@@ -2611,45 +2621,79 @@ function loadDashboard(){
     if(!kurs) return;
     const ausb = _ausbilder.find(a=>a.id===kurs.ausbilderId);
     const berufId = (ausb&&(ausb.berufId||ausb.berufLabel))||'_none';
-    const berufLabel = (ausb&&ausb.berufLabel)||'';
+    const berufLabel = (ausb&&ausb.berufLabel)||'Ohne Berufsgruppe';
     const name=(t.vorname||'')+' '+(t.nachname||'');
     const meta=esc(kurs.name||'')+(kurs.ausbilderName?' · '+esc(kurs.ausbilderName):'');
-    const berufBadge = berufLabel ? berufBadgeHTML(berufId, berufLabel) : '';
-    if(t.status==='absent')  absentList.push({name,meta,berufBadge,berufLabel,kursId:kurs.id,tnId:t.id});
-    if(t.wiederholer)        wdhList.push({name,meta,berufBadge,berufLabel,kursId:kurs.id,tnId:t.id,grund:t.wdhGrund||''});
+    if(t.status==='absent')  absentList.push({name,meta,berufId,berufLabel,kursId:kurs.id,tnId:t.id});
+    if(t.wiederholer)        wdhList.push({name,meta,berufId,berufLabel,kursId:kurs.id,tnId:t.id,grund:t.wdhGrund||''});
   });
-  // Nach Berufsgruppe sortieren (Gruppierung durch Sortierung sichtbar)
-  absentList.sort((a,b)=>a.berufLabel.localeCompare(b.berufLabel,'de')||a.name.localeCompare(b.name,'de'));
-  wdhList.sort((a,b)=>a.berufLabel.localeCompare(b.berufLabel,'de')||a.name.localeCompare(b.name,'de'));
+
+  // Helper: Liste nach Berufsgruppe gruppieren
+  function _groupByBeruf(list){
+    const g={};
+    list.forEach(x=>{
+      if(!g[x.berufId]) g[x.berufId]={label:x.berufLabel,items:[]};
+      g[x.berufId].items.push(x);
+    });
+    // Items je Gruppe alphabetisch
+    Object.values(g).forEach(grp=>grp.items.sort((a,b)=>a.name.localeCompare(b.name,'de')));
+    return g;
+  }
+  // Render eine Gruppe: Header (farbig, aufklappbar) + Items
+  // variant: 'absent' oder 'wdh'
+  function _renderBerufGroup(berufId, grp, variant){
+    const keys=Object.keys(BERUFE);
+    const idx=keys.indexOf(berufId);
+    const c=_berufColors[(idx>=0?idx:0)%_berufColors.length];
+    const groupDomId='grp_'+variant+'_'+berufId.replace(/[^a-zA-Z0-9_]/g,'_');
+    const itemsHtml=grp.items.map(x=>{
+      const init=x.name.trim().split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+      if(variant==='absent'){
+        return `<div class="status-alert sa-absent" draggable="true"
+          ondragstart="event.stopPropagation();event.dataTransfer.setData('text/plain','${x.tnId}');event.dataTransfer.effectAllowed='copy';this.style.opacity='.4';_dragTNId='${x.tnId}'"
+          ondragend="this.style.opacity=''"
+          title="Kursdetails öffnen" onclick="event.stopPropagation();showKursDetail('${x.kursId}')">
+          <div class="sa-avatar">${init}</div>
+          <div class="sa-info"><div class="sa-name">${esc(x.name.trim())}</div><div class="sa-meta">${x.meta}</div></div>
+          <div style="margin-left:auto;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">⠿ ziehen</div>
+        </div>`;
+      } else {
+        return `<div class="status-alert sa-wdh" draggable="true"
+          ondragstart="event.stopPropagation();event.dataTransfer.setData('text/plain','${x.tnId}');event.dataTransfer.effectAllowed='copy';this.style.opacity='.4';_dragTNId='${x.tnId}'"
+          ondragend="this.style.opacity=''"
+          title="Kursdetails öffnen" onclick="event.stopPropagation();showKursDetail('${x.kursId}')">
+          <div class="sa-avatar">${init}</div>
+          <div class="sa-info"><div class="sa-name">${esc(x.name.trim())}</div><div class="sa-meta">${x.meta}</div>${x.grund?'<div style="font-size:.6rem;color:#d97706;font-weight:700;margin-top:2px">Grund: '+esc(x.grund)+'</div>':''}</div>
+          <div style="margin-left:auto;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">⠿ ziehen</div>
+        </div>`;
+      }
+    }).join('');
+    return `<div style="margin-bottom:6px">
+      <div onclick="toggleBerufGroup('${groupDomId}')" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${c}12;border-left:3px solid ${c};border-radius:6px;cursor:pointer;user-select:none;transition:background .12s" onmouseover="this.style.background='${c}1a'" onmouseout="this.style.background='${c}12'">
+        <span style="flex:1;font-size:.68rem;font-weight:800;color:${c};letter-spacing:.02em">${esc(grp.label)}</span>
+        <span style="background:${c};color:#fff;padding:1px 8px;border-radius:10px;font-size:.58rem;font-weight:800;min-width:20px;text-align:center">${grp.items.length}</span>
+        <span id="${groupDomId}_arr" style="font-size:.65rem;color:${c};transition:transform .15s;transform:rotate(0deg)">▸</span>
+      </div>
+      <div id="${groupDomId}" style="display:none;padding-top:4px">${itemsHtml}</div>
+    </div>`;
+  }
 
   if(absentEl){
     if(!absentList.length){ absentEl.innerHTML='<div class="empty">Keine Fehlenden</div>'; }
-    else absentEl.innerHTML=absentList.map(x=>{
-      const init=x.name.trim().split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      return `<div class="status-alert sa-absent" draggable="true"
-        ondragstart="event.dataTransfer.setData('text/plain','${x.tnId}');event.dataTransfer.effectAllowed='copy';this.style.opacity='.4';_dragTNId='${x.tnId}'"
-        ondragend="this.style.opacity=''"
-        title="Kursdetails öffnen" onclick="showKursDetail('${x.kursId}')">
-        <div class="sa-avatar">${init}</div>
-        <div class="sa-info"><div class="sa-name">${esc(x.name.trim())}${x.berufBadge?' '+x.berufBadge:''}</div><div class="sa-meta">${x.meta}</div></div>
-        <div style="margin-left:auto;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">⠿ ziehen</div>
-      </div>`;
-    }).join('');
+    else {
+      const groups=_groupByBeruf(absentList);
+      const groupIds=Object.keys(groups).sort((a,b)=>groups[a].label.localeCompare(groups[b].label,'de'));
+      absentEl.innerHTML=groupIds.map(gid=>_renderBerufGroup(gid,groups[gid],'absent')).join('');
+    }
   }
 
   if(wdhEl){
     if(!wdhList.length){ wdhEl.innerHTML='<div class="empty">Keine Wiederholer</div>'; }
-    else wdhEl.innerHTML=wdhList.map(x=>{
-      const init=x.name.trim().split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      return `<div class="status-alert sa-wdh" draggable="true"
-        ondragstart="event.dataTransfer.setData('text/plain','${x.tnId}');event.dataTransfer.effectAllowed='copy';this.style.opacity='.4';_dragTNId='${x.tnId}'"
-        ondragend="this.style.opacity=''"
-        title="Kursdetails öffnen" onclick="showKursDetail('${x.kursId}')">
-        <div class="sa-avatar">${init}</div>
-        <div class="sa-info"><div class="sa-name">${esc(x.name.trim())}${x.berufBadge?' '+x.berufBadge:''}</div><div class="sa-meta">${x.meta}</div>${x.grund?'<div style="font-size:.6rem;color:#d97706;font-weight:700;margin-top:2px">Grund: '+esc(x.grund)+'</div>':''}</div>
-        <div style="margin-left:auto;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">⠿ ziehen</div>
-      </div>`;
-    }).join('');
+    else {
+      const groups=_groupByBeruf(wdhList);
+      const groupIds=Object.keys(groups).sort((a,b)=>groups[a].label.localeCompare(groups[b].label,'de'));
+      wdhEl.innerHTML=groupIds.map(gid=>_renderBerufGroup(gid,groups[gid],'wdh')).join('');
+    }
   }
 
   // Kurse Liste: laufende und kommende zuerst, archivierte separat
