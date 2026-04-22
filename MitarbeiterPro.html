@@ -138,8 +138,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="login-wrap" id="loginWrap">
   <div class="login-box">
     <div class="login-logo">Mitarbeiter<span>Pro</span></div>
-    <div class="login-sub">Dein Lehrgangsportal</div>
-    <div class="login-badge">📚 FÜR AUSZUBILDENDE</div>
+    <div class="login-sub">Dein Mitarbeiter-Portal</div>
+    <div class="login-badge">💼 FÜR MITARBEITER</div>
     <div><label class="fl">E-Mail</label><input class="fi" type="email" id="lEmail" placeholder="deine@email.de" autocomplete="email"></div>
     <div><label class="fl">Passwort</label><input class="fi" type="password" id="lPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="err" id="lErr"></div>
@@ -722,13 +722,35 @@ auth.onAuthStateChanged(u=>{
 });
 
 function findTN(email){
-  return db.collection('globalTN').where('email','==',email).limit(1).get()
+  const emailNorm=(email||'').trim().toLowerCase();
+  return db.collection('globalTN').where('email','==',emailNorm).limit(1).get()
     .then(snap=>{
-      if(snap.empty) return false;
-      _tnId=snap.docs[0].id;
-      _tnData=snap.docs[0].data();
-      return true;
-    }).catch(()=>false);
+      if(!snap.empty){
+        _tnId=snap.docs[0].id;
+        _tnData=snap.docs[0].data();
+        return true;
+      }
+      // Fallback: E-Mail könnte mit anderer Schreibweise gespeichert sein
+      // Wir probieren noch eine Get-by-UID, falls die TN-Doc-ID = Auth-UID ist
+      if(_uid){
+        return db.collection('globalTN').doc(_uid).get().then(doc=>{
+          if(doc.exists){
+            _tnId=doc.id;
+            _tnData=doc.data();
+            return true;
+          }
+          return false;
+        }).catch(err=>{
+          console.error('findTN by UID error:',err);
+          return false;
+        });
+      }
+      return false;
+    }).catch(err=>{
+      console.error('findTN error:',err);
+      showErr('Fehler beim Laden: '+(err.message||err));
+      return false;
+    });
 }
 
 function doLogin(){
