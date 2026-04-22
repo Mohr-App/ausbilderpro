@@ -2620,8 +2620,25 @@ function loadDashboard(){
     const kurs = _kurse.find(k=>k.id===t.aktiverKursId);
     if(!kurs) return;
     const ausb = _ausbilder.find(a=>a.id===kurs.ausbilderId);
-    const berufId = (ausb&&(ausb.berufId||ausb.berufLabel))||'_none';
-    const berufLabel = (ausb&&ausb.berufLabel)||'Ohne Berufsgruppe';
+    // Berufsgruppe bestimmen — mehrstufiger Fallback:
+    // 1) Ausbilder berufId → Label aus BERUFE
+    // 2) Teilnehmer-beruf-String → getBerufKey → Label aus BERUFE
+    // 3) Ausbilder berufLabel direkt (wenn nur Text hinterlegt)
+    // 4) Fallback "Ohne Berufsgruppe"
+    let berufId='_none', berufLabel='Ohne Berufsgruppe';
+    if(ausb && ausb.berufId && BERUFE[ausb.berufId]){
+      berufId=ausb.berufId;
+      berufLabel=BERUFE[ausb.berufId].label||ausb.berufLabel||berufId;
+    } else if(t.beruf){
+      const key=getBerufKey(t.beruf, t.berufGruppeId);
+      if(key && key!=='andere' && BERUFE[key]){
+        berufId=key;
+        berufLabel=BERUFE[key].label||key;
+      }
+    } else if(ausb && ausb.berufLabel){
+      berufId=ausb.berufLabel;
+      berufLabel=ausb.berufLabel;
+    }
     const name=(t.vorname||'')+' '+(t.nachname||'');
     const meta=esc(kurs.name||'')+(kurs.ausbilderName?' · '+esc(kurs.ausbilderName):'');
     if(t.status==='absent')  absentList.push({name,meta,berufId,berufLabel,kursId:kurs.id,tnId:t.id});
@@ -2797,12 +2814,18 @@ function loadDashboard(){
     html+='</div>';
   }
   if(active.length){
-    // Nach Berufsgruppe gruppieren
+    // Nach Berufsgruppe gruppieren — mit robustem Lookup
     const byBeruf={};
     active.forEach(k=>{
       const ausb=_ausbilder.find(a=>a.id===k.ausbilderId);
-      const bLabel=(ausb&&ausb.berufLabel)||'— Ohne Berufsgruppe —';
-      const bId=(ausb&&(ausb.berufId||ausb.berufLabel))||'_none';
+      let bId='_none', bLabel='— Ohne Berufsgruppe —';
+      if(ausb && ausb.berufId && BERUFE[ausb.berufId]){
+        bId=ausb.berufId;
+        bLabel=BERUFE[ausb.berufId].label||ausb.berufLabel||bId;
+      } else if(ausb && ausb.berufLabel){
+        bId=ausb.berufLabel;
+        bLabel=ausb.berufLabel;
+      }
       if(!byBeruf[bId]) byBeruf[bId]={label:bLabel,kurse:[]};
       byBeruf[bId].kurse.push(k);
     });
