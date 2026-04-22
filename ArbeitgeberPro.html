@@ -356,7 +356,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto" id="agAusTabs">
         <button class="stab active" data-tab="monat" title="Monat" onclick="showAgAusTab('monat')">Monat</button>
         <button class="stab" data-tab="auftraege" title="Aufträge" onclick="showAgAusTab('auftraege')">Aufträge</button>
-        <button class="stab" data-tab="belege" title="Belege" onclick="showAgAusTab('belege')">💶 Belege</button>
         <button class="stab" data-tab="urlaub" title="Urlaub" onclick="showAgAusTab('urlaub')">Urlaub</button>
       </div>
 
@@ -389,27 +388,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
 
-      <!-- AUSWERTUNG: Belege (Abrechnungsbelege) -->
-      <div class="abtab" id="abtab-belege">
-        <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px;flex-wrap:wrap">
-            <div class="card-title" style="margin:0">💶 Abrechnungsbelege</div>
-            <div style="display:flex;gap:4px;align-items:center">
-              <select id="belegFilter" onchange="loadBelege()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:4px 8px;font-size:.65rem;font-family:'Sora',sans-serif">
-                <option value="alle">Alle</option>
-                <option value="offen">Offen</option>
-                <option value="bezahlt">Bezahlt</option>
-                <option value="storniert">Storniert</option>
-              </select>
-              <button onclick="openBelegEditor()" style="padding:6px 12px;background:linear-gradient(135deg,#2563eb,#059669);border:none;border-radius:6px;color:#fff;font-size:.65rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">+ Neuer Beleg</button>
-            </div>
-          </div>
-          <div style="font-size:.62rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Belege werden aus erledigten Aufträgen generiert und als PDF/E-Mail verschickt. <b>Keine Rechnungen im Sinne §14 UStG</b> — bitte in Ihr offizielles Fakturaprogramm übernehmen.</div>
-          <div id="belegStats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px"></div>
-          <div id="belegListe"><div class="empty">Lädt…</div></div>
-        </div>
-      </div>
-
       <!-- AUSWERTUNG: Urlaub -->
       <div class="abtab" id="abtab-urlaub">
         <div class="card">
@@ -424,6 +402,55 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div class="card-title">📋 Alle Anträge</div>
           <div id="agUrlaubAlle"><div class="empty">Lädt…</div></div>
         </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- BELEGE – Abrechnungsbelege                          -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="agpage" id="agpage-belege">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="card-icon" style="width:36px;height:36px;background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(16,185,129,.1));color:var(--acc);display:flex;align-items:center;justify-content:center;border-radius:8px">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+        </div>
+        <div style="font-size:1.1rem;font-weight:800">Abrechnungsbelege</div>
+      </div>
+
+      <!-- GROSSE STATS -->
+      <div id="belegStatsBig" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="padding:14px;background:linear-gradient(135deg,#fef3c7,#fde68a);border:1px solid rgba(245,158,11,.3);border-radius:12px">
+          <div style="font-size:.58rem;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">⏳ Offen</div>
+          <div id="belegStatOffenBetrag" style="font-size:1.25rem;font-weight:800;color:#92400e;font-family:'JetBrains Mono',monospace">–</div>
+          <div id="belegStatOffenAnz" style="font-size:.58rem;color:#b45309;margin-top:2px">–</div>
+        </div>
+        <div style="padding:14px;background:linear-gradient(135deg,#d1fae5,#a7f3d0);border:1px solid rgba(5,150,105,.3);border-radius:12px">
+          <div style="font-size:.58rem;color:#065f46;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">✓ Bezahlt</div>
+          <div id="belegStatBezahltBetrag" style="font-size:1.25rem;font-weight:800;color:#065f46;font-family:'JetBrains Mono',monospace">–</div>
+          <div id="belegStatBezahltAnz" style="font-size:.58rem;color:#047857;margin-top:2px">–</div>
+        </div>
+        <div style="padding:14px;background:linear-gradient(135deg,#dbeafe,#bfdbfe);border:1px solid rgba(37,99,235,.3);border-radius:12px">
+          <div style="font-size:.58rem;color:#1e40af;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">💰 <span id="belegStatJahrLbl">Gesamt</span></div>
+          <div id="belegStatGesamtBetrag" style="font-size:1.25rem;font-weight:800;color:#1e40af;font-family:'JetBrains Mono',monospace">–</div>
+          <div id="belegStatGesamtAnz" style="font-size:.58rem;color:#1d4ed8;margin-top:2px">–</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:6px;flex-wrap:wrap">
+          <div class="card-title" style="margin:0">📋 Belegliste</div>
+          <div style="display:flex;gap:4px;align-items:center">
+            <select id="belegFilter" onchange="loadBelege()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:5px 10px;font-size:.65rem;font-family:'Sora',sans-serif">
+              <option value="alle">Alle</option>
+              <option value="offen">Offen</option>
+              <option value="bezahlt">Bezahlt</option>
+              <option value="storniert">Storniert</option>
+            </select>
+            <select id="belegJahr" onchange="loadBelege()" style="background:var(--sur2);border:1px solid var(--brd);color:var(--tx);border-radius:6px;padding:5px 10px;font-size:.65rem;font-family:'JetBrains Mono',monospace"></select>
+            <button onclick="openBelegEditor()" style="padding:7px 14px;background:linear-gradient(135deg,#2563eb,#059669);border:none;border-radius:6px;color:#fff;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">+ Neuer Beleg</button>
+          </div>
+        </div>
+        <div style="font-size:.62rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Abrechnungsbelege werden aus erledigten Aufträgen erzeugt + manuelle Positionen. <b>Keine Rechnungen im Sinne §14 UStG</b> — übernehmen Sie die Daten in Ihr Fakturaprogramm.</div>
+        <div id="belegListe"><div class="empty">Lädt…</div></div>
       </div>
     </div>
 
@@ -696,6 +723,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </button>
     <button class="bnav-btn" data-page="auswertung" id="agnav-auswertung" onclick="showAgPage('auswertung')" title="Auswertung">
       <span class="bi"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>Auswertung
+    </button>
+    <button class="bnav-btn" data-page="belege" id="agnav-belege" onclick="showAgPage('belege')" title="Belege">
+      <span class="bi"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg></span>Belege
     </button>
     <button class="bnav-btn" data-page="einstellungen" id="agnav-einstellungen" onclick="showAgPage('einstellungen')" title="Einstellungen">
       <span class="bi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>Einstell.
@@ -1756,7 +1786,25 @@ function showAgPage(id){
   if(nb) nb.classList.add('active');
   if(id==='live') initAgLive();
   if(id==='auswertung') initAgAuswertung();
+  if(id==='belege') initAgBelege();
   if(id==='einstellungen') initAgEinstellungen();
+}
+
+function initAgBelege(){
+  fillBelegJahrSelect();
+  loadBelege();
+}
+
+function fillBelegJahrSelect(){
+  const sel=document.getElementById('belegJahr');
+  if(!sel) return;
+  if(sel.options.length>0) return; // einmalig füllen
+  const currentY=new Date().getFullYear();
+  let html='<option value="alle">Alle Jahre</option>';
+  for(let y=currentY; y>=currentY-4; y--){
+    html+='<option value="'+y+'"'+(y===currentY?' selected':'')+'>'+y+'</option>';
+  }
+  sel.innerHTML=html;
 }
 
 // Secondary Firebase App for creating users without logging out AG
@@ -2224,8 +2272,8 @@ const _tabConfigs={
     containerId:'agBnav',
     storageKey:'ag_bnav_order',
     attr:'data-page',
-    labels:{live:'📡 Live', auswertung:'📊 Auswertung', einstellungen:'⚙ Einstellungen'},
-    default:['live','auswertung','einstellungen']
+    labels:{live:'📡 Live', auswertung:'📊 Auswertung', belege:'💶 Belege', einstellungen:'⚙ Einstellungen'},
+    default:['live','auswertung','belege','einstellungen']
   },
   live: {
     containerId:'agLiveTabs',
@@ -2313,15 +2361,13 @@ function renderAgTabOrderSettings(){
 function showAgAusTab(tab){
   document.querySelectorAll('#agpage-auswertung .abtab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('#agAusTabs .stab').forEach(t=>t.classList.remove('active'));
-  // Mapping: 'auftraege' in Auswertung-Tab → Pane-ID abtab-aus-auftraege (nicht abtab-auftraege! Das ist die Live-Seite)
-  const paneIdMap={monat:'abtab-monat', auftraege:'abtab-aus-auftraege', urlaub:'abtab-urlaub', belege:'abtab-belege'};
+  const paneIdMap={monat:'abtab-monat', auftraege:'abtab-aus-auftraege', urlaub:'abtab-urlaub'};
   const pane=document.getElementById(paneIdMap[tab]||'abtab-'+tab); if(pane) pane.classList.add('active');
   const btn=document.querySelector('#agAusTabs [data-tab="'+tab+'"]');
   if(btn) btn.classList.add('active');
   if(tab==='monat'){fillAgMonatSelect('agZeitMonat');loadAgZeiten();}
   if(tab==='auftraege'){fillAgMonatSelect('agAuftragsMonat');loadAgAuftragsAuswertung();}
   if(tab==='urlaub') loadAgUrlaub();
-  if(tab==='belege') loadBelege();
 }
 // Legacy-Wrapper robust gegen Tab-Reorder (nutzt data-attrs statt Indizes)
 function showAgBetriebTab(tab){
@@ -2495,31 +2541,62 @@ function _fmtDE(d){ if(!d||d.length<10) return d||''; const p=d.split('-'); retu
 function loadBelege(){
   if(!_uid) return;
   const listEl=document.getElementById('belegListe');
-  const statsEl=document.getElementById('belegStats');
   const filterEl=document.getElementById('belegFilter');
+  const jahrEl=document.getElementById('belegJahr');
   if(!listEl) return;
   const filter=filterEl?filterEl.value:'alle';
+  const jahr=jahrEl?jahrEl.value:'alle';
   listEl.innerHTML='<div class="empty">Lädt…</div>';
-  db.collection('users').doc(_uid).collection('belege').orderBy('datum','desc').limit(200).get().then(snap=>{
+  db.collection('users').doc(_uid).collection('belege').orderBy('datum','desc').limit(500).get().then(snap=>{
     const belege=[];
     snap.forEach(d=>belege.push({id:d.id,...d.data()}));
-    // Stats
-    let sumOffen=0, sumBezahlt=0, sumYear=0;
-    const thisYear=String(new Date().getFullYear());
-    belege.forEach(b=>{
-      if((b.datum||'').startsWith(thisYear)) sumYear+=(b.bruttosumme||0);
-      if(b.status==='bezahlt') sumBezahlt+=(b.bruttosumme||0);
-      else if(b.status!=='storniert') sumOffen+=(b.bruttosumme||0);
+
+    // Jahr-Filter anwenden
+    const belegeJahr = jahr==='alle' ? belege : belege.filter(b=>(b.datum||'').startsWith(jahr));
+
+    // Stats berechnen (auf jahr-gefilterten Belegen)
+    let sumOffen=0, cntOffen=0;
+    let sumBezahlt=0, cntBezahlt=0;
+    let sumGesamt=0, cntGesamt=0;
+    belegeJahr.forEach(b=>{
+      if(b.status==='storniert') return;
+      const br=b.bruttosumme||0;
+      sumGesamt+=br; cntGesamt++;
+      if(b.status==='bezahlt'){ sumBezahlt+=br; cntBezahlt++; }
+      else { sumOffen+=br; cntOffen++; }
     });
+
+    // Big-Stats füllen
+    const elOB=document.getElementById('belegStatOffenBetrag');
+    const elOA=document.getElementById('belegStatOffenAnz');
+    const elBB=document.getElementById('belegStatBezahltBetrag');
+    const elBA=document.getElementById('belegStatBezahltAnz');
+    const elGB=document.getElementById('belegStatGesamtBetrag');
+    const elGA=document.getElementById('belegStatGesamtAnz');
+    const elGL=document.getElementById('belegStatJahrLbl');
+    if(elOB) elOB.textContent=_belegFmtEur(sumOffen);
+    if(elOA) elOA.textContent=cntOffen+' '+(cntOffen===1?'Beleg':'Belege');
+    if(elBB) elBB.textContent=_belegFmtEur(sumBezahlt);
+    if(elBA) elBA.textContent=cntBezahlt+' '+(cntBezahlt===1?'Beleg':'Belege');
+    if(elGB) elGB.textContent=_belegFmtEur(sumGesamt);
+    if(elGA) elGA.textContent=cntGesamt+' '+(cntGesamt===1?'Beleg':'Belege');
+    if(elGL) elGL.textContent = jahr==='alle' ? 'Gesamt' : 'Einnahmen '+jahr;
+
+    // Auch alte kleine Stats (falls Element noch im DOM ist)
+    const statsEl=document.getElementById('belegStats');
     if(statsEl){
       statsEl.innerHTML=
         '<div style="padding:10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;text-align:center"><div style="font-size:.56rem;color:#d97706;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Offen</div><div style="font-size:1rem;font-weight:800;color:#d97706">'+_belegFmtEur(sumOffen)+'</div></div>'+
         '<div style="padding:10px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:8px;text-align:center"><div style="font-size:.56rem;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Bezahlt</div><div style="font-size:1rem;font-weight:800;color:#059669">'+_belegFmtEur(sumBezahlt)+'</div></div>'+
-        '<div style="padding:10px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;text-align:center"><div style="font-size:.56rem;color:#2563eb;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">'+thisYear+'</div><div style="font-size:1rem;font-weight:800;color:#2563eb">'+_belegFmtEur(sumYear)+'</div></div>';
+        '<div style="padding:10px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;text-align:center"><div style="font-size:.56rem;color:#2563eb;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Gesamt</div><div style="font-size:1rem;font-weight:800;color:#2563eb">'+_belegFmtEur(sumGesamt)+'</div></div>';
     }
-    // Filtern
-    const filtered=belege.filter(b=>filter==='alle'||b.status===filter);
-    if(!filtered.length){ listEl.innerHTML='<div class="empty">Keine Belege '+(filter!=='alle'?'mit Status "'+filter+'"':'')+'</div>'; return; }
+
+    // Status-Filter anwenden
+    const filtered=belegeJahr.filter(b=>filter==='alle'||b.status===filter);
+    if(!filtered.length){
+      listEl.innerHTML='<div class="empty">Keine Belege'+(filter!=='alle'?' mit Status „'+filter+'"':'')+(jahr!=='alle'?' in '+jahr:'')+'</div>';
+      return;
+    }
     const statusFarbe={offen:'#d97706',bezahlt:'#059669',storniert:'#94a3b8'};
     const statusLabel={offen:'OFFEN',bezahlt:'BEZAHLT',storniert:'STORNIERT'};
     listEl.innerHTML=filtered.map(b=>{
