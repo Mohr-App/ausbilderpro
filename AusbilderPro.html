@@ -654,6 +654,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
     </div>
     <button class="tbtn" onclick="fbLogout()" id="fbLogoutBtn" title="Abmelden" style="display:none">⎋ Abmelden</button>
+    <!-- View-As-Admin-Button (nur Stefan-Whitelist) -->
+    <div style="position:relative;display:none" id="viewAsWrap">
+      <button class="tbtn" title="In Kollegen-Ansicht wechseln" onclick="openViewAsModal()" style="background:rgba(124,58,237,.12);border-color:rgba(124,58,237,.35);color:#7c3aed">👁 Als…</button>
+    </div>
     <div style="position:relative">
       <button class="tbtn" title="Menü öffnen" onclick="toggleHdrMenu()" id="hdrMenuBtn">⚙ Mehr</button>
       <div id="hdrMenu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--sur);border:2px solid #e2e8f0;border-radius:10px;padding:6px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.1);min-width:170px;display:none;flex-direction:column;gap:4px;">
@@ -6403,6 +6407,8 @@ try{
     _dataOwner=null; // Reset bis Daten geladen sind
     // App-Launcher-Check: Admin?
     _checkAdminShowLauncher(user.uid);
+    // View-As Button sichtbar wenn Stefan
+    _updateViewAsButtonVisibility();
     // State für neuen User zurücksetzen (localStorage ist jetzt UID-spezifisch)
     S={kats:{},katOrder:[],curKat:null,curInst:null};
     _trash=[];
@@ -6946,6 +6952,252 @@ window.addEventListener('load',()=>{
   }
 });
 
+// ═══════════════════════════════════════════════════════════════
+// VIEW-AS: Admin-Modus zum Anschauen von Kollegen-Daten (read-only)
+// ═══════════════════════════════════════════════════════════════
+// Whitelist der Admins die den View-As-Button sehen
+const _VIEWAS_WHITELIST = ['s.mohr@ish.de'];
+let _viewAsEmail = null;   // aktiv gewaehlter Kollege (lowercase) oder null
+let _viewAsName = '';      // Anzeigename fuer Banner
+
+// Zentraler Getter: liefert die E-Mail des gerade "aktiven" Ausbilders
+// Wenn View-As aktiv → die E-Mail des Kollegen, sonst die eigene.
+function getActiveAusbilderEmail(){
+  if(_viewAsEmail) return _viewAsEmail;
+  const u = _auth && _auth.currentUser;
+  return (u && u.email) ? u.email.toLowerCase() : '';
+}
+
+// Check ob gerade read-only ist (View-As aktiv)
+function isViewAsReadOnly(){ return !!_viewAsEmail; }
+
+// Button-Sichtbarkeit beim Login steuern
+function _updateViewAsButtonVisibility(){
+  const wrap = document.getElementById('viewAsWrap');
+  if(!wrap) return;
+  const u = _auth && _auth.currentUser;
+  const email = (u && u.email || '').toLowerCase();
+  wrap.style.display = _VIEWAS_WHITELIST.includes(email) ? 'inline-block' : 'none';
+}
+
+// Modal oeffnen + Ausbilder-Liste laden
+function openViewAsModal(){
+  const modal = document.getElementById('viewAsModal');
+  const list = document.getElementById('viewAsList');
+  modal.classList.add('open');
+  list.innerHTML = '<div style="text-align:center;color:var(--mu);padding:20px">Lädt Kollegen…</div>';
+  if(!_db){ list.innerHTML = '<div style="color:#ef4444;padding:12px">Nicht verbunden</div>'; return; }
+
+  _db.collection('shared').doc('kursSettings').collection('ausbilder').get().then(snap=>{
+    const ausb = [];
+    const meEmail = (_auth && _auth.currentUser && _auth.currentUser.email || '').toLowerCase();
+    snap.forEach(doc=>{
+      const d = doc.data();
+      const loginEmail = (d.loginEmail || d.email || '').toLowerCase();
+      if(!loginEmail || loginEmail === meEmail) return; // nicht mich selbst
+      ausb.push({
+        id: doc.id,
+        email: loginEmail,
+        name: ((d.vorname||'') + ' ' + (d.nachname||'')).trim() || d.name || loginEmail
+      });
+    });
+    ausb.sort((a,b)=>a.name.localeCompare(b.name,'de'));
+
+    if(!ausb.length){
+      list.innerHTML = '<div style="color:var(--mu);padding:12px;text-align:center">Keine anderen Ausbilder gefunden</div>';
+      return;
+    }
+    list.innerHTML = ausb.map(a => {
+      const init = (a.name.split(' ').map(s=>s[0]||'').join('') || '?').toUpperCase().slice(0,2);
+      return '<button onclick="enterViewAs('+JSON.stringify(a.email)+','+JSON.stringify(a.name)+')" '
+        +'style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--sur2);border:1.5px solid var(--brd);border-radius:10px;cursor:pointer;text-align:left;font-family:\'Sora\',sans-serif;transition:all .15s" '
+        +'onmouseover="this.style.borderColor=\'#7c3aed\';this.style.background=\'rgba(124,58,237,.05)\'" '
+        +'onmouseout="this.style.borderColor=\'var(--brd)\';this.style.background=\'var(--sur2)\'">'
+        +'<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.8rem;flex-shrink:0">'+esc(init)+'</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:.85rem;font-weight:700;color:var(--tx);overflow:hidden;text-overflow:ellipsis">'+esc(a.name)+'</div>'
+        +'<div style="font-size:.65rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace;overflow:hidden;text-overflow:ellipsis">'+esc(a.email)+'</div>'
+        +'</div>'
+        +'<span style="color:#7c3aed;font-size:1.1rem">→</span>'
+        +'</button>';
+    }).join('');
+  }).catch(err=>{
+    list.innerHTML = '<div style="color:#ef4444;padding:12px">Fehler: '+esc(err.message)+'</div>';
+  });
+}
+
+// View-As aktivieren: E-Mail des Kollegen merken + Kurs-Browser oeffnen
+function enterViewAs(email, name){
+  _viewAsEmail = (email||'').toLowerCase();
+  _viewAsName = name || email;
+  document.getElementById('viewAsModal').classList.remove('open');
+  // Banner aktivieren
+  const banner = document.getElementById('viewAsBanner');
+  const nameSpan = document.getElementById('viewAsName');
+  if(banner) banner.style.display = 'block';
+  if(nameSpan) nameSpan.textContent = _viewAsName;
+  document.body.style.paddingTop = '40px';
+  toast('👁 Ansicht: ' + _viewAsName, 'ok');
+  // Kurs-Browser oeffnen (zeigt alle Kurse des Kollegen inkl. TN)
+  setTimeout(() => openViewAsBrowser(), 300);
+}
+
+function exitViewAs(){
+  _viewAsEmail = null;
+  _viewAsName = '';
+  const banner = document.getElementById('viewAsBanner');
+  if(banner) banner.style.display = 'none';
+  document.body.style.paddingTop = '';
+  // Falls Browser noch offen: schliessen
+  const b = document.getElementById('viewAsBrowserModal');
+  if(b) b.classList.remove('open');
+  toast('✓ Zurück zu eigener Ansicht');
+}
+
+// Kurs-Browser: Liste aller Kurse des aktuellen View-As-Ausbilders
+function openViewAsBrowser(){
+  let modal = document.getElementById('viewAsBrowserModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'viewAsBrowserModal';
+    modal.className = 'ov';
+    modal.innerHTML =
+      '<div class="modal" style="max-width:680px;max-height:90vh;display:flex;flex-direction:column">'
+      + '<div class="mhd">'
+      +   '<div class="mtit" style="display:flex;align-items:center;gap:8px">'
+      +     '<span style="color:#7c3aed">👁</span>'
+      +     '<span id="vaBrowserTitle">Kurse von Kollege</span>'
+      +   '</div>'
+      +   '<button class="xcls" onclick="document.getElementById(\'viewAsBrowserModal\').classList.remove(\'open\')" title="Schließen">&#10005;</button>'
+      + '</div>'
+      + '<div class="mbdy" style="overflow-y:auto;flex:1">'
+      +   '<div id="vaBrowserBody"><div style="text-align:center;color:var(--mu);padding:20px">Lädt…</div></div>'
+      + '</div></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.classList.remove('open'); });
+  }
+  document.getElementById('vaBrowserTitle').textContent = 'Kurse von ' + _viewAsName;
+  modal.classList.add('open');
+  _loadViewAsKurse();
+}
+
+function _loadViewAsKurse(){
+  const body = document.getElementById('vaBrowserBody');
+  body.innerHTML = '<div style="text-align:center;color:var(--mu);padding:20px">Lädt Kurse…</div>';
+  if(!_db) return;
+  _db.collection('shared').doc('kurse').collection('list')
+    .where('ausbilderLoginEmail','==',_viewAsEmail)
+    .get().then(snap=>{
+      const kurse = [];
+      snap.forEach(doc=>kurse.push({id:doc.id,...doc.data()}));
+      // nach Datum sortieren, neueste zuerst
+      kurse.sort((a,b)=>(b.von||'').localeCompare(a.von||''));
+      if(!kurse.length){
+        body.innerHTML = '<div style="text-align:center;color:var(--mu);padding:40px 20px">'
+          + '<div style="font-size:2rem;margin-bottom:8px">📭</div>'
+          + '<div style="font-weight:700">Keine Kurse gefunden</div>'
+          + '<div style="font-size:.72rem;margin-top:8px">Dieser Ausbilder hat keine Kurse verknüpft.</div>'
+          + '</div>';
+        return;
+      }
+      const today = new Date().toISOString().slice(0,10);
+      body.innerHTML = '<div style="font-size:.72rem;color:var(--mu);margin-bottom:10px">'
+        + kurse.length + ' Kurs' + (kurse.length>1?'e':'') + ' · Klick für Teilnehmer</div>'
+        + '<div style="display:flex;flex-direction:column;gap:6px">'
+        + kurse.map(k=>{
+            const name = k.name || k.lehrgangsart || 'Kurs';
+            const vonBis = fmtDE(k.von) + ' – ' + fmtDE(k.bis);
+            let status = '', statusColor = 'var(--mu)';
+            if(k.von && k.bis){
+              if(today < k.von){ status = 'Geplant'; statusColor = '#2563eb'; }
+              else if(today > k.bis){ status = 'Beendet'; statusColor = '#64748b'; }
+              else { status = 'Läuft'; statusColor = '#059669'; }
+            }
+            return '<div onclick="_viewAsShowKursTN('+JSON.stringify(k.id)+','+JSON.stringify(name)+')" '
+              + 'style="padding:10px 12px;background:var(--sur2);border:1.5px solid var(--brd);border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .12s" '
+              + 'onmouseover="this.style.borderColor=\'#7c3aed\';this.style.background=\'rgba(124,58,237,.04)\'" '
+              + 'onmouseout="this.style.borderColor=\'var(--brd)\';this.style.background=\'var(--sur2)\'">'
+              + '<div style="width:36px;height:36px;border-radius:8px;background:rgba(124,58,237,.1);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">📋</div>'
+              + '<div style="flex:1;min-width:0">'
+              +   '<div style="font-size:.85rem;font-weight:700">'+esc(name)+'</div>'
+              +   '<div style="font-size:.65rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+esc(vonBis)+'</div>'
+              + '</div>'
+              + (status ? '<div style="font-size:.6rem;font-weight:700;color:'+statusColor+';padding:3px 8px;background:'+statusColor+'15;border-radius:10px;flex-shrink:0">'+status+'</div>' : '')
+              + '<span style="color:#7c3aed;font-size:1rem;flex-shrink:0">→</span>'
+              + '</div>';
+          }).join('')
+        + '</div>';
+    }).catch(err=>{
+      body.innerHTML = '<div style="color:#ef4444;padding:12px">Fehler: '+esc(err.message)+'</div>';
+    });
+}
+
+// TN eines ausgewaehlten Kurses anzeigen
+function _viewAsShowKursTN(kursId, kursName){
+  const body = document.getElementById('vaBrowserBody');
+  body.innerHTML = '<button onclick="_loadViewAsKurse()" style="margin-bottom:10px;background:none;border:1px solid var(--brd);color:var(--tx);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.72rem;font-family:Sora,sans-serif">← Zurück zur Kurs-Liste</button>'
+    + '<div style="font-size:.95rem;font-weight:800;margin-bottom:4px">'+esc(kursName)+'</div>'
+    + '<div id="vaTnBody" style="margin-top:10px"><div style="text-align:center;color:var(--mu);padding:20px">Lädt Teilnehmer…</div></div>';
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').get().then(snap=>{
+    const tnBody = document.getElementById('vaTnBody');
+    if(snap.empty){ tnBody.innerHTML = '<div style="color:var(--mu);padding:20px;text-align:center">Keine Teilnehmer im Kurs</div>'; return; }
+    const tns = [];
+    snap.forEach(d=>tns.push({id:d.id,...d.data()}));
+    tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
+    tnBody.innerHTML = '<div style="font-size:.72rem;color:var(--mu);margin-bottom:8px">'+tns.length+' Teilnehmer</div>'
+      + '<div style="display:flex;flex-direction:column;gap:4px">'
+      + tns.map(t=>{
+          const fullName = ((t.vorname||'') + ' ' + (t.nachname||'')).trim() || '?';
+          const init = ((t.vorname||'?')[0] + (t.nachname||'?')[0]).toUpperCase();
+          const beruf = t.beruf || '';
+          const firma = t.firma || '';
+          let statusBadge = '';
+          if(t.status==='absent') statusBadge = '<span style="font-size:.6rem;padding:2px 6px;background:rgba(220,38,38,.08);color:#dc2626;border-radius:4px;font-weight:700">✗ Fehlt</span>';
+          else if(t.wiederholer) statusBadge = '<span style="font-size:.6rem;padding:2px 6px;background:rgba(217,119,6,.08);color:#d97706;border-radius:4px;font-weight:700">↻ Wdh</span>';
+          return '<div style="padding:8px 10px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;display:flex;align-items:center;gap:10px">'
+            + '<div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;flex-shrink:0">'+esc(init)+'</div>'
+            + '<div style="flex:1;min-width:0">'
+            +   '<div style="font-size:.8rem;font-weight:700">'+esc(fullName)+'</div>'
+            +   (beruf||firma ? '<div style="font-size:.62rem;color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc([beruf,firma].filter(Boolean).join(' · '))+'</div>' : '')
+            + '</div>'
+            + statusBadge
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }).catch(err=>{
+    document.getElementById('vaTnBody').innerHTML = '<div style="color:#ef4444;padding:12px">Fehler: '+esc(err.message)+'</div>';
+  });
+}
+
+// CSS fuer View-As Modal (falls noch benoetigt)
+(function injectViewAsCSS(){
+  const css = `
+    #viewAsBanner { font-family:'Sora',sans-serif; }
+    #viewAsBrowserModal .mhd { border-bottom:2px solid rgba(124,58,237,.15); }
+  `;
+  const s = document.createElement('style');
+  s.textContent = css;
+  document.head.appendChild(s);
+})();
+
 </script>
+
+<!-- VIEW-AS Banner (nur sichtbar wenn aktiv) -->
+<div id="viewAsBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9998;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;padding:8px 16px;font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;text-align:center;box-shadow:0 2px 12px rgba(124,58,237,.4)">
+  <span style="margin-right:8px">👁 Ansicht als: <span id="viewAsName"></span> · Read-only</span>
+  <button onclick="exitViewAs()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;padding:4px 12px;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;margin-left:8px">← Zurück zu mir</button>
+</div>
+
+<!-- VIEW-AS Modal: Ausbilder auswaehlen -->
+<div class="ov" id="viewAsModal" onclick="if(event.target===this)document.getElementById('viewAsModal').classList.remove('open')">
+<div class="modal" style="max-width:480px">
+<div class="mhd"><div class="mtit">👁 Ansicht wechseln</div><button class="xcls" onclick="document.getElementById('viewAsModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
+<div class="mbdy">
+<div style="font-size:.72rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Wähle einen Kollegen — du siehst dann dessen Kurse und Teilnehmer. <b style="color:#7c3aed">Read-only</b> — Änderungen sind deaktiviert. Du kannst jederzeit über den Banner oben zurückwechseln.</div>
+<div id="viewAsList" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto">
+<div style="text-align:center;color:var(--mu);padding:20px">Lädt Kollegen…</div>
+</div>
+</div></div></div>
+
 </body>
 </html>
