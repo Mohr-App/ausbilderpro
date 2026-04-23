@@ -7009,7 +7009,8 @@ function openViewAsModal(){
     }
     list.innerHTML = ausb.map(a => {
       const init = (a.name.split(' ').map(s=>s[0]||'').join('') || '?').toUpperCase().slice(0,2);
-      return '<button onclick="enterViewAs('+JSON.stringify(a.email)+','+JSON.stringify(a.name)+')" '
+      // Daten als data-Attribute, Click-Handler weiter unten via Event-Delegation
+      return '<button class="viewas-pick" data-email="'+esc(a.email)+'" data-name="'+esc(a.name)+'" '
         +'style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--sur2);border:1.5px solid var(--brd);border-radius:10px;cursor:pointer;text-align:left;font-family:\'Sora\',sans-serif;transition:all .15s" '
         +'onmouseover="this.style.borderColor=\'#7c3aed\';this.style.background=\'rgba(124,58,237,.05)\'" '
         +'onmouseout="this.style.borderColor=\'var(--brd)\';this.style.background=\'var(--sur2)\'">'
@@ -7021,6 +7022,14 @@ function openViewAsModal(){
         +'<span style="color:#7c3aed;font-size:1.1rem">→</span>'
         +'</button>';
     }).join('');
+    // Event-Delegation: Klick auf einen Kollegen → enterViewAs aufrufen
+    list.querySelectorAll('.viewas-pick').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const email = btn.getAttribute('data-email') || '';
+        const name = btn.getAttribute('data-name') || '';
+        enterViewAs(email, name);
+      });
+    });
   }).catch(err=>{
     list.innerHTML = '<div style="color:#ef4444;padding:12px">Fehler: '+esc(err.message)+'</div>';
   });
@@ -7103,7 +7112,7 @@ function _loadViewAsKurse(){
       const today = new Date().toISOString().slice(0,10);
       body.innerHTML = '<div style="font-size:.72rem;color:var(--mu);margin-bottom:10px">'
         + kurse.length + ' Kurs' + (kurse.length>1?'e':'') + ' · Klick für Teilnehmer</div>'
-        + '<div style="display:flex;flex-direction:column;gap:6px">'
+        + '<div style="display:flex;flex-direction:column;gap:6px" id="vaKurseList">'
         + kurse.map(k=>{
             const name = k.name || k.lehrgangsart || 'Kurs';
             const vonBis = fmtDE(k.von) + ' – ' + fmtDE(k.bis);
@@ -7113,7 +7122,7 @@ function _loadViewAsKurse(){
               else if(today > k.bis){ status = 'Beendet'; statusColor = '#64748b'; }
               else { status = 'Läuft'; statusColor = '#059669'; }
             }
-            return '<div onclick="_viewAsShowKursTN('+JSON.stringify(k.id)+','+JSON.stringify(name)+')" '
+            return '<div class="viewas-kurs" data-kursid="'+esc(k.id)+'" data-kursname="'+esc(name)+'" '
               + 'style="padding:10px 12px;background:var(--sur2);border:1.5px solid var(--brd);border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .12s" '
               + 'onmouseover="this.style.borderColor=\'#7c3aed\';this.style.background=\'rgba(124,58,237,.04)\'" '
               + 'onmouseout="this.style.borderColor=\'var(--brd)\';this.style.background=\'var(--sur2)\'">'
@@ -7127,6 +7136,14 @@ function _loadViewAsKurse(){
               + '</div>';
           }).join('')
         + '</div>';
+      // Event-Delegation fuer Kurs-Clicks
+      document.querySelectorAll('#vaKurseList .viewas-kurs').forEach(el => {
+        el.addEventListener('click', () => {
+          const kid = el.getAttribute('data-kursid') || '';
+          const kname = el.getAttribute('data-kursname') || '';
+          _viewAsShowKursTN(kid, kname);
+        });
+      });
     }).catch(err=>{
       body.innerHTML = '<div style="color:#ef4444;padding:12px">Fehler: '+esc(err.message)+'</div>';
     });
