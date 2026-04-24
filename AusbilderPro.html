@@ -180,6 +180,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .pool-sb-body{flex:1;overflow-y:auto;padding:8px;}
 .pool-sb-body.pool-sb-dropover{background:rgba(59,130,246,.05);outline:2px dashed var(--acc);outline-offset:-4px;}
 .pool-empty{color:#94a3b8;font-size:.7rem;text-align:center;padding:20px 10px;font-family:'JetBrains Mono',monospace;line-height:1.6;}
+.pool-empty-guide{padding:14px 12px;font-family:'Sora',sans-serif;}
+.pool-guide-title{font-size:.9rem;font-weight:800;color:#1e2230;margin-bottom:2px;text-align:center;}
+.pool-guide-sub{font-size:.7rem;color:#64748b;margin-bottom:14px;text-align:center;line-height:1.4;}
+.pool-guide-way{display:flex;gap:10px;margin-bottom:10px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;align-items:flex-start;}
+.pool-guide-num{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.pool-guide-body{flex:1;min-width:0;}
+.pool-guide-h{font-size:.78rem;font-weight:700;color:#1e2230;margin-bottom:2px;}
+.pool-guide-t{font-size:.66rem;color:#64748b;line-height:1.45;margin-bottom:7px;}
+.pool-guide-btn{display:inline-block;padding:6px 10px;font-size:.68rem;font-weight:700;border-radius:6px;border:1.5px solid #cbd5e1;background:#fff;color:#475569;cursor:pointer;font-family:'Sora',sans-serif;line-height:1;transition:background .12s,border-color .12s;}
+.pool-guide-btn:hover{background:#f1f5f9;border-color:#94a3b8;}
+.pool-guide-btn-primary{background:linear-gradient(135deg,#2563eb,#059669);color:#fff;border-color:transparent;}
+.pool-guide-btn-primary:hover{opacity:.92;}
 .pool-card{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:grab;transition:all .12s;user-select:none;display:flex;align-items:center;gap:8px;}
 .pool-card:hover{border-color:var(--acc);background:rgba(59,130,246,.05);}
 .pool-card.dragging{opacity:.4;border-color:var(--acc);}
@@ -2243,6 +2255,53 @@ function updatePoolHint(){
 function dismissPoolHint(){
   try{ localStorage.setItem(_lsKey('poolHintDismissed'),'1'); }catch(e){}
   const b=document.getElementById('poolHintBanner'); if(b) b.style.display='none';
+}
+
+// Leer-Pool-Anleitung (wenn keine TN im Pool): 3 Wege zum Hinzufügen
+function poolEmptyGuideHtml(state){
+  // state: 'noKurs' (kein Firestore-Kurs verknüpft) | 'noTN' (Kurs da, aber leer)
+  const inst=curInst();
+  const hasKurs = !!(inst && inst.sharedKursId);
+  // Button-Block je nach Zustand: wenn noch kein Kurs, ist QR-Code und +TN nicht möglich
+  const qrBtn = hasKurs
+    ? '<button onclick="openQRModal()" class="pool-guide-btn pool-guide-btn-primary" title="QR-Code anzeigen">📱 QR-Code anzeigen</button>'
+    : '<button onclick="activateFirestore()" class="pool-guide-btn pool-guide-btn-primary" title="Kurs aktivieren – dann QR-Code verfügbar">🔗 Kurs aktivieren</button>';
+  const tnBtn = hasKurs
+    ? '<button onclick="openManualTNModal()" class="pool-guide-btn" title="Teilnehmer manuell hinzufügen">➕ TN hinzufügen</button>'
+    : '';
+  const hbzBtn = '<button onclick="openPoolLink()" class="pool-guide-btn" title="Mit HBZ-Verwaltung-Kurs verknüpfen">🔗 HBZ-Kurs verknüpfen</button>';
+
+  return ''
+    +'<div class="pool-empty-guide">'
+    +  '<div class="pool-guide-title">Noch keine Teilnehmer</div>'
+    +  '<div class="pool-guide-sub">So kommen Azubis in deinen Kurs:</div>'
+    +  '<div class="pool-guide-way">'
+    +    '<div class="pool-guide-num">1</div>'
+    +    '<div class="pool-guide-body">'
+    +      '<div class="pool-guide-h">QR-Code</div>'
+    +      '<div class="pool-guide-t">Azubis scannen – registrieren sich selbst.</div>'
+    +      qrBtn
+    +    '</div>'
+    +  '</div>'
+    +  '<div class="pool-guide-way">'
+    +    '<div class="pool-guide-num">2</div>'
+    +    '<div class="pool-guide-body">'
+    +      '<div class="pool-guide-h">HBZ-Verwaltung</div>'
+    +      '<div class="pool-guide-t">Falls deine Verwaltung den Kurs schon angelegt hat.</div>'
+    +      hbzBtn
+    +    '</div>'
+    +  '</div>'
+    +(hasKurs
+    ? '<div class="pool-guide-way">'
+      +'<div class="pool-guide-num">3</div>'
+      +'<div class="pool-guide-body">'
+      +  '<div class="pool-guide-h">Manuell</div>'
+      +  '<div class="pool-guide-t">Schnell einzelnen TN selbst eintragen.</div>'
+      +  tnBtn
+      +'</div>'
+      +'</div>'
+    : '')
+    +'</div>';
 }
 function saveNewInst(){
   if(!dpKatId)return;
@@ -5779,11 +5838,12 @@ function loadPool(){
   }
   const kursId = inst.sharedKursId;
   if(!kursId){
-    body.innerHTML='<div class="pool-empty">Kein Kurs verknüpft.<br><span style="color:var(--acc);cursor:pointer" title="→ Jetzt verknüpfen" onclick="openPoolLink()">→ Jetzt verknüpfen</span></div>';
+    body.innerHTML=poolEmptyGuideHtml('noKurs');
     _autoPlacedIds=new Set();
     // Auch ohne Firestore lokale Container rendern
     renderFehlt(null);
     renderWiederholer(null);
+    try{ updatePoolHint(); }catch(e){}
     return;
   }
   if(!_db){ 
@@ -5833,7 +5893,7 @@ function loadPool(){
     _poolUnsub = kursRef.collection('teilnehmer').orderBy('nachname').onSnapshot(snap=>{
       // ── Snapshot-Guard ──
       if(isStale()){if(_poolUnsub){_poolUnsub();_poolUnsub=null;}return;}
-      if(snap.empty){ body.innerHTML='<div class="pool-empty">Keine Teilnehmer im Kurs</div>'; renderFehlt(kursId); renderWiederholer(kursId); return; }
+      if(snap.empty){ body.innerHTML=poolEmptyGuideHtml('noTN'); renderFehlt(kursId); renderWiederholer(kursId); try{ updatePoolHint(); }catch(e){} return; }
       const seats = curSeats();
       // Robust normalization: collapse spaces, trim, lowercase
       function normName(n){ return (n||'').replace(/\s+/g,' ').trim().toLowerCase(); }
