@@ -101,6 +101,71 @@ body{
   line-height:1.6;
 }
 .footer a{color:rgba(255,255,255,.45);text-decoration:none}
+
+/* iOS Install Banner */
+.ios-banner{
+  position:fixed;top:0;left:0;right:0;
+  background:rgba(0,0,0,.4);
+  backdrop-filter:blur(12px);
+  color:#fff;padding:10px 44px 10px 16px;
+  font-size:.75rem;font-weight:500;
+  border-bottom:1px solid rgba(255,255,255,.15);
+  z-index:100;
+  display:none;
+  animation:slideDown .4s ease-out;
+}
+@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+.ios-banner b{font-weight:700}
+.ios-banner a{color:#fff;text-decoration:underline;font-weight:700}
+.ios-banner-close{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  width:28px;height:28px;border:none;background:transparent;color:#fff;
+  font-size:1.1rem;cursor:pointer;opacity:.7;border-radius:50%;
+}
+.ios-banner-close:hover{opacity:1;background:rgba(255,255,255,.15)}
+
+/* iOS Install Modal */
+.ios-modal{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);
+  backdrop-filter:blur(8px);
+  display:none;align-items:center;justify-content:center;
+  padding:20px;z-index:200;
+  animation:fadeIn .3s;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.ios-modal-content{
+  background:#fff;color:#1e2230;
+  border-radius:20px;padding:28px 24px 24px;
+  max-width:360px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);
+}
+.ios-modal-title{font-size:1.25rem;font-weight:800;margin-bottom:6px;color:#2563eb}
+.ios-modal-sub{font-size:.8rem;color:#64748b;margin-bottom:20px}
+.ios-step{
+  display:flex;gap:12px;align-items:flex-start;
+  margin-bottom:14px;padding:12px;
+  background:#f1f5f9;border-radius:12px;
+}
+.ios-step-num{
+  flex-shrink:0;width:26px;height:26px;
+  border-radius:50%;background:#2563eb;color:#fff;
+  font-size:.8rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+.ios-step-txt{font-size:.85rem;line-height:1.45;color:#1e2230}
+.ios-step-txt b{font-weight:700;color:#2563eb}
+.ios-step-icon{
+  display:inline-flex;vertical-align:middle;
+  width:16px;height:20px;margin:0 3px;
+}
+.ios-step-icon svg{width:100%;height:100%}
+.ios-modal-btn{
+  width:100%;padding:13px;
+  background:linear-gradient(135deg,#2563eb,#059669);
+  color:#fff;border:none;border-radius:12px;
+  font-family:'Sora',sans-serif;font-size:.9rem;font-weight:700;
+  cursor:pointer;margin-top:8px;
+}
 </style>
 </head>
 <body>
@@ -145,7 +210,7 @@ body{
     </div>
     <div class="role-info">
       <div class="role-name">Azubi</div>
-      <div class="role-desc">Lehrgänge, Berichtsheft, Meldungen vom Ausbilder</div>
+      <div class="role-desc">Lehrgänge, Aufträge, Meldungen vom Ausbilder</div>
     </div>
     <div class="role-arrow">›</div>
   </button>
@@ -156,12 +221,90 @@ body{
   </div>
 </div>
 
+<!-- iOS Install Banner -->
+<div class="ios-banner" id="iosBanner">
+  📱 <b>iPhone-Nutzer:</b> Installiere BetriebPro wie eine richtige App — <a href="#" onclick="showIosModal(event)">so geht's</a>
+  <button class="ios-banner-close" onclick="dismissIosBanner(event)" aria-label="Schließen">×</button>
+</div>
+
+<!-- iOS Install Modal -->
+<div class="ios-modal" id="iosModal" onclick="if(event.target===this)hideIosModal()">
+  <div class="ios-modal-content">
+    <div class="ios-modal-title">App installieren</div>
+    <div class="ios-modal-sub">In 3 Schritten auf deinem Home-Bildschirm:</div>
+
+    <div class="ios-step">
+      <div class="ios-step-num">1</div>
+      <div class="ios-step-txt">
+        Tippe unten in Safari auf das <b>Teilen-Symbol</b>
+        <span class="ios-step-icon"><svg viewBox="0 0 20 24"><path d="M10 2v14M6 6l4-4 4 4M3 12v8a1 1 0 001 1h12a1 1 0 001-1v-8" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      </div>
+    </div>
+
+    <div class="ios-step">
+      <div class="ios-step-num">2</div>
+      <div class="ios-step-txt">
+        Scrolle runter und tippe auf <b>"Zum Home-Bildschirm"</b>
+      </div>
+    </div>
+
+    <div class="ios-step">
+      <div class="ios-step-num">3</div>
+      <div class="ios-step-txt">
+        Tippe oben rechts auf <b>"Hinzufügen"</b> — fertig!
+      </div>
+    </div>
+
+    <button class="ios-modal-btn" onclick="hideIosModal()">Alles klar</button>
+  </div>
+</div>
+
 <script>
 function chooseRole(role){
   localStorage.setItem('ausbilderpro_role', role);
   if(role === 'ag') window.location.href = 'ArbeitgeberPro.html';
   else if(role === 'azubi') window.location.href = 'AzubiPro.html';
   else window.location.href = 'MitarbeiterPro.html';
+}
+
+// iOS Install Detection
+(function(){
+  var ua = navigator.userAgent;
+  var isIos = /iPhone|iPad|iPod/.test(ua) && !window.MSStream;
+  var isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|mercury/i.test(ua);
+  var isStandalone = window.navigator.standalone === true;
+  // 'standalone' wird true wenn App vom Home-Bildschirm gestartet wird
+  var dismissedAt = parseInt(localStorage.getItem('iosBannerDismissed')||'0', 10);
+  var oneDayAgo = Date.now() - 24*60*60*1000;
+  var shouldShow = isIos && isSafari && !isStandalone && dismissedAt < oneDayAgo;
+
+  if(shouldShow){
+    document.getElementById('iosBanner').style.display='block';
+    // Wrap nach unten schieben damit Banner nicht überdeckt
+    document.querySelector('.wrap').style.paddingTop='80px';
+  }
+
+  // Wenn iOS-User aber NICHT Safari (z.B. Chrome auf iPhone) → Hinweis
+  if(isIos && !isSafari && !isStandalone){
+    var b = document.getElementById('iosBanner');
+    b.innerHTML = '📱 <b>Tipp:</b> Öffne diese Seite in <b>Safari</b> um die App zu installieren';
+    b.style.display='block';
+    document.querySelector('.wrap').style.paddingTop='80px';
+  }
+})();
+
+function showIosModal(e){
+  if(e) e.preventDefault();
+  document.getElementById('iosModal').style.display='flex';
+}
+function hideIosModal(){
+  document.getElementById('iosModal').style.display='none';
+}
+function dismissIosBanner(e){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  document.getElementById('iosBanner').style.display='none';
+  document.querySelector('.wrap').style.paddingTop='';
+  localStorage.setItem('iosBannerDismissed', Date.now().toString());
 }
 </script>
 </body>
