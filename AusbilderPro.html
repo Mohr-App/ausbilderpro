@@ -1893,6 +1893,14 @@ function delInst(katId,instId,e){
   // Firestore-Kurs mitlöschen wenn vorhanden
   if(inst.sharedKursId&&_db){
     const kursId=inst.sharedKursId;
+    const doFirestoreDelete = ()=>{
+      _db.collection('shared').doc('kurse').collection('list').doc(kursId).delete().then(()=>{
+        console.log('Firestore-Kurs gelöscht:',kursId);
+      }).catch(err=>{
+        console.error('Firestore-Kurs konnte nicht gelöscht werden:',kursId,err);
+        toast('⚠ Cloud-Kurs nicht gelöscht: '+(err.message||err.code||'Unbekannt'),'bad');
+      });
+    };
     // TN freigeben: aktiverKursId entfernen + benachrichtigen
     _db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
       const batch=_db.batch();
@@ -1913,9 +1921,11 @@ function delInst(katId,instId,e){
       });
       return batch.commit();
     }).then(()=>{
-      _db.collection('shared').doc('kurse').collection('list').doc(kursId).delete().catch(()=>{});
-    }).catch(()=>{
-      _db.collection('shared').doc('kurse').collection('list').doc(kursId).delete().catch(()=>{});
+      doFirestoreDelete();
+    }).catch(err=>{
+      console.warn('TN-Freigabe beim Kurs-Löschen fehlgeschlagen:',err);
+      // Firestore-Kurs trotzdem versuchen zu löschen
+      doFirestoreDelete();
     });
   }
   if(S.kats[katId]&&S.kats[katId].instances){
