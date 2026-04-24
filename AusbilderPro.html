@@ -995,6 +995,33 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- SITZPLAN SETUP DIALOG (erstes Mal einer Kursart) -->
+<div class="dpov" id="seatSetupModal" onclick="if(event.target===this)closeSeatSetup()">
+  <div class="dpm" style="max-width:440px">
+    <div class="dpm-hd">
+      <div class="dpm-tit">🪑 Sitzplan einrichten</div>
+      <button class="xcls" onclick="closeSeatSetup()" title="Schließen">✕</button>
+    </div>
+    <div class="dpm-bd">
+      <div style="padding:10px 12px;background:rgba(5,150,105,.06);border:1.5px solid rgba(5,150,105,.2);border-radius:8px;margin-bottom:14px;font-size:.72rem;color:var(--tx);line-height:1.5">
+        Erster Lehrgang in dieser Kursart — richte jetzt den Sitzplan ein. Ab dem nächsten Lehrgang wird dein Layout automatisch übernommen.
+      </div>
+      <div class="fg">
+        <label class="fl">Wieviele Sitzplätze insgesamt?</label>
+        <input class="fi" id="seatSetupCount" type="number" min="2" max="60" value="24" inputmode="numeric" style="font-size:1.1rem;font-weight:700;text-align:center">
+        <div style="font-size:.65rem;color:var(--mu);margin-top:4px;line-height:1.4">
+          Nummerierung: ungerade links, gerade rechts (Zickzack).<br>
+          Tische lassen sich später jederzeit hinzufügen oder entfernen.
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="dp-save" title="Sitzplan anlegen" onclick="applySeatSetup()" style="flex:1">✓ Sitzplan anlegen</button>
+        <button class="tbtn" title="Standard-Layout (12 Plätze) verwenden" onclick="useDefaultSeatLayout()" style="padding:10px 14px">Standard (12)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- POOL LINK MODAL -->
 <div class="dpov" id="poolLinkModal" onclick="if(event.target===this)closePoolLink()">
   <div class="dpm" style="max-width:420px">
@@ -1342,6 +1369,26 @@ function showChangelog(){
 const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const DEFAULT_LEFT  = ['6','5','4','3','2','1'];   // rendered top→bottom, so 1 is nearest tafel
 const DEFAULT_RIGHT = ['12','11','10','9','8','7']; // 7 nearest tafel
+
+// Zickzack-Layout: links ungerade, rechts gerade, Reihen von Tafel weg
+// Beispiel 24 Sitze: links [23,21,19,17,15,13,11,9,7,5,3,1], rechts [24,22,20,18,16,14,12,10,8,6,4,2]
+// (Erste Reihe an der Tafel = niedrigste Nummer)
+function buildZigZagLayout(totalSeats){
+  if(totalSeats<2) totalSeats=2;
+  if(totalSeats%2) totalSeats++; // gerade machen
+  const pairs = totalSeats/2;
+  const leftNums=[]; const rightNums=[];
+  for(let i=0;i<pairs;i++){
+    leftNums.push(String(i*2+1));   // 1,3,5,...
+    rightNums.push(String(i*2+2));  // 2,4,6,...
+  }
+  // rendered top→bottom = hinterste Reihe oben -> reverse damit Tafel-naheste unten
+  return {
+    leftSeats: leftNums.reverse(),
+    rightSeats: rightNums.reverse(),
+    nextSeatNum: totalSeats+1
+  };
+}
 
 let S = { kats:{}, katOrder:[], curKat:null, curInst:null };
 // ── PAPIERKORB (30 Tage) ──
@@ -2140,22 +2187,92 @@ function openDp(katId){
   document.getElementById('dpov').classList.add('open');
 }
 function closeDp(){ document.getElementById('dpov').classList.remove('open');dpKatId=null; }
+
+// ─── SITZPLAN-SETUP ───
+let _pendingSeatSetup=null;
+
+function closeSeatSetup(){
+  document.getElementById('seatSetupModal').classList.remove('open');
+  _pendingSeatSetup=null;
+}
+function applySeatSetup(){
+  const n=parseInt(document.getElementById('seatSetupCount').value||'0',10);
+  if(!n||n<2||n>60){ toast('Bitte eine Zahl zwischen 2 und 60 eingeben','bad'); return; }
+  if(!_pendingSeatSetup){ closeSeatSetup(); return; }
+  _pendingSeatSetup.layout = buildZigZagLayout(n);
+  // Merken: Setup wurde einmal durchlaufen (pro User)
+  try{ localStorage.setItem(_lsKey('seatSetupSkip'),'1'); }catch(e){}
+  document.getElementById('seatSetupModal').classList.remove('open');
+  // Weiterleiten an saveNewInst (dpKatId, dpKatId-Felder sind noch gefüllt)
+  saveNewInst();
+}
+function useDefaultSeatLayout(){
+  if(!_pendingSeatSetup){ closeSeatSetup(); return; }
+  // Default = 12 Plätze ohne layout-Flag → fällt auf DEFAULT_LEFT/RIGHT zurück
+  _pendingSeatSetup.layout = null;
+  try{ localStorage.setItem(_lsKey('seatSetupSkip'),'1'); }catch(e){}
+  document.getElementById('seatSetupModal').classList.remove('open');
+  // Da layout=null, nutzt saveNewInst lastRows (gibts nicht) → DEFAULT
+  // Damit _pendingSeatSetup nicht nochmal geprüft wird, temporär 'consumed' markieren:
+  _pendingSeatSetup._consumed=true;
+  saveNewInst();
+}
+
+// Pool-Hinweis: Zeigt Anleitung wenn Pool-TN da sind aber keiner platziert ist
+function updatePoolHint(){
+  const banner=document.getElementById('poolHintBanner');
+  if(!banner) return;
+  const inst=curInst();
+  if(!inst){ banner.style.display='none'; return; }
+  // Dauerhaft ausgeblendet?
+  if(localStorage.getItem(_lsKey('poolHintDismissed'))==='1'){
+    banner.style.display='none'; return;
+  }
+  // Anzahl Sitze belegt
+  const seatsFilled=Object.values(inst.seats||{}).filter(d=>d&&d.name).length;
+  if(seatsFilled>0){ banner.style.display='none'; return; }
+  // Pool hat Teilnehmer? (DOM-basiert: tatsächlich gerenderte Pool-Karten)
+  const body=document.getElementById('poolSbBody');
+  const poolTN = body ? body.querySelectorAll('.pool-card').length : 0;
+  if(poolTN>0 && seatsFilled===0){
+    banner.style.display='block';
+  } else {
+    banner.style.display='none';
+  }
+}
+function dismissPoolHint(){
+  try{ localStorage.setItem(_lsKey('poolHintDismissed'),'1'); }catch(e){}
+  const b=document.getElementById('poolHintBanner'); if(b) b.style.display='none';
+}
 function saveNewInst(){
   if(!dpKatId)return;
   if(_demoMode&&countAllInstances()>=10){ showDemoLimit(); closeDp(); return; }
   const sD=document.getElementById('dpSD').value,sM=document.getElementById('dpSM').value,sY=document.getElementById('dpSY').value;
   const eD=document.getElementById('dpED').value,eM=document.getElementById('dpEM').value,eY=document.getElementById('dpEY').value;
   if(!sD||!sM||!sY||!eD||!eM||!eY){alert('Bitte beide Daten vollständig ausfüllen.');return;}
+
+  // Setup-Dialog bei erstem Lehrgang einer Kursart
+  const prevInstances=Object.values(S.kats[dpKatId]?.instances||{});
+  const setupSkipKey = _lsKey('seatSetupSkip');
+  const setupDone = localStorage.getItem(setupSkipKey) === '1';
+  if(prevInstances.length===0 && !_pendingSeatSetup && !setupDone){
+    // Datumsfelder merken, Setup-Dialog öffnen
+    _pendingSeatSetup = {sD,sM,sY,eD,eM,eY,katId:dpKatId};
+    document.getElementById('seatSetupModal').classList.add('open');
+    setTimeout(()=>{ const el=document.getElementById('seatSetupCount'); if(el){el.focus();el.select();} }, 50);
+    return; // Rest wartet auf applySeatSetup / useDefaultSeatLayout
+  }
+
   const id=gid();
   // Tischbeschriftungen vom letzten Lehrgang derselben Art übernehmen
-  const prevInstances=Object.values(S.kats[dpKatId]?.instances||{});
+  const prevInstances2=Object.values(S.kats[dpKatId]?.instances||{});
   let lastLabels={};
   let lastRows=null;
   let lastSeatCnt=13;
   let lastNextSeatNum=13;
-  if(prevInstances.length){
+  if(prevInstances2.length){
     // Neuesten Lehrgang finden (nach Startdatum)
-    const sorted=[...prevInstances].sort((a,b)=>{
+    const sorted=[...prevInstances2].sort((a,b)=>{
       const da=a.sY+'-'+String(a.sM).padStart(2,'0')+'-'+String(a.sD).padStart(2,'0');
       const db2=b.sY+'-'+String(b.sM).padStart(2,'0')+'-'+String(b.sD).padStart(2,'0');
       return db2>da?1:db2<da?-1:0;
@@ -2166,11 +2283,31 @@ function saveNewInst(){
     if(last.seatCnt) lastSeatCnt=last.seatCnt;
     if(last.nextSeatNum) lastNextSeatNum=last.nextSeatNum;
   }
-  const rows=lastRows||[
-    {id:'r1',label:'',seats:[...DEFAULT_LEFT]},
-    {id:'r2',label:'',seats:[...DEFAULT_RIGHT]}
-  ];
-  const instData={sD,sM,sY,eD,eM,eY,rows,seatCnt:lastSeatCnt,seats:{},nextSeatNum:lastNextSeatNum,seatLabels:lastLabels,kurstage:5};
+  // Setup hat Priorität, dann Vererbung vom letzten Kurs, dann Default
+  let rows, seatCnt, nextSeatNum;
+  if(_pendingSeatSetup && _pendingSeatSetup.layout){
+    const l=_pendingSeatSetup.layout;
+    rows=[
+      {id:'r1',label:'',seats:[...l.leftSeats]},
+      {id:'r2',label:'',seats:[...l.rightSeats]}
+    ];
+    seatCnt=l.leftSeats.length+l.rightSeats.length;
+    nextSeatNum=l.nextSeatNum;
+    lastLabels={}; // frisch ohne Labels
+  } else if(lastRows){
+    rows=lastRows;
+    seatCnt=lastSeatCnt;
+    nextSeatNum=lastNextSeatNum;
+  } else {
+    rows=[
+      {id:'r1',label:'',seats:[...DEFAULT_LEFT]},
+      {id:'r2',label:'',seats:[...DEFAULT_RIGHT]}
+    ];
+    seatCnt=13;
+    nextSeatNum=13;
+  }
+  const instData={sD,sM,sY,eD,eM,eY,rows,seatCnt,seats:{},nextSeatNum,seatLabels:lastLabels,kurstage:5};
+  _pendingSeatSetup=null; // reset nach Verwendung
 
   // Automatisch Firestore-Kurs erstellen wenn angemeldet
   if(_db&&_auth&&_auth.currentUser){
@@ -2312,10 +2449,22 @@ function renderMain(){
     +'<div class="li"><div class="ld" style="background:#ef4444"></div>Abs. Unentsch.</div>'
     +'<div class="li"><div class="ld" style="background:#fcd34d"></div>Krank</div>'
     +'<div class="li"><div class="ld" style="background:#818cf8"></div>Berufsschule</div>'
-    +'</div>';
+    +'</div>'
+    +'<div id="poolHintBanner" style="display:none;margin:10px 0;padding:12px 16px;background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(5,150,105,.06));border:1.5px solid rgba(37,99,235,.25);border-radius:10px;font-size:.74rem;color:var(--tx);line-height:1.55">'
+    +'<div style="display:flex;justify-content:space-between;align-items:start;gap:10px">'
+    +'<div style="flex:1">'
+    +'<div style="font-weight:800;color:#2563eb;margin-bottom:6px">💡 So belegst du Sitzplätze</div>'
+    +'<div style="margin-bottom:4px">• <b>Azubi aus dem Pool (rechts)</b> auf einen Tisch ziehen</div>'
+    +'<div style="margin-bottom:4px">• Oder: <b>Tisch anklicken</b> → Azubi auswählen</div>'
+    +'<div>• Oder: <b>Azubi gibt in seiner App</b> seine Wunsch-Platznummer ein → wird automatisch platziert</div>'
+    +'</div>'
+    +'<button onclick="dismissPoolHint()" title="Hinweis ausblenden" style="background:transparent;border:none;color:var(--mu);cursor:pointer;font-size:1rem;padding:4px 8px;flex-shrink:0">✕</button>'
+    +'</div></div>';
   renderSeats();
   renderQuickAttCount();
   loadPool();
+  // Pool-Hinweis zeigen wenn: Pool hat TN + keine Sitze belegt + nicht ausgeblendet
+  try{ updatePoolHint(); }catch(e){}
   // Mobile-Modus wiederherstellen
   if(_mobileListMode){
     const listEl=document.getElementById('mobileListView');
@@ -2389,6 +2538,8 @@ function renderSeats(){
   requestAnimationFrame(scaleSeating);
   // Drop-Targets für Pool-Drag auf den neuen Seat-Elementen einrichten
   if(typeof setupSeatDropTargets==='function') setupSeatDropTargets();
+  // Pool-Hinweis ggf. ausblenden wenn jetzt TN platziert sind
+  try{ if(typeof updatePoolHint==='function') updatePoolHint(); }catch(e){}
 }
 function scaleSeating(){} // disabled
 window.addEventListener('resize', ()=>scaleSeating());
@@ -5786,6 +5937,7 @@ function loadPool(){
       setupSeatDropTargets();
       renderFehlt(kursId);
       renderWiederholer(kursId);
+      try{ updatePoolHint(); }catch(e){}
     }, err=>{ if(!isStale()) body.innerHTML='<div class="pool-empty">Fehler beim Laden</div>'; });
   });
 }
