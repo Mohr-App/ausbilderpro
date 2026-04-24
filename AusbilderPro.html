@@ -4026,16 +4026,45 @@ function openAusbilderProfil(){
   document.getElementById('apTelefon').value=p.telefon||'';
   document.getElementById('apEmail').value=p.email||'';
   document.getElementById('ausbilderProfilModal').classList.add('open');
+  // Nach Anzeigen: frische Firestore-Daten nachladen (overwrite falls neuer)
+  if(_fbUid && _db){
+    _db.collection('users').doc(_fbUid).collection('data').doc('profil').get().then(doc=>{
+      if(!doc.exists) return;
+      const d=doc.data()||{};
+      // localStorage aktualisieren als Cache
+      localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(d));
+      // Modal-Felder nur überschreiben wenn User noch nicht getippt hat
+      const nEl=document.getElementById('apName');
+      const tEl=document.getElementById('apTelefon');
+      const eEl=document.getElementById('apEmail');
+      if(nEl && !nEl.value) nEl.value=d.name||'';
+      if(tEl && !tEl.value) tEl.value=d.telefon||'';
+      if(eEl && !eEl.value) eEl.value=d.email||'';
+    }).catch(()=>{});
+  }
 }
 function saveAusbilderProfil(){
   const name=(document.getElementById('apName').value||'').trim();
   const telefon=(document.getElementById('apTelefon').value||'').trim();
   const email=(document.getElementById('apEmail').value||'').trim();
   if(!name){toast('Bitte Name eingeben','bad');return;}
-  localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify({name,telefon,email}));
+  const data={name,telefon,email};
+  // Sofort localStorage (schneller Cache) + Firestore (persistent)
+  localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(data));
+  if(_fbUid && _db){
+    _db.collection('users').doc(_fbUid).collection('data').doc('profil')
+      .set(data,{merge:true})
+      .then(()=>{
+        toast('Profil gespeichert ✓');
+      })
+      .catch(err=>{
+        toast('Cloud-Fehler: '+err.message,'bad');
+      });
+  } else {
+    toast('Profil lokal gespeichert ✓');
+  }
   document.getElementById('ausbilderProfilModal').classList.remove('open');
   loadAusbilder(); // Header-Name aktualisieren
-  toast('Profil gespeichert ✓');
 }
 function changeAusbilderPw(){
   const pw1=document.getElementById('apPwNew').value;
@@ -6669,7 +6698,17 @@ function fbLoadData(){
       checkAusbNotifications();
       checkFirstLoginPwHint();
       checkDsgvoConsent();
-      loadAusbilder(); // Profilname in Header laden (erst hier ist _fbUid gesetzt)
+      // Profil aus Firestore nachladen (persistent, nicht nur localStorage)
+      _db.collection('users').doc(_fbUid).collection('data').doc('profil').get().then(pDoc=>{
+        if(pDoc.exists){
+          const p=pDoc.data()||{};
+          if(p.name||p.telefon||p.email){
+            localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(p));
+          }
+        }
+      }).catch(()=>{}).finally(()=>{
+        loadAusbilder(); // Profilname in Header (nach evtl. Firestore-Load)
+      });
       ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||'');
     })
     .catch(()=>{
