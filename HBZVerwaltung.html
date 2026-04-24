@@ -2068,7 +2068,21 @@ function renderSbAusbTree(){
 
   // Attach Kurse to their Ausbilder
   _kurse.forEach(k => {
-    const aId = k.ausbilderId || null;
+    let aId = k.ausbilderId || null;
+
+    // Email-Match Fallback: wenn keine ausbilderId gespeichert,
+    // versuche Ausbilder per Email zu finden (ausbilderLoginEmail oder ausbilderEmail)
+    if(!aId){
+      const email = (k.ausbilderLoginEmail || k.ausbilderEmail || '').toLowerCase();
+      if(email){
+        const match = _ausbilder.find(x =>
+          (x.loginEmail||'').toLowerCase() === email ||
+          (x.email||'').toLowerCase() === email
+        );
+        if(match) aId = match.id;
+      }
+    }
+
     if(aId) {
       // find which beruf this ausbilder belongs to
       const a = _ausbilder.find(x => x.id === aId);
@@ -2077,7 +2091,7 @@ function renderSbAusbTree(){
       if(!byBeruf[bKey].ausbilder[aId]) byBeruf[bKey].ausbilder[aId] = { name: a ? a.name : (k.ausbilderName||'?'), kurse: [] };
       byBeruf[bKey].ausbilder[aId].kurse.push(k);
     } else {
-      // Fallback: group by email for old-style courses
+      // Fallback: group by email for old-style courses (Ausbilder nicht in VP angelegt)
       const bKey = getBerufKey(k.name);
       if(!byBeruf[bKey]) byBeruf[bKey] = { ausbilder: {} };
       const eKey = 'email_' + (k.ausbilderEmail||'unbekannt');
