@@ -2684,13 +2684,14 @@ let _dragSeatId=null;
 
 function swapSeats(aId,bId){
   const inst=curInst(); if(!inst)return;
-  const rows=getRows(inst);
-  let aRow=null,aIdx=-1,bRow=null,bIdx=-1;
-  rows.forEach(r=>{ const i=r.seats.indexOf(aId); if(i>-1){aRow=r;aIdx=i;} });
-  rows.forEach(r=>{ const i=r.seats.indexOf(bId); if(i>-1){bRow=r;bIdx=i;} });
-  if(!aRow||!bRow)return;
-  aRow.seats[aIdx]=bId;
-  bRow.seats[bIdx]=aId;
+  // Fix: Nur den Inhalt (Teilnehmer-Daten) tauschen, NICHT die Seat-IDs.
+  // Damit bleiben die Tischnummern (inst.seatLabels[sid]) an ihrer Position
+  // und nur die Teilnehmer wandern.
+  inst.seats = inst.seats || {};
+  const a = inst.seats[aId];
+  const b = inst.seats[bId];
+  if(b === undefined){ delete inst.seats[aId]; } else { inst.seats[aId] = b; }
+  if(a === undefined){ delete inst.seats[bId]; } else { inst.seats[bId] = a; }
   persist(); renderSeats();
 }
 
