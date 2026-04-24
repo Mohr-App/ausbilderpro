@@ -292,6 +292,42 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .snum{font-family:'JetBrains Mono',monospace;font-size:.52rem;color:#64748b;position:absolute;top:4px;right:5px;cursor:pointer;border-radius:3px;padding:1px 2px;transition:background .12s,color .12s;}
 .snum:hover{background:rgba(59,130,246,.12);color:var(--acc);}
 .shint{color:#94a3b8;font-size:.76rem;font-style:italic;text-align:center;}
+/* Erster leerer Sitz als Onboarding-Hinweis */
+.seat-first-empty{
+  position:relative;
+  border:2px dashed #2563eb !important;
+  background:linear-gradient(135deg,rgba(37,99,235,.04),rgba(5,150,105,.04)) !important;
+  animation:seatPulseFirst 2.2s ease-in-out infinite;
+  box-shadow:0 0 0 0 rgba(37,99,235,.35);
+}
+@keyframes seatPulseFirst{
+  0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.35); border-color:#2563eb;}
+  50%    {box-shadow:0 0 0 6px rgba(37,99,235,0); border-color:#059669;}
+}
+.seat-first-empty .shint-first{
+  color:#2563eb !important;
+  font-style:normal !important;
+  font-weight:700;
+  font-size:.82rem;
+}
+.seat-first-empty .shint-sub{
+  font-size:.62rem;
+  color:#64748b;
+  text-align:center;
+  margin-top:2px;
+  font-style:italic;
+  line-height:1.3;
+  padding:0 4px;
+}
+.seat-first-empty .shint-close{
+  position:absolute;top:4px;right:4px;
+  width:18px;height:18px;border-radius:50%;
+  border:none;background:rgba(148,163,184,.15);color:#64748b;
+  font-size:.72rem;font-weight:700;cursor:pointer;padding:0;
+  line-height:1;display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+.seat-first-empty .shint-close:hover{background:rgba(239,68,68,.15);color:#dc2626;}
 .sname-row{display:flex;align-items:baseline;gap:5px;margin-bottom:1px;overflow:hidden;}
 .sname{font-weight:700;font-size:.9rem;color:#0f172a;padding-right:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .smeta{position:absolute;bottom:5px;right:7px;font-size:.54rem;color:#5a6a8a;font-family:'JetBrains Mono',monospace;white-space:nowrap;opacity:.9;}
@@ -2257,6 +2293,14 @@ function dismissPoolHint(){
   const b=document.getElementById('poolHintBanner'); if(b) b.style.display='none';
 }
 
+// Ersten-Sitz-Hint dauerhaft ausblenden
+function dismissFirstSeatHint(e){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  try{ localStorage.setItem(_lsKey('firstSeatHintDismissed'),'1'); }catch(err){}
+  // Re-render entfernt die Puls-Klasse
+  if(typeof renderSeats==='function') renderSeats();
+}
+
 // Leer-Pool-Anleitung (wenn keine TN im Pool): 3 Wege zum Hinzufügen
 function poolEmptyGuideHtml(state){
   // state: 'noKurs' (kein Firestore-Kurs verknüpft) | 'noTN' (Kurs da, aber leer)
@@ -2553,6 +2597,25 @@ function renderSeats(){
   const wrap=document.getElementById('seatingEl'); if(!wrap)return;
   wrap.innerHTML='';
   const rows=getRows(inst);
+  // Ersten leeren Sitz finden (zum Hervorheben als Onboarding-Hinweis)
+  let _firstEmptySeatId=null;
+  const _seatsMap=inst.seats||{};
+  outer: for(const r of rows){
+    for(const sid of (r.seats||[])){
+      const d=_seatsMap[sid];
+      if(!d||!d.name){ _firstEmptySeatId=sid; break outer; }
+    }
+  }
+  // Nur hervorheben wenn:
+  //  - mind. 1 leerer Sitz (sonst nix zu zeigen)
+  //  - NICHT alle leer (bei komplett leerem Plan ist der Pool-Hinweis schon da)
+  //  - User hat Hint nicht dauerhaft ausgeblendet
+  const totalSeats=rows.reduce((m,r)=>m+r.seats.length,0);
+  const filledSeats=Object.values(_seatsMap).filter(d=>d&&d.name).length;
+  const hintDismissed=localStorage.getItem(_lsKey('firstSeatHintDismissed'))==='1';
+  const showFirstEmptyHint = _firstEmptySeatId && filledSeats>0 && filledSeats<totalSeats && !hintDismissed;
+  if(!showFirstEmptyHint) _firstEmptySeatId=null;
+  window._firstEmptySeatId = _firstEmptySeatId;
   const rowCount = rows.length;
   const rowCls = rowCount===1?'rows-1':rowCount===2?'rows-2':rowCount===3?'rows-3':rowCount===4?'rows-4':rowCount===5?'rows-5':'rows-6up';
   wrap.className='seating '+rowCls;
@@ -2962,7 +3025,9 @@ function mkSeat(id,seats){
   const inst=curInst();
   const label=(inst&&inst.seatLabels&&inst.seatLabels[id]!=null&&inst.seatLabels[id]!=='')?inst.seatLabels[id]:'—';
   const el=document.createElement('div');
-  el.className='seat';el.id='seat-'+id;el.onclick=()=>openModal(id);
+  const isFirstEmpty = window._firstEmptySeatId === id;
+  el.className='seat'+(isFirstEmpty?' seat-first-empty':'');
+  el.id='seat-'+id;el.onclick=()=>openModal(id);
   const d=seats[id];
   el.innerHTML='<div class="snum" title="Tischnummer ändern" onclick="renameSeat(event,\''+id+'\')">'+esc(label)+'</div>';
   // drag & drop
@@ -2983,7 +3048,17 @@ function mkSeat(id,seats){
   el.addEventListener('dragover',e=>{ e.preventDefault(); if(_dragSeatId&&_dragSeatId!==id){ document.querySelectorAll('.seat').forEach(s=>s.classList.remove('drag-over')); el.classList.add('drag-over'); } });
   el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
   el.addEventListener('drop',e=>{ e.preventDefault(); if(!_dragSeatId||_dragSeatId===id)return; swapSeats(_dragSeatId,id); });
-  if(!d||!d.name){ el.innerHTML+='<div class="shint" title="Klicken um Teilnehmer zuzuweisen">+ Sitzplatz belegen</div>'; }
+  if(!d||!d.name){
+    if(isFirstEmpty){
+      // Ersten leeren Sitz: zusätzlicher Sub-Hint für Drag, kleiner Close-Button
+      el.innerHTML+=''
+        +'<div class="shint shint-first" title="Klicken zum Zuweisen – oder Azubi aus dem Pool hierher ziehen">+ Sitzplatz belegen</div>'
+        +'<div class="shint-sub">oder Azubi aus dem Pool hierher ziehen</div>'
+        +'<button class="shint-close" title="Hinweis ausblenden" onclick="dismissFirstSeatHint(event)">✕</button>';
+    } else {
+      el.innerHTML+='<div class="shint" title="Klicken um Teilnehmer zuzuweisen">+ Sitzplatz belegen</div>';
+    }
+  }
   else{
     el.classList.add('filled');
     el.title=d.name+' – Klicken für Details';
