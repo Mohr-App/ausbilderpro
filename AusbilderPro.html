@@ -2217,7 +2217,9 @@ function saveNewInst(){
         S.kats[dpKatId].instances[id]=instData;
         S.curKat=dpKatId;S.curInst=id;S.kats[dpKatId].open=true;
         persist();closeDp();renderAll();
-        toast('Lehrgang erstellt ✓ – QR-Code und Pool verfügbar');
+        toast('Lehrgang erstellt ✓');
+        // QR-Modal automatisch oeffnen – Ausbilder kann direkt ausdrucken
+        setTimeout(()=>{ try{ openQRModal(); }catch(e){} }, 400);
       }).catch(err=>{
       // Fallback: lokal erstellen ohne Firestore
       S.kats[dpKatId].instances[id]=instData;
@@ -4065,6 +4067,21 @@ function saveAusbilderProfil(){
   }
   document.getElementById('ausbilderProfilModal').classList.remove('open');
   loadAusbilder(); // Header-Name aktualisieren
+  // Falls der User grade einen Kurs angelegt hat der noch nicht Firestore-synced ist:
+  // Jetzt nachholen und QR-Modal oeffnen
+  const inst=curInst();
+  if(inst && !inst.sharedKursId && _db && _auth?.currentUser){
+    setTimeout(()=>{
+      try{
+        activateFirestore();
+        // Nach Firestore-Sync QR oeffnen (activateFirestore ist async, deswegen etwas warten)
+        setTimeout(()=>{
+          const i2=curInst();
+          if(i2 && i2.sharedKursId){ try{ openQRModal(); }catch(e){} }
+        }, 1200);
+      }catch(e){}
+    }, 300);
+  }
 }
 function changeAusbilderPw(){
   const pw1=document.getElementById('apPwNew').value;
@@ -4410,6 +4427,8 @@ function activateFirestore(){
     inst.sharedKursId=ref.id;
     persist();renderMain();
     toast('QR-Code + Pool aktiviert ✓');
+    // QR-Modal direkt oeffnen (Ausbilder kann gleich drucken)
+    setTimeout(()=>{ try{ openQRModal(); }catch(e){} }, 400);
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
