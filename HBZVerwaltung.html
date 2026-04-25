@@ -8690,3 +8690,48 @@ window.addEventListener('load',()=>{
 <div class="modal" style="max-width:480px">
 <div class="mhd"><div class="mtit">📋 Was ist neu?</div><button class="xcls" onclick="document.getElementById('changelogModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
 <div class="mbdy" style="max-height:60
+<!-- TEMP DEBUG-Button (nach Diagnose entfernen) -->
+<button id="vpDebugBtn" onclick="vpMobileDebug()" style="position:fixed;bottom:8px;right:8px;z-index:9999;background:#dc2626;color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:1rem;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3);font-weight:700">?</button>
+<div id="vpDebugOut" style="display:none;position:fixed;inset:0;background:#fff;z-index:10000;padding:14px;overflow:auto;font-family:monospace;font-size:11px;line-height:1.6;white-space:pre-wrap;color:#000"></div>
+<script>
+function vpMobileDebug(){
+  const sb=document.querySelector('.sb');
+  const a=document.getElementById('sbAusbTree');
+  const t=document.getElementById('sbTnTree');
+  const k=document.getElementById('sbKurseTree');
+  const al=document.getElementById('sbAppLauncher');
+  const o=document.getElementById('sbOverlay');
+  const r=sb?sb.getBoundingClientRect():null;
+  const cs=sb?getComputedStyle(sb):null;
+  let out='=== VP Mobile Debug ===\n';
+  out+='Window: '+window.innerWidth+'x'+window.innerHeight+'\n\n';
+  out+='Sidebar (.sb):\n';
+  out+=' classList: '+((sb&&sb.className)||'FEHLT')+'\n';
+  out+=' rect: '+(r?Math.round(r.left)+','+Math.round(r.top)+' '+Math.round(r.width)+'x'+Math.round(r.height):'-')+'\n';
+  out+=' display: '+((cs&&cs.display)||'-')+'\n';
+  out+=' transform: '+((cs&&cs.transform)||'-')+'\n';
+  out+=' z-index: '+((cs&&cs.zIndex)||'-')+'\n';
+  out+=' position: '+((cs&&cs.position)||'-')+'\n';
+  out+=' open?: '+((sb&&sb.classList.contains('mobile-open'))?'JA':'nein')+'\n\n';
+  out+='Overlay (.sb-overlay):\n';
+  out+=' classList: '+((o&&o.className)||'FEHLT')+'\n';
+  out+=' show?: '+((o&&o.classList.contains('show'))?'JA':'nein')+'\n\n';
+  out+='AppLauncher (#sbAppLauncher):\n';
+  out+=' data-admin: '+((al&&al.getAttribute('data-admin'))||'-')+'\n';
+  out+=' html-Laenge: '+((al&&al.innerHTML.length)||0)+'\n\n';
+  out+='AusbilderTree (#sbAusbTree):\n';
+  out+=' html-Laenge: '+((a&&a.innerHTML.length)||0)+'\n';
+  out+=' Vorschau: '+((a&&a.innerHTML.slice(0,150))||'LEER')+'\n\n';
+  out+='TnTree (#sbTnTree):\n';
+  out+=' html-Laenge: '+((t&&t.innerHTML.length)||0)+'\n';
+  out+=' Vorschau: '+((t&&t.innerHTML.slice(0,150))||'LEER')+'\n\n';
+  out+='KurseTree (#sbKurseTree):\n';
+  out+=' html-Laenge: '+((k&&k.innerHTML.length)||0)+'\n\n';
+  out+='_isAdmin: '+(typeof _isAdmin!=='undefined'?_isAdmin:'?')+'\n';
+  out+='User-Email: '+(typeof _auth!=='undefined'&&_auth&&_auth.currentUser?_auth.currentUser.email:'?')+'\n';
+  const div=document.getElementById('vpDebugOut');
+  div.textContent=out+'\n\n[Tippen zum Schliessen]';
+  div.style.display='block';
+  div.onclick=function(){div.style.display='none';};
+}
+</script>
