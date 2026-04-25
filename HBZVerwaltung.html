@@ -475,7 +475,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 /* ── MOBILE RESPONSIVE ── */
 .hdr-burger{display:none;background:none;border:none;color:#e2e8f0;font-size:1.4rem;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1;}
 .hdr-burger:hover{background:rgba(255,255,255,.1);}
-.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:299;}
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:149;}
 @media(max-width:768px){
   #dashCharts{grid-template-columns:1fr!important;}
   #dashStatusGrid{grid-template-columns:1fr!important;}
@@ -497,8 +497,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   .sb-app-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:.72rem;font-weight:800;font-family:'Sora',sans-serif;}
   .sb-app-label{flex:1;min-width:0;font-size:.75rem;font-weight:700;line-height:1.2;}
   .sb-app-label small{display:block;font-size:.55rem;font-weight:500;color:var(--mu);margin-top:2px;}
-  .sb{position:fixed;top:0;left:0;bottom:0;width:82vw;max-width:310px;background:#fff;z-index:300;transform:translateX(-110%);transition:transform .27s cubic-bezier(.4,0,.2,1);box-shadow:8px 0 24px rgba(0,0,0,.08);-webkit-overflow-scrolling:touch;overflow-y:auto;overscroll-behavior:contain;padding-top:54px;}
-  .sb.mobile-open{transform:translateX(0);}
+  .sb{position:fixed;left:-300px;top:54px;bottom:0;width:280px;z-index:150;transition:left .25s ease;box-shadow:none;}
+  .sb.mobile-open{left:0;box-shadow:4px 0 24px rgba(0,0,0,.12);}
   .sb-overlay.show{display:block;}
   .main{padding:14px 8px;overflow-x:hidden;max-width:100vw;}
   .grid2,.grid3,#dashStatusGrid{grid-template-columns:1fr!important;}
@@ -1964,17 +1964,6 @@ function toggleMobileSb(){
   const ov=document.getElementById('sbOverlay');
   const open=sb.classList.toggle('mobile-open');
   ov.classList.toggle('show',open);
-  // Repaint erzwingen damit Inhalt sofort sichtbar wird (sonst manchmal leer bis Touch)
-  if(open){
-    // Doppelter rAF: erst der Browser-Reflow nach class-toggle, dann unser Hack
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      // Trigger Re-Layout durch Lese-Zugriff auf offsetHeight
-      void sb.offsetHeight;
-      // Falls Inhalt-Bäume leer sind, Render erzwingen
-      if(typeof renderSbAusbTree==='function') try{renderSbAusbTree();}catch(e){}
-      if(typeof renderSbTnTree==='function') try{renderSbTnTree();}catch(e){}
-    }));
-  }
 }
 function closeMobileSb(){
   document.querySelector('.sb')?.classList.remove('mobile-open');
