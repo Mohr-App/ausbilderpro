@@ -1965,6 +1965,24 @@ function toggleMobileSb(){
   const ov=document.getElementById('sbOverlay');
   const open=sb.classList.toggle('mobile-open');
   ov.classList.toggle('show',open);
+  if(open){
+    // Composite-Layer-Bug auf Mobile: nach Slide-In Render erzwingen
+    // damit Tree-Inhalte direkt sichtbar sind (nicht erst nach Scroll)
+    setTimeout(()=>{
+      // Doppelter Repaint-Trick:
+      // 1. Aktuelles transform lesen erzwingt Layout-Reflow
+      void sb.offsetHeight;
+      // 2. Tree-Render erneut triggern (idempotent, aktualisiert Composite-Layer)
+      try{
+        if(typeof renderSbAusbTree==='function') renderSbAusbTree();
+        if(typeof renderSbTnTree==='function') renderSbTnTree();
+        if(typeof renderSbKurseTree==='function') renderSbKurseTree();
+      }catch(e){}
+      // 3. visibility Toggle erzwingt finalen Composite-Refresh
+      sb.style.willChange='auto';
+      requestAnimationFrame(()=>{ sb.style.willChange=''; });
+    }, 320); // nach Animation (.27s + Puffer)
+  }
 }
 function closeMobileSb(){
   document.querySelector('.sb')?.classList.remove('mobile-open');
