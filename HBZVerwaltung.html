@@ -8599,7 +8599,52 @@ function restoreData(data){
 }
 
 // ── SW + Install ──
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw-vp.js').then(()=>console.log('VP SW ok')).catch(e=>console.warn('SW:',e));});}
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw-vp.js').then(reg=>{
+      console.log('VP SW ok');
+      // Periodisch nach Update suchen (alle 60s)
+      setInterval(()=>{ try{reg.update();}catch(e){} }, 60000);
+      // Wenn neue Version verfügbar → installierter SW wartet
+      reg.addEventListener('updatefound', ()=>{
+        const newSw = reg.installing;
+        if(!newSw) return;
+        newSw.addEventListener('statechange', ()=>{
+          if(newSw.state === 'installed' && navigator.serviceWorker.controller){
+            // Neue Version steht bereit → User informieren
+            showVpUpdateBanner();
+          }
+        });
+      });
+    }).catch(e=>console.warn('SW:',e));
+    // Wenn neuer SW aktiviert wird, Seite neu laden
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+      if(refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  });
+}
+
+// Update-Banner zeigen
+function showVpUpdateBanner(){
+  if(document.getElementById('vpUpdateBanner')) return;
+  const b=document.createElement('div');
+  b.id='vpUpdateBanner';
+  b.style.cssText='position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10000;padding:14px 20px;background:#2563eb;color:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-family:Sora,sans-serif;font-size:.85rem;font-weight:700;display:flex;align-items:center;gap:14px;max-width:90vw';
+  b.innerHTML='<span>Neue Version verfügbar</span><button onclick="applyVpUpdate()" style="background:#fff;color:#2563eb;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer">Aktualisieren</button>';
+  document.body.appendChild(b);
+}
+function applyVpUpdate(){
+  navigator.serviceWorker.getRegistration().then(reg=>{
+    if(reg && reg.waiting){
+      reg.waiting.postMessage({type:'SKIP_WAITING'});
+    } else {
+      window.location.reload();
+    }
+  });
+}
 // ── Install Banner ──
 let _installPrompt=null;
 window.addEventListener('beforeinstallprompt',e=>{

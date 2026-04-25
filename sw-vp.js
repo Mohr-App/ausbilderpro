@@ -1,4 +1,4 @@
-const CACHE = 'verwaltungpro-v177';
+const CACHE = 'verwaltungpro-v178';
 const ASSETS = [
   './HBZVerwaltung.html',
   './manifest-vp.json',
@@ -23,6 +23,13 @@ self.addEventListener('activate', e => {
       keys.filter(k => k.startsWith('verwaltungpro-') && k !== CACHE).map(k => caches.delete(k))
     )).then(() => self.clients.claim())
   );
+});
+
+// Skip-Waiting auf Anfrage (für Update-Knopf in der App)
+self.addEventListener('message', e => {
+  if(e.data && e.data.type === 'SKIP_WAITING'){
+    self.skipWaiting();
+  }
 });
 
 // Fetch: network-first for all requests
