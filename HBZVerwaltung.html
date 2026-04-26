@@ -497,8 +497,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   .sb-app-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:.72rem;font-weight:800;font-family:'Sora',sans-serif;}
   .sb-app-label{flex:1;min-width:0;font-size:.75rem;font-weight:700;line-height:1.2;}
   .sb-app-label small{display:block;font-size:.55rem;font-weight:500;color:var(--mu);margin-top:2px;}
-  .sb{position:fixed;left:0;top:54px;bottom:0;width:280px;z-index:300;transform:translateX(-110%);transition:transform .27s cubic-bezier(.4,0,.2,1);box-shadow:none;-webkit-overflow-scrolling:touch;}
-  .sb.mobile-open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.12);}
+  .sb{position:fixed;left:0;top:54px;bottom:0;width:280px;z-index:300;display:none;box-shadow:none;-webkit-overflow-scrolling:touch;}
+  .sb.mobile-open{display:flex;box-shadow:4px 0 24px rgba(0,0,0,.12);}
   .sb-overlay{background:rgba(0,0,0,.4)!important;z-index:299!important;}
   .sb-overlay.show{display:block;}
   .main{padding:14px 8px;overflow-x:hidden;max-width:100vw;}
@@ -1963,25 +1963,8 @@ document.addEventListener('keydown', function(e){
 function toggleMobileSb(){
   const sb=document.querySelector('.sb');
   const ov=document.getElementById('sbOverlay');
-  const wasOpen = sb.classList.contains('mobile-open');
-  if(wasOpen){
-    // Schließen: erst transform-Klasse zurücksetzen für Animation
-    sb.style.transform='';  // entfernt die left:0-Override
-    sb.classList.remove('mobile-open');
-    ov.classList.remove('show');
-  } else {
-    // Öffnen: Animation starten
-    sb.classList.add('mobile-open');
-    ov.classList.add('show');
-    // Nach Animation transform komplett entfernen damit Composite-Layer
-    // aufgeloest wird und Inhalte normal rendern (statt nur bei Scroll)
-    setTimeout(()=>{
-      if(sb.classList.contains('mobile-open')){
-        // left:0 hardcoden, transform raus
-        sb.style.transform='none';
-      }
-    }, 300);
-  }
+  const open=sb.classList.toggle('mobile-open');
+  ov.classList.toggle('show',open);
 }
 function closeMobileSb(){
   document.querySelector('.sb')?.classList.remove('mobile-open');
