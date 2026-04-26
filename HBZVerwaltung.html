@@ -1963,25 +1963,24 @@ document.addEventListener('keydown', function(e){
 function toggleMobileSb(){
   const sb=document.querySelector('.sb');
   const ov=document.getElementById('sbOverlay');
-  const open=sb.classList.toggle('mobile-open');
-  ov.classList.toggle('show',open);
-  if(open){
-    // Composite-Layer-Bug auf Mobile: nach Slide-In Render erzwingen
-    // damit Tree-Inhalte direkt sichtbar sind (nicht erst nach Scroll)
+  const wasOpen = sb.classList.contains('mobile-open');
+  if(wasOpen){
+    // Schließen: erst transform-Klasse zurücksetzen für Animation
+    sb.style.transform='';  // entfernt die left:0-Override
+    sb.classList.remove('mobile-open');
+    ov.classList.remove('show');
+  } else {
+    // Öffnen: Animation starten
+    sb.classList.add('mobile-open');
+    ov.classList.add('show');
+    // Nach Animation transform komplett entfernen damit Composite-Layer
+    // aufgeloest wird und Inhalte normal rendern (statt nur bei Scroll)
     setTimeout(()=>{
-      // Doppelter Repaint-Trick:
-      // 1. Aktuelles transform lesen erzwingt Layout-Reflow
-      void sb.offsetHeight;
-      // 2. Tree-Render erneut triggern (idempotent, aktualisiert Composite-Layer)
-      try{
-        if(typeof renderSbAusbTree==='function') renderSbAusbTree();
-        if(typeof renderSbTnTree==='function') renderSbTnTree();
-        if(typeof renderSbKurseTree==='function') renderSbKurseTree();
-      }catch(e){}
-      // 3. visibility Toggle erzwingt finalen Composite-Refresh
-      sb.style.willChange='auto';
-      requestAnimationFrame(()=>{ sb.style.willChange=''; });
-    }, 320); // nach Animation (.27s + Puffer)
+      if(sb.classList.contains('mobile-open')){
+        // left:0 hardcoden, transform raus
+        sb.style.transform='none';
+      }
+    }, 300);
   }
 }
 function closeMobileSb(){
