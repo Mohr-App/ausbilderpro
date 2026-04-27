@@ -156,43 +156,95 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <!-- SELF-REGISTRATION (via QR join link) -->
 <div class="login-wrap" id="joinWrap" style="display:none">
-  <div class="login-box" style="max-width:400px">
+  <div class="login-box" style="max-width:420px">
     <div class="login-logo">Azubi<span>Pro</span></div>
     <div class="login-sub">Lehrgang beitreten</div>
     <div id="joinKursInfo" style="margin-bottom:12px;padding:10px 14px;background:rgba(16,185,129,.08);border:1.5px solid rgba(16,185,129,.25);border-radius:10px;font-size:.78rem;text-align:center"></div>
 
-    <!-- LOGIN (oben) -->
-    <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px;text-align:center">Bereits ein Konto?</div>
-    <div><label class="fl">E-Mail</label><input class="fi" type="email" id="jLoginEmail" placeholder="deine@email.de" autocomplete="email"></div>
-    <div style="margin-top:6px"><label class="fl">Passwort</label><input class="fi" type="password" id="jLoginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitJoinLogin()"></div>
-    <div class="err" id="jLoginErr"></div>
-    <button class="btn" onclick="submitJoinLogin()" style="margin-top:8px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Anmelden & beitreten">Anmelden & Lehrgang beitreten</button>
+    <!-- LOGIN (oben - schnell für bestehende User) -->
+    <div id="joinLoginSection">
+      <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px;text-align:center">Bereits ein Konto?</div>
+      <div><label class="fl">E-Mail</label><input class="fi" type="email" id="jLoginEmail" placeholder="deine@email.de" autocomplete="email"></div>
+      <div style="margin-top:6px"><label class="fl">Passwort</label><input class="fi" type="password" id="jLoginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitJoinLogin()"></div>
+      <div class="err" id="jLoginErr"></div>
+      <button class="btn" onclick="submitJoinLogin()" style="margin-top:8px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Anmelden & beitreten">Anmelden & Lehrgang beitreten</button>
+      <div style="margin-top:14px;border-top:1px solid var(--brd);padding-top:12px;text-align:center">
+        <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px">Noch kein Konto?</div>
+        <button class="btn" onclick="startJoinWizard()" style="background:linear-gradient(135deg,#059669,#10b981)" title="Schritt-für-Schritt-Registrierung starten">✨ Jetzt registrieren</button>
+      </div>
+    </div>
 
-    <!-- REGISTRIERUNG (unten) -->
-    <div style="margin-top:14px;border-top:1px solid var(--brd);padding-top:12px">
-      <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px;text-align:center">Noch kein Konto? Jetzt registrieren</div>
-      <div style="display:flex;gap:8px">
-        <div style="flex:1"><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="jVorname" placeholder="Max"></div>
-        <div style="flex:1"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="jNachname" placeholder="Mustermann"></div>
+    <!-- REGISTRIERUNG WIZARD -->
+    <div id="joinWizard" style="display:none">
+      <!-- Fortschrittsbalken -->
+      <div style="margin-bottom:18px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:.68rem;color:var(--mu);font-weight:700" id="wizStepLabel">Schritt 1 von 6</div>
+          <button onclick="wizCancel()" style="background:none;border:none;color:var(--mu);font-size:.7rem;cursor:pointer;text-decoration:underline" title="Zurück zum Login">✕ Abbrechen</button>
+        </div>
+        <div style="height:6px;background:var(--brd);border-radius:3px;overflow:hidden">
+          <div id="wizProgress" style="height:100%;background:linear-gradient(90deg,#2563eb,#10b981);width:16%;transition:width .25s"></div>
+        </div>
       </div>
-      <div style="margin-top:6px"><label class="fl">Betrieb / Ausbildungsfirma <span style="color:#ef4444">*</span></label><input class="fi" id="jFirma" placeholder="Firma GmbH"></div>
-      <div style="margin-top:6px"><label class="fl">Beruf</label><select class="fi" id="jBeruf" onchange="fillFachrichtungen('jBeruf','jFachrichtung')" style="font-size:.76rem"><option value="">– Beruf wählen –</option></select></div>
-      <div style="margin-top:6px" id="jFachrichtungRow" style="display:none"><label class="fl">Fachrichtung</label><select class="fi" id="jFachrichtung" style="font-size:.76rem"><option value="">– erst Beruf wählen –</option></select></div>
-      <div style="display:flex;gap:8px;margin-top:6px">
-        <div style="flex:1"><label class="fl">Lehrjahr</label><select class="fi" id="jLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
-        <div style="flex:1"><label class="fl">Geburtsdatum</label><input type="date" class="fi" id="jGeburt"></div>
+
+      <!-- Schritt 1: Name -->
+      <div class="wiz-step" data-step="1">
+        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">👋 Wie heißt du?</div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Damit wir dich richtig ansprechen.</div>
+        <div><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="jVorname" placeholder="Max" autocomplete="given-name"></div>
+        <div style="margin-top:8px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="jNachname" placeholder="Mustermann" autocomplete="family-name"></div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:6px">
-        <div style="flex:1"><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jEmail" placeholder="deine@email.de"></div>
-        <div style="flex:1"><label class="fl">Telefon</label><input class="fi" type="tel" id="jTelefon" placeholder="0170..."></div>
+
+      <!-- Schritt 2: Beruf -->
+      <div class="wiz-step" data-step="2" style="display:none">
+        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🛠 Was lernst du?</div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Wähle deinen Ausbildungsberuf.</div>
+        <div><label class="fl">Beruf <span style="color:#ef4444">*</span></label><select class="fi" id="jBeruf" onchange="fillFachrichtungen('jBeruf','jFachrichtung')" style="font-size:.82rem"><option value="">– Beruf wählen –</option></select></div>
+        <div id="jFachrichtungRow" style="margin-top:8px;display:none"><label class="fl">Fachrichtung</label><select class="fi" id="jFachrichtung" style="font-size:.82rem"><option value="">– erst Beruf wählen –</option></select></div>
+        <div style="margin-top:8px"><label class="fl">Lehrjahr</label><select class="fi" id="jLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
       </div>
-      <div style="margin-top:8px"><label class="fl">Passwort festlegen <span style="color:#ef4444">*</span></label><input class="fi" type="password" id="jPasswort" placeholder="Min. 6 Zeichen" autocomplete="new-password"></div>
-      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:10px 12px;background:rgba(59,130,246,.04);border:1.5px solid rgba(59,130,246,.15);border-radius:8px;cursor:pointer;user-select:none">
-        <input type="checkbox" id="jDsgvo" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:#10b981">
-        <span style="font-size:.62rem;color:var(--mu);line-height:1.5">Ich habe die <a href="https://ausbilderpro.de/datenschutz.html" target="_blank" style="color:var(--acc);text-decoration:underline" onclick="event.stopPropagation()">Datenschutzerklärung</a> und die <a href="https://ausbilderpro.de/nutzungsbedingungen.html" target="_blank" style="color:var(--acc);text-decoration:underline" onclick="event.stopPropagation()">Nutzungsbedingungen</a> gelesen und stimme der Verarbeitung meiner Daten zu. <span style="color:#ef4444">*</span></span>
-      </label>
-      <div class="err" id="jErr"></div>
-      <button class="btn" onclick="submitJoinRegistration()" style="margin-top:10px;background:linear-gradient(135deg,#059669,#10b981)" title="Registrieren & beitreten">Registrieren & Lehrgang beitreten</button>
+
+      <!-- Schritt 3: Betrieb -->
+      <div class="wiz-step" data-step="3" style="display:none">
+        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🏢 Wo machst du die Ausbildung?</div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Dein Ausbildungsbetrieb.</div>
+        <div><label class="fl">Betrieb / Firma <span style="color:#ef4444">*</span></label><input class="fi" id="jFirma" placeholder="Firma GmbH"></div>
+      </div>
+
+      <!-- Schritt 4: Geburtsdatum -->
+      <div class="wiz-step" data-step="4" style="display:none">
+        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🎂 Wann bist du geboren?</div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Optional – kannst du auch überspringen.</div>
+        <div><label class="fl">Geburtsdatum</label><input type="date" class="fi" id="jGeburt"></div>
+      </div>
+
+      <!-- Schritt 5: Kontakt -->
+      <div class="wiz-step" data-step="5" style="display:none">
+        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">📧 Wie erreichen wir dich?</div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Email ist nötig zum Einloggen. Telefon nur falls du möchtest.</div>
+        <div><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jEmail" placeholder="deine@email.de" autocomplete="email"></div>
+        <div style="margin-top:8px"><label class="fl">Telefon <span style="color:var(--mu);font-weight:400;font-size:.62rem">(freiwillig)</span></label><input class="fi" type="tel" id="jTelefon" placeholder="0170 1234567" autocomplete="tel"></div>
+      </div>
+
+      <!-- Schritt 6: Passwort + DSGVO -->
+      <div class="wiz-step" data-step="6" style="display:none">
+        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🔒 Letzter Schritt</div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Passwort festlegen und Datenschutz bestätigen.</div>
+        <div><label class="fl">Passwort wählen <span style="color:#ef4444">*</span></label><input class="fi" type="password" id="jPasswort" placeholder="Mindestens 6 Zeichen" autocomplete="new-password"></div>
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-top:14px;padding:10px 12px;background:rgba(59,130,246,.04);border:1.5px solid rgba(59,130,246,.15);border-radius:8px;cursor:pointer;user-select:none">
+          <input type="checkbox" id="jDsgvo" style="margin-top:2px;width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:#10b981">
+          <span style="font-size:.66rem;color:var(--mu);line-height:1.5">Ich habe die <a href="https://ausbilderpro.de/datenschutz.html" target="_blank" style="color:var(--acc);text-decoration:underline" onclick="event.stopPropagation()">Datenschutzerklärung</a> und die <a href="https://ausbilderpro.de/nutzungsbedingungen.html" target="_blank" style="color:var(--acc);text-decoration:underline" onclick="event.stopPropagation()">Nutzungsbedingungen</a> gelesen und stimme der Verarbeitung meiner Daten zu. <span style="color:#ef4444">*</span></span>
+        </label>
+      </div>
+
+      <div class="err" id="jErr" style="margin-top:10px"></div>
+
+      <!-- Navigation Buttons -->
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="wizBackBtn" class="btn" onclick="wizBack()" style="flex:1;background:var(--sur2);color:var(--tx);box-shadow:none;display:none" title="Vorheriger Schritt">← Zurück</button>
+        <button id="wizNextBtn" class="btn" onclick="wizNext()" style="flex:2;background:linear-gradient(135deg,#2563eb,#3b82f6)" title="Weiter">Weiter →</button>
+        <button id="wizSubmitBtn" class="btn" onclick="submitJoinRegistration()" style="flex:2;background:linear-gradient(135deg,#059669,#10b981);display:none" title="Registrierung abschliessen">✓ Registrieren</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1100,6 +1152,9 @@ let _joinKursId=null;
   // Join-Screen anzeigen statt Login
   document.getElementById('loginWrap').style.display='none';
   document.getElementById('joinWrap').style.display='flex';
+  // Wizard-Reset: Login-Section sichtbar, Wizard versteckt, bei Step 1 starten
+  document.getElementById('joinLoginSection').style.display='block';
+  document.getElementById('joinWizard').style.display='none';
 })();
 
 function showNormalLogin(){
@@ -1210,6 +1265,101 @@ function submitJoinLogin(){
     errEl.textContent=map[err.code]||'Fehler: '+err.message;
   });
 }
+
+// ── REGISTRIERUNGS-WIZARD (Step-by-Step) ──
+let _wizStep = 1;
+const _WIZ_TOTAL = 6;
+
+function startJoinWizard(){
+  _wizStep = 1;
+  document.getElementById('joinLoginSection').style.display='none';
+  document.getElementById('joinWizard').style.display='block';
+  showWizStep(1);
+}
+
+function wizCancel(){
+  document.getElementById('joinWizard').style.display='none';
+  document.getElementById('joinLoginSection').style.display='block';
+  // Felder NICHT leeren - falls User abgebrochen ist und nochmal versucht
+}
+
+function showWizStep(n){
+  _wizStep = n;
+  document.querySelectorAll('.wiz-step').forEach(el=>{
+    el.style.display = (parseInt(el.getAttribute('data-step'),10)===n)?'block':'none';
+  });
+  document.getElementById('wizStepLabel').textContent='Schritt '+n+' von '+_WIZ_TOTAL;
+  document.getElementById('wizProgress').style.width=(n*100/_WIZ_TOTAL)+'%';
+  document.getElementById('wizBackBtn').style.display = n>1 ? 'block' : 'none';
+  document.getElementById('wizNextBtn').style.display = n<_WIZ_TOTAL ? 'block' : 'none';
+  document.getElementById('wizSubmitBtn').style.display = n===_WIZ_TOTAL ? 'block' : 'none';
+  document.getElementById('jErr').textContent = '';
+  // Auto-Focus auf erstes Input des aktuellen Steps
+  setTimeout(()=>{
+    const cur=document.querySelector('.wiz-step[data-step="'+n+'"]');
+    const inp=cur?.querySelector('input,select');
+    if(inp && !inp.disabled) try{inp.focus();}catch(e){}
+  }, 60);
+}
+
+function wizValidateStep(n){
+  const errEl=document.getElementById('jErr');
+  errEl.textContent='';
+  errEl.style.color='var(--bad)';
+  if(n===1){
+    const v=(document.getElementById('jVorname').value||'').trim();
+    const nn=(document.getElementById('jNachname').value||'').trim();
+    if(!v){ errEl.textContent='Bitte Vorname eintragen.'; return false; }
+    if(!nn){ errEl.textContent='Bitte Nachname eintragen.'; return false; }
+  }
+  if(n===2){
+    const b=document.getElementById('jBeruf').value||'';
+    if(!b){ errEl.textContent='Bitte Beruf auswählen.'; return false; }
+  }
+  if(n===3){
+    const f=(document.getElementById('jFirma').value||'').trim();
+    if(!f){ errEl.textContent='Bitte Betrieb/Firma eintragen.'; return false; }
+  }
+  // Schritt 4 (Geburtsdatum) ist optional
+  if(n===5){
+    const e=(document.getElementById('jEmail').value||'').trim();
+    if(!e){ errEl.textContent='Bitte E-Mail eintragen.'; return false; }
+    if(!e.includes('@') || !e.includes('.')){ errEl.textContent='Bitte gültige E-Mail-Adresse eintragen.'; return false; }
+  }
+  // Schritt 6 wird beim Submit validiert
+  return true;
+}
+
+function wizNext(){
+  if(!wizValidateStep(_wizStep)) return;
+  if(_wizStep < _WIZ_TOTAL){
+    showWizStep(_wizStep+1);
+  }
+}
+
+function wizBack(){
+  if(_wizStep > 1){
+    showWizStep(_wizStep-1);
+  }
+}
+
+// Enter-Taste in Inputs schaltet weiter (für schnelles Tippen)
+document.addEventListener('keydown', e=>{
+  if(e.key !== 'Enter') return;
+  const wiz=document.getElementById('joinWizard');
+  if(!wiz || wiz.style.display==='none') return;
+  // Enter in Inputs/Selects (außer Textareas)
+  const tag=(e.target.tagName||'').toUpperCase();
+  if(tag==='INPUT' || tag==='SELECT'){
+    e.preventDefault();
+    if(_wizStep < _WIZ_TOTAL){
+      wizNext();
+    } else {
+      submitJoinRegistration();
+    }
+  }
+});
+
 
 function submitJoinRegistration(){
   const vorname=(document.getElementById('jVorname').value||'').trim();
