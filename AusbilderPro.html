@@ -1122,6 +1122,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         Die Lehrgangsart ist die <b>Bezeichnung des Lehrgangs</b> (z.B. „ET1", „ET2", „Metallgrundausbildung"). Meistens ist sie von der Verwaltung vorgegeben. Darunter legst du dann <b>einzelne Lehrgänge</b> mit konkreten Start-/Enddaten an.
       </div>
       <p style="font-size:.74rem;color:var(--mu);margin-bottom:10px">Aus vordefinierten auswählen:</p>
+      <div id="katmlSugg" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:8px"></div>
       <div class="katml-div"></div>
       <p style="font-size:.74rem;color:var(--mu);margin-bottom:8px;margin-top:14px">Oder eigene Art anlegen:</p>
       <div class="katml-custom">
@@ -1337,6 +1338,7 @@ function showHilfeModal(){ document.getElementById('hilfeModal').classList.add('
 
 // ── MEIN URLAUB ──
 let _myAusbDocId=null;
+let _myAusbBerufId=null;
 function openMeinUrlaub(){
   document.getElementById('urlaubModal').classList.add('open');
   document.getElementById('myUrlaubForm').style.display='none';
@@ -1351,6 +1353,7 @@ function openMeinUrlaub(){
       const doc=snap.docs[0];
       _myAusbDocId=doc.id;
       const data=doc.data();
+      _myAusbBerufId=data.berufId||null;
       const urlaub=(data.urlaub||[]).sort((a,b)=>(a.von||'')>(b.von||'')?1:-1);
       const today=new Date().toISOString().slice(0,10);
       if(!urlaub.length){ el.innerHTML='<div class="empty">Kein Urlaub eingetragen</div>'; return; }
@@ -2189,9 +2192,71 @@ function linkHBZKurs(kursId, kursData, targetKatId){
 }
 
 // Kat modal
+// Sync neu angelegte Lehrgangsart in VerwaltungPro-Stamm (shared/kursSettings/lehrgangsarten).
+// Damit ist die Lehrgangsart fuer die Verwaltung und andere Ausbilder im Dropdown verfuegbar.
+// Die berufGruppeId des Ausbilders wird mitgespeichert, damit Vorschlaege gezielt nach Beruf gefiltert werden.
+function _syncLehrgangsartToVP(lbl){
+  if(!lbl || !_db || !_auth || !_auth.currentUser) return;
+  const name = String(lbl).trim();
+  if(!name) return;
+  const myBeruf = _myAusbBerufId || '';
+  const col = _db.collection('shared').doc('kursSettings').collection('lehrgangsarten');
+  col.get().then(snap=>{
+    // Duplikat = gleicher Name UND gleiche Berufsgruppe (oder beide ohne Beruf)
+    const exists = snap.docs.some(d => {
+      const data = d.data();
+      const sameName = String(data.name||'').trim().toLowerCase() === name.toLowerCase();
+      const sameBeruf = String(data.berufGruppeId||'') === String(myBeruf);
+      return sameName && sameBeruf;
+    });
+    if(!exists){
+      const payload = {name, createdBy:_auth.currentUser.email||'', createdAt: firebase.firestore.FieldValue.serverTimestamp()};
+      if(myBeruf) payload.berufGruppeId = myBeruf;
+      col.add(payload).catch(err=>console.warn('Lehrgangsart-Sync fehlgeschlagen:',err));
+    }
+  }).catch(err=>console.warn('Lehrgangsart-Lookup fehlgeschlagen:',err));
+}
+
 function openKatModal(){
   document.getElementById('katInp').value='';
   document.getElementById('katml').classList.add('open');
+  // Vorschlaege aus VerwaltungPro-Stamm laden (shared/kursSettings/lehrgangsarten)
+  // Filter: nur Lehrgangsarten der eigenen Berufsgruppe oder uebergreifende (ohne berufGruppeId)
+  const sugg = document.getElementById('katmlSugg');
+  if(!sugg) return;
+  sugg.innerHTML = '<div style="font-size:.7rem;color:var(--mu);font-style:italic">Lade Vorschläge…</div>';
+  if(!_db || !_auth || !_auth.currentUser){
+    sugg.innerHTML = '<div style="font-size:.7rem;color:var(--mu);font-style:italic">Bitte einloggen für Vorschläge</div>';
+    return;
+  }
+  _db.collection('shared').doc('kursSettings').collection('lehrgangsarten').get()
+    .then(snap=>{
+      // Bereits genutzte Kats ausfiltern (case-insensitive Vergleich)
+      const usedLabels = new Set(Object.values(S.kats||{}).map(k=>String(k.label||'').trim().toLowerCase()));
+      const myBeruf = _myAusbBerufId || '';
+      // Filter nach Berufsgruppe: eigene Berufsgruppe + uebergreifende (kein berufGruppeId)
+      // Wenn Ausbilder noch keine berufId hat (Fallback) → alle anzeigen
+      const items = snap.docs
+        .map(d=>{ const x=d.data(); return {name:String(x.name||'').trim(), berufGruppeId:x.berufGruppeId||''}; })
+        .filter(x => x.name && !usedLabels.has(x.name.toLowerCase()))
+        .filter(x => !myBeruf || !x.berufGruppeId || x.berufGruppeId === myBeruf)
+        .map(x => x.name);
+      // Duplikate entfernen (gleicher Name kann in mehreren Berufsgruppen existieren, hier reicht der Name)
+      const unique = [...new Set(items)].sort((a,b)=>a.localeCompare(b,'de',{sensitivity:'base'}));
+      if(!unique.length){
+        sugg.innerHTML = '<div style="font-size:.7rem;color:var(--mu);font-style:italic">Keine Vorschläge für deine Berufsgruppe</div>';
+        return;
+      }
+      sugg.innerHTML = unique.map(name=>
+        '<button type="button" class="katml-add" style="background:var(--sur2);color:var(--tx);border:1.5px solid var(--brd);padding:5px 10px;font-size:.74rem;font-weight:600" '
+        + 'onclick="addPredefKat(\''+name.replace(/'/g,"\\'")+'\')" title="\u00DCbernehmen">'
+        + name.replace(/</g,'&lt;')+'</button>'
+      ).join('');
+    })
+    .catch(err=>{
+      console.warn('Lehrgangsarten laden fehlgeschlagen:',err);
+      sugg.innerHTML = '<div style="font-size:.7rem;color:var(--mu);font-style:italic">Vorschläge nicht verfügbar</div>';
+    });
 }
 function closeKatModal(){ document.getElementById('katml').classList.remove('open'); }
 function addPredefKat(lbl){
@@ -2199,6 +2264,7 @@ function addPredefKat(lbl){
   S.kats[id]={label:lbl,predefined:true,open:false,instances:{}};
   if(!S.katOrder.includes(id)) S.katOrder.push(id);
   persist();renderSidebar();closeKatModal();
+  _syncLehrgangsartToVP(lbl);
 }
 function addCustomKat(){
   const lbl=document.getElementById('katInp').value.trim();if(!lbl)return;
@@ -2206,6 +2272,7 @@ function addCustomKat(){
   S.kats[id]={label:lbl,predefined:false,open:true,instances:{}};
   S.katOrder.push(id);
   persist();renderSidebar();closeKatModal();
+  _syncLehrgangsartToVP(lbl);
 }
 
 // Date picker
@@ -2456,6 +2523,7 @@ function saveNewInst(){
     // ausbilderId ermitteln via Email-Match in shared/ausbilder/list
     // Damit wird der Kurs in VerwaltungPro direkt unter dem richtigen Ausbilder
     // eingeordnet (statt unter Email-Fallback)
+    _syncLehrgangsartToVP(kursName);
     _db.collection('shared').doc('ausbilder').collection('list')
       .where('loginEmail','==',email).limit(1).get()
       .then(snap=>{
@@ -4727,6 +4795,7 @@ function activateFirestore(){
     createdBy: email
   };
   toast('Aktiviere Kurs …');
+  _syncLehrgangsartToVP(kursName);
   _db.collection('shared').doc('kurse').collection('list').add(kursData).then(ref=>{
     inst.sharedKursId=ref.id;
     persist();renderMain();
@@ -7145,6 +7214,7 @@ function checkAusbNotifications(){
       _ausbNotifUnsub=docRef.onSnapshot(doc=>{
         if(!doc.exists) return;
         const data=doc.data();
+        if(data.berufId) _myAusbBerufId=data.berufId;
         const notifs=(data.benachrichtigungen||[]).filter(n=>!n.gelesen);
         const el=document.getElementById('ausbNotifBanner');
         if(!el) return;
