@@ -1239,10 +1239,31 @@ function submitJoinRegistration(){
 
   _registering=true; // Auth-Listener blockieren
 
-  // 1. Firebase Auth Konto erstellen
-  auth.createUserWithEmailAndPassword(email, passwort).then(cred=>{
+  // 1. Firebase Auth Konto erstellen ODER (falls bereits vorhanden) einloggen
+  // Self-Heal: Bei email-already-in-use (z.B. abgebrochene Vorregistrierung)
+  // versuchen wir einzuloggen statt zu scheitern - falls das Passwort passt,
+  // koennen wir den TN-Eintrag anlegen (der hat ggf. gefehlt)
+  function authOrSignIn(){
+    return auth.createUserWithEmailAndPassword(email, passwort).catch(err=>{
+      if(err.code==='auth/email-already-in-use'){
+        // Versuch: Login mit dem gleichen Passwort (klappt nur wenn User gestern dasselbe eingegeben hat)
+        return auth.signInWithEmailAndPassword(email, passwort).catch(loginErr=>{
+          // Wenn Passwort nicht passt, ist es ein wirklicher Konflikt
+          if(loginErr.code==='auth/wrong-password' || loginErr.code==='auth/invalid-credential'){
+            const e2=new Error('Diese E-Mail ist bereits mit einem anderen Passwort registriert. Falls du dich bereits einmal angemeldet hattest, nutze bitte oben "Anmelden" mit deinem damaligen Passwort.');
+            e2.code='custom/email-conflict';
+            throw e2;
+          }
+          throw loginErr;
+        });
+      }
+      throw err;
+    });
+  }
+
+  authOrSignIn().then(cred=>{
     const uid=cred.user.uid;
-    // 2. globalTN Dokument erstellen
+    // 2. globalTN Dokument erstellen (oder ueberschreiben falls verwaist)
     const tnData={
       vorname, nachname, firma, beruf, berufGruppe, ausbjahr, geburtsdatum,
       email: email,
@@ -1269,7 +1290,15 @@ function submitJoinRegistration(){
         bis: kd.bis||'',
         addedAt: Date.now()
       }];
-      return db.collection('globalTN').add(tnData);
+      // Erst pruefen ob TN-Eintrag bereits existiert (z.B. abgebrochene Vorregistrierung)
+      return db.collection('globalTN').where('kontaktEmail','==',email).limit(1).get().then(existSnap=>{
+        if(!existSnap.empty){
+          // Existierenden Eintrag aktualisieren statt neuen anlegen
+          const existRef=existSnap.docs[0].ref;
+          return existRef.update(tnData).then(()=>existRef);
+        }
+        return db.collection('globalTN').add(tnData);
+      });
     }).then(ref=>{
       // 3. In Kurs-TN-Subcollection eintragen
       return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId)
@@ -1313,7 +1342,10 @@ function submitJoinRegistration(){
     const map={
       'auth/email-already-in-use':'Diese E-Mail ist bereits registriert. Bitte über "Anmelden" einloggen.',
       'auth/invalid-email':'Ungültige E-Mail-Adresse',
-      'auth/weak-password':'Passwort zu schwach (min. 6 Zeichen)'
+      'auth/weak-password':'Passwort zu schwach (min. 6 Zeichen)',
+      'auth/wrong-password':'Falsches Passwort. Bitte über "Anmelden" einloggen.',
+      'auth/invalid-credential':'Falsches Passwort. Bitte über "Anmelden" einloggen.',
+      'custom/email-conflict':err.message
     };
     errEl.textContent=map[err.code]||'Fehler: '+err.message;
   });
