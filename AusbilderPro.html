@@ -271,9 +271,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 @media(max-width:780px){
   .seating.gridV .aisle[data-line="1"]{ width:14px; }
 }
-/* Horizontale Linie: seat mit data-line="1" innerhalb .seating.gridH */
-.seating.gridH .seat[data-line="1"]{
-  border-top:1px dashed rgba(100,116,139,.5);
+/* Horizontale Linie: leeres .hsep-Spacer-Element zwischen Sitzen (analog .aisle zwischen Reihen) */
+.hsep{height:0;flex-shrink:0;}
+.seating.gridH .hsep[data-line="1"]{
+  height:14px;
+  background:linear-gradient(to bottom,transparent 0,transparent calc(50% - 1px),rgba(100,116,139,.5) calc(50% - 1px),rgba(100,116,139,.5) calc(50% + 1px),transparent calc(50% + 1px),transparent 100%);
 }
 .seats-grid{display:flex;flex-direction:column;gap:7px;}
 /* seat styling merged above */
@@ -2837,10 +2839,15 @@ function renderSeats(){
     hdr.appendChild(inp); hdr.appendChild(btns);
     const grid=document.createElement('div'); grid.className=cls; grid.id='grid-'+row.id;
     row.seats.forEach((sid,si)=>{
-      const seatEl=mkSeat(sid,inst.seats);
-      // si=0 → erster Sitz (keine Linie davor), si=1 → Position 1 (Linie nach Sitz 1), usw.
-      if(si>0 && _isGridLineVisible('H', si)) seatEl.setAttribute('data-line','1');
-      grid.appendChild(seatEl);
+      // Trennlinie VOR diesem Sitz (außer dem ersten) als leeres .hsep-Element einfügen
+      // si=1 → Position 1 (zwischen Sitz 1 und 2), si=2 → Position 2, usw.
+      if(si>0){
+        const hsep=document.createElement('div');
+        hsep.className='hsep';
+        if(_isGridLineVisible('H', si)) hsep.setAttribute('data-line','1');
+        grid.appendChild(hsep);
+      }
+      grid.appendChild(mkSeat(sid,inst.seats));
     });
     col.appendChild(hdr); col.appendChild(grid);
     wrap.appendChild(col);
