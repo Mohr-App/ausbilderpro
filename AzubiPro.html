@@ -161,6 +161,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="login-sub">Lehrgang beitreten</div>
     <div id="joinKursInfo" style="margin-bottom:12px;padding:10px 14px;background:rgba(16,185,129,.08);border:1.5px solid rgba(16,185,129,.25);border-radius:10px;font-size:.78rem;text-align:center"></div>
 
+    <!-- INSTALL-HINWEIS (kontextsensitiv für iOS / Android / Desktop) -->
+    <div id="joinInstallHint" style="display:none;margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(5,150,105,.06));border:1.5px solid rgba(37,99,235,.2);border-radius:10px;font-size:.72rem;line-height:1.5;color:var(--tx)">
+      <div style="font-weight:700;color:#2563eb;margin-bottom:4px">📱 Tipp: BetriebPro aufs Handy</div>
+      <div id="joinInstallHintBody" style="color:var(--mu)"></div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+        <button id="joinInstallBtn" onclick="joinDoInstall()" style="background:#2563eb;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:.68rem;font-weight:700;cursor:pointer;display:none">＋ Aufs Handy hinzufügen</button>
+        <button onclick="joinDismissInstall()" style="background:transparent;color:var(--mu);border:1px solid var(--brd);padding:6px 12px;border-radius:6px;font-size:.66rem;cursor:pointer">Später</button>
+      </div>
+    </div>
+
     <!-- LOGIN (oben - schnell für bestehende User) -->
     <div id="joinLoginSection">
       <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px;text-align:center">Bereits ein Konto?</div>
@@ -1155,7 +1165,78 @@ let _joinKursId=null;
   // Wizard-Reset: Login-Section sichtbar, Wizard versteckt, bei Step 1 starten
   document.getElementById('joinLoginSection').style.display='block';
   document.getElementById('joinWizard').style.display='none';
+  // Install-Hinweis kontextsensitiv anzeigen
+  setTimeout(()=>{ try{ updateJoinInstallHint(); }catch(e){} }, 100);
 })();
+
+// ── INSTALL-HINWEIS (im Join-Screen) ──
+let _deferredInstallPrompt = null;
+
+// Android Chrome: PWA-Install-Prompt abfangen (kommt als Event)
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  // Falls Join-Screen sichtbar: Hinweis aktualisieren
+  if(_joinKursId) updateJoinInstallHint();
+});
+
+function isStandalone(){
+  return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+}
+
+function updateJoinInstallHint(){
+  const hint = document.getElementById('joinInstallHint');
+  const body = document.getElementById('joinInstallHintBody');
+  const btn = document.getElementById('joinInstallBtn');
+  if(!hint || !body) return;
+
+  // Bereits installiert oder vor weniger als 24h ausgeblendet → nicht zeigen
+  if(isStandalone()){ hint.style.display='none'; return; }
+  const dismissedAt = parseInt(localStorage.getItem('joinInstallDismissed')||'0', 10);
+  if(Date.now() - dismissedAt < 24*60*60*1000){ hint.style.display='none'; return; }
+
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua);
+  const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
+  const isAndroid = /Android/.test(ua);
+  const isChrome = /Chrome|CriOS/.test(ua) && !/Edg|OPR|SamsungBrowser/.test(ua);
+
+  if(isIOS && isSafari){
+    body.innerHTML = 'Tippe unten auf <b>Teilen-Symbol</b> <span style="font-family:monospace">⎘</span>, dann <b>"Zum Home-Bildschirm"</b>. So hast du BetriebPro wie eine richtige App auf deinem Handy.';
+    btn.style.display = 'none';
+    hint.style.display = 'block';
+  } else if(isIOS && !isSafari){
+    body.innerHTML = 'Öffne diese Seite in <b>Safari</b> (nicht Chrome) — dort kannst du BetriebPro auf den Home-Bildschirm hinzufügen.';
+    btn.style.display = 'none';
+    hint.style.display = 'block';
+  } else if(isAndroid && _deferredInstallPrompt){
+    body.innerHTML = 'BetriebPro lässt sich wie eine echte App auf deinem Handy speichern. Ein Tipp und fertig.';
+    btn.style.display = 'inline-block';
+    hint.style.display = 'block';
+  } else if(isAndroid){
+    body.innerHTML = 'Tippe oben rechts auf das <b>3-Punkte-Menü</b>, dann <b>"App installieren"</b> oder <b>"Zum Startbildschirm hinzufügen"</b>.';
+    btn.style.display = 'none';
+    hint.style.display = 'block';
+  } else {
+    // Desktop oder unbekannt: Nicht zeigen
+    hint.style.display = 'none';
+  }
+}
+
+function joinDoInstall(){
+  if(!_deferredInstallPrompt) return;
+  _deferredInstallPrompt.prompt();
+  _deferredInstallPrompt.userChoice.then(()=>{
+    _deferredInstallPrompt = null;
+    document.getElementById('joinInstallHint').style.display = 'none';
+  });
+}
+
+function joinDismissInstall(){
+  try{ localStorage.setItem('joinInstallDismissed', Date.now().toString()); }catch(e){}
+  document.getElementById('joinInstallHint').style.display = 'none';
+}
 
 function showNormalLogin(){
   document.getElementById('joinWrap').style.display='none';
