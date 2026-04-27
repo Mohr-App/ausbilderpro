@@ -262,6 +262,22 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .add-row-btn{background:none;border:1px dashed var(--brd);color:var(--mu);border-radius:8px;cursor:pointer;font-size:1rem;width:30px;height:70px;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:26px;}
 .add-row-btn:hover{border-color:var(--acc);color:var(--acc);background:rgba(59,130,246,.07);}
 .aisle{width:8px;flex-shrink:0;}
+/* Trennlinien (Toggles via .seating-Klassen gridV / gridH) */
+/* Vertikale Linie zwischen Reihen-Spalten (im Aisle) */
+.seating.gridV .aisle{
+  width:14px;
+  background:linear-gradient(to right,transparent 0,transparent calc(50% - 1px),rgba(100,116,139,.5) calc(50% - 1px),rgba(100,116,139,.5) calc(50% + 1px),transparent calc(50% + 1px),transparent 100%);
+}
+@media(max-width:780px){
+  /* Mobile: Reihen sind weiterhin nebeneinander (CSS oben), aber für Vollständigkeit */
+  .seating.gridV .aisle{
+    width:14px;
+  }
+}
+/* Horizontale Linie zwischen Sitzplätzen einer Reihe */
+.seating.gridH .seats-grid > .seat + .seat{
+  border-top:1px dashed rgba(100,116,139,.5);
+}
 .seats-grid{display:flex;flex-direction:column;gap:7px;}
 /* seat styling merged above */
 .seat::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(59,130,246,.06),transparent);opacity:0;transition:opacity .16s;}
@@ -2607,6 +2623,8 @@ function renderMain(){
   el.innerHTML=
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button></div></div>'
     +'<div class="hdr-actions" id="kursActions">'
+    +'<button class="tbtn main-docs-btn" id="btnGridV" onclick="toggleGridLine(\'V\')" style="background:rgba(100,116,139,.08);border-color:rgba(100,116,139,.25);color:#475569" title="Vertikale Trennlinien zwischen Reihen ein/aus">┃ Vertikal</button>'
+    +'<button class="tbtn main-docs-btn" id="btnGridH" onclick="toggleGridLine(\'H\')" style="background:rgba(100,116,139,.08);border-color:rgba(100,116,139,.25);color:#475569" title="Horizontale Trennlinien zwischen Sitzplätzen ein/aus">━ Horizontal</button>'
     +'<button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
     +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()" title="Kursunterlagen hochladen und verwalten">📁 Dokumente</button>'
     +'<button class="tbtn main-docs-btn" onclick="ausbilderKommtSpaeter()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
@@ -2698,6 +2716,8 @@ function renderSeats(){
   const rowCount = rows.length;
   const rowCls = rowCount===1?'rows-1':rowCount===2?'rows-2':rowCount===3?'rows-3':rowCount===4?'rows-4':rowCount===5?'rows-5':'rows-6up';
   wrap.className='seating '+rowCls;
+  // Persistierte Trennlinien-Einstellung anwenden
+  applyGridLines();
   const maxCount=rows.reduce((m,r)=>Math.max(m,r.seats.length),0);
   const cls='seats-grid';
   rows.forEach((row,ri)=>{
@@ -2742,6 +2762,33 @@ function renderSeats(){
 }
 function scaleSeating(){} // disabled
 window.addEventListener('resize', ()=>scaleSeating());
+
+// ─── Trennlinien (vertikal zwischen Reihen, horizontal zwischen Sitzplätzen) ───
+function applyGridLines(){
+  const wrap=document.getElementById('seatingEl'); if(!wrap)return;
+  const v=localStorage.getItem(_lsKey('gridLineV'))==='1';
+  const h=localStorage.getItem(_lsKey('gridLineH'))==='1';
+  wrap.classList.toggle('gridV',v);
+  wrap.classList.toggle('gridH',h);
+  const bV=document.getElementById('btnGridV');
+  const bH=document.getElementById('btnGridH');
+  if(bV){
+    bV.style.background=v?'rgba(37,99,235,.12)':'rgba(100,116,139,.08)';
+    bV.style.borderColor=v?'rgba(37,99,235,.4)':'rgba(100,116,139,.25)';
+    bV.style.color=v?'#2563eb':'#475569';
+  }
+  if(bH){
+    bH.style.background=h?'rgba(37,99,235,.12)':'rgba(100,116,139,.08)';
+    bH.style.borderColor=h?'rgba(37,99,235,.4)':'rgba(100,116,139,.25)';
+    bH.style.color=h?'#2563eb':'#475569';
+  }
+}
+function toggleGridLine(axis){
+  const k=_lsKey(axis==='V'?'gridLineV':'gridLineH');
+  const cur=localStorage.getItem(k)==='1';
+  if(cur) localStorage.removeItem(k); else localStorage.setItem(k,'1');
+  applyGridLines();
+}
 
 // ─── MOBILE LIST VIEW ───
 let _mobileListMode=false;
