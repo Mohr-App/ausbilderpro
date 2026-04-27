@@ -262,20 +262,17 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .add-row-btn{background:none;border:1px dashed var(--brd);color:var(--mu);border-radius:8px;cursor:pointer;font-size:1rem;width:30px;height:70px;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:26px;}
 .add-row-btn:hover{border-color:var(--acc);color:var(--acc);background:rgba(59,130,246,.07);}
 .aisle{width:8px;flex-shrink:0;}
-/* Trennlinien (Toggles via .seating-Klassen gridV / gridH) */
-/* Vertikale Linie zwischen Reihen-Spalten (im Aisle) */
-.seating.gridV .aisle{
+/* Trennlinien (per data-Attribut auf den jeweiligen Elementen) */
+/* Vertikale Linie: aisle mit data-line="1" innerhalb .seating.gridV */
+.seating.gridV .aisle[data-line="1"]{
   width:14px;
   background:linear-gradient(to right,transparent 0,transparent calc(50% - 1px),rgba(100,116,139,.5) calc(50% - 1px),rgba(100,116,139,.5) calc(50% + 1px),transparent calc(50% + 1px),transparent 100%);
 }
 @media(max-width:780px){
-  /* Mobile: Reihen sind weiterhin nebeneinander (CSS oben), aber für Vollständigkeit */
-  .seating.gridV .aisle{
-    width:14px;
-  }
+  .seating.gridV .aisle[data-line="1"]{ width:14px; }
 }
-/* Horizontale Linie zwischen Sitzplätzen einer Reihe */
-.seating.gridH .seats-grid > .seat + .seat{
+/* Horizontale Linie: seat mit data-line="1" innerhalb .seating.gridH */
+.seating.gridH .seat[data-line="1"]{
   border-top:1px dashed rgba(100,116,139,.5);
 }
 .seats-grid{display:flex;flex-direction:column;gap:7px;}
@@ -1144,6 +1141,32 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="katml-custom">
         <input class="katml-inp" id="katInp" type="text" placeholder="z.B. ET1, Klasse 4a…" onkeydown="if(event.key==='Enter')addCustomKat()">
         <button class="katml-add" title="+ Anlegen" onclick="addCustomKat()">+ Anlegen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GRID-LINE CONFIG MODAL (Sitzplan-Trennlinien) -->
+<div class="katml" id="gridCfgml" onclick="if(event.target===this)closeGridConfigModal()">
+  <div class="katml-box">
+    <div class="katml-hd"><div class="katml-tit">⚙ Trennlinien konfigurieren</div><button class="xcls" onclick="closeGridConfigModal()" title="Schließen">✕</button></div>
+    <div class="katml-bd">
+      <div style="padding:10px 12px;background:rgba(59,130,246,.06);border:1.5px solid rgba(59,130,246,.2);border-radius:8px;margin-bottom:14px;font-size:.72rem;color:var(--tx);line-height:1.5">
+        <div style="font-weight:700;margin-bottom:4px;color:var(--acc)">💡 Welche Trennlinien anzeigen?</div>
+        Hier wählst du, an welchen Positionen Trennlinien gezeichnet werden — gilt für <b>alle Lehrgänge</b>. Der Master-Schalter <b>┃ Vertikal</b> bzw. <b>━ Horizontal</b> in der Aktionen-Leiste muss zusätzlich aktiv sein.
+      </div>
+
+      <p style="font-size:.74rem;color:var(--mu);margin-bottom:10px;font-weight:700">┃ Vertikale Linien <span style="font-weight:400;color:var(--mu)">(zwischen Reihen-Spalten)</span></p>
+      <div id="gridCfgVList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:18px"></div>
+
+      <div class="katml-div"></div>
+
+      <p style="font-size:.74rem;color:var(--mu);margin-bottom:10px;margin-top:14px;font-weight:700">━ Horizontale Linien <span style="font-weight:400;color:var(--mu)">(zwischen Sitzplätzen einer Reihe)</span></p>
+      <div id="gridCfgHList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px"></div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--brd)">
+        <button class="katml-add" onclick="resetGridConfig()" style="background:transparent;color:var(--mu);border:1.5px solid var(--brd)" title="Alle Linien wieder anzeigen">↺ Zurücksetzen</button>
+        <button class="katml-add" onclick="closeGridConfigModal()" title="Fertig">✓ Fertig</button>
       </div>
     </div>
   </div>
@@ -2625,6 +2648,7 @@ function renderMain(){
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="tbtn main-docs-btn" id="btnGridV" onclick="toggleGridLine(\'V\')" style="background:rgba(100,116,139,.08);border-color:rgba(100,116,139,.25);color:#475569" title="Vertikale Trennlinien zwischen Reihen ein/aus">┃ Vertikal</button>'
     +'<button class="tbtn main-docs-btn" id="btnGridH" onclick="toggleGridLine(\'H\')" style="background:rgba(100,116,139,.08);border-color:rgba(100,116,139,.25);color:#475569" title="Horizontale Trennlinien zwischen Sitzplätzen ein/aus">━ Horizontal</button>'
+    +'<button class="tbtn main-docs-btn" onclick="openGridConfigModal()" style="background:rgba(100,116,139,.08);border-color:rgba(100,116,139,.25);color:#475569" title="Einzelne Trennlinien an/aus">⚙ Linien…</button>'
     +'<button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
     +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()" title="Kursunterlagen hochladen und verwalten">📁 Dokumente</button>'
     +'<button class="tbtn main-docs-btn" onclick="ausbilderKommtSpaeter()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
@@ -2722,7 +2746,13 @@ function renderSeats(){
   const cls='seats-grid';
   rows.forEach((row,ri)=>{
     // thin separator between rows (not before first)
-    if(ri>0){ const sep=document.createElement('div'); sep.className='aisle'; wrap.appendChild(sep); }
+    // ri=0 → vor Reihe 1 (kein Aisle), ri=1 → Aisle nach Reihe 1 (Position 1), usw.
+    if(ri>0){
+      const sep=document.createElement('div'); sep.className='aisle';
+      const showLine = _isGridLineVisible('V', ri); // ri = Position des Aisles (1,2,3,...)
+      if(showLine) sep.setAttribute('data-line','1');
+      wrap.appendChild(sep);
+    }
     const col=document.createElement('div');
     col.className='side';
     // header: editable label + seat +/- + delete row
@@ -2745,7 +2775,12 @@ function renderSeats(){
     if(rows.length>1) btns.appendChild(bDel);
     hdr.appendChild(inp); hdr.appendChild(btns);
     const grid=document.createElement('div'); grid.className=cls; grid.id='grid-'+row.id;
-    row.seats.forEach(sid=>grid.appendChild(mkSeat(sid,inst.seats)));
+    row.seats.forEach((sid,si)=>{
+      const seatEl=mkSeat(sid,inst.seats);
+      // si=0 → erster Sitz (keine Linie davor), si=1 → Position 1 (Linie nach Sitz 1), usw.
+      if(si>0 && _isGridLineVisible('H', si)) seatEl.setAttribute('data-line','1');
+      grid.appendChild(seatEl);
+    });
     col.appendChild(hdr); col.appendChild(grid);
     wrap.appendChild(col);
   });
@@ -2788,6 +2823,81 @@ function toggleGridLine(axis){
   const cur=localStorage.getItem(k)==='1';
   if(cur) localStorage.removeItem(k); else localStorage.setItem(k,'1');
   applyGridLines();
+  // Re-render damit data-line-Attribute auf neuen Aisle/Seats greifen
+  if(typeof renderSeats==='function') renderSeats();
+}
+
+// Pro-Position Sichtbarkeit: leere/keine Liste = ALLE sichtbar (Default).
+// Liste ['1','3'] = nur Position 1 und 3 sichtbar.
+function _getGridHiddenSet(axis){
+  const k=_lsKey(axis==='V'?'gridLineVHidden':'gridLineHHidden');
+  try{
+    const arr=JSON.parse(localStorage.getItem(k)||'[]');
+    return new Set((arr||[]).map(String));
+  }catch(e){ return new Set(); }
+}
+function _setGridHiddenSet(axis,set){
+  const k=_lsKey(axis==='V'?'gridLineVHidden':'gridLineHHidden');
+  localStorage.setItem(k,JSON.stringify([...set]));
+}
+function _isGridLineVisible(axis,pos){
+  return !_getGridHiddenSet(axis).has(String(pos));
+}
+
+// Anzahl der Positionen für die Modal-Liste.
+// Vertikal: aktuelle Reihen-1 (mind. 1 falls 1 Reihe → trotzdem ein Slot, falls Nutzer plant).
+// Horizontal: maximale Sitze einer Reihe -1, fallback 12.
+function _gridConfigCounts(){
+  const inst=curInst();
+  let vMax=0, hMax=0;
+  if(inst){
+    const rows=getRows(inst);
+    vMax=Math.max(0, rows.length-1);
+    hMax=rows.reduce((m,r)=>Math.max(m, (r.seats||[]).length-1), 0);
+  }
+  // sinnvolle Mindestmenge an Slots damit Nutzer auch für andere Lehrgänge konfigurieren kann
+  vMax=Math.max(vMax, 6);
+  hMax=Math.max(hMax, 10);
+  return {vMax, hMax};
+}
+
+function openGridConfigModal(){
+  const {vMax,hMax}=_gridConfigCounts();
+  const vHidden=_getGridHiddenSet('V');
+  const hHidden=_getGridHiddenSet('H');
+  const vList=document.getElementById('gridCfgVList');
+  const hList=document.getElementById('gridCfgHList');
+  const mkRow=(axis,pos,checked,label)=>{
+    return '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;cursor:pointer;user-select:none;font-size:.78rem">'
+      +'<input type="checkbox" '+(checked?'checked':'')+' onchange="toggleGridLinePos(\''+axis+'\','+pos+',this.checked)" style="width:16px;height:16px;cursor:pointer">'
+      +'<span>'+label+'</span></label>';
+  };
+  let vh='';
+  for(let i=1;i<=vMax;i++){
+    vh+=mkRow('V', i, !vHidden.has(String(i)), 'Linie nach Reihe '+i+' (zwischen Reihe '+i+' und '+(i+1)+')');
+  }
+  let hh='';
+  for(let i=1;i<=hMax;i++){
+    hh+=mkRow('H', i, !hHidden.has(String(i)), 'Linie nach Sitz '+i+' (zwischen Sitz '+i+' und '+(i+1)+')');
+  }
+  if(vList) vList.innerHTML=vh;
+  if(hList) hList.innerHTML=hh;
+  document.getElementById('gridCfgml').classList.add('open');
+}
+function closeGridConfigModal(){
+  document.getElementById('gridCfgml').classList.remove('open');
+  if(typeof renderSeats==='function') renderSeats();
+}
+function toggleGridLinePos(axis,pos,checked){
+  const set=_getGridHiddenSet(axis);
+  if(checked) set.delete(String(pos)); else set.add(String(pos));
+  _setGridHiddenSet(axis,set);
+  if(typeof renderSeats==='function') renderSeats();
+}
+function resetGridConfig(){
+  localStorage.removeItem(_lsKey('gridLineVHidden'));
+  localStorage.removeItem(_lsKey('gridLineHHidden'));
+  openGridConfigModal(); // re-render Modal
 }
 
 // ─── MOBILE LIST VIEW ───
