@@ -3451,6 +3451,16 @@ function saveAusbilder(){
 }
 function confirmDeleteAusbilder(){
   const id = document.getElementById('addAusbId').value;
+  // Pruefen ob Kurse noch zugeordnet sind (verhindert verwaiste Kurse)
+  const linked = (_kurse||[]).filter(k => k.ausbilderId === id && !k.entwurf);
+  if(linked.length){
+    const list = linked.slice(0,5).map(k => '• ' + (k.lehrgangsart || k.id)).join('\n');
+    const more = linked.length > 5 ? '\n• … (+' + (linked.length-5) + ' weitere)' : '';
+    alert('Ausbilder hat noch ' + linked.length + ' Kurs' + (linked.length>1?'e':'') +
+          ' zugeordnet:\n\n' + list + more +
+          '\n\nBitte erst einem anderen Ausbilder zuweisen oder die Kurse löschen, bevor der Ausbilder entfernt werden kann.');
+    return;
+  }
   if(!confirm('Ausbilder wirklich löschen?')) return;
   db.collection('shared').doc('kursSettings').collection('ausbilder').doc(id).delete()
     .then(()=>{ closeAddAusbModal(); toast('Gelöscht'); })
