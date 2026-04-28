@@ -3075,17 +3075,26 @@ async function runPilotAnonymization(){
     append('Gefunden: '+snap.size+' Datensätze in globalTN','var(--mu)');
     let ok=0, skipped=0, failed=0;
     const failedDocs=[];
+    const skipReasons={typAndere:0, keineIndikatoren:0, keineAenderung:0};
+    const typCount={};
     for(const doc of snap.docs){
       const d=doc.data();
+      const tnLabel=(d.vorname||'?')+' '+(d.nachname||'?');
+      // Typ-Statistik (für Trockenlauf-Analyse)
+      const tKey=d.typ||'(kein typ)';
+      typCount[tKey]=(typCount[tKey]||0)+1;
       // Nur Azubis/TNs anonymisieren - Ausbilder/AG/MA/Verwaltung-Accounts überspringen
       if(d.typ && d.typ!=='azubi' && d.typ!=='tn'){
         skipped++;
+        skipReasons.typAndere++;
+        if(dryRun) append('  [SKIP typ='+d.typ+'] '+tnLabel,'var(--mu)');
         continue;
       }
       // Wenn kein typ-Feld vorhanden: nur anonymisieren wenn Schüler-Indikatoren da sind
-      // (Ausbilder/MA/AG haben meist andere Felder, Schüler haben vorname+nachname+ausbjahr/kontaktEmail)
       if(!d.typ && !d.ausbjahr && !d.berufGruppeId && !d.aktiverKursId){
         skipped++;
+        skipReasons.keineIndikatoren++;
+        if(dryRun) append('  [SKIP keine-Indikatoren] '+tnLabel+' (Felder: '+Object.keys(d).slice(0,8).join(',')+')','var(--mu)');
         continue;
       }
       const updates={};
@@ -3102,15 +3111,15 @@ async function runPilotAnonymization(){
       if(d.ort){ updates.ort=''; changed=true; }
       if(!changed){
         skipped++;
+        skipReasons.keineAenderung++;
+        if(dryRun) append('  [SKIP bereits-anon] '+tnLabel,'var(--mu)');
         continue;
       }
       updates.pilotAnonymizedAt=new Date().toISOString();
-      const tnLabel=(d.vorname||'?')+' '+(d.nachname||'?');
       if(dryRun){
-        append('  [DRY] '+tnLabel+' → '+Object.keys(updates).join(', '),'var(--mu)');
+        append('  [WÜRDE] '+tnLabel+' → '+Object.keys(updates).join(', '),'var(--ok)');
         ok++;
       } else {
-        // Einzeln updaten statt batch — bei Fehler weitermachen
         try{
           await doc.ref.update(updates);
           ok++;
@@ -3121,6 +3130,15 @@ async function runPilotAnonymization(){
           append('  ✗ '+tnLabel+': '+(err.message||err),'var(--bad)');
         }
       }
+    }
+    // Statistik fürs Verständnis
+    if(dryRun){
+      append('--- typ-Verteilung in globalTN: ---','var(--acc)');
+      Object.entries(typCount).forEach(([t,n])=>append('  '+t+': '+n,'var(--mu)'));
+      append('--- Skip-Gründe: ---','var(--acc)');
+      append('  typ war Nicht-Schüler: '+skipReasons.typAndere,'var(--mu)');
+      append('  kein typ + keine Schüler-Indikatoren: '+skipReasons.keineIndikatoren,'var(--mu)');
+      append('  bereits anonymisiert / keine Änderung nötig: '+skipReasons.keineAenderung,'var(--mu)');
     }
     // Audit-Log nur bei echtem Lauf
     if(!dryRun){
