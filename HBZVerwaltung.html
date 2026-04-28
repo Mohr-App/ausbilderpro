@@ -633,8 +633,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </div>
     <div class="hdr-sep"></div>
     <div class="hdr-user" id="hdrUser"></div>
-    <button class="hdr-btn" onclick="doFullBackup()" title="Alle Daten als JSON-Datei sichern">📦 <span class="hdr-btn-text">Backup</span></button>
-    <button class="hdr-btn" onclick="document.getElementById('restoreFileIn').click()" title="JSON-Backup wiederherstellen" style="opacity:.7"><span class="hdr-btn-text">Restore</span></button>
+    <button class="hdr-btn" id="backupBtn" onclick="doFullBackup()" title="Alle Daten als JSON-Datei sichern" style="display:none">📦 <span class="hdr-btn-text">Backup</span></button>
+    <button class="hdr-btn" id="restoreBtn" onclick="document.getElementById('restoreFileIn').click()" title="JSON-Backup wiederherstellen" style="opacity:.7;display:none"><span class="hdr-btn-text">Restore</span></button>
     <input type="file" id="restoreFileIn" accept=".json" style="display:none" onchange="doRestore(event)">
     <button class="hdr-btn" onclick="showHVHilfe()" style="opacity:.7" title="Anleitungen und FAQ"><span class="hdr-btn-text">Hilfe</span></button>
     <div class="app-launcher-wrap" id="appLauncher">
@@ -1856,6 +1856,13 @@ function grantAccess(u, role){
         }
       }).catch(()=>{if(settingsBtn) settingsBtn.style.display='none';});
   }
+  // Backup/Restore-Buttons nur für Admin sichtbar (Daten-Export sensibel!)
+  if(role==='admin'){
+    const bb=document.getElementById('backupBtn');
+    const rb=document.getElementById('restoreBtn');
+    if(bb) bb.style.display='';
+    if(rb) rb.style.display='';
+  }
   loadAll();
   loadAusbilderEmails();
   // Stefan-Accounts haben ggf. andere primaere Rolle (z.B. arbeitgeber fuer AG).
@@ -1866,7 +1873,11 @@ function grantAccess(u, role){
   } else {
     db.collection('users').doc(_uid).set({email:u.email, role:role},{merge:true}).catch(()=>{});
   }
-  checkBackupReminder();
+  // Backup-Reminder: NUR fuer Admin und NICHT im Pilot-Modus (Datenschutz: keine
+  // unnoetigen lokalen Klartext-Backups bei Kollegen)
+  if(role==='admin' && !PILOT_MODE){
+    checkBackupReminder();
+  }
   loadUrlaubBadge();
   checkDsgvoConsent();
 }
@@ -8668,6 +8679,17 @@ function closeKursModal(){ document.getElementById('kursModal').classList.remove
 
 // ── KOMPLETT-BACKUP ──
 function doFullBackup(){
+  // Nur Admin darf Klartext-Backup ziehen
+  if(_userRole!=='admin'){
+    toast('Nur Admin darf Backups erstellen','bad');
+    return;
+  }
+  // Im Pilot-Modus: zusaetzliche Warnung
+  if(PILOT_MODE){
+    if(!confirm('⚠ Pilotphase\n\nDieses Backup enthaelt Schuelerdaten als JSON-Datei (auch wenn anonymisiert: Email, Firma, Berufsgruppe, Anwesenheit).\n\nLokale Backups auf Desktop/Laptop sind in der Pilotphase NICHT empfohlen, da:\n- automatische taegliche Cloud-Backups (Frankfurt, 98 Tage) bereits laufen\n- lokale Dateien ausserhalb der DSGVO-Schutzzone landen\n\nWirklich lokales Backup erstellen?')){
+      return;
+    }
+  }
   toast('📦 Backup wird erstellt…');
   const backup={meta:{app:'VerwaltungPro',version:'1.5.0',date:new Date().toISOString(),email:_email},globalTN:[],kurse:[],kursSettings:{ausbilder:[],lehrgangsarten:[],berufe:[],verwaltung:[],standorte:[]}};
   Promise.all([
@@ -8736,6 +8758,11 @@ function checkBackupReminder(){
 
 // ── RESTORE ──
 function doRestore(e){
+  if(_userRole!=='admin'){
+    toast('Nur Admin darf Restore ausführen','bad');
+    e.target.value='';
+    return;
+  }
   const file=e.target.files[0];
   if(!file) return;
   e.target.value='';
