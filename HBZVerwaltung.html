@@ -3058,24 +3058,35 @@ async function runPilotAnonymization(){
     log.innerHTML+='<div style="color:'+(color||'var(--mu)')+'">['+t+'] '+msg+'</div>';
     log.scrollTop=log.scrollHeight;
   };
-  if(!confirm('Sicher? Alle Schüler-Vor-/Nachnamen werden auf 2 Buchstaben gekürzt und Telefon, Geburtsdatum, Adresse werden entfernt.\n\nDIES IST NICHT UMKEHRBAR.\n\nFortfahren?')){
-    return;
-  }
-  if(!confirm('Letzte Bestätigung:\n\nDie Anonymisierung wird jetzt endgültig durchgeführt.\nKlartext-Namen werden auf Kürzel überschrieben.\n\nFortfahren?')){
-    return;
+  // Erste Frage: Trockenlauf oder Echt?
+  const dryRun=confirm('TROCKENLAUF starten?\n\nOK = Nur prüfen was passieren würde (keine Änderungen)\nAbbrechen = Echte Anonymisierung durchführen\n\nEmpfehlung: Erst Trockenlauf, dann Echt.');
+  if(!dryRun){
+    if(!confirm('Sicher? ECHTE Anonymisierung jetzt durchführen.\n\nAlle Schüler-Vor-/Nachnamen werden auf 2 Buchstaben gekürzt und Telefon, Geburtsdatum, Adresse werden entfernt.\n\nDIES IST NICHT UMKEHRBAR.\n\nFortfahren?')){
+      return;
+    }
+    if(!confirm('Letzte Bestätigung:\n\nDie Anonymisierung wird jetzt endgültig durchgeführt.\nKlartext-Namen werden auf Kürzel überschrieben.\n\nFortfahren?')){
+      return;
+    }
   }
   log.innerHTML='';
-  append('Starte Anonymisierung…','var(--acc)');
+  append(dryRun?'🔍 TROCKENLAUF startet…':'⚠ ECHTE Anonymisierung startet…','var(--acc)');
   try{
     const snap=await db.collection('globalTN').get();
-    append('Gefunden: '+snap.size+' Datensätze','var(--mu)');
-    let ok=0, skipped=0, failed=0, batch=db.batch(), batchCount=0;
-    const auditEntries=[];
+    append('Gefunden: '+snap.size+' Datensätze in globalTN','var(--mu)');
+    let ok=0, skipped=0, failed=0;
+    const failedDocs=[];
     for(const doc of snap.docs){
       const d=doc.data();
-      // Nur Azubis/TNs anonymisieren - Ausbilder/AG-Accounts überspringen
+      // Nur Azubis/TNs anonymisieren - Ausbilder/AG/MA/Verwaltung-Accounts überspringen
       if(d.typ && d.typ!=='azubi' && d.typ!=='tn'){
-        skipped++; continue;
+        skipped++;
+        continue;
+      }
+      // Wenn kein typ-Feld vorhanden: nur anonymisieren wenn Schüler-Indikatoren da sind
+      // (Ausbilder/MA/AG haben meist andere Felder, Schüler haben vorname+nachname+ausbjahr/kontaktEmail)
+      if(!d.typ && !d.ausbjahr && !d.berufGruppeId && !d.aktiverKursId){
+        skipped++;
+        continue;
       }
       const updates={};
       let changed=false;
@@ -3089,39 +3100,53 @@ async function runPilotAnonymization(){
       if(d.adresse){ updates.adresse=''; changed=true; }
       if(d.plz){ updates.plz=''; changed=true; }
       if(d.ort){ updates.ort=''; changed=true; }
-      if(changed){
-        updates.pilotAnonymizedAt=new Date().toISOString();
-        batch.update(doc.ref, updates);
-        batchCount++;
-        auditEntries.push({tnId: doc.id, fields: Object.keys(updates)});
-        if(batchCount>=400){
-          await batch.commit();
-          ok+=batchCount;
-          append('… ' + ok + ' aktualisiert', 'var(--ok)');
-          batch=db.batch(); batchCount=0;
-        }
-      } else {
+      if(!changed){
         skipped++;
+        continue;
+      }
+      updates.pilotAnonymizedAt=new Date().toISOString();
+      const tnLabel=(d.vorname||'?')+' '+(d.nachname||'?');
+      if(dryRun){
+        append('  [DRY] '+tnLabel+' → '+Object.keys(updates).join(', '),'var(--mu)');
+        ok++;
+      } else {
+        // Einzeln updaten statt batch — bei Fehler weitermachen
+        try{
+          await doc.ref.update(updates);
+          ok++;
+          if(ok%5===0) append('  ✓ '+ok+' aktualisiert…','var(--ok)');
+        }catch(err){
+          failed++;
+          failedDocs.push({id:doc.id, label:tnLabel, error:err.message||String(err)});
+          append('  ✗ '+tnLabel+': '+(err.message||err),'var(--bad)');
+        }
       }
     }
-    if(batchCount>0){
-      await batch.commit();
-      ok+=batchCount;
+    // Audit-Log nur bei echtem Lauf
+    if(!dryRun){
+      try{
+        await db.collection('auditLog').add({
+          action: 'pilot_anonymization',
+          timestamp: new Date().toISOString(),
+          executedBy: auth?.currentUser?.email||'unbekannt',
+          total: snap.size,
+          anonymized: ok,
+          skipped: skipped,
+          failed: failed
+        });
+        append('✓ Audit-Log geschrieben','var(--ok)');
+      }catch(err){
+        append('⚠ Audit-Log konnte nicht geschrieben werden: '+(err.message||err),'var(--bad)');
+      }
     }
-    // Audit-Log schreiben
-    await db.collection('auditLog').add({
-      action: 'pilot_anonymization',
-      timestamp: new Date().toISOString(),
-      executedBy: auth?.currentUser?.email||'unbekannt',
-      total: snap.size,
-      anonymized: ok,
-      skipped: skipped,
-      failed: failed
-    });
-    append('✓ Fertig: ' + ok + ' anonymisiert, ' + skipped + ' übersprungen', 'var(--ok)');
-    alert('Anonymisierung abgeschlossen:\n\n' + ok + ' Datensätze anonymisiert\n' + skipped + ' übersprungen (keine Schülerdaten oder bereits anonymisiert)\n\nAudit-Log wurde geschrieben.');
+    append((dryRun?'🔍 Trockenlauf':'✓ Anonymisierung')+' fertig: '+ok+' '+(dryRun?'würden':'wurden')+' anonymisiert, '+skipped+' übersprungen'+(failed>0?', '+failed+' Fehler':''),'var(--ok)');
+    if(failedDocs.length){
+      append('Fehler-Details:','var(--bad)');
+      failedDocs.forEach(f=>append('  · '+f.label+' ('+f.id+'): '+f.error,'var(--bad)'));
+    }
+    alert((dryRun?'Trockenlauf':'Anonymisierung')+' abgeschlossen:\n\n'+ok+' '+(dryRun?'würden':'wurden')+' anonymisiert\n'+skipped+' übersprungen\n'+failed+' Fehler\n\n'+(dryRun?'Wenn alles ok aussieht: Funktion erneut aufrufen und ECHTE Anonymisierung wählen.':''));
   }catch(err){
-    append('✗ Fehler: '+(err.message||err),'var(--bad)');
+    append('✗ Fataler Fehler: '+(err.message||err),'var(--bad)');
     alert('Fehler: '+(err.message||err));
   }
 }
