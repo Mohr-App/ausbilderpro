@@ -4015,6 +4015,61 @@ function resolveAllPoolTnIds(){
     });
   });
 }
+
+// ─── PILOT-SYNC: Sitzplatz-Namen aus globalTN aktualisieren ───
+// Nach Anonymisierung haben Sitzpläne lokal evtl. noch Vollnamen. Diese Funktion
+// gleicht lokalen seat.name/seat.company mit aktuellem Firestore-Stand ab.
+// Lookup über seat.poolTnId → globalTN/{tnId}. Wenn Firestore neuer ist, wird lokal überschrieben.
+function syncSeatNamesFromFirestore(){
+  if(_demoMode) return;
+  if(!_db) return;
+  // Sammle alle poolTnIds aus allen Sitzplätzen
+  const tnIds=new Set();
+  Object.values(S.kats||{}).forEach(kat=>{
+    Object.values(kat.instances||{}).forEach(inst=>{
+      Object.values(inst.seats||{}).forEach(seat=>{
+        if(seat&&seat.poolTnId) tnIds.add(seat.poolTnId);
+      });
+    });
+  });
+  if(!tnIds.size) return;
+  // Hole alle relevanten globalTN-Docs (parallel, einzeln um nicht alle 71 zu laden)
+  const promises=[...tnIds].map(tnId=>
+    _db.collection('globalTN').doc(tnId).get()
+      .then(doc=>doc.exists?{tnId,data:doc.data()}:null)
+      .catch(()=>null)
+  );
+  Promise.all(promises).then(results=>{
+    const tnMap={};
+    results.filter(r=>r).forEach(r=>{ tnMap[r.tnId]=r.data; });
+    let changed=false;
+    Object.values(S.kats||{}).forEach(kat=>{
+      Object.values(kat.instances||{}).forEach(inst=>{
+        Object.entries(inst.seats||{}).forEach(([sid,seat])=>{
+          if(!seat||!seat.poolTnId) return;
+          const tn=tnMap[seat.poolTnId];
+          if(!tn) return;
+          // Namen synchronisieren (Firestore = Wahrheit)
+          const fsName=((tn.vorname||'')+' '+(tn.nachname||'')).trim();
+          if(fsName && seat.name!==fsName){
+            seat.name=fsName;
+            changed=true;
+          }
+          // Firma synchronisieren
+          if(tn.firma!==undefined && seat.company!==tn.firma){
+            seat.company=tn.firma||'';
+            changed=true;
+          }
+        });
+      });
+    });
+    if(changed){
+      persist();
+      if(typeof renderSeats==='function') renderSeats();
+      if(typeof renderSidebar==='function') renderSidebar();
+    }
+  }).catch(()=>{});
+}
 let _modalSnapshot=null;
 function _seatModalDirty(){
   if(!_modalSnapshot) return false;
@@ -7391,6 +7446,7 @@ function fbLoadData(){
       loadHBZKurse();
       loadBerufeFromFirestore();
       resolveAllPoolTnIds();
+      syncSeatNamesFromFirestore();
       loadTNPhotos();
       checkAusbNotifications();
       checkFirstLoginPwHint();
