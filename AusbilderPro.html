@@ -1032,6 +1032,27 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- PILOT-BANNER OVERLAY (einmalig nach Login, Stand 28.04.2026) -->
+<div id="pilotBannerOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9998;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:440px;width:100%;background:var(--sur);border:2px solid #f59e0b;border-radius:16px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.4)">
+    <div style="font-size:1.1rem;font-weight:800;color:#92400e;margin-bottom:6px">⚠ Pilot-Hinweis</div>
+    <div style="font-size:.78rem;color:var(--tx);line-height:1.6;margin-bottom:14px">
+      AusbilderPro befindet sich aktuell in der <b>Pilotphase</b>. Aus Datensparsamkeitsgründen wurde Folgendes angepasst:
+    </div>
+    <ul style="font-size:.74rem;color:var(--tx);line-height:1.7;margin-bottom:14px;padding-left:20px">
+      <li>Vor- und Nachnamen werden nur als <b>2-Buchstaben-Kürzel</b> gespeichert (z.B. „Ma. Mu." statt „Max Mustermann")</li>
+      <li>Telefonnummern und Geburtsdaten werden <b>nicht erfasst</b></li>
+      <li>Bestehende Daten wurden entsprechend angepasst</li>
+      <li>Anwesenheits- und Notendaten bleiben unverändert</li>
+    </ul>
+    <div style="font-size:.7rem;color:var(--mu);line-height:1.6;margin-bottom:14px">
+      Sobald die Nutzung mit der HBZ-Geschäftsführung formal geregelt ist, informieren wir erneut.
+      Bei Fragen: <a href="mailto:info@ausbilderpro.de" style="color:var(--acc)">info@ausbilderpro.de</a>
+    </div>
+    <button title="Verstanden" onclick="dismissPilotBanner()" style="width:100%;padding:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✓ Verstanden</button>
+  </div>
+</div>
+
 <!-- TN DETAIL MODAL -->
 <div class="ov" id="tnDetailModal" title="Schließen" onclick="if(event.target===this)this.classList.remove('open')">
 <div class="modal" style="max-width:420px">
@@ -1051,15 +1072,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="modal" style="max-width:400px">
 <div class="mhd"><div class="mtit">👤 Teilnehmer manuell hinzufügen</div><button class="xcls" onclick="document.getElementById('manualTNModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
 <div class="mbdy">
-<div class="fg"><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="mtVorname" placeholder="Max"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="mtNachname" placeholder="Mustermann"></div>
+<div style="background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.25);border-radius:8px;padding:9px 11px;margin-bottom:12px;font-size:.7rem;color:#92400e;line-height:1.5">
+⚠ <b>Pilotphase:</b> Bitte nur 2-Buchstaben-Kürzel eingeben (z.B. „Ma." statt „Maximilian"). Telefon und Geburtsdatum werden in der Pilotphase nicht erfasst.
+</div>
+<div class="fg"><label class="fl">Vorname (Kürzel) <span style="color:#ef4444">*</span></label><input class="fi" id="mtVorname" placeholder="Ma." maxlength="3"></div>
+<div class="fg" style="margin-top:6px"><label class="fl">Nachname (Kürzel) <span style="color:#ef4444">*</span></label><input class="fi" id="mtNachname" placeholder="Mu." maxlength="3"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Betrieb</label><input class="fi" id="mtBetrieb" placeholder="Firma GmbH"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Berufsgruppe <span style="color:#ef4444">*</span></label><select class="fi" id="mtBerufGruppe" onchange="mtUpdateFachrichtungen()" style="cursor:pointer"><option value="">– Berufsgruppe wählen –</option></select></div>
 <div class="fg" style="margin-top:6px;display:none" id="mtFachWrap"><label class="fl">Fachrichtung</label><select class="fi" id="mtFachrichtung" style="cursor:pointer"><option value="">– Fachrichtung wählen –</option></select></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Lehrjahr <span style="color:#ef4444">*</span></label><select class="fi" id="mtLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
 <div style="display:flex;gap:8px;margin-top:6px">
 <div class="fg" style="flex:1"><label class="fl">E-Mail</label><input class="fi" id="mtEmail" type="email" placeholder="max@firma.de"></div>
-<div class="fg" style="flex:1"><label class="fl">Telefon</label><input class="fi" id="mtTelefon" type="tel" placeholder="0170..."></div>
+<div class="fg" style="flex:1"><label class="fl" style="color:var(--mu)">Telefon <span style="font-size:.6rem;font-weight:400">(Pilotphase: gesperrt)</span></label><input class="fi" id="mtTelefon" type="tel" placeholder="—" disabled style="opacity:.45;cursor:not-allowed;background:var(--sur2)"></div>
 </div>
 <div class="fg" style="margin-top:6px"><label class="fl">Sitzplatznummer</label><input class="fi" id="mtSitzplatz" type="number" min="1" placeholder="z.B. 5" style="max-width:120px"></div>
 <button class="bsave" title="✓ Hinzufügen" onclick="saveManualTN()" style="margin-top:12px">✓ Hinzufügen</button>
@@ -1433,6 +1457,22 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Lehrgangsarten an
 const APP_VERSION = 'v2.6.0';
+// ─── PILOT-MODUS: Datensparsamkeit waehrend Pilotphase ───
+// Solange aktiviert: Vor-/Nachname werden auf 2-Buchstaben-Kuerzel reduziert,
+// Telefon und Geburtsdatum werden nicht erfasst, Eingabefelder sind eingeschraenkt.
+const PILOT_MODE = true;
+const PILOT_BANNER_KEY = 'pilotBannerSeen_2026_04_28';
+function pilotShortName(s){
+  if(!PILOT_MODE) return s;
+  const v = (s||'').trim();
+  if(!v) return '';
+  // Schon ein Kuerzel ("Ma." oder "Ma" mit max 2 Buchstaben)?
+  if(/^[A-Za-zÄÖÜäöüß]{1,2}\.?$/.test(v)) {
+    return v.replace(/\.$/,'') + '.';
+  }
+  // Erste 2 Buchstaben + Punkt
+  return v.replace(/[^A-Za-zÄÖÜäöüß]/g,'').slice(0,2) + '.';
+}
 const APP_BUILD = '2026-03-04';
 const CHANGELOG = [
   {v:'v2.6.0', d:'04.03.2026', items:['🔄 Berufe dynamisch aus Firestore (statt hardcoded)','📊 Anwesenheit → HBZ Sync (aggregiert pro TN)','📱 Mobile Listenansicht synct jetzt auch nach Firestore']},
@@ -4745,6 +4785,24 @@ function submitDsgvoConsent(){
     toast('✓ Zustimmung gespeichert');
   }).catch(err=>{if(errEl)errEl.textContent='Fehler: '+err.message;});
 }
+// ─── PILOT-BANNER: einmalige Hinweis-Anzeige bei Login ───
+function checkPilotBanner(){
+  if(!PILOT_MODE) return;
+  if(localStorage.getItem(_lsKey(PILOT_BANNER_KEY))==='1') return;
+  const ov=document.getElementById('pilotBannerOverlay');
+  if(ov) ov.style.display='flex';
+}
+function dismissPilotBanner(){
+  localStorage.setItem(_lsKey(PILOT_BANNER_KEY),'1');
+  const ov=document.getElementById('pilotBannerOverlay');
+  if(ov) ov.style.display='none';
+  // Optional: Quittierung in Firestore loggen (Beleg-Wert)
+  if(_db && _fbUid){
+    _db.collection('users').doc(_fbUid).set({
+      pilotBannerSeen: { zeitpunkt: new Date().toISOString(), version: '2026-04-28' }
+    },{merge:true}).catch(()=>{});
+  }
+}
 function getAusbilderKursData(){
   const p=getAusbilderProfil();
   const loginEmail=_auth?.currentUser?.email?.toLowerCase()||'';
@@ -5137,9 +5195,12 @@ function saveManualTN(){
   const inst=curInst();
   if(!inst||!inst.sharedKursId){toast('Kein Kurs verknüpft','bad');return;}
   const kursId=inst.sharedKursId;
-  const vorname=(document.getElementById('mtVorname').value||'').trim();
-  const nachname=(document.getElementById('mtNachname').value||'').trim();
+  let vorname=(document.getElementById('mtVorname').value||'').trim();
+  let nachname=(document.getElementById('mtNachname').value||'').trim();
   if(!vorname||!nachname){toast('Bitte Vor- und Nachname eingeben','bad');return;}
+  // ── PILOT-MODUS: Namen automatisch auf 2-Buchstaben-Kürzel reduzieren ──
+  vorname = pilotShortName(vorname);
+  nachname = pilotShortName(nachname);
   const firma=(document.getElementById('mtBetrieb').value||'').trim();
   // Neue Dropdown-Logik: Berufsgruppe + optional Fachrichtung
   const berufGruppeSel=document.getElementById('mtBerufGruppe');
@@ -5153,7 +5214,8 @@ function saveManualTN(){
   const ausbjahr=document.getElementById('mtLehrjahr').value||'';
   if(!ausbjahr){toast('Bitte Lehrjahr wählen','bad');return;}
   const kontaktEmail=(document.getElementById('mtEmail').value||'').trim();
-  const kontaktTelefon=(document.getElementById('mtTelefon').value||'').trim();
+  // ── PILOT-MODUS: Telefon nicht gespeichert (Datensparsamkeit) ──
+  const kontaktTelefon='';
   const wunschSitzplatz=(document.getElementById('mtSitzplatz').value||'').trim();
 
   if(!_db){toast('Nicht verbunden','bad');return;}
@@ -7333,6 +7395,7 @@ function fbLoadData(){
       checkAusbNotifications();
       checkFirstLoginPwHint();
       checkDsgvoConsent();
+      checkPilotBanner();
       // Profil aus Firestore nachladen (persistent, nicht nur localStorage)
       _db.collection('users').doc(_fbUid).collection('data').doc('profil').get().then(pDoc=>{
         if(pDoc.exists){

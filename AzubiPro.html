@@ -200,9 +200,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <!-- Schritt 1: Name -->
       <div class="wiz-step" data-step="1">
         <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">👋 Wie heißt du?</div>
-        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Damit wir dich richtig ansprechen.</div>
-        <div><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="jVorname" placeholder="Max" autocomplete="given-name"></div>
-        <div style="margin-top:8px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="jNachname" placeholder="Mustermann" autocomplete="family-name"></div>
+        <div style="background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.25);border-radius:8px;padding:9px 11px;margin:8px 0 12px;font-size:.7rem;color:#92400e;line-height:1.5">
+          ⚠ <b>Pilotphase:</b> Bitte nur die ersten 2 Buchstaben eingeben (z.B. „Ma." statt „Maximilian"). Datensparsamkeit während der Pilotphase.
+        </div>
+        <div><label class="fl">Vorname (Kürzel) <span style="color:#ef4444">*</span></label><input class="fi" id="jVorname" placeholder="Ma." autocomplete="off" maxlength="3"></div>
+        <div style="margin-top:8px"><label class="fl">Nachname (Kürzel) <span style="color:#ef4444">*</span></label><input class="fi" id="jNachname" placeholder="Mu." autocomplete="off" maxlength="3"></div>
       </div>
 
       <!-- Schritt 2: Beruf -->
@@ -221,19 +223,21 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div><label class="fl">Betrieb / Firma <span style="color:#ef4444">*</span></label><input class="fi" id="jFirma" placeholder="Firma GmbH"></div>
       </div>
 
-      <!-- Schritt 4: Geburtsdatum -->
+      <!-- Schritt 4: Geburtsdatum (Pilotphase deaktiviert, Schritt bleibt für Wizard-Konsistenz) -->
       <div class="wiz-step" data-step="4" style="display:none">
-        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🎂 Wann bist du geboren?</div>
-        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Optional – kannst du auch überspringen.</div>
-        <div><label class="fl">Geburtsdatum</label><input type="date" class="fi" id="jGeburt"></div>
+        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🎂 Geburtsdatum</div>
+        <div style="background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.25);border-radius:8px;padding:9px 11px;margin:8px 0 12px;font-size:.72rem;color:#92400e;line-height:1.5">
+          ⚠ In der Pilotphase wird das Geburtsdatum <b>nicht erfasst</b>. Klicke einfach auf „Weiter".
+        </div>
+        <div><label class="fl" style="color:var(--mu)">Geburtsdatum (Pilotphase: gesperrt)</label><input type="date" class="fi" id="jGeburt" disabled style="opacity:.45;cursor:not-allowed;background:var(--sur2)"></div>
       </div>
 
       <!-- Schritt 5: Kontakt -->
       <div class="wiz-step" data-step="5" style="display:none">
         <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">📧 Wie erreichen wir dich?</div>
-        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Email ist nötig zum Einloggen. Telefon nur falls du möchtest.</div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Email ist nötig zum Einloggen.</div>
         <div><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jEmail" placeholder="deine@email.de" autocomplete="email"></div>
-        <div style="margin-top:8px"><label class="fl">Telefon <span style="color:var(--mu);font-weight:400;font-size:.62rem">(freiwillig)</span></label><input class="fi" type="tel" id="jTelefon" placeholder="0170 1234567" autocomplete="tel"></div>
+        <div style="margin-top:8px"><label class="fl" style="color:var(--mu)">Telefon <span style="font-size:.6rem;font-weight:400">(Pilotphase: gesperrt)</span></label><input class="fi" type="tel" id="jTelefon" placeholder="—" disabled style="opacity:.45;cursor:not-allowed;background:var(--sur2)"></div>
       </div>
 
       <!-- Schritt 6: Passwort + DSGVO -->
@@ -842,6 +846,17 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 </div>
 
 <script>
+// ─── PILOT-MODUS: Datensparsamkeit waehrend Pilotphase ───
+const PILOT_MODE = true;
+function pilotShortName(s){
+  if(!PILOT_MODE) return s;
+  const v = (s||'').trim();
+  if(!v) return '';
+  if(/^[A-Za-zÄÖÜäöüß]{1,2}\.?$/.test(v)) {
+    return v.replace(/\.$/,'') + '.';
+  }
+  return v.replace(/[^A-Za-zÄÖÜäöüß]/g,'').slice(0,2) + '.';
+}
 // ── Firebase ──
 const _fbCfg={
   apiKey:"AIzaSyCI5hJLj22FTiAJoVIPis7VhoQqJiMLAZQ",
@@ -1443,17 +1458,21 @@ document.addEventListener('keydown', e=>{
 
 
 function submitJoinRegistration(){
-  const vorname=(document.getElementById('jVorname').value||'').trim();
-  const nachname=(document.getElementById('jNachname').value||'').trim();
+  let vorname=(document.getElementById('jVorname').value||'').trim();
+  let nachname=(document.getElementById('jNachname').value||'').trim();
+  // ── PILOT-MODUS: Namen automatisch auf 2-Buchstaben-Kuerzel reduzieren ──
+  vorname = pilotShortName(vorname);
+  nachname = pilotShortName(nachname);
   const firma=(document.getElementById('jFirma').value||'').trim();
   const berufSel=document.getElementById('jBeruf');
   const fachSel=document.getElementById('jFachrichtung');
   const beruf=fachSel&&fachSel.value?fachSel.value:(berufSel?berufSel.value:'');
   const berufGruppe=berufSel?berufSel.value:'';
   const ausbjahr=document.getElementById('jLehrjahr').value||'';
-  const geburtsdatum=document.getElementById('jGeburt').value||'';
+  // ── PILOT-MODUS: Geburtsdatum und Telefon nicht erfasst ──
+  const geburtsdatum='';
   const email=(document.getElementById('jEmail').value||'').trim().toLowerCase();
-  const telefon=(document.getElementById('jTelefon').value||'').trim();
+  const telefon='';
   const passwort=document.getElementById('jPasswort').value||'';
   const errEl=document.getElementById('jErr');
   errEl.textContent='';
