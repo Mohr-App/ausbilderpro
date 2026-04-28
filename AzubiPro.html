@@ -406,13 +406,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <div class="card-title" style="margin-bottom:0">🏭 Vom Betrieb</div>
-          <label style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600">📤 An Betrieb senden<input type="file" id="azSendToAGIn" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="azSendToAG(event)"></label>
+          <span id="azSendToAGWrap" style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(148,163,184,.3);border-radius:6px;background:rgba(148,163,184,.06);color:var(--mu);cursor:not-allowed;font-weight:600;opacity:.55" title="Upload in Pilotphase deaktiviert">📤 Upload (Pilot: gesperrt)</span>
         </div>
         <div id="docsAG" style="margin-top:6px"><div class="empty">Keine Dokumente vom Betrieb</div></div>
       </div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div class="card-title" style="margin-bottom:0">📎 Meine Dokumente</div></div>
-        <button class="upload-btn" onclick="myDocsUpload()" title="Dokument hochladen">📁 Dokument hochladen</button>
+        <button class="upload-btn" onclick="myDocsUpload()" title="Upload in Pilotphase deaktiviert" disabled style="opacity:.55;cursor:not-allowed">📁 Upload (Pilot: gesperrt)</button>
         <input type="file" id="myDocsFileIn" style="display:none" onchange="myDocsHandleUpload(event)" multiple>
         <div id="docsMy" style="margin-top:10px"><div class="empty">Noch keine eigenen Dokumente</div></div>
       </div>
@@ -4399,8 +4399,10 @@ function azDeleteAGDoc(docId){
 }
 
 function azSendToAG(e){
-  const file=e.target.files[0];
   e.target.value='';
+  // ── PILOT-MODUS: Upload deaktiviert ──
+  if(PILOT_MODE){ toast('Upload in Pilotphase deaktiviert','bad'); return; }
+  const file=e.target.files[0];
   if(!file||!_tnId) return;
   if(file.size>2*1024*1024){toast('Max. 2 MB','bad');return;}
   toast('⬆ Wird gesendet…');
@@ -4420,12 +4422,18 @@ function azSendToAG(e){
   reader.readAsDataURL(file);
 }
 
-function myDocsUpload(){ document.getElementById('myDocsFileIn').click(); }
+function myDocsUpload(){
+  // ── PILOT-MODUS: Upload deaktiviert ──
+  if(PILOT_MODE){ toast('Upload in Pilotphase deaktiviert','bad'); return; }
+  document.getElementById('myDocsFileIn').click();
+}
 
 function myDocsHandleUpload(e){
+  e.target.value='';
+  // ── PILOT-MODUS: Upload deaktiviert ──
+  if(PILOT_MODE){ toast('Upload in Pilotphase deaktiviert','bad'); return; }
   const files=e.target.files;
   if(!files.length||!_tnId) return;
-  e.target.value='';
   Array.from(files).forEach(file=>{
     if(file.size>20*1024*1024){ toast('Datei zu groß (max 20 MB)','bad'); return; }
     const path='shared/tn/'+_tnId+'/docs/'+Date.now()+'_'+file.name;

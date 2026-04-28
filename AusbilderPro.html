@@ -1163,7 +1163,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" title="📁 Datei hochladen" onclick="docsUpload('file','course')" style="flex:1">📁 Datei hochladen</button>
         <button class="tbtn" title="📷 Kamera" onclick="docsUpload('cam','course')" style="flex:1">📷 Kamera</button>
       </div>
-      <input type="file" id="docsFileInCourse" style="display:none" onchange="docsHandleUpload(event,'course')">
+      <input type="file" id="docsFileInCourse" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="docsHandleUpload(event,'course')">
       <input type="file" id="docsCamInCourse" accept="image/*" capture="environment" style="display:none" onchange="docsHandleUpload(event,'course')">
       <div id="docsListCourse" style="display:flex;flex-direction:column;gap:6px">
         <div style="color:var(--mu);font-size:.75rem;text-align:center;padding:20px">Keine Dokumente vorhanden</div>
@@ -1435,7 +1435,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <button class="tbtn" title="📁 Datei hochladen" onclick="docsUpload('file','seat')" style="flex:1;font-size:.75rem">📁 Datei hochladen</button>
           <button class="tbtn" title="📷 Kamera" onclick="docsUpload('cam','seat')" style="flex:1;font-size:.75rem">📷 Kamera</button>
         </div>
-        <input type="file" id="docsFileInSeat" style="display:none" onchange="docsHandleUpload(event,'seat')">
+        <input type="file" id="docsFileInSeat" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="docsHandleUpload(event,'seat')">
         <input type="file" id="docsCamInSeat" accept="image/*" capture="environment" style="display:none" onchange="docsHandleUpload(event,'seat')">
         <div id="docsListSeat" style="display:flex;flex-direction:column;gap:6px">
           <div style="color:var(--mu);font-size:.75rem;text-align:center;padding:20px">Keine Dokumente vorhanden</div>
@@ -6997,6 +6997,11 @@ function closePoolLink(){ document.getElementById('poolLinkModal').classList.rem
 // DOKUMENTE (Firebase Storage)
 // ═══════════════════════════════════════════════
 function docsUpload(type, scope){
+  // ── PILOT-MODUS: Kamera deaktiviert (nur PDF/Word über Datei-Auswahl) ──
+  if(PILOT_MODE && type==='cam'){
+    alert('Kamera-Upload in der Pilotphase deaktiviert.\nBitte Datei-Auswahl verwenden (PDF/Word).');
+    return;
+  }
   const id = scope==='seat' ? (type==='cam' ? 'docsCamInSeat' : 'docsFileInSeat')
                              : (type==='cam' ? 'docsCamInCourse' : 'docsFileInCourse');
   document.getElementById(id).click();
@@ -7006,6 +7011,18 @@ function docsHandleUpload(e, scope){
   const file = e.target.files[0];
   if(!file || !_fbUid) return;
   e.target.value = '';
+  // ── PILOT-MODUS: Nur PDF + Word zulassen ──
+  if(PILOT_MODE){
+    const name=(file.name||'').toLowerCase();
+    const okExt=name.endsWith('.pdf')||name.endsWith('.doc')||name.endsWith('.docx');
+    const okType=file.type==='application/pdf'
+      ||file.type==='application/msword'
+      ||file.type==='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if(!okExt && !okType){
+      alert('In der Pilotphase sind nur PDF- und Word-Dokumente erlaubt.\n\nBilder, Videos und andere Datei-Typen werden nicht unterstützt.');
+      return;
+    }
+  }
   const maxMB = 20;
   if(file.size > maxMB * 1024 * 1024){ alert('Datei zu groß (max '+maxMB+' MB)'); return; }
 
