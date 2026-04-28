@@ -4228,6 +4228,7 @@ function addAtt(){
 }
 function toggleAe(el, e){
   if(e.target.classList.contains('bdel')) return;
+  if(e.target.classList.contains('bedit')) return;
   el.classList.toggle('expanded');
 }
 function delAtt(i){
@@ -4235,6 +4236,76 @@ function delAtt(i){
   renderAtt();
   const saveBtn=document.getElementById('btnSaveAtt');
   if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';}
+}
+// Nachträgliches Bearbeiten eines Anwesenheitseintrags
+// (z.B. "Zu spät" oder "Früher gegangen" zu einem bestehenden Anwesend-Eintrag hinzufügen)
+function editAtt(i, ev){
+  if(ev) ev.stopPropagation();
+  const a=tmpAtt[i];
+  if(!a) return;
+  const isPresent=a.type==='present';
+  const lateChecked=(a.lateMins>0)?'checked':'';
+  const earlyChecked=(a.earlyMins>0)?'checked':'';
+  const lateVal=a.lateMins||'';
+  const earlyVal=a.earlyMins||'';
+  const noteVal=a.note||'';
+  // Modal aufbauen
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,18,25,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div style="max-width:420px;width:100%;background:var(--sur);border:2px solid var(--acc);border-radius:14px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.4)">'
+    +'<div style="font-size:1rem;font-weight:800;color:var(--tx);margin-bottom:4px">📝 Eintrag bearbeiten</div>'
+    +'<div style="font-size:.7rem;color:var(--mu);margin-bottom:14px">'+fmtD(a.date)+' — '+attCfg(a).label+'</div>'
+    +(isPresent?(
+      '<div style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px;margin-bottom:12px">'
+      +'<label style="display:flex;align-items:center;gap:8px;font-size:.78rem;cursor:pointer;margin-bottom:8px">'
+      +'<input type="checkbox" id="editLateChk" '+lateChecked+' onchange="document.getElementById(\'editLateMins\').disabled=!this.checked"> Zu spät'
+      +'</label>'
+      +'<div style="display:flex;align-items:center;gap:6px;padding-left:24px">'
+      +'<input type="number" class="fi" id="editLateMins" value="'+lateVal+'" placeholder="0" min="0" style="width:80px;font-size:.78rem;padding:6px 8px" '+(lateChecked?'':'disabled')+'>'
+      +'<span style="font-size:.7rem;color:var(--mu)">Minuten</span>'
+      +'</div>'
+      +'</div>'
+      +'<div style="background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:10px;margin-bottom:12px">'
+      +'<label style="display:flex;align-items:center;gap:8px;font-size:.78rem;cursor:pointer;margin-bottom:8px">'
+      +'<input type="checkbox" id="editEarlyChk" '+earlyChecked+' onchange="document.getElementById(\'editEarlyMins\').disabled=!this.checked"> Früher gegangen'
+      +'</label>'
+      +'<div style="display:flex;align-items:center;gap:6px;padding-left:24px">'
+      +'<input type="number" class="fi" id="editEarlyMins" value="'+earlyVal+'" placeholder="0" min="0" style="width:80px;font-size:.78rem;padding:6px 8px" '+(earlyChecked?'':'disabled')+'>'
+      +'<span style="font-size:.7rem;color:var(--mu)">Minuten</span>'
+      +'</div>'
+      +'</div>'
+    ):'')
+    +'<label class="fl" style="margin-bottom:6px;display:block">Bemerkung</label>'
+    +'<input class="fi" type="text" id="editAttNote" value="'+esc(noteVal).replace(/"/g,'&quot;')+'" placeholder="optional…" style="margin-bottom:14px">'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="badd" onclick="closeEditAtt()" style="flex:1;background:var(--sur2);color:var(--tx);box-shadow:none">Abbrechen</button>'
+    +'<button class="badd" onclick="saveEditAtt('+i+')" style="flex:1;background:linear-gradient(135deg,#2563eb,#3b82f6)">💾 Speichern</button>'
+    +'</div>'
+    +'</div>';
+  ov.id='editAttOverlay';
+  ov.onclick=(e)=>{ if(e.target===ov) closeEditAtt(); };
+  document.body.appendChild(ov);
+}
+function closeEditAtt(){
+  const ov=document.getElementById('editAttOverlay');
+  if(ov) ov.remove();
+}
+function saveEditAtt(i){
+  const a=tmpAtt[i];
+  if(!a){ closeEditAtt(); return; }
+  if(a.type==='present'){
+    const lc=document.getElementById('editLateChk');
+    const ec=document.getElementById('editEarlyChk');
+    a.lateMins=(lc&&lc.checked)?(parseInt(document.getElementById('editLateMins').value)||0):0;
+    a.earlyMins=(ec&&ec.checked)?(parseInt(document.getElementById('editEarlyMins').value)||0):0;
+  }
+  const nf=document.getElementById('editAttNote');
+  if(nf) a.note=nf.value||'';
+  closeEditAtt();
+  renderAtt();
+  const saveBtn=document.getElementById('btnSaveAtt');
+  if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';}
+  toast('Eintrag aktualisiert','ok');
 }
 function renderAtt(){
   const att=tmpAtt;
@@ -4263,7 +4334,7 @@ function renderAtt(){
     let extra='';
     if(a.lateMins>0) extra+=' <span class="ab ab-l">'+a.lateMins+' min</span>';
     if(a.earlyMins>0) extra+=' <span class="ab ab-e2">'+a.earlyMins+' min</span>';
-    return '<div class="ae2" onclick="toggleAe(this,event)"><div class="aei"><div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span class="ab '+cf.cls+'">'+cf.label+'</span>'+extra+'</div><div class="aed">'+fmtD(a.date)+'</div>'+(a.note?'<div class="aen">'+esc(a.note)+'</div>':'')+'</div><button class="bdel" title="Anwesenheitseintrag löschen" onclick="delAtt('+i+')">✕</button></div>';
+    return '<div class="ae2" onclick="toggleAe(this,event)"><div class="aei"><div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span class="ab '+cf.cls+'">'+cf.label+'</span>'+extra+'</div><div class="aed">'+fmtD(a.date)+'</div>'+(a.note?'<div class="aen">'+esc(a.note)+'</div>':'')+'</div><div style="display:flex;gap:4px"><button class="bedit" title="Eintrag bearbeiten" onclick="editAtt('+i+',event)" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#1e40af;font-size:.7rem;padding:3px 8px;border-radius:5px;cursor:pointer;font-weight:700">✎</button><button class="bdel" title="Anwesenheitseintrag löschen" onclick="delAtt('+i+')">✕</button></div></div>';
   }).join('');
 }
 // ── FOTO ──
