@@ -1686,6 +1686,12 @@ function persist(){
 
 function autoExport(reason){
   if(_demoMode) return;
+  // ── PILOT-MODUS: Kein lokaler Auto-Export. Daten liegen sicher in Firestore.
+  // Lokale .hbz-Dateien wuerden Schuelerdaten ausserhalb der DSGVO-Schutzzone ablegen.
+  if(PILOT_MODE){
+    _lastExportCount = _changeCount; // Counter trotzdem zuruecksetzen damit nicht alle 20 Aenderungen geprueft wird
+    return;
+  }
   _lastExportCount = _changeCount;
   if(_driveToken){ driveSave(); return; }
   const plain=JSON.stringify(S,null,2);
@@ -5945,6 +5951,12 @@ function showDemoUpgrade(){
 
 function doExport(){
   if(_demoMode){ showDemoUpgrade(); return; }
+  // ── PILOT-MODUS: Warnung anzeigen ──
+  if(PILOT_MODE){
+    if(!confirm('⚠ Pilotphase\n\nDer Export erstellt eine verschlüsselte Datei mit allen Sitzplan-, Anwesenheits- und Notendaten auf deinem Gerät.\n\nWährend der Pilotphase liegen die Daten ohnehin sicher in der Cloud (Firestore, EU-Region Frankfurt). Lokale Exports sind nicht empfohlen, da die Datei den DSGVO-Schutzbereich verlässt.\n\nWirklich exportieren?')){
+      return;
+    }
+  }
   _lastExportCount=_changeCount;
   let pw=localStorage.getItem(_lsKey('ap_exppw'))||'';
   if(!pw){
