@@ -2950,22 +2950,30 @@ function scaleSeating(){} // disabled
 window.addEventListener('resize', ()=>scaleSeating());
 
 // ─── Trennlinien (vertikal zwischen Reihen, horizontal zwischen Sitzplätzen) ───
+// Cloud-synct via S.gridLines; localStorage nur als Fallback bei Migration
 function applyGridLines(){
   const wrap=document.getElementById('seatingEl'); if(!wrap)return;
-  const v=localStorage.getItem(_lsKey('gridLineV'))==='1';
-  const h=localStorage.getItem(_lsKey('gridLineH'))==='1';
+  const cloud = (S && S.gridLines) || null;
+  const v = cloud && 'V' in cloud ? !!cloud.V : (localStorage.getItem(_lsKey('gridLineV'))==='1');
+  const h = cloud && 'H' in cloud ? !!cloud.H : (localStorage.getItem(_lsKey('gridLineH'))==='1');
   wrap.classList.toggle('gridV',v);
   wrap.classList.toggle('gridH',h);
 }
 function setGridLineMaster(axis,on){
+  if(!S.gridLines) S.gridLines = {V:false, H:false, VHidden:[], HHidden:[]};
+  if(axis==='V') S.gridLines.V = !!on;
+  else S.gridLines.H = !!on;
+  // Backwards-compat: localStorage auch setzen
   const k=_lsKey(axis==='V'?'gridLineV':'gridLineH');
   if(on) localStorage.setItem(k,'1'); else localStorage.removeItem(k);
   applyGridLines();
   if(typeof renderSeats==='function') renderSeats();
+  if(typeof persist==='function') persist();
 }
 function openTrennlinienModal(){
-  const v=localStorage.getItem(_lsKey('gridLineV'))==='1';
-  const h=localStorage.getItem(_lsKey('gridLineH'))==='1';
+  const cloud = (S && S.gridLines) || null;
+  const v = cloud && 'V' in cloud ? !!cloud.V : (localStorage.getItem(_lsKey('gridLineV'))==='1');
+  const h = cloud && 'H' in cloud ? !!cloud.H : (localStorage.getItem(_lsKey('gridLineH'))==='1');
   const cbV=document.getElementById('trennMasterV');
   const cbH=document.getElementById('trennMasterH');
   if(cbV) cbV.checked=v;
@@ -2987,6 +2995,11 @@ function closeMobMoreMenu(){
 // Pro-Position Sichtbarkeit: leere/keine Liste = ALLE sichtbar (Default).
 // Liste ['1','3'] = nur Position 1 und 3 sichtbar.
 function _getGridHiddenSet(axis){
+  const cloud = (S && S.gridLines) || null;
+  if(cloud){
+    const arr = (axis==='V' ? cloud.VHidden : cloud.HHidden) || null;
+    if(arr) return new Set(arr.map(String));
+  }
   const k=_lsKey(axis==='V'?'gridLineVHidden':'gridLineHHidden');
   try{
     const arr=JSON.parse(localStorage.getItem(k)||'[]');
@@ -2994,8 +3007,14 @@ function _getGridHiddenSet(axis){
   }catch(e){ return new Set(); }
 }
 function _setGridHiddenSet(axis,set){
+  if(!S.gridLines) S.gridLines = {V:false, H:false, VHidden:[], HHidden:[]};
+  const arr=[...set];
+  if(axis==='V') S.gridLines.VHidden = arr;
+  else S.gridLines.HHidden = arr;
+  // Backwards-compat: localStorage auch
   const k=_lsKey(axis==='V'?'gridLineVHidden':'gridLineHHidden');
-  localStorage.setItem(k,JSON.stringify([...set]));
+  localStorage.setItem(k,JSON.stringify(arr));
+  if(typeof persist==='function') persist();
 }
 function _isGridLineVisible(axis,pos){
   return !_getGridHiddenSet(axis).has(String(pos));
@@ -3052,8 +3071,13 @@ function toggleGridLinePos(axis,pos,checked){
   if(typeof renderSeats==='function') renderSeats();
 }
 function resetGridConfig(){
+  if(S.gridLines){
+    S.gridLines.VHidden = [];
+    S.gridLines.HHidden = [];
+  }
   localStorage.removeItem(_lsKey('gridLineVHidden'));
   localStorage.removeItem(_lsKey('gridLineHHidden'));
+  if(typeof persist==='function') persist();
   openGridConfigModal(); // re-render Modal
 }
 
