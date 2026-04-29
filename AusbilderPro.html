@@ -738,6 +738,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="openAusbilderProfil();closeHdrMenu()" style="width:100%;text-align:left" title="Name, Telefon, E-Mail für Azubis hinterlegen">👤 Mein Profil</button>
         <button class="tbtn" onclick="openTrennlinienModal();closeHdrMenu()" style="width:100%;text-align:left" title="Sitzplan-Trennlinien konfigurieren">📐 Trennlinien</button>
         <button class="tbtn" onclick="openTrash();closeHdrMenu()" style="width:100%;text-align:left" title="Gelöschte Lehrgänge wiederherstellen (30 Tage)">🗑 Papierkorb</button>
+        <button class="tbtn" onclick="appReset();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#991b1b" title="App-Cache und alte lokale Dateien zurücksetzen (bei Problemen)">🔄 App zurücksetzen</button>
         <button class="tbtn" id="pilotCleanupBtn" onclick="pilotCleanupLocalState();closeHdrMenu()" style="width:100%;text-align:left;display:none;background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.2);color:#92400e" title="Pilot-Cleanup: Geister-Sitzplaetze und Vollnamen lokal+Cloud bereinigen">⚠ Pilot-Cleanup</button>
         <button class="tbtn" onclick="showHilfeModal();closeHdrMenu()" style="width:100%;text-align:left" title="Anleitungen und Tipps">❓ Brauchst du Hilfe?</button>
       </div>
@@ -5037,6 +5038,65 @@ function backfillCourseAusbilderData(profil){
         }).catch(()=>{});
       }
     }).catch(()=>{});
+}
+
+// ─── APP-RESET / DIAGNOSE: einfaches Self-Service-Tool fuer Kollegen ───
+// Erneuert Service-Worker, gibt Diagnose aus und reloadet.
+async function appReset(){
+  let report=[];
+  report.push('🔍 Diagnose vor Reset:\n');
+  // Code-Stand (PILOT_MODE existiert seit v309)
+  if(typeof PILOT_MODE!=='undefined'){
+    report.push('· Code-Stand: NEU (PILOT_MODE='+PILOT_MODE+')');
+  } else {
+    report.push('· Code-Stand: ALT (Reset noetig!)');
+  }
+  // Service-Worker?
+  let swCount=0;
+  if('serviceWorker' in navigator){
+    try{
+      const regs=await navigator.serviceWorker.getRegistrations();
+      swCount=regs.length;
+      report.push('· Service-Worker registriert: '+swCount);
+    }catch(e){ report.push('· Service-Worker-Check fehlgeschlagen'); }
+  }
+  // Cache-Speicher
+  let cacheCount=0;
+  if('caches' in window){
+    try{
+      const keys=await caches.keys();
+      cacheCount=keys.length;
+      report.push('· Browser-Caches: '+cacheCount+(keys.length?' ('+keys.join(', ')+')':''));
+    }catch(e){}
+  }
+  report.push('\n');
+  report.push('Reset wird:');
+  report.push('1. Service-Worker abmelden');
+  report.push('2. Alle Browser-Caches der App leeren');
+  report.push('3. Seite mit frischem Code neu laden');
+  report.push('\nLOKALE DATEN bleiben erhalten (Sitzplaene, Anwesenheit) - die liegen sicher in der Cloud und kommen beim Login zurueck.');
+  report.push('\nReset jetzt durchfuehren?');
+
+  if(!confirm(report.join('\n'))) return;
+
+  // 1. Service-Worker abmelden
+  if('serviceWorker' in navigator){
+    try{
+      const regs=await navigator.serviceWorker.getRegistrations();
+      for(const r of regs){ await r.unregister(); }
+    }catch(e){ console.warn('SW unregister failed',e); }
+  }
+  // 2. Caches loeschen
+  if('caches' in window){
+    try{
+      const keys=await caches.keys();
+      for(const k of keys){ await caches.delete(k); }
+    }catch(e){ console.warn('Cache delete failed',e); }
+  }
+  // 3. Hinweis auf alte ap_auto_*.hbz Dateien (bei Kollegen mit aktivem Pilot)
+  alert('✓ App zurueckgesetzt!\n\nDie Seite wird jetzt neu geladen. Beim naechsten Login werden deine Daten frisch aus der Cloud geholt.\n\nFalls auf deinem Desktop oder Download-Ordner alte ap_auto_*.hbz Dateien liegen: bitte manuell loeschen (Suche nach "ap_auto" → alle markieren → Papierkorb).');
+  // Force-Reload (true = von Server, nicht aus Cache)
+  setTimeout(()=>{ location.reload(true); }, 100);
 }
 
 // ─── PILOT-CLEANUP: lokalen State von Vollnamen + Geister-Eintraegen bereinigen ───
