@@ -40,6 +40,10 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['berufsschultage']);
         allow update: if request.auth != null
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['kurstage']);
+        // Profil-Backfill: Kurs-Ersteller darf eigene Ausbilder-Stammdaten nachtragen
+        allow update: if request.auth != null
+          && resource.data.createdBy == request.auth.token.email
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ausbilderName','ausbilderEmail','ausbilderTel']);
         allow create: if request.auth != null && docId == 'urlaubLog';
         match /{deep}/{deepDoc} {
           allow read: if request.auth != null;

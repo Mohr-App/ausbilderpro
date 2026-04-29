@@ -4851,6 +4851,9 @@ function saveAusbilderProfil(){
       .set(data,{merge:true})
       .then(()=>{
         toast('Profil gespeichert ✓');
+        // Bestehende Kurse mit fehlendem Telefon/Email/Namen nachtraeglich befuellen.
+        // Use Case: Profil wurde NACH Kursanlage erstellt -> in Kurs-Docs fehlen Werte.
+        backfillCourseAusbilderData(data);
       })
       .catch(err=>{
         toast('Cloud-Fehler: '+err.message,'bad');
@@ -4992,6 +4995,38 @@ function getAusbilderKursData(){
     ausbilderName: p.name||_auth?.currentUser?.displayName||loginEmail,
     ausbilderTel: p.telefon||''
   };
+}
+
+// Aktualisiert in bestehenden Kurs-Docs Felder die noch leer sind, wenn das Profil
+// nachtraeglich gepflegt wurde (z.B. Telefonnummer ergaenzt).
+// Schreibt nur wenn der jeweilige Kurs-Wert wirklich leer ist - keine Ueberschreibung.
+function backfillCourseAusbilderData(profil){
+  if(!_db||!_auth?.currentUser?.email) return;
+  const loginEmail=_auth.currentUser.email.toLowerCase();
+  _db.collection('shared').doc('kurse').collection('list')
+    .where('ausbilderLoginEmail','==',loginEmail)
+    .get()
+    .then(snap=>{
+      if(snap.empty) return;
+      let updated=0;
+      const tasks=[];
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const update={};
+        if(profil.telefon && !d.ausbilderTel) update.ausbilderTel=profil.telefon;
+        if(profil.email && !d.ausbilderEmail) update.ausbilderEmail=profil.email;
+        if(profil.name && !d.ausbilderName) update.ausbilderName=profil.name;
+        if(Object.keys(update).length){
+          tasks.push(doc.ref.update(update));
+          updated++;
+        }
+      });
+      if(tasks.length){
+        Promise.all(tasks).then(()=>{
+          if(updated>0) toast(updated+' Kurs(e) mit Profil aktualisiert ✓');
+        }).catch(()=>{});
+      }
+    }).catch(()=>{});
 }
 
 // ─── TN DETAIL ───
