@@ -2211,13 +2211,28 @@ function loadHBZKurse(){
   if(!section) return;
   if(!_db||!_auth||!_auth.currentUser){ section.innerHTML=''; if(sectionMob) sectionMob.innerHTML=''; return; }
 
+  const myEmail=_auth.currentUser.email.toLowerCase();
   _db.collection('shared').doc('kurse').collection('list')
-    .where('ausbilderLoginEmail','==',_auth.currentUser.email.toLowerCase())
+    .where('ausbilderLoginEmail','==',myEmail)
     .get().then(snap=>{
       const linked=getLinkedKursIds();
       const unlinked=[];
+      const orphansToCleanup=[]; // verwaiste eigene Kurse (lokal geloescht aber Firestore-Doc blieb)
       snap.forEach(doc=>{
-        if(!linked.has(doc.id)) unlinked.push({id:doc.id,...doc.data()});
+        if(linked.has(doc.id)) return;
+        const data=doc.data();
+        // Self-Healing: Eigener Kurs (createdBy=meine email + standalone) der lokal nicht mehr da ist
+        // → wurde geloescht, Firestore-Doc blieb durch alten Bug → jetzt aufraeumen
+        const isMyOrphan=data.standalone===true && (data.createdBy||'').toLowerCase()===myEmail;
+        if(isMyOrphan){
+          orphansToCleanup.push(doc.ref);
+        } else {
+          unlinked.push({id:doc.id,...data});
+        }
+      });
+      // Orphans aus Firestore aufraeumen (im Hintergrund, ohne Toast)
+      orphansToCleanup.forEach(ref=>{
+        ref.delete().catch(err=>console.warn('Orphan-Cleanup fehlgeschlagen:',err));
       });
 
       if(!unlinked.length){ section.innerHTML=''; if(sectionMob) sectionMob.innerHTML=''; return; }
@@ -2655,7 +2670,9 @@ function saveNewInst(){
     seatCnt=13;
     nextSeatNum=13;
   }
-  const instData={sD,sM,sY,eD,eM,eY,rows,seatCnt,seats:{},nextSeatNum,seatLabels:lastLabels,kurstage:5};
+  const myEmail=(_auth?.currentUser?.email||'').toLowerCase();
+  const instData={sD,sM,sY,eD,eM,eY,rows,seatCnt,seats:{},nextSeatNum,seatLabels:lastLabels,kurstage:5,
+    standalone:true, createdBy:myEmail};
   _pendingSeatSetup=null; // reset nach Verwendung
 
   // Automatisch Firestore-Kurs erstellen wenn angemeldet
