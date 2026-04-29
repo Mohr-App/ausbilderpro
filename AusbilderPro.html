@@ -5079,14 +5079,35 @@ async function pilotCleanupLocalState(){
     }
   });
   // PHASE 2: Confirm + Cleanup
+  // Detail-Liste der Geister fuer Anzeige (max 20 Zeichen pro Eintrag)
+  const ghostList=ghosts.slice(0,10).map(ref=>{
+    const seat=ref.seat;
+    const kat=S.kats[ref.katId];
+    const inst=kat&&kat.instances&&kat.instances[ref.instId];
+    const kursLabel=kat?kat.label:'?';
+    const instDate=inst?(inst.von||'').substring(5)+'-'+(inst.bis||'').substring(5):'';
+    return '  · '+(seat.name||'(leer)')+' ['+kursLabel+' '+instDate+', Sitz '+ref.seatId+']';
+  }).join('\n');
+  const ghostMore=ghosts.length>10?'\n  ... und '+(ghosts.length-10)+' weitere':'';
+  const fullNamesList=fullNames.slice(0,5).map(ref=>{
+    const seat=ref.seat;
+    const kat=S.kats[ref.katId];
+    return '  · '+(seat.name||'')+' ['+(kat?kat.label:'?')+']';
+  }).join('\n');
+  const fullNamesMore=fullNames.length>5?'\n  ... und '+(fullNames.length-5)+' weitere':'';
+
   const summary=
-    'Diagnose:\n\n'+
-    '· '+ghosts.length+' Geister-Sitzplaetze (poolTnId verweist auf geloeschte TNs)\n'+
-    '· '+fullNames.length+' Sitzplaetze mit Vollnamen (sollten Kuerzel sein)\n'+
-    '· '+allSeatRefs.length+' Sitzplaetze gesamt geprueft\n\n'+
+    'DIAGNOSE:\n\n'+
+    '═══ GEISTER-SITZPLÄTZE ('+ghosts.length+') ═══\n'+
+    '(poolTnId verweist auf geloeschte TNs)\n\n'+
+    (ghostList||'  (keine)')+ghostMore+'\n\n'+
+    '═══ VOLLNAMEN ('+fullNames.length+') ═══\n'+
+    '(sollten Kuerzel sein)\n\n'+
+    (fullNamesList||'  (keine)')+fullNamesMore+'\n\n'+
+    '════════════════════\n\n'+
     'Cleanup wuerde:\n'+
-    '- Geister-Sitzplaetze KOMPLETT LEEREN (Name, Firma, Beruf, Notizen weg)\n'+
-    '- Vollnamen-Sitzplaetze auf 2-Buchstaben-Kuerzel reduzieren (Vor- und Nachname)\n\n'+
+    '· Geister-Sitzplaetze KOMPLETT LEEREN\n'+
+    '· Vollnamen auf 2-Buchstaben-Kuerzel reduzieren\n\n'+
     'Cleanup jetzt durchfuehren?';
   if(!confirm(summary)) return;
   // Helper: Kuerzeln (analog pilotShortName)
