@@ -738,6 +738,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="openAusbilderProfil();closeHdrMenu()" style="width:100%;text-align:left" title="Name, Telefon, E-Mail für Azubis hinterlegen">👤 Mein Profil</button>
         <button class="tbtn" onclick="openTrennlinienModal();closeHdrMenu()" style="width:100%;text-align:left" title="Sitzplan-Trennlinien konfigurieren">📐 Trennlinien</button>
         <button class="tbtn" onclick="openTrash();closeHdrMenu()" style="width:100%;text-align:left" title="Gelöschte Lehrgänge wiederherstellen (30 Tage)">🗑 Papierkorb</button>
+        <button class="tbtn" id="pilotCleanupBtn" onclick="pilotCleanupLocalState();closeHdrMenu()" style="width:100%;text-align:left;display:none;background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.2);color:#92400e" title="Pilot-Cleanup: Geister-Sitzplaetze und Vollnamen lokal+Cloud bereinigen">⚠ Pilot-Cleanup</button>
         <button class="tbtn" onclick="showHilfeModal();closeHdrMenu()" style="width:100%;text-align:left" title="Anleitungen und Tipps">❓ Brauchst du Hilfe?</button>
       </div>
     </div>
@@ -5029,6 +5030,110 @@ function backfillCourseAusbilderData(profil){
     }).catch(()=>{});
 }
 
+// ─── PILOT-CLEANUP: lokalen State von Vollnamen + Geister-Eintraegen bereinigen ───
+// Wird vom Header-Menue manuell ausgeloest.
+// Schritt 1: Diagnose - zeigt was gefunden wurde
+// Schritt 2: Cleanup - entfernt Geister + kuerzt Vollnamen
+async function pilotCleanupLocalState(){
+  if(!PILOT_MODE){alert('Funktion nur im Pilot-Modus aktiv');return;}
+  if(!_db){alert('Firestore nicht verbunden');return;}
+  // PHASE 1: Diagnose - Welche Sitze haben poolTnId? Welche existieren in globalTN?
+  const tnIdsInUse=new Set();
+  const allSeatRefs=[]; // {katId, instId, seatId, seat}
+  Object.keys(S.kats||{}).forEach(katId=>{
+    const kat=S.kats[katId];
+    Object.keys(kat.instances||{}).forEach(instId=>{
+      const inst=kat.instances[instId];
+      Object.keys(inst.seats||{}).forEach(seatId=>{
+        const seat=inst.seats[seatId];
+        if(seat&&(seat.name||seat.poolTnId)){
+          allSeatRefs.push({katId,instId,seatId,seat});
+          if(seat.poolTnId) tnIdsInUse.add(seat.poolTnId);
+        }
+      });
+    });
+  });
+  if(!allSeatRefs.length){alert('Keine Sitzplaetze mit Daten gefunden.');return;}
+  // Firestore-Existenz pro poolTnId pruefen
+  const existsMap={};
+  const promises=[...tnIdsInUse].map(tnId=>
+    _db.collection('globalTN').doc(tnId).get()
+      .then(doc=>{ existsMap[tnId]=doc.exists; })
+      .catch(()=>{ existsMap[tnId]=null; }) // unbekannt bei Fehler -> nicht loeschen
+  );
+  await Promise.all(promises);
+  // Klassifizieren
+  const ghosts=[]; // poolTnId vorhanden, aber Firestore-Doc weg
+  const fullNames=[]; // Name nicht in Kuerzel-Form
+  const isShort=name=>{
+    if(!name) return true;
+    const parts=(name||'').trim().split(/\s+/);
+    return parts.every(p=>/^[A-Za-zÄÖÜäöüß]{1,2}\.?$/.test(p));
+  };
+  allSeatRefs.forEach(ref=>{
+    const {seat}=ref;
+    if(seat.poolTnId && existsMap[seat.poolTnId]===false){
+      ghosts.push(ref);
+    } else if(seat.name && !isShort(seat.name)){
+      fullNames.push(ref);
+    }
+  });
+  // PHASE 2: Confirm + Cleanup
+  const summary=
+    'Diagnose:\n\n'+
+    '· '+ghosts.length+' Geister-Sitzplaetze (poolTnId verweist auf geloeschte TNs)\n'+
+    '· '+fullNames.length+' Sitzplaetze mit Vollnamen (sollten Kuerzel sein)\n'+
+    '· '+allSeatRefs.length+' Sitzplaetze gesamt geprueft\n\n'+
+    'Cleanup wuerde:\n'+
+    '- Geister-Sitzplaetze KOMPLETT LEEREN (Name, Firma, Beruf, Notizen weg)\n'+
+    '- Vollnamen-Sitzplaetze auf 2-Buchstaben-Kuerzel reduzieren (Vor- und Nachname)\n\n'+
+    'Cleanup jetzt durchfuehren?';
+  if(!confirm(summary)) return;
+  // Helper: Kuerzeln (analog pilotShortName)
+  const shorten=s=>{
+    const v=(s||'').trim();
+    if(!v) return '';
+    const parts=v.split(/\s+/);
+    return parts.map(p=>{
+      if(/^[A-Za-zÄÖÜäöüß]{1,2}\.?$/.test(p)) return p.replace(/\.$/,'')+'.';
+      return p.replace(/[^A-Za-zÄÖÜäöüß]/g,'').slice(0,2)+'.';
+    }).join(' ');
+  };
+  let ghostsCleared=0, namesShortened=0;
+  ghosts.forEach(ref=>{
+    const seat=ref.seat;
+    // Sitzplatz komplett leeren - geloeschter TN soll keine Spuren hinterlassen
+    delete seat.name;
+    delete seat.company;
+    delete seat.profession;
+    delete seat.ausbjahr;
+    delete seat.note;
+    delete seat.bemerkung;
+    delete seat.photo;
+    delete seat.mitarbeit;
+    delete seat.fuehrung;
+    delete seat.praxis;
+    delete seat.poolTnId;
+    delete seat.note1;
+    delete seat.note2;
+    delete seat.note3;
+    delete seat.gesamtnote;
+    ghostsCleared++;
+  });
+  fullNames.forEach(ref=>{
+    const seat=ref.seat;
+    seat.name=shorten(seat.name);
+    namesShortened++;
+  });
+  if(typeof persist==='function') persist();
+  if(typeof renderSeats==='function') renderSeats();
+  if(typeof renderSidebar==='function') renderSidebar();
+  alert('Cleanup abgeschlossen:\n\n'+
+    '✓ '+ghostsCleared+' Geister-Sitzplaetze geleert\n'+
+    '✓ '+namesShortened+' Namen auf Kuerzel reduziert\n\n'+
+    'Aenderungen wurden lokal und in Firestore gespeichert.');
+}
+
 // ─── TN DETAIL ───
 function openTnDetail(tnId){
   if(!_db||!tnId) return;
@@ -7529,6 +7634,9 @@ function _checkAdminShowLauncher(uid){
   if(stefanWhitelist.includes(curEmail)){
     const el=document.getElementById('appLauncher');
     if(el) el.style.display='inline-block';
+    // Pilot-Cleanup-Button nur fuer Stefan sichtbar
+    const cb=document.getElementById('pilotCleanupBtn');
+    if(cb && PILOT_MODE) cb.style.display='';
     return;
   }
   _db.collection('users').doc(uid).get().then(doc=>{
