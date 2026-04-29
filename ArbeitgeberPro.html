@@ -1088,27 +1088,6 @@ function _generateFirmaCode(firma){
   let code='';for(let i=0;i<4;i++) code+=chars[Math.floor(Math.random()*chars.length)];
   return prefix+'-'+code;
 }
-function checkDsgvoConsent(){
-  if(!_uid) return;
-  db.collection('users').doc(_uid).get().then(doc=>{
-    if(!doc.exists) return;
-    if(doc.data().dsgvoZustimmung) return;
-    const ov=document.getElementById('dsgvoOverlay');
-    if(ov) ov.style.display='flex';
-  }).catch(()=>{});
-}
-function submitDsgvoConsent(){
-  const checked=document.getElementById('dsgvoConsentCheck')?.checked;
-  const errEl=document.getElementById('dsgvoErr');
-  if(!checked){if(errEl)errEl.textContent='Bitte Checkbox anklicken um fortzufahren';return;}
-  if(!_uid){if(errEl)errEl.textContent='Nicht angemeldet';return;}
-  const consent={datenschutz:true,nutzungsbedingungen:true,zeitpunkt:new Date().toISOString(),version:'1.0'};
-  db.collection('users').doc(_uid).set({dsgvoZustimmung:consent},{merge:true}).then(()=>{
-    document.getElementById('dsgvoOverlay').style.display='none';
-    toast('✓ Zustimmung gespeichert');
-  }).catch(err=>{if(errEl)errEl.textContent='Fehler: '+err.message;});
-}
-
 function doLogin(){
   const email=document.getElementById('lEmail').value.trim();
   const pw=document.getElementById('lPw').value;
@@ -3452,8 +3431,6 @@ function agZeitNachtragen(){
     loadAgZeiten();
   }).catch(e=>{err.textContent='Fehler: '+e.message;});
 }
-function timeToMin(t){const p=(t||'0:0').split(':');return parseInt(p[0])*60+parseInt(p[1]||0);}
-
 let _agZeitLiveUnsubs=[];
 function startAgZeitLive(){
   // Alte Listener stoppen
