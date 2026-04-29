@@ -1295,7 +1295,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="tp active" id="tp-info">
         <div class="fg ac-wrap">
           <label class="fl">Name</label>
-          <input class="fi" type="text" id="iName" placeholder="Schülername" autocomplete="off" oninput="acInput('iName','acName')" onkeydown="acKey(event,'acName')" onfocus="acInput('iName','acName')" onblur="acBlur('acName')">
+          <input class="fi" type="text" id="iName" placeholder="Schülername" autocomplete="off" oninput="acInput('iName','acName');updateSeatModalTitle()" onkeydown="acKey(event,'acName')" onfocus="acInput('iName','acName')" onblur="acBlur('acName')">
           <div class="ac-drop" id="acName"></div>
         </div>
         <div class="fg ac-wrap">
@@ -3782,6 +3782,21 @@ function acKey(e, dropId){
   if(_acSelIdx[dropId]>=0) items[_acSelIdx[dropId]].scrollIntoView({block:'nearest'});
 }
 
+// Aktualisiert Modal-Titel wenn Sitzplatz-Belegung sich aendert (Name eingetippt/geleert)
+function updateSeatModalTitle(){
+  const titleEl=document.getElementById('mtit');
+  if(!titleEl) return;
+  const inst_=curInst();
+  if(!inst_) return;
+  // curSeat global gesetzt von openModal
+  if(typeof curSeat==='undefined'||!curSeat) return;
+  const seatLabel=(inst_.seatLabels&&inst_.seatLabels[curSeat]!=null&&inst_.seatLabels[curSeat]!=='')?inst_.seatLabels[curSeat]:null;
+  const baseTitle=seatLabel?'Sitzplatz '+seatLabel:'Sitzplatz';
+  const nameInp=document.getElementById('iName');
+  const occupantName=nameInp?(nameInp.value||'').trim():'';
+  titleEl.textContent=occupantName?baseTitle+' ('+occupantName+')':baseTitle;
+}
+
 function openModal(id){
   const d_check=curSeats()[id]||{};
   // Meldungs-Intercept: wenn ungelesene Meldungen → erst anzeigen
@@ -3797,7 +3812,10 @@ function openModal(id){
   _modalSnapshot={name:d.name||'',company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',attLen:(d.attendance||[]).length};
   const inst_=curInst();
   const seatLabel=(inst_&&inst_.seatLabels&&inst_.seatLabels[id]!=null&&inst_.seatLabels[id]!=='')?inst_.seatLabels[id]:null;
-  document.getElementById('mtit').textContent=seatLabel?'Sitzplatz '+seatLabel:'Sitzplatz';
+  // Titel-Zusammensetzung: "Sitzplatz 5 (Ma. Mu.)" wenn belegt, sonst nur "Sitzplatz 5"
+  const baseTitle=seatLabel?'Sitzplatz '+seatLabel:'Sitzplatz';
+  const occupantName=(d.name||'').trim();
+  document.getElementById('mtit').textContent=occupantName?baseTitle+' ('+occupantName+')':baseTitle;
   // Firestore TN-Daten laden (async, darf openModal nicht blockieren)
   try{
     const fsInfo=document.getElementById('tnFirestoreInfo');
