@@ -2051,11 +2051,20 @@ function delInst(katId,instId,e){
   if(!inst) return;
   const seatCount=Object.values(inst.seats||{}).filter(d=>d&&d.name).length;
   const label=instLabel(inst);
-  if(!confirm('⚠️ Lehrgang '+label+' löschen?\n\n'+seatCount+' Schüler mit Anwesenheit und Noten.'))return;
-  if(seatCount>0&&!confirm('LETZTE WARNUNG:\n\nAlle Sitzpläne, Anwesenheitsdaten und Noten für '+label+' gehen verloren.\n\nDaten werden 30 Tage im Papierkorb aufbewahrt.\n\nEndgültig löschen?'))return;
+  // Pruefen wer den Firestore-Kurs angelegt hat
+  const myEmail=(_auth?.currentUser?.email||'').toLowerCase();
+  const isMyCourse=!inst.sharedKursId || inst.standalone || (inst.createdBy && inst.createdBy.toLowerCase()===myEmail);
+  // Confirm-Text je nach Eigentum
+  if(isMyCourse){
+    if(!confirm('⚠️ Lehrgang '+label+' löschen?\n\n'+seatCount+' Schüler mit Anwesenheit und Noten.\n\nDieser Kurs wurde von dir angelegt — er wird komplett (lokal + Cloud) gelöscht.'))return;
+    if(seatCount>0&&!confirm('LETZTE WARNUNG:\n\nAlle Sitzpläne, Anwesenheitsdaten und Noten für '+label+' gehen verloren.\n\nDaten werden 30 Tage im Papierkorb aufbewahrt.\n\nEndgültig löschen?'))return;
+  } else {
+    if(!confirm('⚠️ Lehrgang '+label+' aus deiner Ansicht entfernen?\n\nDieser Kurs wurde von der Verwaltung angelegt. Er wird nur LOKAL bei dir entfernt.\n\nIn der Verwaltung bleibt der Kurs bestehen — endgültiges Löschen ist nur dort möglich.\n\n'+seatCount+' Schüler mit Anwesenheit/Noten würden bei dir lokal entfernt.'))return;
+    if(seatCount>0&&!confirm('Wirklich nur lokal entfernen?\n\nDeine Anwesenheits- und Notendaten zu diesem Kurs gehen lokal verloren.\nDaten werden 30 Tage im Papierkorb aufbewahrt.'))return;
+  }
   trashPush('inst','Lehrgang: '+S.kats[katId].label+' '+label,{katId,instId,inst,katLabel:S.kats[katId].label});
-  // Firestore-Kurs mitlöschen wenn vorhanden
-  if(inst.sharedKursId&&_db){
+  // Firestore-Kurs nur loeschen wenn er von DIR ist
+  if(inst.sharedKursId&&_db&&isMyCourse){
     const kursId=inst.sharedKursId;
     const doFirestoreDelete = ()=>{
       _db.collection('shared').doc('kurse').collection('list').doc(kursId).delete().then(()=>{
@@ -2097,7 +2106,7 @@ function delInst(katId,instId,e){
     if(S.curKat===katId&&S.curInst===instId) S.curInst=Object.keys(S.kats[katId].instances)[0]||null;
   }
   persist();renderAll();loadHBZKurse();
-  toast('🗑 Lehrgang gelöscht – 30 Tage im Papierkorb');
+  toast(isMyCourse?'🗑 Lehrgang gelöscht – 30 Tage im Papierkorb':'🗑 Lehrgang lokal entfernt');
 }
 
 // ─── HBZ-KURSE (automatische Verknüpfung) ───
