@@ -7474,11 +7474,21 @@ function renderWiederholer(kursId){
         card.draggable=false;
         card.dataset.name=fullName; card.dataset.tnid=doc.id; card.dataset.kursid=kursId;
         card.dataset.company=d.firma||''; card.dataset.profession=d.beruf||''; card.dataset.ausbjahr=d.ausbjahr||'';
-        const resetBtn='<button class="tn-reset-btn" title="Status zurücksetzen" onclick="event.stopPropagation();resetTNStatus(\''+doc.id+'\',\'wiederholer\','+JSON.stringify(fullName)+')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1" onmouseover="this.style.background=\'rgba(100,116,139,.12)\';this.style.color=\'#0f172a\'" onmouseout="this.style.background=\'none\';this.style.color=\'#64748b\'">↺</button>';
+        const resetBtn='<button class="tn-reset-btn" title="Status zurücksetzen" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">↺</button>';
         card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#0f172a">'+esc(fullName)+'</div>'
           +'<div class="pool-sub">↩ Kurs wiederholen</div></div>'
           +resetBtn;
+        // Reset-Button per addEventListener (sicher gegenüber Quote-Problemen)
+        const btn=card.querySelector('.tn-reset-btn');
+        if(btn){
+          btn.addEventListener('click',ev=>{
+            ev.stopPropagation(); ev.preventDefault();
+            resetTNStatus(doc.id, 'wiederholer', fullName);
+          });
+          btn.addEventListener('mouseover',()=>{ btn.style.background='rgba(100,116,139,.12)'; btn.style.color='#0f172a'; });
+          btn.addEventListener('mouseout',()=>{ btn.style.background='none'; btn.style.color='#64748b'; });
+        }
         card.addEventListener('dragstart',ev=>{
           _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
           ev.dataTransfer.setData('text/plain',fullName);
@@ -7530,10 +7540,22 @@ function renderFehlt(kursId){
     card.draggable=false;
     card.dataset.name=name; card.dataset.tnid=tnId||''; card.dataset.kursid=fsKursId||'';
     card.dataset.company=company||''; card.dataset.profession=profession||''; card.dataset.ausbjahr=ausbjahr||'';
-    const resetBtn=tnId?'<button class="tn-reset-btn" title="Status zurücksetzen" onclick="event.stopPropagation();resetTNStatus(\''+tnId+'\',\'absent\','+JSON.stringify(name)+')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1" onmouseover="this.style.background=\'rgba(100,116,139,.12)\';this.style.color=\'#0f172a\'" onmouseout="this.style.background=\'none\';this.style.color=\'#64748b\'">↺</button>':'';
+    const resetBtn=tnId?'<button class="tn-reset-btn" title="Status zurücksetzen" data-tnid="'+esc(tnId)+'" data-name="'+esc(name).replace(/"/g,'&quot;')+'" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">↺</button>':'';
     card.innerHTML='<div class="pool-avatar" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444">'+initials+'</div>'
       +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(name)+'</div></div>'
       +resetBtn;
+    // Reset-Button per addEventListener (sicher gegenüber Quote-Problemen im Namen)
+    if(tnId){
+      const btn=card.querySelector('.tn-reset-btn');
+      if(btn){
+        btn.addEventListener('click',ev=>{
+          ev.stopPropagation(); ev.preventDefault();
+          resetTNStatus(tnId, 'absent', name);
+        });
+        btn.addEventListener('mouseover',()=>{ btn.style.background='rgba(100,116,139,.12)'; btn.style.color='#0f172a'; });
+        btn.addEventListener('mouseout',()=>{ btn.style.background='none'; btn.style.color='#64748b'; });
+      }
+    }
     card.addEventListener('dragstart',ev=>{
       _poolDragId=name; _poolDragTnId=tnId||null; _poolDragKursId=fsKursId||null;
       _fehltLocal = !tnId; // flag: ist lokaler Fehlt-Eintrag
