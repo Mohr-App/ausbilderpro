@@ -4026,7 +4026,9 @@ function openModal(id){
   // Speichern-Button: immer ausgegraut bis Hinzufügen gedrückt wird
   const saveAttBtn=document.getElementById('btnSaveAtt');
   if(saveAttBtn){saveAttBtn.style.opacity='.35';saveAttBtn.style.pointerEvents='none';}
-  updGrades();renderAtt();stab('info');refreshDataLists();
+  // Initial-Tab: Anwesenheit wenn Platz belegt, sonst Person
+  const initialTab=(d.name&&d.name.trim())?'att':'info';
+  updGrades();renderAtt();stab(initialTab);refreshDataLists();
   // Bescheinigung-Button nur wenn TN verknüpft
   const bbtn=document.getElementById('btnBescheinigung');
   if(bbtn){bbtn.dataset.show=(d.poolTnId&&d.name)?'1':'0';bbtn.style.display=(d.poolTnId&&d.name)?'':'none';}
@@ -4180,6 +4182,9 @@ function stab(t){
   document.querySelectorAll('.tp').forEach(x=>x.classList.remove('active'));
   document.querySelector('.tab[onclick="stab(\''+t+'\')"]').classList.add('active');
   document.getElementById('tp-'+t).classList.add('active');
+  // Modal-Body nach oben scrollen damit nicht mitten im Tab gestartet wird
+  const mb=document.querySelector('#ov .mbdy');
+  if(mb) mb.scrollTop=0;
   // Speichern/Leeren nur bei Person, Noten – Anwesenheit hat eigenen Button, Dokumente/Historie keinen
   const hideAll=t==='docs'||t==='att'||t==='hist';
   const bs=document.getElementById('btnSaveSeat');
