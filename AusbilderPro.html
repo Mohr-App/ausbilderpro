@@ -6774,6 +6774,74 @@ function sendKursAusfallEmailAG(tnData, kursLabel, todayDE, ausbilderName){
   }).catch(()=>{});
 }
 
+// Setzt einen TN-Status (absent oder wiederholer) zurueck → wieder normal im Kurs
+// fromType: 'absent' | 'wiederholer'  (fuer die Mail-Texte)
+function resetTNStatus(tnId, fromType, tnName){
+  if(!_db || !tnId) return;
+  const labelMap = {absent: 'Nicht angetreten', wiederholer: 'Wiederholer'};
+  const fromLabel = labelMap[fromType] || 'Status';
+  const displayName = tnName || 'diesen Teilnehmer';
+  if(!confirm('↺ Status für '+displayName+' zurücksetzen?\n\nDer Status "'+fromLabel+'" wird entfernt — der Azubi nimmt wieder normal am Kurs teil.\n\nFolgende Benachrichtigungen werden ausgelöst:\n• App-Benachrichtigung in AzubiPro\n• E-Mail an Azubi (sofern Adresse hinterlegt)\n• E-Mail an Arbeitgeber\n\nFortfahren?')) return;
+  const ref = _db.collection('globalTN').doc(tnId);
+  const kursName=S.kats[S.curKat]?.label||'Lehrgang';
+  const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
+  const kursId=curInst()?.sharedKursId;
+  // 1. Status-Felder loeschen + aktiverKursId wieder setzen
+  const upd = {
+    status: firebase.firestore.FieldValue.delete(),
+    wiederholer: firebase.firestore.FieldValue.delete()
+  };
+  if(kursId) upd.aktiverKursId = kursId;
+  ref.update(upd).catch(err=>{ toast('Fehler: '+err.message,'bad'); });
+  // 2. kursHistory bereinigen + Benachrichtigung
+  if(kursId){
+    ref.get().then(doc=>{
+      if(!doc.exists) return;
+      const data=doc.data();
+      // History-Marker zuruecksetzen
+      const hist=(data.kursHistory||[]).map(h=>{
+        if(h.kursId!==kursId) return h;
+        const cleaned={...h};
+        if(fromType==='absent') delete cleaned.nichtErschienen;
+        if(fromType==='wiederholer') delete cleaned.abgebrochen;
+        return cleaned;
+      });
+      const benach=data.benachrichtigungen||[];
+      benach.push({
+        typ:'kurs_status_zurueck',
+        text:'Dein Status für den Lehrgang "'+kursName+'" wurde zurückgesetzt. Du nimmst wieder normal am Kurs teil.',
+        ausbilder: ausName,
+        datum: new Date().toISOString(),
+        gelesen: false
+      });
+      ref.update({kursHistory: hist, benachrichtigungen: benach}).catch(()=>{});
+      // Subcollection-Status (im Kurs-Dokument) auf attending
+      _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('teilnehmer').doc(tnId)
+        .update({status:'attending'}).catch(()=>{});
+      // E-Mail an Azubi
+      sendTnEmail(data, '↺ Lehrgang "'+kursName+'" – Status zurückgesetzt',
+        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">dein Status für den Lehrgang <b>"'+kursName+'"</b> wurde zurückgesetzt.</p>'
+        +'<div style="padding:12px;background:#ecfdf5;border:2px solid #a7f3d0;border-radius:8px;margin-bottom:12px">'
+        +'<p style="margin:0;font-size:.85rem;color:#065f46;font-weight:700">Du nimmst wieder normal am Kurs teil und wirst zu den regulären Terminen erwartet.</p></div>'
+        +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">📞 Bei Fragen wende dich bitte an deinen Ausbilder oder Ausbildungsbetrieb.</p>'
+      );
+      // E-Mail an Arbeitgeber
+      sendAgEmail(data, '↺ Status zurückgesetzt – '+kursName,
+        '<div style="padding:12px;background:#ecfdf5;border:2px solid #a7f3d0;border-radius:8px;margin-bottom:12px">'
+        +'<p style="margin:0 0 6px;font-size:.85rem;color:#065f46;font-weight:700">Status zurückgesetzt</p>'
+        +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursName+'</p>'
+        +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Vorheriger Status: '+fromLabel+'</p>'
+        +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
+        +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender nimmt wieder normal am Lehrgang teil.</p>'
+      );
+    }).catch(()=>{});
+  }
+  toast('↺ Status zurückgesetzt');
+  // UI aktualisieren
+  setTimeout(()=>{ if(typeof loadPool==='function') loadPool(); },300);
+}
+
 function syncGlobalTNStatus(tnId, statusType){
   // tnId = globalTN doc ID (= kurs subcollection doc ID)
   // statusType: 'absent' | 'wiederholer' | 'clear'
@@ -7406,9 +7474,11 @@ function renderWiederholer(kursId){
         card.draggable=false;
         card.dataset.name=fullName; card.dataset.tnid=doc.id; card.dataset.kursid=kursId;
         card.dataset.company=d.firma||''; card.dataset.profession=d.beruf||''; card.dataset.ausbjahr=d.ausbjahr||'';
+        const resetBtn='<button class="tn-reset-btn" title="Status zurücksetzen" onclick="event.stopPropagation();resetTNStatus(\''+doc.id+'\',\'wiederholer\','+JSON.stringify(fullName)+')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1" onmouseover="this.style.background=\'rgba(100,116,139,.12)\';this.style.color=\'#0f172a\'" onmouseout="this.style.background=\'none\';this.style.color=\'#64748b\'">↺</button>';
         card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#0f172a">'+esc(fullName)+'</div>'
-          +'<div class="pool-sub">↩ Kurs wiederholen</div></div>';
+          +'<div class="pool-sub">↩ Kurs wiederholen</div></div>'
+          +resetBtn;
         card.addEventListener('dragstart',ev=>{
           _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
           ev.dataTransfer.setData('text/plain',fullName);
@@ -7460,8 +7530,10 @@ function renderFehlt(kursId){
     card.draggable=false;
     card.dataset.name=name; card.dataset.tnid=tnId||''; card.dataset.kursid=fsKursId||'';
     card.dataset.company=company||''; card.dataset.profession=profession||''; card.dataset.ausbjahr=ausbjahr||'';
+    const resetBtn=tnId?'<button class="tn-reset-btn" title="Status zurücksetzen" onclick="event.stopPropagation();resetTNStatus(\''+tnId+'\',\'absent\','+JSON.stringify(name)+')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1" onmouseover="this.style.background=\'rgba(100,116,139,.12)\';this.style.color=\'#0f172a\'" onmouseout="this.style.background=\'none\';this.style.color=\'#64748b\'">↺</button>':'';
     card.innerHTML='<div class="pool-avatar" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444">'+initials+'</div>'
-      +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(name)+'</div></div>';
+      +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(name)+'</div></div>'
+      +resetBtn;
     card.addEventListener('dragstart',ev=>{
       _poolDragId=name; _poolDragTnId=tnId||null; _poolDragKursId=fsKursId||null;
       _fehltLocal = !tnId; // flag: ist lokaler Fehlt-Eintrag
