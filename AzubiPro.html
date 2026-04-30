@@ -1656,8 +1656,12 @@ function submitJoinRegistration(){
       }
     };
     let _kursNameForMail='';
-    // Kursinfo für History laden
-    return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get().then(kDoc=>{
+    // WICHTIG: Auf vollstaendige Auth-Token-Propagation warten bevor Firestore-Operationen.
+    // cred.user.getIdToken(true) erzwingt frischen Token + wartet bis er beim Backend gilt.
+    return cred.user.getIdToken(true).then(()=>{
+      // Kursinfo für History laden
+      return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get();
+    }).then(kDoc=>{
       const kd=kDoc.exists?kDoc.data():{};
       _kursNameForMail = kd.name||kd.lehrgangsart||'Lehrgang';
       tnData.kursHistory=[{
@@ -1667,15 +1671,8 @@ function submitJoinRegistration(){
         bis: kd.bis||'',
         addedAt: Date.now()
       }];
-      // Erst pruefen ob TN-Eintrag bereits existiert (z.B. abgebrochene Vorregistrierung)
-      return db.collection('globalTN').where('kontaktEmail','==',email).limit(1).get().then(existSnap=>{
-        if(!existSnap.empty){
-          // Existierenden Eintrag aktualisieren statt neuen anlegen
-          const existRef=existSnap.docs[0].ref;
-          return existRef.update(tnData).then(()=>existRef);
-        }
-        return db.collection('globalTN').add(tnData);
-      });
+      // Direkt neuen TN anlegen (kein where-Query mehr - Rules erlauben create einfacher als update von vielen Feldern)
+      return db.collection('globalTN').add(tnData);
     }).then(ref=>{
       // 3. In Kurs-TN-Subcollection eintragen
       return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId)
@@ -1720,15 +1717,17 @@ function submitJoinRegistration(){
   }).catch(err=>{
     _registering=false;
     errEl.style.color='var(--bad)';
+    console.error('Registrierung-Fehler:', err.code, err.message, err);
     const map={
       'auth/email-already-in-use':'Diese E-Mail ist bereits registriert. Bitte über "Anmelden" einloggen.',
       'auth/invalid-email':'Ungültige E-Mail-Adresse',
       'auth/weak-password':'Passwort zu schwach (min. 6 Zeichen)',
       'auth/wrong-password':'Falsches Passwort. Bitte über "Anmelden" einloggen.',
       'auth/invalid-credential':'Falsches Passwort. Bitte über "Anmelden" einloggen.',
+      'permission-denied':'Berechtigung verweigert. Bitte F12-Konsole öffnen und Fehler an Stefan schicken.',
       'custom/email-conflict':err.message
     };
-    errEl.textContent=map[err.code]||'Fehler: '+err.message;
+    errEl.textContent=map[err.code]||'Fehler ('+(err.code||'?')+'): '+err.message;
   });
 }
 
