@@ -4285,16 +4285,25 @@ function toggleSubField(which){
 }
 function addAtt(){
   const date=getDateFromSelects(),note=document.getElementById('aNote').value;
-  if(!date||!curAttMain){alert('Bitte Datum und Status wählen.');return;}
+  if(!date){alert('Bitte Datum wählen.');return;}
+  // Wenn kein Status gewählt: Modal öffnen statt nur Alert
+  if(!curAttMain){
+    _openAddAttModal(date, note);
+    return;
+  }
   const entry={date,type:curAttMain,note,lateMins:0,earlyMins:0};
   if(curAttMain==='present'){
     if(document.getElementById('chkLate').checked) entry.lateMins=parseInt(document.getElementById('lateMins').value)||0;
     if(document.getElementById('chkEarly').checked) entry.earlyMins=parseInt(document.getElementById('earlyMins').value)||0;
   }
-  // Bestehenden Eintrag für gleichen Tag ersetzen statt doppelt anlegen
-  const existIdx=tmpAtt.findIndex(a=>a.date===date);
+  _commitAttEntry(entry);
+}
+
+// Eintrag zur Liste hinzufügen + Speichern-Button aktivieren (gemeinsame Logik für Hauptformular und Modal)
+function _commitAttEntry(entry){
+  const existIdx=tmpAtt.findIndex(a=>a.date===entry.date);
   if(existIdx>=0){
-    if(!confirm('Für den '+fmtD(date)+' existiert bereits ein Eintrag ('+attCfg(tmpAtt[existIdx]).label+').\n\nÜberschreiben?')) return;
+    if(!confirm('Für den '+fmtD(entry.date)+' existiert bereits ein Eintrag ('+attCfg(tmpAtt[existIdx]).label+').\n\nÜberschreiben?')) return false;
     tmpAtt[existIdx]=entry;
   } else {
     tmpAtt.push(entry);
@@ -4304,6 +4313,93 @@ function addAtt(){
   const saveBtn=document.getElementById('btnSaveAtt');
   if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';}
   renderAtt();
+  return true;
+}
+
+// Modal: User klickt "+ Hinzufügen" ohne Status zu wählen
+// Im Modal Status + ggf. Sub-Optionen (Zu spät, Früher) wählen, dann übernehmen
+function _openAddAttModal(dateVal, preNote){
+  if(document.getElementById('attAddOv')) return; // Doppelklick-Schutz
+  const ov=document.createElement('div');
+  ov.id='attAddOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,18,25,.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px';
+  const mkBtn=(type,icon,label)=>'<button type="button" class="ap-status-btn" data-type="'+type+'" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--brd);border-radius:10px;background:var(--sur2);color:var(--tx);cursor:pointer;font-size:.78rem;font-weight:700;text-align:left;font-family:Sora,sans-serif"><span style="font-size:1.1rem">'+icon+'</span>'+label+'</button>';
+  ov.innerHTML='<div style="max-width:460px;width:100%;max-height:85vh;overflow-y:auto;background:var(--sur);border:2px solid var(--acc);border-radius:14px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.4)">'
+    +'<div style="font-size:1rem;font-weight:800;color:var(--tx);margin-bottom:4px">📝 Status auswählen</div>'
+    +'<div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Für '+fmtD(dateVal)+' — wähle den Status:</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+    + mkBtn('present','✅','Anwesend')
+    + mkBtn('sick','🤒','Krank')
+    + mkBtn('absent_e','📋','Entschuldigt')
+    + mkBtn('absent_u','❌','Unentschuldigt')
+    +'</div>'
+    +'<div style="margin-bottom:12px">'+mkBtn('berufsschule','🏫','Berufsschule')+'</div>'
+    // Sub-Felder für Anwesend
+    +'<div id="apPresentSub" style="display:none;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px;margin-bottom:12px">'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:.78rem;cursor:pointer;margin-bottom:8px">'
+    +'<input type="checkbox" id="apLateChk" onchange="document.getElementById(\'apLateMins\').disabled=!this.checked"> Zu spät'
+    +'</label>'
+    +'<div style="display:flex;align-items:center;gap:6px;padding-left:24px;margin-bottom:10px">'
+    +'<input type="number" class="fi" id="apLateMins" placeholder="0" min="0" style="width:80px;font-size:.78rem;padding:6px 8px" disabled>'
+    +'<span style="font-size:.7rem;color:var(--mu)">Minuten zu spät</span>'
+    +'</div>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:.78rem;cursor:pointer;margin-bottom:8px">'
+    +'<input type="checkbox" id="apEarlyChk" onchange="document.getElementById(\'apEarlyMins\').disabled=!this.checked"> Früher gegangen'
+    +'</label>'
+    +'<div style="display:flex;align-items:center;gap:6px;padding-left:24px">'
+    +'<input type="number" class="fi" id="apEarlyMins" placeholder="0" min="0" style="width:80px;font-size:.78rem;padding:6px 8px" disabled>'
+    +'<span style="font-size:.7rem;color:var(--mu)">Minuten früher gegangen</span>'
+    +'</div>'
+    +'</div>'
+    // Bemerkung
+    +'<label class="fl" style="margin-bottom:6px;display:block">Bemerkung</label>'
+    +'<input class="fi" type="text" id="apNote" value="'+esc(preNote||'').replace(/"/g,'&quot;')+'" placeholder="optional…" style="margin-bottom:14px">'
+    // Footer-Buttons
+    +'<div style="display:flex;gap:8px">'
+    +'<button type="button" class="badd" onclick="_closeAddAttModal()" style="flex:1;background:var(--sur2);color:var(--tx);box-shadow:none">Abbrechen</button>'
+    +'<button type="button" class="badd" id="apOkBtn" onclick="_confirmAddAttModal()" style="flex:1.4;background:linear-gradient(135deg,#10b981,#059669);color:#fff;opacity:.4;pointer-events:none">+ Hinzufügen</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  ov.dataset.date = dateVal;
+  ov.dataset.selected = '';
+  // Status-Button-Klicks
+  const styleSelected=(btn)=>{
+    ov.querySelectorAll('.ap-status-btn').forEach(b=>{ b.style.background='var(--sur2)'; b.style.borderColor='var(--brd)'; b.style.color='var(--tx)'; });
+    btn.style.background='linear-gradient(135deg,#2563eb,#3b82f6)';
+    btn.style.borderColor='#2563eb';
+    btn.style.color='#fff';
+  };
+  ov.querySelectorAll('.ap-status-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const t=b.dataset.type;
+      ov.dataset.selected=t;
+      styleSelected(b);
+      const sub=document.getElementById('apPresentSub');
+      if(sub) sub.style.display = (t==='present') ? 'block' : 'none';
+      const ok=document.getElementById('apOkBtn');
+      if(ok){ ok.style.opacity='1'; ok.style.pointerEvents='auto'; }
+    });
+  });
+}
+function _closeAddAttModal(){
+  const ov=document.getElementById('attAddOv');
+  if(ov) ov.remove();
+}
+function _confirmAddAttModal(){
+  const ov=document.getElementById('attAddOv');
+  if(!ov) return;
+  const type=ov.dataset.selected;
+  const date=ov.dataset.date;
+  if(!type||!date){ ov.remove(); return; }
+  const entry={date,type,note:(document.getElementById('apNote')?.value||''),lateMins:0,earlyMins:0};
+  if(type==='present'){
+    if(document.getElementById('apLateChk')?.checked) entry.lateMins=parseInt(document.getElementById('apLateMins').value)||0;
+    if(document.getElementById('apEarlyChk')?.checked) entry.earlyMins=parseInt(document.getElementById('apEarlyMins').value)||0;
+  }
+  if(_commitAttEntry(entry)){
+    ov.remove();
+  }
 }
 function toggleAe(el, e){
   if(e.target.classList.contains('bdel')) return;
