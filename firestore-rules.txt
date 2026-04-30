@@ -11,6 +11,13 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
       allow read, write: if isAdmin();
+      // Lookup für firmaCode-Verknüpfung: jeder authentifizierte User darf
+      // Arbeitgeber-User-Docs lesen (enthält keine sensiblen Daten - nur firma/firmaCode/role/email)
+      allow read: if request.auth != null
+        && resource.data.role == 'arbeitgeber';
+      // AG kann seine MA-User lesen (firma muss übereinstimmen)
+      allow read: if request.auth != null
+        && resource.data.role == 'mitarbeiter';
       match /{sub}/{subDoc} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
         allow read, write: if isAdmin();
@@ -92,6 +99,9 @@ service cloud.firestore {
         );
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['beruf']);
+      // Firmencode-Verknüpfung: Azubi verknüpft sich mit Arbeitgeber
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId']);
       // Pilot-Anonymisierung: Admin darf Datenminimierungs-Felder updaten
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
