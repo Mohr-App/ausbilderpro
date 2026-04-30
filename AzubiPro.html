@@ -1357,6 +1357,90 @@ function submitJoinLogin(){
   });
 }
 
+// ── WILLKOMMENS-MAIL nach erfolgreicher Self-Registration ──
+function sendWelcomeEmail(email, name, kursName){
+  if(!db || !email) return;
+  const appUrl='https://mohr-app.github.io/ausbilderpro/AzubiPro.html';
+  const iconUrl='https://mohr-app.github.io/ausbilderpro/icon-azubi-192.png';
+  const greeting=name?'Hallo '+name:'Hallo';
+  const kursLine=kursName?'<p style="margin:0 0 14px;font-size:.88rem;color:#1e293b;line-height:1.55">du wurdest erfolgreich für den Lehrgang <b>"'+kursName+'"</b> registriert. Schön, dass du dabei bist!</p>':'<p style="margin:0 0 14px;font-size:.88rem;color:#1e293b;line-height:1.55">deine Registrierung war erfolgreich. Schön, dass du dabei bist!</p>';
+  const html='<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:20px;background:#f8fafc">'
+    // Header mit Icon
+    +'<div style="text-align:center;margin-bottom:24px;padding:24px 16px;background:linear-gradient(135deg,#10b981,#059669);border-radius:14px">'
+    +'<img src="'+iconUrl+'" alt="AzubiPro" style="width:72px;height:72px;border-radius:18px;margin-bottom:10px;background:#fff;padding:6px;box-shadow:0 4px 14px rgba(0,0,0,.15)">'
+    +'<div style="font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:-.02em">Azubi<span style="opacity:.85">Pro</span></div>'
+    +'<div style="font-size:.78rem;color:rgba(255,255,255,.9);margin-top:4px">Dein Lehrgangs-Begleiter</div>'
+    +'</div>'
+
+    // Begrüßung
+    +'<div style="padding:22px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;margin-bottom:18px">'
+    +'<p style="margin:0 0 14px;font-size:1rem;font-weight:700;color:#0f172a">'+greeting+',</p>'
+    +kursLine
+    +'<p style="margin:0 0 18px;font-size:.88rem;color:#374151;line-height:1.55">In AzubiPro behältst du den Überblick über deinen Lehrgang, kannst dich krankmelden und erhältst wichtige Informationen direkt von deinem Ausbilder.</p>'
+
+    // App-Öffnen-Button
+    +'<div style="text-align:center;margin-bottom:22px">'
+    +'<a href="'+appUrl+'" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:.92rem;box-shadow:0 4px 14px rgba(16,185,129,.3)">📱 AzubiPro öffnen</a>'
+    +'</div>'
+    +'<p style="margin:0;font-size:.7rem;color:#64748b;text-align:center;font-family:monospace;word-break:break-all">'+appUrl+'</p>'
+    +'</div>'
+
+    // Installation iOS
+    +'<div style="padding:18px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;margin-bottom:14px">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+    +'<span style="font-size:1.4rem"></span>'
+    +'<div style="font-size:.95rem;font-weight:700;color:#0f172a">iPhone / iPad installieren</div>'
+    +'</div>'
+    +'<ol style="margin:0 0 0 20px;padding:0;font-size:.85rem;color:#374151;line-height:1.7">'
+    +'<li>App über den Button oben in <b>Safari</b> öffnen</li>'
+    +'<li>Auf das <b>Teilen-Symbol</b> ⬆ unten in der Mitte tippen</li>'
+    +'<li><b>"Zum Home-Bildschirm"</b> auswählen</li>'
+    +'<li>Mit "Hinzufügen" bestätigen</li>'
+    +'</ol>'
+    +'</div>'
+
+    // Installation Android
+    +'<div style="padding:18px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;margin-bottom:14px">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+    +'<span style="font-size:1.4rem">🤖</span>'
+    +'<div style="font-size:.95rem;font-weight:700;color:#0f172a">Android installieren</div>'
+    +'</div>'
+    +'<ol style="margin:0 0 0 20px;padding:0;font-size:.85rem;color:#374151;line-height:1.7">'
+    +'<li>App über den Button oben in <b>Chrome</b> öffnen</li>'
+    +'<li>Auf das <b>Drei-Punkte-Menü</b> ⋮ rechts oben tippen</li>'
+    +'<li><b>"Zum Startbildschirm hinzufügen"</b> oder <b>"App installieren"</b> auswählen</li>'
+    +'<li>Mit "Installieren" bestätigen</li>'
+    +'</ol>'
+    +'</div>'
+
+    // Datenschutz-Box
+    +'<div style="padding:18px;background:#ecfdf5;border:2px solid #a7f3d0;border-radius:14px;margin-bottom:14px">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+    +'<span style="font-size:1.4rem">🔒</span>'
+    +'<div style="font-size:.95rem;font-weight:700;color:#065f46">Datenschutz &amp; Sicherheit</div>'
+    +'</div>'
+    +'<p style="margin:0 0 8px;font-size:.85rem;color:#065f46;line-height:1.55"><b>AzubiPro ist eine Web-App</b> — sie läuft direkt im Browser und benötigt keinen App-Store-Download.</p>'
+    +'<ul style="margin:0 0 0 20px;padding:0;font-size:.82rem;color:#065f46;line-height:1.65">'
+    +'<li>Kein Zugriff auf deine <b>Kamera</b></li>'
+    +'<li>Kein Zugriff auf deine <b>Kontakte</b></li>'
+    +'<li>Kein Zugriff auf <b>Fotos oder Dateien</b></li>'
+    +'<li>Server in Deutschland (Frankfurt)</li>'
+    +'<li>Keine Werbung, keine Analyse-Tracker</li>'
+    +'</ul>'
+    +'</div>'
+
+    +'<p style="margin:18px 0 0;font-size:.7rem;color:#9ca3af;text-align:center;line-height:1.5">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.<br>Bei Fragen wende dich bitte an deinen Ausbilder.</p>'
+    +'</div>';
+
+  db.collection('mail').add({
+    to: email,
+    message: {
+      subject: '🎉 Willkommen bei AzubiPro' + (kursName ? ' – '+kursName : ''),
+      html: html
+    }
+  }).catch(err=>console.warn('Welcome-Mail-Fehler:',err));
+}
+
 // ── REGISTRIERUNGS-WIZARD (Step-by-Step) ──
 let _wizStep = 1;
 const _WIZ_TOTAL = 6;
@@ -1525,12 +1609,14 @@ function submitJoinRegistration(){
         version: '1.0'
       }
     };
+    let _kursNameForMail='';
     // Kursinfo für History laden
     return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get().then(kDoc=>{
       const kd=kDoc.exists?kDoc.data():{};
+      _kursNameForMail = kd.name||kd.lehrgangsart||'Lehrgang';
       tnData.kursHistory=[{
         kursId: _joinKursId,
-        kursName: kd.name||kd.lehrgangsart||'Lehrgang',
+        kursName: _kursNameForMail,
         von: kd.von||'',
         bis: kd.bis||'',
         addedAt: Date.now()
@@ -1557,6 +1643,10 @@ function submitJoinRegistration(){
         }).then(()=>{
           // 4. users-Dokument mit azubi-Rolle
           return db.collection('users').doc(uid).set({email: email, role:'azubi'},{merge:true});
+        }).then(()=>{
+          // 5. Willkommens-Mail an Azubi (mit App-Link, Installations-Anleitung, Datenschutz-Info)
+          const fullName=((vorname||'')+' '+(nachname||'')).trim();
+          sendWelcomeEmail(email, fullName, _kursNameForMail);
         });
     });
   }).then(()=>{
