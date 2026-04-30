@@ -8094,12 +8094,15 @@ function transferEntwurf(kursId){
   // TN mit E-Mail zählen (für transparente Info)
   const mailCount=tnIds.filter(id=>{const tn=_globalTN.find(t=>t.id===id);return tn&&(tn.kontaktEmail||tn.email);}).length;
   const noMailCount=tnIds.length-mailCount;
+  const firmenSet=new Set();
+  tnIds.forEach(id=>{const tn=_globalTN.find(t=>t.id===id);if(tn?.firma)firmenSet.add(tn.firma);});
   let confirmMsg='📚 Lehrgang "'+k.name+'" mit '+tnIds.length+' TN an '+k.ausbilderName+' übertragen?\n\n';
   confirmMsg+='Folgende Aktionen werden ausgelöst:\n';
   confirmMsg+='• TN werden dem Ausbilder zugeordnet\n';
   confirmMsg+='• App-Benachrichtigung in AzubiPro\n';
   if(mailCount>0) confirmMsg+='• Willkommens-E-Mail an '+mailCount+' Azubi(s) mit Kurs-Info, App-Link und Installations-Anleitung\n';
   if(noMailCount>0) confirmMsg+='• '+noMailCount+' TN haben keine E-Mail hinterlegt — keine Mail an diese\n';
+  if(firmenSet.size>0) confirmMsg+='• Info-E-Mail an die Arbeitgeber von '+firmenSet.size+' Firma(n) (sofern registriert)\n';
   confirmMsg+='\nFortfahren?';
   if(!confirm(confirmMsg)) return;
 
@@ -8213,6 +8216,8 @@ function bldUebertragen(){
   // TN mit E-Mail zählen (für transparente Info)
   const _bldMailCount=_bldTNIds.filter(id=>{const tn=_globalTN.find(t=>t.id===id);return tn&&(tn.kontaktEmail||tn.email);}).length;
   const _bldNoMailCount=_bldTNIds.length-_bldMailCount;
+  const _bldFirmenSet=new Set();
+  _bldTNIds.forEach(id=>{const tn=_globalTN.find(t=>t.id===id);if(tn?.firma)_bldFirmenSet.add(tn.firma);});
   let _bldConfirmMsg='📚 Lehrgang "'+lgartObj.name+'" mit '+_bldTNIds.length+' Teilnehmer(n) an '+ausbObj.name+' übertragen?\n\n';
   _bldConfirmMsg+='Folgende Aktionen werden ausgelöst:\n';
   _bldConfirmMsg+='• Neuer Kurs wird angelegt\n';
@@ -8220,6 +8225,7 @@ function bldUebertragen(){
   _bldConfirmMsg+='• App-Benachrichtigung in AzubiPro\n';
   if(_bldMailCount>0) _bldConfirmMsg+='• Willkommens-E-Mail an '+_bldMailCount+' Azubi(s) mit Kurs-Info, App-Link und Installations-Anleitung\n';
   if(_bldNoMailCount>0) _bldConfirmMsg+='• '+_bldNoMailCount+' TN haben keine E-Mail hinterlegt — keine Mail an diese\n';
+  if(_bldFirmenSet.size>0) _bldConfirmMsg+='• Info-E-Mail an die Arbeitgeber von '+_bldFirmenSet.size+' Firma(n) (sofern registriert)\n';
   _bldConfirmMsg+='\nFortfahren?';
   if(!confirm(_bldConfirmMsg)) return;
 
@@ -8448,6 +8454,16 @@ function notifyTNByEmail(tnIds, kursName, von, bis, ausbilderName){
         html: html
       }
     }).catch(err=>console.warn('Notify-Mail-Fehler:',err));
+    // AG-Mail (an alle Arbeitgeber-User der Firma)
+    sendAgEmailVP(tn, '📚 Auszubildender wurde Lehrgang zugewiesen – '+(kursName||'Lehrgang'),
+      '<div style="padding:14px 16px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:10px;margin-bottom:14px">'
+      +'<div style="font-size:.92rem;font-weight:800;color:#1e40af;margin-bottom:6px">📚 '+esc(kursName||'Lehrgang')+'</div>'
+      +(zeitraum?'<div style="font-size:.82rem;color:#1e3a8a;margin-bottom:3px">📅 <b>Zeitraum:</b> '+esc(zeitraum)+'</div>':'')
+      +(ausbilderName?'<div style="font-size:.82rem;color:#1e3a8a">👷 <b>Ausbilder:</b> '+esc(ausbilderName)+'</div>':'')
+      +'</div>'
+      +'<p style="margin:0 0 10px;font-size:.85rem;color:#374151;line-height:1.55">Ihr Auszubildender wurde diesem Lehrgang neu zugewiesen. Bitte halten Sie den Zeitraum frei und stellen Sie ggf. den Auszubildenden für die Lehrgangstermine frei.</p>'
+      +'<p style="margin:0;font-size:.78rem;color:#64748b;line-height:1.55">Alle Termine und Anwesenheiten sehen Sie in <b>ArbeitgeberPro</b> sobald der Auszubildende sich registriert hat.</p>'
+    );
   });
 }
 
