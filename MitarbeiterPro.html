@@ -640,7 +640,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="display:flex;gap:8px;margin-top:8px">
         <div style="flex:1">
           <div class="as-label">⏱ Stundenaufwand</div>
-          <input type="number" id="asStunden" min="0" step="0.5" placeholder="z.B. 3.5" style="width:100%;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-family:'JetBrains Mono',monospace">
+          <div style="display:flex;gap:6px;align-items:stretch">
+            <input type="number" id="asStunden" min="0" step="0.5" placeholder="z.B. 3.5" style="flex:1;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.78rem;font-family:'JetBrains Mono',monospace">
+            <button id="asStundenStempelBtn" type="button" onclick="asUseStempelZeit()" style="display:none;padding:6px 10px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.4);border-radius:8px;color:#059669;font-size:.65rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;white-space:nowrap" title="Stempel-Zeit übernehmen">⏱ Übernehmen</button>
+          </div>
+          <div id="asStempelHint" style="display:none;font-size:.6rem;color:#059669;margin-top:3px;line-height:1.3"></div>
         </div>
       </div>
       <div style="margin-top:8px">
@@ -2445,6 +2449,50 @@ function _renderAufdProtokoll(a){
   if(!body||!a) return;
   const isErledigt=a.status==='erledigt';
   let h='';
+  // ── Auftrags-Stempel-Button (Hilfe für Zeit-Tracking) ──
+  if(!isErledigt){
+    const log = a.auftragZeitLog||[];
+    const offen = log.find(e=>e.start && !e.ende);
+    const sumMin = log.reduce((sum,e)=>sum+(e.dauerMin||0),0);
+    const sumH = (sumMin/60).toFixed(2);
+    const isLaufend = !!offen;
+    const btnBg = isLaufend ? 'linear-gradient(135deg,#dc2626,#ef4444)' : 'linear-gradient(135deg,#059669,#10b981)';
+    const btnTxt = isLaufend ? '⏹<br>Stopp' : '▶<br>Start';
+    const btnTitle = isLaufend ? 'Auftragszeit stoppen' : 'Auftragszeit starten';
+    h+='<div style="padding:12px;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #a7f3d0;border-radius:10px;margin-bottom:12px">';
+    h+='<div style="font-size:.62rem;color:#065f46;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;text-align:center">⏱ Zeit-Tracking für diesen Auftrag</div>';
+    h+='<div style="display:flex;justify-content:center;margin-bottom:8px">'
+      +'<button id="aufStempelBtn" onclick="auftragStempelToggle(\''+a.id+'\')" style="width:110px;height:110px;padding:0;border:none;border-radius:50%;font-size:.78rem;font-weight:800;cursor:pointer;font-family:\'Sora\',sans-serif;background:'+btnBg+';color:#fff;box-shadow:0 4px 14px rgba(16,185,129,.3),inset 0 -3px 0 rgba(0,0,0,.1);display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2" title="'+btnTitle+'">'+btnTxt+'</button>'
+      +'</div>';
+    if(isLaufend){
+      const startTime = new Date(offen.start);
+      const startStr = startTime.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+      h+='<div style="text-align:center;font-size:.7rem;color:#059669;font-weight:700;margin-bottom:6px">⏱ Läuft seit '+startStr+' <span id="aufStempelLive" style="font-family:\'JetBrains Mono\',monospace"></span></div>';
+    }
+    if(log.length){
+      h+='<div style="border-top:1px solid #a7f3d0;padding-top:8px;margin-top:6px">';
+      h+='<div style="font-size:.62rem;color:#065f46;font-weight:700;margin-bottom:4px">📋 Zeit-Einträge ('+log.length+')</div>';
+      log.slice().reverse().forEach((e,idx)=>{
+        const realIdx = log.length-1-idx;
+        if(!e.start) return;
+        const sStart = new Date(e.start).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        const sEnde = e.ende ? new Date(e.ende).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) : '–';
+        const dauerStr = e.dauerMin ? Math.floor(e.dauerMin/60)+'h '+(e.dauerMin%60)+'min' : (e.ende?'0min':'läuft…');
+        h+='<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#fff;border:1px solid #d1fae5;border-radius:6px;margin-bottom:4px;font-size:.65rem;font-family:\'JetBrains Mono\',monospace">'
+          +'<span style="color:#059669;flex:1">'+sStart+' – '+sEnde+'</span>'
+          +'<span style="color:#0f172a;font-weight:700">'+dauerStr+'</span>'
+          +(e.ende?'<button onclick="auftragStempelDelete(\''+a.id+'\','+realIdx+')" title="Eintrag löschen" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 4px;font-size:.85rem">×</button>':'')
+          +'</div>';
+      });
+      if(sumMin>0){
+        h+='<div style="text-align:right;font-size:.72rem;font-weight:700;color:#0f172a;margin-top:6px;padding:5px 8px;background:#fff;border-radius:6px">Σ '+sumH+' h ('+sumMin+' min)</div>';
+      }
+      h+='</div>';
+    }
+    h+='<div style="font-size:.6rem;color:#475569;text-align:center;margin-top:8px;line-height:1.4">💡 Nur als Hilfe – beim Erledigen kannst du die Stunden auch manuell eintragen</div>';
+    h+='</div>';
+  }
+  // ── Status-Badge ──
   const statusTxt=isErledigt?'✅ Erledigt':(a.status==='inarbeit'?'⏱ In Arbeit':'📋 Offen');
   const statusCol=isErledigt?'#059669':(a.status==='inarbeit'?'#d97706':'#2563eb');
   const statusBg=isErledigt?'rgba(16,185,129,.08)':(a.status==='inarbeit'?'rgba(245,158,11,.08)':'rgba(37,99,235,.08)');
@@ -2506,9 +2554,97 @@ function _renderAufdProtokoll(a){
     }
   }
   body.innerHTML=h;
+  // Live-Timer für laufende Stempel-Session
+  if(_aufStempelTimer){clearInterval(_aufStempelTimer);_aufStempelTimer=null;}
+  if(a.auftragZeitLog && a.auftragZeitLog.find(e=>e.start && !e.ende)){
+    const offenStart = new Date(a.auftragZeitLog.find(e=>e.start && !e.ende).start);
+    _aufStempelTimer = setInterval(()=>{
+      const el=document.getElementById('aufStempelLive');
+      if(!el){clearInterval(_aufStempelTimer);_aufStempelTimer=null;return;}
+      const diffMs = Date.now() - offenStart.getTime();
+      const min = Math.floor(diffMs/60000);
+      const sec = Math.floor((diffMs%60000)/1000);
+      el.textContent = '· ' + Math.floor(min/60)+'h '+(min%60)+'m '+(sec<10?'0':'')+sec+'s';
+    }, 1000);
+  }
+}
+let _aufStempelTimer=null;
+let _aufStempelBusy=false;
+
+function auftragStempelToggle(aufId){
+  if(_aufStempelBusy) return;
+  if(!_tnId||!aufId) return;
+  _aufStempelBusy=true;
+  const ref=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId);
+  ref.get().then(doc=>{
+    if(!doc.exists){_aufStempelBusy=false;return;}
+    const a=doc.data();
+    const log = (a.auftragZeitLog||[]).slice();
+    const offenIdx = log.findIndex(e=>e.start && !e.ende);
+    if(offenIdx>=0){
+      // STOP - laufenden Eintrag schließen
+      const e = log[offenIdx];
+      const ende = new Date().toISOString();
+      const dauerMin = Math.max(1, Math.round((Date.now() - new Date(e.start).getTime())/60000));
+      log[offenIdx] = {...e, ende, dauerMin};
+      // Summe der Stempelzeit (nur abgeschlossene Eintraege)
+      const sumMin = log.reduce((s,x)=>s+(x.dauerMin||0),0);
+      return ref.update({
+        auftragZeitLog: log,
+        stempelZeitMin: sumMin
+      }).then(()=>{
+        toast('⏹ Auftragszeit gestoppt: '+Math.floor(dauerMin/60)+'h '+(dauerMin%60)+'min');
+        // UI neu rendern
+        const aNew = {...a, auftragZeitLog: log, stempelZeitMin: sumMin};
+        _renderAufdProtokoll(aNew);
+        // Auch globale Auftragsliste updaten
+        const idx = _auftraege.findIndex(x=>x.id===aufId);
+        if(idx>=0) _auftraege[idx] = {..._auftraege[idx], ...aNew};
+      });
+    } else {
+      // START - neuen Eintrag öffnen
+      log.push({start: new Date().toISOString()});
+      return ref.update({auftragZeitLog: log}).then(()=>{
+        toast('▶ Auftragszeit gestartet');
+        const aNew = {...a, auftragZeitLog: log};
+        _renderAufdProtokoll(aNew);
+        const idx = _auftraege.findIndex(x=>x.id===aufId);
+        if(idx>=0) _auftraege[idx] = {..._auftraege[idx], ...aNew};
+      });
+    }
+  }).catch(err=>{
+    toast('Fehler: '+err.message,'bad');
+  }).finally(()=>{
+    _aufStempelBusy=false;
+  });
+}
+
+function auftragStempelDelete(aufId, idx){
+  if(!_tnId||!aufId) return;
+  if(!confirm('Diesen Zeit-Eintrag wirklich löschen?')) return;
+  const ref=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId);
+  ref.get().then(doc=>{
+    if(!doc.exists) return;
+    const a=doc.data();
+    const log = (a.auftragZeitLog||[]).slice();
+    if(idx<0||idx>=log.length) return;
+    log.splice(idx,1);
+    const sumMin = log.reduce((s,x)=>s+(x.dauerMin||0),0);
+    return ref.update({
+      auftragZeitLog: log,
+      stempelZeitMin: sumMin
+    }).then(()=>{
+      toast('Eintrag gelöscht');
+      const aNew = {...a, auftragZeitLog: log, stempelZeitMin: sumMin};
+      _renderAufdProtokoll(aNew);
+      const idxA = _auftraege.findIndex(x=>x.id===aufId);
+      if(idxA>=0) _auftraege[idxA] = {..._auftraege[idxA], ...aNew};
+    });
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 function closeAufDetails(){
   if(_aufdChatUnsub){_aufdChatUnsub();_aufdChatUnsub=null;}
+  if(_aufStempelTimer){clearInterval(_aufStempelTimer);_aufStempelTimer=null;}
   document.getElementById('aufDetailsModal').classList.remove('open');
   _aufdAufId=null;
   renderAuftraege();
@@ -2662,6 +2798,20 @@ function auftragErledigen(id){
   document.getElementById('asSigSection').style.display='';
   document.getElementById('asTaetigkeit').value='';
   document.getElementById('asStunden').value='';
+  // Stempel-Hinweis aktualisieren - zeigt Summe wenn Stempel-Log vorhanden ist
+  const stempelMin = a?.stempelZeitMin || 0;
+  const hintEl = document.getElementById('asStempelHint');
+  const useBtn = document.getElementById('asStundenStempelBtn');
+  if(stempelMin>0 && hintEl && useBtn){
+    const stempelH = (stempelMin/60).toFixed(2);
+    hintEl.style.display='block';
+    hintEl.innerHTML='💡 Aus Stempel: <b>'+stempelH+' h</b> ('+Math.floor(stempelMin/60)+'h '+(stempelMin%60)+'min)';
+    useBtn.style.display='inline-block';
+    useBtn.dataset.stempelh=stempelH;
+  } else if(hintEl && useBtn){
+    hintEl.style.display='none';
+    useBtn.style.display='none';
+  }
   document.getElementById('asMatInput').value='';
   document.getElementById('asMatTags').innerHTML='';
   document.getElementById('asPhotos').innerHTML='<label class="photo-add" id="asPhotoAdd">📷<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="asAddPhotos(this.files)"></label>';
@@ -2672,6 +2822,14 @@ function auftragErledigen(id){
   btn.style.background='linear-gradient(135deg,#059669,#10b981)';
   document.getElementById('asModal').classList.add('open');
   sigInit();
+}
+function asUseStempelZeit(){
+  const btn=document.getElementById('asStundenStempelBtn');
+  const inp=document.getElementById('asStunden');
+  if(!btn||!inp) return;
+  const h = btn.dataset.stempelh;
+  if(h) inp.value = h;
+  toast('⏱ Stempel-Zeit übernommen');
 }
 function loadMatListe(){
   if(!_tnId||!db) return;
