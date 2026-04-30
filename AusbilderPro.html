@@ -6785,7 +6785,28 @@ function resetTNStatus(tnId, fromType, tnName){
   const ref = _db.collection('globalTN').doc(tnId);
   const kursName=S.kats[S.curKat]?.label||'Lehrgang';
   const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
-  const kursId=curInst()?.sharedKursId;
+  const inst=curInst();
+  const kursId=inst?.sharedKursId;
+  // 0. Lokale Aufräumarbeiten BEVOR Firestore-Update lädt
+  if(inst){
+    // a) fehltStudents-Eintrag entfernen (nicht angetreten)
+    if(fromType==='absent' && inst.fehltStudents){
+      inst.fehltStudents = inst.fehltStudents.filter(f=>{
+        if(f.poolTnId === tnId) return false;
+        if(tnName && f.name && f.name.toLowerCase()===tnName.toLowerCase()) return false;
+        return true;
+      });
+    }
+    // b) wiederholer-Flag von Sitzplätzen entfernen
+    if(fromType==='wiederholer' && inst.seats){
+      Object.values(inst.seats).forEach(d=>{
+        if(d && (d.poolTnId===tnId || (tnName && d.name && d.name.toLowerCase()===tnName.toLowerCase()))){
+          delete d.wiederholer;
+        }
+      });
+    }
+    persist();
+  }
   // 1. Status-Felder loeschen + aktiverKursId wieder setzen
   const upd = {
     status: firebase.firestore.FieldValue.delete(),
@@ -6838,8 +6859,11 @@ function resetTNStatus(tnId, fromType, tnName){
     }).catch(()=>{});
   }
   toast('↺ Status zurückgesetzt');
-  // UI aktualisieren
-  setTimeout(()=>{ if(typeof loadPool==='function') loadPool(); },300);
+  // UI komplett neu laden (renderFehlt + renderWiederholer triggern)
+  setTimeout(()=>{
+    if(typeof renderSeats==='function') renderSeats();
+    if(typeof loadPool==='function') loadPool();
+  },400);
 }
 
 function syncGlobalTNStatus(tnId, statusType){
