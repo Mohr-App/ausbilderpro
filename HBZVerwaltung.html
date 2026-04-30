@@ -6030,7 +6030,12 @@ function dropTNIntoKurs(e){
       firma:tn.firma||'',beruf:tn.beruf||'',ausbjahr:tn.ausbjahr||'',
       addedAt:Date.now(),globalTNId:_dragTNId
     })
-  ).then(()=>{toast('Zugewiesen ✓');loadKursTNView();filterGlobalTN();})
+  ).then(()=>{
+    toast('Zugewiesen ✓');
+    // Mail an TN (mit App-Link, Installations-Anleitung, Datenschutz-Info) - nur wenn Email vorhanden
+    notifyTNByEmail([_dragTNId], kursName, kurs?.von||'', kurs?.bis||'', kurs?.ausbilderName||'');
+    loadKursTNView();filterGlobalTN();
+  })
   .catch(err=>toast('Fehler: '+err.message,'bad'));
   _dragTNId=null;
 }
@@ -6129,6 +6134,8 @@ function reassignTNToKurs(e, newKursId){
   })
   .then(()=>{
     toast(tnName.trim()+' → '+newKursName+' ✓');
+    // Mail an TN (mit App-Link, Installations-Anleitung, Datenschutz-Info)
+    notifyTNByEmail([tnId], newKursName, newKurs?.von||'', newKurs?.bis||'', newKurs?.ausbilderName||'');
     filterGlobalTN();
   })
   .catch(err=>toast('Fehler: '+err.message,'bad'));
@@ -7844,6 +7851,8 @@ function pickTNForKurs(tnId){
       addedAt:Date.now(), globalTNId:tnId
     });
   toast((tn.vorname||'')+' '+(tn.nachname||'')+' hinzugefügt ✓');
+  // Mail an TN (mit App-Link, Installations-Anleitung, Datenschutz-Info)
+  notifyTNByEmail([tnId], kurs?.name||'', kurs?.von||'', kurs?.bis||'', kurs?.ausbilderName||'');
   renderTNPicker();
   // Kursdetail nach kurzer Pause aktualisieren
   setTimeout(()=>showKursDetail(kursId), 600);
@@ -8327,35 +8336,104 @@ function pickAc(inputId, dropId, val){
 function closeAc(dropId){ document.getElementById(dropId).classList.remove('open'); }
 
 // Firmen sammeln aus allen Teilnehmern
+// Schickt jedem TN eine personalisierte Kurs-Zuweisungs-Mail mit App-Link, Installations-Anleitung und Datenschutz-Info
 function notifyTNByEmail(tnIds, kursName, von, bis, ausbilderName){
-  const emails=[];
+  if(!db||!tnIds||!tnIds.length) return;
+  // TN-Daten zusammensammeln (mit E-Mail)
+  const recipients=[];
   tnIds.forEach(id=>{
     const tn=_globalTN.find(t=>t.id===id);
-    if(tn&&tn.email) emails.push(tn.email);
+    if(!tn) return;
+    const mail=tn.kontaktEmail||tn.email||'';
+    if(!mail) return;
+    recipients.push({tn, email:mail});
   });
-  if(!emails.length) return;
-  // HV-Kontakt laden
-  const hvName=document.getElementById('hvNameInp')?.value||'';
-  const hvEmail=document.getElementById('hvEmailInp')?.value||_email||'';
+  if(!recipients.length) return;
+  // Nicht blocken — laufen lassen ohne Confirm (Confirm gibt's schon vorher beim "Übertragen"-Button)
+  const appUrl='https://mohr-app.github.io/ausbilderpro/AzubiPro.html';
+  const iconUrl='https://mohr-app.github.io/ausbilderpro/icon-azubi-192.png';
+  const zeitraum=(von&&bis)?(fmtDE(von)+' – '+fmtDE(bis)):'';
+  recipients.forEach(({tn,email})=>{
+    const fullName=((tn.vorname||'')+' '+(tn.nachname||'')).trim();
+    const greeting=fullName?'Hallo '+fullName:'Hallo';
+    const html='<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:20px;background:#f8fafc">'
+      // Header
+      +'<div style="text-align:center;margin-bottom:24px;padding:24px 16px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:14px">'
+      +'<img src="'+iconUrl+'" alt="AzubiPro" style="width:72px;height:72px;border-radius:18px;margin-bottom:10px;background:#fff;padding:6px;box-shadow:0 4px 14px rgba(0,0,0,.15)">'
+      +'<div style="font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:-.02em">Azubi<span style="opacity:.85">Pro</span></div>'
+      +'<div style="font-size:.78rem;color:rgba(255,255,255,.9);margin-top:4px">Neuer Lehrgang zugewiesen</div>'
+      +'</div>'
 
-  setTimeout(()=>{
-    if(!confirm('📧 '+emails.length+' Azubi(s) haben eine E-Mail-Adresse.\n\nJetzt eine Benachrichtigung per E-Mail versenden?')) return;
+      // Begrüßung + Kurs-Info
+      +'<div style="padding:22px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;margin-bottom:18px">'
+      +'<p style="margin:0 0 14px;font-size:1rem;font-weight:700;color:#0f172a">'+greeting+',</p>'
+      +'<p style="margin:0 0 14px;font-size:.88rem;color:#1e293b;line-height:1.55">du wurdest einem neuen Lehrgang zugewiesen:</p>'
+      +'<div style="padding:14px 16px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:10px;margin-bottom:16px">'
+      +'<div style="font-size:.95rem;font-weight:800;color:#1e40af;margin-bottom:6px">📚 '+esc(kursName||'Lehrgang')+'</div>'
+      +(zeitraum?'<div style="font-size:.82rem;color:#1e3a8a;margin-bottom:3px">📅 <b>Zeitraum:</b> '+esc(zeitraum)+'</div>':'')
+      +(ausbilderName?'<div style="font-size:.82rem;color:#1e3a8a">👷 <b>Ausbilder:</b> '+esc(ausbilderName)+'</div>':'')
+      +'</div>'
+      +'<p style="margin:0 0 18px;font-size:.85rem;color:#374151;line-height:1.55">Öffne <b>AzubiPro</b>, um den Lehrgang einzusehen, dich krankzumelden oder Termine zu verwalten.</p>'
+      +'<div style="text-align:center;margin-bottom:14px">'
+      +'<a href="'+appUrl+'" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:.92rem;box-shadow:0 4px 14px rgba(37,99,235,.3)">📱 AzubiPro öffnen</a>'
+      +'</div>'
+      +'<p style="margin:0;font-size:.7rem;color:#64748b;text-align:center;font-family:monospace;word-break:break-all">'+appUrl+'</p>'
+      +'</div>'
 
-    const subject=encodeURIComponent('Neuer Lehrgang: '+kursName+' ('+fmtDE(von)+' – '+fmtDE(bis)+')');
-    const body=encodeURIComponent(
-      'Hallo,\n\n'
-      +'du wurdest einem neuen Lehrgang zugewiesen:\n\n'
-      +'📚 Lehrgang: '+kursName+'\n'
-      +'📅 Zeitraum: '+fmtDE(von)+' – '+fmtDE(bis)+'\n'
-      +'👷 Ausbilder: '+ausbilderName+'\n\n'
-      +'Bitte öffne die AzubiPro-App und bestätige den Lehrgang.\n\n'
-      +'Bei Fragen melde dich bei der Hauptverwaltung.\n\n'
-      +'Mit freundlichen Grüßen\n'
-      +(hvName||'Die Hauptverwaltung')
-    );
-    const bcc=encodeURIComponent(emails.join(','));
-    window.open('mailto:?bcc='+bcc+'&subject='+subject+'&body='+body,'_blank');
-  },600);
+      // iOS-Installation
+      +'<div style="padding:18px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;margin-bottom:14px">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+      +'<span style="font-size:1.4rem"></span>'
+      +'<div style="font-size:.95rem;font-weight:700;color:#0f172a">iPhone / iPad installieren</div>'
+      +'</div>'
+      +'<ol style="margin:0 0 0 20px;padding:0;font-size:.85rem;color:#374151;line-height:1.7">'
+      +'<li>App über den Button oben in <b>Safari</b> öffnen</li>'
+      +'<li>Auf das <b>Teilen-Symbol</b> ⬆ unten in der Mitte tippen</li>'
+      +'<li><b>"Zum Home-Bildschirm"</b> auswählen</li>'
+      +'<li>Mit "Hinzufügen" bestätigen</li>'
+      +'</ol>'
+      +'</div>'
+
+      // Android-Installation
+      +'<div style="padding:18px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;margin-bottom:14px">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+      +'<span style="font-size:1.4rem">🤖</span>'
+      +'<div style="font-size:.95rem;font-weight:700;color:#0f172a">Android installieren</div>'
+      +'</div>'
+      +'<ol style="margin:0 0 0 20px;padding:0;font-size:.85rem;color:#374151;line-height:1.7">'
+      +'<li>App über den Button oben in <b>Chrome</b> öffnen</li>'
+      +'<li>Auf das <b>Drei-Punkte-Menü</b> ⋮ rechts oben tippen</li>'
+      +'<li><b>"Zum Startbildschirm hinzufügen"</b> oder <b>"App installieren"</b> auswählen</li>'
+      +'<li>Mit "Installieren" bestätigen</li>'
+      +'</ol>'
+      +'</div>'
+
+      // Datenschutz-Box
+      +'<div style="padding:18px;background:#ecfdf5;border:2px solid #a7f3d0;border-radius:14px;margin-bottom:14px">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+      +'<span style="font-size:1.4rem">🔒</span>'
+      +'<div style="font-size:.95rem;font-weight:700;color:#065f46">Datenschutz &amp; Sicherheit</div>'
+      +'</div>'
+      +'<p style="margin:0 0 8px;font-size:.85rem;color:#065f46;line-height:1.55"><b>AzubiPro ist eine Web-App</b> — sie läuft direkt im Browser und benötigt keinen App-Store-Download.</p>'
+      +'<ul style="margin:0 0 0 20px;padding:0;font-size:.82rem;color:#065f46;line-height:1.65">'
+      +'<li>Kein Zugriff auf deine <b>Kamera</b></li>'
+      +'<li>Kein Zugriff auf deine <b>Kontakte</b></li>'
+      +'<li>Kein Zugriff auf <b>Fotos oder Dateien</b></li>'
+      +'<li>Server in Deutschland (Frankfurt)</li>'
+      +'<li>Keine Werbung, keine Analyse-Tracker</li>'
+      +'</ul>'
+      +'</div>'
+
+      +'<p style="margin:18px 0 0;font-size:.7rem;color:#9ca3af;text-align:center;line-height:1.5">Diese E-Mail wurde automatisch von der Lehrgangs-Verwaltung versendet.<br>Bei Fragen wende dich bitte an deinen Ausbildungsbetrieb oder die Verwaltung.</p>'
+      +'</div>';
+    db.collection('mail').add({
+      to: email,
+      message: {
+        subject: '📚 Neuer Lehrgang: '+(kursName||'Lehrgang')+(zeitraum?' ('+zeitraum+')':''),
+        html: html
+      }
+    }).catch(err=>console.warn('Notify-Mail-Fehler:',err));
+  });
 }
 
 function collectFirmen(){
