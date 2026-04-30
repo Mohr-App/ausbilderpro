@@ -5589,15 +5589,22 @@ function deleteTnKomplett(tnId){
   const inst=curInst();
   const kursId=inst?.sharedKursId;
   if(!kursId){toast('Kein Kurs verknüpft','bad');return;}
-  if(!confirm('Teilnehmer aus diesem Kurs entfernen?')) return;
+  if(!confirm('⚠️ Teilnehmer aus diesem Kurs entfernen?\n\nFolgende Aktionen werden ausgelöst:\n• TN wird aus dem Kurs entfernt\n• App-Benachrichtigung in AzubiPro\n• E-Mail an Azubi (sofern Adresse hinterlegt)\n• E-Mail an Arbeitgeber (sofern hinterlegt)\n\nFortfahren?')) return;
 
-  // 1. Aus Kurs-Teilnehmer-Subcollection löschen
-  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-    .collection('teilnehmer').doc(tnId).delete().then(()=>{
-      // 2. aktiverKursId im globalTN zurücksetzen + aus kursHistory entfernen
-      return _db.collection('globalTN').doc(tnId).get();
-    }).then(doc=>{
-      if(!doc.exists) return;
+  const kursName=S.kats[S.curKat]?.label||'Lehrgang';
+  const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
+
+  // 0. TN-Daten VORHER laden für Mails (sonst sind sie nach delete weg)
+  _db.collection('globalTN').doc(tnId).get().then(doc=>{
+    const tnDataForMail = doc.exists ? doc.data() : null;
+
+    // 1. Aus Kurs-Teilnehmer-Subcollection löschen
+    return _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').doc(tnId).delete().then(()=>tnDataForMail);
+  }).then(tnDataForMail=>{
+    // 2. aktiverKursId im globalTN zurücksetzen + aus kursHistory entfernen + Benachrichtigung
+    return _db.collection('globalTN').doc(tnId).get().then(doc=>{
+      if(!doc.exists) return tnDataForMail;
       const data=doc.data();
       const updates={};
       if(data.aktiverKursId===kursId){
@@ -5606,20 +5613,49 @@ function deleteTnKomplett(tnId){
       // kursHistory: Eintrag komplett entfernen
       const hist=(data.kursHistory||[]).filter(h=>h.kursId!==kursId);
       updates.kursHistory=hist;
-      return _db.collection('globalTN').doc(tnId).update(updates);
-    }).then(()=>{
-      // 3. Vom Sitzplatz entfernen (lokal)
-      if(inst){
-        Object.keys(inst.seats||{}).forEach(sid=>{
-          if(inst.seats[sid]&&inst.seats[sid].poolTnId===tnId){
-            inst.seats[sid]={};
-          }
-        });
-      }
-      document.getElementById('ov').classList.remove('open');
-      persist();renderSeats();loadPool();
-      toast('✓ Teilnehmer aus Kurs entfernt');
-    }).catch(err=>toast('Fehler: '+err.message,'bad'));
+      // App-Benachrichtigung an Azubi
+      const benach=data.benachrichtigungen||[];
+      benach.push({
+        typ:'kurs_entfernt',
+        text:'Du wurdest aus dem Lehrgang "'+kursName+'" entfernt.',
+        ausbilder: ausName,
+        datum: new Date().toISOString(),
+        gelesen: false
+      });
+      updates.benachrichtigungen=benach;
+      return _db.collection('globalTN').doc(tnId).update(updates).then(()=>tnDataForMail||data);
+    });
+  }).then(tnDataForMail=>{
+    // 3. Mails verschicken
+    if(tnDataForMail){
+      // Mail an Azubi
+      sendTnEmail(tnDataForMail, '✕ Aus Lehrgang "'+kursName+'" entfernt',
+        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">du wurdest aus dem Lehrgang <b>"'+kursName+'"</b> entfernt.</p>'
+        +'<div style="padding:12px;background:#fef2f2;border:2px solid #fecaca;border-radius:8px;margin-bottom:12px">'
+        +'<p style="margin:0;font-size:.85rem;color:#991b1b;font-weight:700">Du brauchst nicht mehr zu den Kursterminen erscheinen.</p></div>'
+        +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">📞 Bei Fragen wende dich bitte an deinen Ausbildungsbetrieb oder die Lehrgangsverwaltung.</p>'
+      );
+      // Mail an Arbeitgeber
+      sendAgEmail(tnDataForMail, '✕ Auszubildender aus Lehrgang entfernt – '+kursName,
+        '<div style="padding:12px;background:#fef2f2;border:2px solid #fecaca;border-radius:8px;margin-bottom:12px">'
+        +'<p style="margin:0 0 6px;font-size:.85rem;color:#991b1b;font-weight:700">Aus Lehrgang entfernt</p>'
+        +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursName+'</p>'
+        +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
+        +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender nimmt nicht mehr am Lehrgang teil. Bei Fragen wenden Sie sich bitte an die Lehrgangsverwaltung.</p>'
+      );
+    }
+    // 4. Vom Sitzplatz entfernen (lokal)
+    if(inst){
+      Object.keys(inst.seats||{}).forEach(sid=>{
+        if(inst.seats[sid]&&inst.seats[sid].poolTnId===tnId){
+          inst.seats[sid]={};
+        }
+      });
+    }
+    document.getElementById('ov').classList.remove('open');
+    persist();renderSeats();loadPool();
+    toast('✓ Teilnehmer aus Kurs entfernt');
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 // ─── STANDALONE MODUS ───
