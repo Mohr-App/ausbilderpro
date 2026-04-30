@@ -6032,8 +6032,6 @@ function dropTNIntoKurs(e){
     })
   ).then(()=>{
     toast('Zugewiesen ✓');
-    // Mail an TN (mit App-Link, Installations-Anleitung, Datenschutz-Info) - nur wenn Email vorhanden
-    notifyTNByEmail([_dragTNId], kursName, kurs?.von||'', kurs?.bis||'', kurs?.ausbilderName||'');
     loadKursTNView();filterGlobalTN();
   })
   .catch(err=>toast('Fehler: '+err.message,'bad'));
@@ -6134,8 +6132,6 @@ function reassignTNToKurs(e, newKursId){
   })
   .then(()=>{
     toast(tnName.trim()+' → '+newKursName+' ✓');
-    // Mail an TN (mit App-Link, Installations-Anleitung, Datenschutz-Info)
-    notifyTNByEmail([tnId], newKursName, newKurs?.von||'', newKurs?.bis||'', newKurs?.ausbilderName||'');
     filterGlobalTN();
   })
   .catch(err=>toast('Fehler: '+err.message,'bad'));
@@ -7851,8 +7847,6 @@ function pickTNForKurs(tnId){
       addedAt:Date.now(), globalTNId:tnId
     });
   toast((tn.vorname||'')+' '+(tn.nachname||'')+' hinzugefügt ✓');
-  // Mail an TN (mit App-Link, Installations-Anleitung, Datenschutz-Info)
-  notifyTNByEmail([tnId], kurs?.name||'', kurs?.von||'', kurs?.bis||'', kurs?.ausbilderName||'');
   renderTNPicker();
   // Kursdetail nach kurzer Pause aktualisieren
   setTimeout(()=>showKursDetail(kursId), 600);
@@ -8097,7 +8091,17 @@ function transferEntwurf(kursId){
     toast('⚠️ '+k.ausbilderName+' hat bereits einen aktiven Kurs im Zeitraum: '+conflict.name+' ('+fmtDE(conflict.von)+' – '+fmtDE(conflict.bis)+')','bad');
     return;
   }
-  if(!confirm('Lehrgang "'+k.name+'" mit '+tnIds.length+' TN an '+k.ausbilderName+' übertragen?')) return;
+  // TN mit E-Mail zählen (für transparente Info)
+  const mailCount=tnIds.filter(id=>{const tn=_globalTN.find(t=>t.id===id);return tn&&(tn.kontaktEmail||tn.email);}).length;
+  const noMailCount=tnIds.length-mailCount;
+  let confirmMsg='📚 Lehrgang "'+k.name+'" mit '+tnIds.length+' TN an '+k.ausbilderName+' übertragen?\n\n';
+  confirmMsg+='Folgende Aktionen werden ausgelöst:\n';
+  confirmMsg+='• TN werden dem Ausbilder zugeordnet\n';
+  confirmMsg+='• App-Benachrichtigung in AzubiPro\n';
+  if(mailCount>0) confirmMsg+='• Willkommens-E-Mail an '+mailCount+' Azubi(s) mit Kurs-Info, App-Link und Installations-Anleitung\n';
+  if(noMailCount>0) confirmMsg+='• '+noMailCount+' TN haben keine E-Mail hinterlegt — keine Mail an diese\n';
+  confirmMsg+='\nFortfahren?';
+  if(!confirm(confirmMsg)) return;
 
   const batch=db.batch();
   const oldKursCleanups=[];
@@ -8206,7 +8210,18 @@ function bldUebertragen(){
     return;
   }
 
-  if(!confirm('Lehrgang "'+lgartObj.name+'" mit '+_bldTNIds.length+' Teilnehmer(n) an '+ausbObj.name+' übertragen?')) return;
+  // TN mit E-Mail zählen (für transparente Info)
+  const _bldMailCount=_bldTNIds.filter(id=>{const tn=_globalTN.find(t=>t.id===id);return tn&&(tn.kontaktEmail||tn.email);}).length;
+  const _bldNoMailCount=_bldTNIds.length-_bldMailCount;
+  let _bldConfirmMsg='📚 Lehrgang "'+lgartObj.name+'" mit '+_bldTNIds.length+' Teilnehmer(n) an '+ausbObj.name+' übertragen?\n\n';
+  _bldConfirmMsg+='Folgende Aktionen werden ausgelöst:\n';
+  _bldConfirmMsg+='• Neuer Kurs wird angelegt\n';
+  _bldConfirmMsg+='• TN werden dem Ausbilder zugeordnet\n';
+  _bldConfirmMsg+='• App-Benachrichtigung in AzubiPro\n';
+  if(_bldMailCount>0) _bldConfirmMsg+='• Willkommens-E-Mail an '+_bldMailCount+' Azubi(s) mit Kurs-Info, App-Link und Installations-Anleitung\n';
+  if(_bldNoMailCount>0) _bldConfirmMsg+='• '+_bldNoMailCount+' TN haben keine E-Mail hinterlegt — keine Mail an diese\n';
+  _bldConfirmMsg+='\nFortfahren?';
+  if(!confirm(_bldConfirmMsg)) return;
 
   const beschreibung=(document.getElementById('bldBeschreibung').value||'').trim();
 
