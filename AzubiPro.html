@@ -881,21 +881,66 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 
 // ── Berufe-Dropdown ──
 let _berufeListe=[];
+// Fallback-Liste fuer Self-Registration (User ist noch nicht eingeloggt, kann Firestore nicht lesen)
+const _STANDARD_BERUFE_FALLBACK=[
+  {name:'Elektroniker',emoji:'⚡',order:10,berufe:[
+    'Elektroniker – Energie- und Gebäudetechnik (EuG)',
+    'Elektroniker – Automatisierungstechnik (AT)',
+    'Elektroniker – Betriebstechnik (BT)',
+    'Elektroniker – Gebäude- und Infrastruktursysteme (GIS)',
+    'Elektroniker – Informations- und Systemtechnik (IS)',
+    'Elektroniker – Maschinen- und Antriebstechnik (MAT)',
+    'Systemelektroniker','Mechatroniker','Elektroanlagenmonteur','Elektroinstallateur']},
+  {name:'Kraftfahrzeugmechatroniker',emoji:'🚗',order:20,berufe:[
+    'Kraftfahrzeugmechatroniker – PKW-Technik',
+    'Kraftfahrzeugmechatroniker – Nutzfahrzeugtechnik',
+    'Kraftfahrzeugmechatroniker – Motorradtechnik',
+    'Kraftfahrzeugmechatroniker – Karosserie- und Fahrzeugbautechnik',
+    'Kraftfahrzeugmechatroniker – System- und Hochvolttechnik']},
+  {name:'Maler und Lackierer',emoji:'🎨',order:30,berufe:[
+    'Maler und Lackierer – Gestaltung und Instandhaltung',
+    'Maler und Lackierer – Kirchenmalerei und Denkmalpflege',
+    'Maler und Lackierer – Bauten- und Korrosionsschutz']},
+  {name:'Anlagenmechaniker SHK',emoji:'🔧',order:40,berufe:[
+    'Anlagenmechaniker SHK','Zentralheizungs- und Lüftungsbauer']},
+  {name:'Tischler',emoji:'🪚',order:50,berufe:['Tischler','Schreiner']},
+  {name:'Bäcker',emoji:'🍞',order:60,berufe:['Bäcker','Konditor']},
+  {name:'Metallbauer / Schlosser',emoji:'🔩',order:70,berufe:[
+    'Metallbauer – Konstruktionstechnik',
+    'Metallbauer – Metallgestaltung',
+    'Metallbauer – Nutzfahrzeugbau']},
+  {name:'Fachverkäufer Bäckerei',emoji:'🧁',order:80,berufe:[
+    'Fachverkäufer Lebensmittelhandwerk – Bäckerei',
+    'Fachverkäufer Lebensmittelhandwerk – Konditorei']},
+  {name:'Friseur',emoji:'💇',order:90,berufe:['Friseur']}
+];
 function loadBerufeDropdown(){
+  // Erst Fallback nutzen damit Self-Registration sofort funktioniert
+  // (vor dem Login kann Firestore nicht gelesen werden)
+  if(!_berufeListe.length){
+    _berufeListe=_STANDARD_BERUFE_FALLBACK.slice();
+    populateBerufSelect('jBeruf');
+    populateBerufSelect('profBeruf');
+  }
+  // Wenn moeglich, vom Server nachladen (ueberschreibt Fallback mit aktuellen Daten)
   db.collection('shared').doc('kursSettings').collection('berufe').orderBy('order').get().then(snap=>{
+    if(snap.empty) return; // Fallback bleibt
     _berufeListe=[];
     snap.forEach(doc=>_berufeListe.push({id:doc.id,...doc.data()}));
     populateBerufSelect('jBeruf');
     populateBerufSelect('profBeruf');
-  }).catch(()=>{});
+  }).catch(()=>{ /* Fallback bleibt aktiv */ });
 }
 function populateBerufSelect(selId){
   const sel=document.getElementById(selId);
   if(!sel) return;
+  const prevValue=sel.value; // gewaehlten Wert merken (Schutz beim Re-Load)
   sel.innerHTML='<option value="">– Beruf wählen –</option>';
   _berufeListe.forEach(b=>{
     sel.innerHTML+='<option value="'+esc(b.name)+'">'+(b.emoji||'📁')+' '+esc(b.name)+'</option>';
   });
+  // Auswahl wiederherstellen falls noch gueltig
+  if(prevValue && _berufeListe.some(b=>b.name===prevValue)) sel.value=prevValue;
 }
 function fillFachrichtungen(berufSelId,fachSelId){
   const berufSel=document.getElementById(berufSelId);
