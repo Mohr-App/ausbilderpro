@@ -2129,7 +2129,93 @@ function _renderMaCard(az){
     +(tel?'<a href="tel:'+esc(tel)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:6px 14px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:#059669">📞 '+esc(tel)+'</a>':'')
     +(email?'<a href="mailto:'+esc(email)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-left:'+(tel?'6px':'0')+';padding:6px 14px;background:rgba(37,99,235,.1);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:var(--acc)">✉ '+esc(email)+'</a>':'')
     +(!tel&&!email?'<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Keine Kontaktdaten hinterlegt</div>':'')
-    +'</div></div>';
+    +'</div>'
+    +'<button onclick="trennAzubiVerknuepfung(\''+esc(az.id)+'\')" title="Verknüpfung aufheben" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:6px 8px;border-radius:6px;font-size:1rem;line-height:1;flex-shrink:0" onmouseover="this.style.background=\'rgba(239,68,68,.12)\';this.style.color=\'#ef4444\'" onmouseout="this.style.background=\'none\';this.style.color=\'#94a3b8\'">⚙</button>'
+    +'</div>';
+}
+
+function trennAzubiVerknuepfung(tnId){
+  const az=_azubis.find(a=>a.id===tnId);
+  if(!az) return;
+  const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
+  const isMA=az.typ==='arbeitnehmer';
+  const rolle=isMA?'Mitarbeiter':'Azubi';
+  if(!confirm('⚠️ Verknüpfung mit '+rolle+' "'+name+'" wirklich aufheben?\n\nFolgende Daten werden DAUERHAFT GELÖSCHT:\n• Alle Stempelzeiten\n• Alle Aufträge\n• Alle Urlaubsanträge\n• Alle Baustellen\n• Alle Betriebs-Meldungen\n\n'+name+' wird per E-Mail benachrichtigt.\n\nDiese Aktion kann nicht rückgängig gemacht werden!')) return;
+  if(!confirm('Letzte Bestätigung: WIRKLICH alle Daten von '+name+' löschen und Verknüpfung aufheben?')) return;
+  toast('⏳ Daten werden gelöscht…');
+  _doFirmaTrennung(tnId, _uid, _firma, 'ag').then(()=>{
+    toast('✓ Verknüpfung mit '+name+' aufgehoben');
+  }).catch(err=>{
+    toast('Fehler: '+err.message,'bad');
+  });
+}
+
+// Trennt Azubi/MA vom Betrieb - löscht alle arbeitsbezogenen Daten + Verknüpfungs-Felder
+function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
+  const subs=['zeiterfassung','urlaubsantraege','baustellen','auftraege','betriebMeldungen'];
+  const tnRef=db.collection('globalTN').doc(tnId);
+  const deletePromises=subs.map(sub=>{
+    return tnRef.collection(sub).get().then(snap=>{
+      const batch=db.batch();
+      snap.forEach(doc=>batch.delete(doc.ref));
+      return snap.size>0?batch.commit():Promise.resolve();
+    }).catch(err=>{console.warn('Sub-Delete '+sub+' Fehler:',err);return null;});
+  });
+  return Promise.all(deletePromises).then(()=>{
+    return tnRef.update({
+      firmaUid: firebase.firestore.FieldValue.delete(),
+      firma: firebase.firestore.FieldValue.delete(),
+      arbeitgeberId: firebase.firestore.FieldValue.delete(),
+      betriebId: firebase.firestore.FieldValue.delete(),
+      arbeitszeitPlan: firebase.firestore.FieldValue.delete(),
+      kundenListe: firebase.firestore.FieldValue.delete(),
+      materialListe: firebase.firestore.FieldValue.delete(),
+      geofence: firebase.firestore.FieldValue.delete()
+    });
+  }).then(()=>{
+    return tnRef.get().then(doc=>{
+      const tn=doc.exists?doc.data():{};
+      const tnName=((tn.vorname||'')+' '+(tn.nachname||'')).trim()||'Mitarbeiter';
+      const tnEmail=tn.kontaktEmail||tn.email||'';
+      // Mail an Gegenseite
+      if(initiator==='ag' && tnEmail){
+        const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+          +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:#fef2f2;border:2px solid #fecaca;border-radius:12px">'
+          +'<div style="font-size:1.1rem;font-weight:800;color:#991b1b">⚠️ Verknüpfung aufgehoben</div></div>'
+          +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
+          +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo '+esc(tnName)+',</p>'
+          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">dein Arbeitgeber <b>'+esc(firmaName)+'</b> hat die Verknüpfung mit dir aufgehoben.</p>'
+          +'<div style="padding:10px;background:#fef3c7;border:1.5px solid #fde68a;border-radius:8px;margin-bottom:10px">'
+          +'<p style="margin:0;font-size:.8rem;color:#92400e">Alle arbeitsbezogenen Daten (Stempelzeiten, Aufträge, Urlaubsanträge, Baustellen, Meldungen) wurden gelöscht.</p></div>'
+          +'<p style="margin:0;font-size:.78rem;color:#475569;line-height:1.55">Bei Fragen wende dich bitte direkt an deinen Arbeitgeber.</p>'
+          +'</div></div>';
+        db.collection('mail').add({
+          to: tnEmail,
+          message: { subject: '⚠️ Verknüpfung mit '+firmaName+' aufgehoben', html: html }
+        }).catch(()=>{});
+      }
+      if(initiator==='azubi'){
+        // Mail an AG
+        db.collection('users').doc(firmaUid).get().then(agDoc=>{
+          const agEmail=agDoc.exists?agDoc.data().email:'';
+          if(!agEmail) return;
+          const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+            +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:#fef2f2;border:2px solid #fecaca;border-radius:12px">'
+            +'<div style="font-size:1.1rem;font-weight:800;color:#991b1b">⚠️ Verknüpfung aufgehoben</div></div>'
+            +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
+            +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo,</p>'
+            +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55"><b>'+esc(tnName)+'</b> hat die Verknüpfung mit Ihrem Betrieb <b>'+esc(firmaName)+'</b> aufgehoben.</p>'
+            +'<div style="padding:10px;background:#fef3c7;border:1.5px solid #fde68a;border-radius:8px;margin-bottom:10px">'
+            +'<p style="margin:0;font-size:.8rem;color:#92400e">Alle arbeitsbezogenen Daten wurden gelöscht.</p></div>'
+            +'</div></div>';
+          db.collection('mail').add({
+            to: agEmail,
+            message: { subject: '⚠️ '+tnName+' hat die Verknüpfung aufgehoben', html: html }
+          }).catch(()=>{});
+        });
+      }
+    });
+  });
 }
 function toggleUeblView(){
   const el=document.getElementById('ueblCollapse');

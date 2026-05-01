@@ -108,6 +108,9 @@ service cloud.firestore {
       // AG genehmigt: setzt firmaUid/firma + loescht firmaPending in einem Update
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','firmaPending']);
+      // Trennen: alle arbeitsbezogenen Felder loeschen in einem Update (Azubi oder AG)
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','arbeitszeitPlan','kundenListe','materialListe','geofence']);
       // Pilot-Anonymisierung: Admin darf Datenminimierungs-Felder updaten
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
