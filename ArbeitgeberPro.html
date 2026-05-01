@@ -274,6 +274,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="abtab" id="abtab-mitarbeiter">
         <!-- Pending-Antraege Banner (Azubis/MA mit Verknuepfungs-Antrag) -->
         <div id="pendingAntraegeBanner"></div>
+        <!-- Ehemalige Mitarbeiter / Azubis Sektion (Read-Only Daten fuer Aufbewahrung) -->
+        <details class="coll-card" id="ehemaligeBox" style="display:none;margin-bottom:12px">
+          <summary><span style="display:flex;align-items:center;gap:8px">📂 Ehemalige Mitarbeiter <span id="ehemaligeCount" style="font-size:.6rem;background:rgba(148,163,184,.15);color:#475569;padding:2px 7px;border-radius:8px;font-weight:700">0</span></span></summary>
+          <div class="coll-body">
+            <div style="font-size:.62rem;color:var(--mu);margin-bottom:8px;line-height:1.5;padding:8px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:6px">⚠️ Daten ehemaliger Mitarbeiter bleiben für Abrechnung und gesetzliche Aufbewahrungspflichten (6 Jahre) erhalten. Read-Only.</div>
+            <div id="ehemaligeListe"></div>
+          </div>
+        </details>
         <!-- Arbeitnehmer -->
         <div class="abtab2 active" id="abtab-ma-arbeitnehmer">
           <button class="big-btn" onclick="openMaAnlegenModal('arbeitnehmer')" style="margin-bottom:12px">
@@ -1257,6 +1265,7 @@ function loadUserData(){
 
 let _pendingAntraege=[];
 let _pendingUnsub=null;
+let _migrationDone={};
 function loadAzubis(){
   if(!_uid)return;
   // Nur per firmaUid – keine firma-String-Suche mehr
@@ -1269,6 +1278,12 @@ function loadAzubis(){
     setupLiveMeldungen();
     _showFirmaCodeBanner();
     _renderPendingAntraege();
+    // Migration: bestehende Subcollection-Daten ohne firmaUid taggen (einmalig pro MA)
+    _azubis.forEach(az=>{
+      if(_migrationDone[az.id]) return;
+      _migrationDone[az.id]=true;
+      _migrateMaSubcollections(az.id);
+    });
     // Kontakt-Verwaltung nur wenn echte Azubis (nicht nur Arbeitnehmer) vorhanden
     const kontaktCard=document.getElementById('agHVKontaktCard');
     if(kontaktCard){
@@ -1283,6 +1298,244 @@ function loadAzubis(){
     _pendingAntraege=[];
     snap.forEach(doc=>_pendingAntraege.push({id:doc.id,...doc.data()}));
     _renderPendingAntraege();
+  });
+  // Listener fuer ehemalige MA: alle TN deren firmaHistorie einen Eintrag mit unserer firmaUid hat
+  // Da Firestore kein where('firmaHistorie.firmaUid','==') in Subcollection-Doc-Filtern unterstuetzt,
+  // laden wir alle TN ohne aktuelle Verknuepfung und pruefen die Subcollection
+  _loadEhemalige();
+}
+
+let _ehemaligeListener=null;
+let _ehemalige=[]; // {id, name, firma, von, bis, beendetVon, kontaktEmail, beruf, photoUrl}
+function _loadEhemalige(){
+  if(!_uid||!db) return;
+  // Alle TN durchsuchen: deren firmaHistorie nach Eintraegen mit firmaUid==_uid filtern
+  // Approach: collectionGroup-Query auf 'firmaHistorie' wo firmaUid==_uid
+  if(_ehemaligeListener){_ehemaligeListener();_ehemaligeListener=null;}
+  _ehemaligeListener=db.collectionGroup('firmaHistorie').where('firmaUid','==',_uid).onSnapshot(snap=>{
+    _ehemalige=[];
+    const tnPromises=[];
+    snap.forEach(histDoc=>{
+      const hist=histDoc.data();
+      // Path: globalTN/{tnId}/firmaHistorie/{histId}
+      const tnId=histDoc.ref.parent.parent.id;
+      tnPromises.push(
+        db.collection('globalTN').doc(tnId).get().then(tnDoc=>{
+          if(!tnDoc.exists) return null;
+          const tn=tnDoc.data();
+          const name=((tn.vorname||'')+' '+(tn.nachname||'')).trim()||'Mitarbeiter';
+          return {
+            id:tnId,
+            histId:histDoc.id,
+            name,
+            vorname:tn.vorname||'',
+            nachname:tn.nachname||'',
+            beruf:tn.beruf||'',
+            typ:tn.typ||'azubi',
+            kontaktEmail:tn.kontaktEmail||tn.email||'',
+            photoUrl:tn.photoUrl||'',
+            firma:hist.firma||'',
+            von:hist.von||null,
+            bis:hist.bis||null,
+            beendetVon:hist.beendetVon||'unbekannt'
+          };
+        })
+      );
+    });
+    Promise.all(tnPromises).then(results=>{
+      _ehemalige=results.filter(Boolean).sort((a,b)=>(b.bis||0)-(a.bis||0));
+      _renderEhemalige();
+    });
+  }, err=>{
+    console.warn('Ehemalige-Listener-Fehler:',err);
+  });
+}
+
+function _renderEhemalige(){
+  const box=document.getElementById('ehemaligeBox');
+  const cnt=document.getElementById('ehemaligeCount');
+  const list=document.getElementById('ehemaligeListe');
+  if(!box||!list) return;
+  if(!_ehemalige.length){
+    box.style.display='none';
+    return;
+  }
+  box.style.display='';
+  if(cnt) cnt.textContent=_ehemalige.length;
+  let h='';
+  _ehemalige.forEach(e=>{
+    const initials=e.name.split(' ').map(w=>(w[0]||'').toUpperCase()).join('').slice(0,2);
+    const vonStr=e.von?new Date(e.von).toLocaleDateString('de-DE'):'?';
+    const bisStr=e.bis?new Date(e.bis).toLocaleDateString('de-DE'):'?';
+    const dauerMs=e.bis&&e.von?(e.bis-e.von):0;
+    const dauerStr=dauerMs>0?_formatDauer(dauerMs):'';
+    h+='<div onclick="openEhemaligeDetail(\''+esc(e.id)+'\')" style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(148,163,184,.05);border:1px solid var(--brd);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'rgba(148,163,184,.1)\'" onmouseout="this.style.background=\'rgba(148,163,184,.05)\'">';
+    h+='<div style="width:40px;height:40px;border-radius:50%;background:rgba(148,163,184,.15);border:1.5px solid rgba(148,163,184,.3);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;color:#475569;flex-shrink:0;overflow:hidden">';
+    h+=e.photoUrl?'<img src="'+esc(e.photoUrl)+'" style="width:100%;height:100%;object-fit:cover;filter:grayscale(60%)">':initials;
+    h+='</div>';
+    h+='<div style="flex:1;min-width:0">';
+    h+='<div style="font-size:.84rem;font-weight:700;color:var(--tx)">'+esc(e.name)+'</div>';
+    if(e.beruf) h+='<div style="font-size:.6rem;color:var(--mu);margin-top:1px">'+esc(e.beruf)+'</div>';
+    h+='<div style="font-size:.62rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace;margin-top:2px">'+vonStr+' – '+bisStr+(dauerStr?' · '+dauerStr:'')+'</div>';
+    h+='</div>';
+    h+='<span style="font-size:.55rem;color:#94a3b8;background:rgba(148,163,184,.1);padding:3px 7px;border-radius:6px;font-weight:700;text-transform:uppercase">'+(e.beendetVon==='ag'?'Sie':'MA')+' getrennt</span>';
+    h+='<span style="color:var(--mu);font-size:1rem">›</span>';
+    h+='</div>';
+  });
+  list.innerHTML=h;
+}
+
+function _formatDauer(ms){
+  const days=Math.floor(ms/(1000*60*60*24));
+  if(days<30) return days+' Tag'+(days!==1?'e':'');
+  const months=Math.floor(days/30);
+  if(months<12) return months+' Monat'+(months!==1?'e':'');
+  const years=Math.floor(months/12);
+  const remMonths=months%12;
+  return years+' Jahr'+(years!==1?'e':'')+(remMonths?' '+remMonths+' Mon.':'');
+}
+
+function openEhemaligeDetail(tnId){
+  const e=_ehemalige.find(x=>x.id===tnId);
+  if(!e) return;
+  // Lade alle Subcollection-Daten mit firmaUid==_uid
+  Promise.all([
+    db.collection('globalTN').doc(tnId).collection('zeiterfassung').where('firmaUid','==',_uid).get(),
+    db.collection('globalTN').doc(tnId).collection('auftraege').where('firmaUid','==',_uid).get(),
+    db.collection('globalTN').doc(tnId).collection('urlaubsantraege').where('firmaUid','==',_uid).get(),
+    db.collection('globalTN').doc(tnId).collection('betriebMeldungen').where('firmaUid','==',_uid).get()
+  ]).then(([zSnap,aSnap,uSnap,mSnap])=>{
+    const zeiten=[];zSnap.forEach(d=>zeiten.push({id:d.id,...d.data()}));
+    const auftraege=[];aSnap.forEach(d=>auftraege.push({id:d.id,...d.data()}));
+    const urlaube=[];uSnap.forEach(d=>urlaube.push({id:d.id,...d.data()}));
+    const meldungen=[];mSnap.forEach(d=>meldungen.push({id:d.id,...d.data()}));
+    _renderEhemaligeModal(e, {zeiten,auftraege,urlaube,meldungen});
+  }).catch(err=>{toast('Fehler beim Laden: '+err.message,'bad');});
+}
+
+function _renderEhemaligeModal(e, data){
+  // Existierendes Modal entfernen
+  const old=document.getElementById('ehemaligeModal');
+  if(old) old.remove();
+  const vonStr=e.von?new Date(e.von).toLocaleDateString('de-DE'):'?';
+  const bisStr=e.bis?new Date(e.bis).toLocaleDateString('de-DE'):'?';
+  // Stunden-Summe + Ist-Minuten
+  const totalMin=data.zeiten.reduce((s,z)=>s+(z.istMinuten||0),0);
+  const totalH=(totalMin/60).toFixed(2);
+  // Aufträge-Status
+  const aOffen=data.auftraege.filter(a=>a.status!=='erledigt').length;
+  const aErledigt=data.auftraege.filter(a=>a.status==='erledigt').length;
+  // Urlaubstage
+  const urlGenehmigt=data.urlaube.filter(u=>u.status==='genehmigt').reduce((s,u)=>s+(u.tage||0),0);
+
+  const m=document.createElement('div');
+  m.id='ehemaligeModal';
+  m.className='mdl open';
+  m.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
+  m.innerHTML='<div style="background:#fff;max-width:680px;width:100%;border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.3)">'
+    +'<div style="padding:18px 20px;background:linear-gradient(135deg,#94a3b8,#64748b);color:#fff;display:flex;align-items:center;justify-content:space-between">'
+    +'<div><div style="font-size:1rem;font-weight:800">📂 '+esc(e.name)+'</div><div style="font-size:.7rem;opacity:.9;margin-top:2px">Ehemaliger '+(e.typ==='arbeitnehmer'?'Mitarbeiter':'Azubi')+' · '+vonStr+' – '+bisStr+'</div></div>'
+    +'<button onclick="document.getElementById(\'ehemaligeModal\').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:1.2rem;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center">×</button>'
+    +'</div>'
+    +'<div style="padding:8px 16px;background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.2);font-size:.65rem;color:#92400e;font-weight:600">🔒 Read-Only · Aufbewahrungspflicht 6 Jahre</div>'
+    +'<div style="padding:18px;max-height:70vh;overflow-y:auto">'
+    +'<div class="stat-row" style="margin-bottom:14px"><div class="stat-card"><div class="stat-num" style="color:#475569">'+totalH+'</div><div class="stat-label">Stunden</div></div>'
+    +'<div class="stat-card"><div class="stat-num" style="color:#475569">'+aErledigt+'/'+(aOffen+aErledigt)+'</div><div class="stat-label">Aufträge</div></div>'
+    +'<div class="stat-card"><div class="stat-num" style="color:#475569">'+urlGenehmigt+'</div><div class="stat-label">Urlaubstage</div></div></div>'
+    +_renderEhemaligeZeiten(data.zeiten)
+    +_renderEhemaligeAuftraege(data.auftraege)
+    +_renderEhemaligeUrlaube(data.urlaube)
+    +_renderEhemaligeMeldungen(data.meldungen)
+    +'</div></div>';
+  document.body.appendChild(m);
+}
+
+function _renderEhemaligeZeiten(zeiten){
+  if(!zeiten.length) return '';
+  const sorted=zeiten.filter(z=>z.eingang).sort((a,b)=>(b.datum||'').localeCompare(a.datum||''));
+  let h='<details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:.78rem;font-weight:700;padding:8px 10px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:7px">⏱ Stempelzeiten ('+sorted.length+')</summary>';
+  h+='<div style="margin-top:6px;max-height:240px;overflow-y:auto">';
+  sorted.forEach(z=>{
+    const minStr=z.istMinuten?Math.floor(z.istMinuten/60)+'h '+(z.istMinuten%60)+'min':'-';
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;font-size:.7rem;border-bottom:1px solid var(--brd);font-family:\'JetBrains Mono\',monospace">';
+    h+='<span style="flex:0 0 90px;color:var(--mu)">'+esc(z.datum||'')+'</span>';
+    h+='<span style="flex:1;color:var(--tx)">'+esc(z.eingang||'')+' – '+esc(z.ausgang||'läuft')+'</span>';
+    h+='<span style="font-weight:700">'+minStr+'</span>';
+    h+='</div>';
+  });
+  h+='</div></details>';
+  return h;
+}
+
+function _renderEhemaligeAuftraege(aufs){
+  if(!aufs.length) return '';
+  const sorted=aufs.sort((a,b)=>(b.erstelltAm||0)-(a.erstelltAm||0));
+  let h='<details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:.78rem;font-weight:700;padding:8px 10px;background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.15);border-radius:7px">📋 Aufträge ('+sorted.length+')</summary>';
+  h+='<div style="margin-top:6px;max-height:240px;overflow-y:auto">';
+  sorted.forEach(a=>{
+    const statusBadge={'offen':'#94a3b8','inArbeit':'#f59e0b','erledigt':'#10b981'}[a.status]||'#94a3b8';
+    h+='<div style="padding:8px 10px;border-bottom:1px solid var(--brd);font-size:.7rem">';
+    h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="font-weight:700;flex:1">'+esc(a.kunde||'-')+'</span>';
+    h+='<span style="font-size:.55rem;background:'+statusBadge+';color:#fff;padding:2px 6px;border-radius:5px;text-transform:uppercase">'+esc(a.status||'-')+'</span></div>';
+    if(a.beschreibung) h+='<div style="font-size:.65rem;color:var(--mu);margin-top:2px">'+esc(a.beschreibung).slice(0,120)+'</div>';
+    if(a.stunden) h+='<div style="font-size:.6rem;color:#475569;font-family:\'JetBrains Mono\',monospace;margin-top:2px">⏱ '+a.stunden+' h</div>';
+    h+='</div>';
+  });
+  h+='</div></details>';
+  return h;
+}
+
+function _renderEhemaligeUrlaube(urls){
+  if(!urls.length) return '';
+  const sorted=urls.sort((a,b)=>(b.beantragAm||0)-(a.beantragAm||0));
+  let h='<details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:.78rem;font-weight:700;padding:8px 10px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.15);border-radius:7px">🏖 Urlaubsanträge ('+sorted.length+')</summary>';
+  h+='<div style="margin-top:6px;max-height:240px;overflow-y:auto">';
+  sorted.forEach(u=>{
+    const statusBadge={'beantragt':'#94a3b8','genehmigt':'#10b981','abgelehnt':'#ef4444'}[u.status]||'#94a3b8';
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--brd);font-size:.7rem;font-family:\'JetBrains Mono\',monospace">';
+    h+='<span style="flex:1">'+esc(u.von||'')+' – '+esc(u.bis||'')+' ('+(u.tage||0)+'T)</span>';
+    h+='<span style="font-size:.55rem;background:'+statusBadge+';color:#fff;padding:2px 6px;border-radius:5px;text-transform:uppercase">'+esc(u.status||'-')+'</span>';
+    h+='</div>';
+  });
+  h+='</div></details>';
+  return h;
+}
+
+function _renderEhemaligeMeldungen(melds){
+  if(!melds.length) return '';
+  const sorted=melds.sort((a,b)=>(b.zeit||'').localeCompare(a.zeit||''));
+  let h='<details><summary style="cursor:pointer;font-size:.78rem;font-weight:700;padding:8px 10px;background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.15);border-radius:7px">💬 Meldungen ('+sorted.length+')</summary>';
+  h+='<div style="margin-top:6px;max-height:240px;overflow-y:auto">';
+  sorted.forEach(m=>{
+    const dt=m.zeit?new Date(m.zeit).toLocaleDateString('de-DE'):'';
+    h+='<div style="padding:6px 10px;border-bottom:1px solid var(--brd);font-size:.7rem">';
+    h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:.55rem;color:#7c3aed;font-weight:700;text-transform:uppercase">'+esc(m.type||'')+'</span><span style="font-size:.6rem;color:var(--mu)">'+dt+'</span></div>';
+    if(m.text) h+='<div style="margin-top:2px;color:var(--tx)">'+esc(m.text).slice(0,200)+'</div>';
+    h+='</div>';
+  });
+  h+='</div></details>';
+  return h;
+}
+
+// Migration: bestehende Subcollection-Daten ohne firmaUid bekommen einmalig den aktuellen
+// firmaUid-Stempel. Wird nur fuer MAs ausgefuehrt die mit DIESEM AG verknuepft sind.
+// Idempotent - laeuft nur ueber Docs ohne firmaUid-Feld.
+function _migrateMaSubcollections(tnId){
+  if(!tnId||!_uid) return;
+  const subs=['zeiterfassung','urlaubsantraege','baustellen','auftraege','betriebMeldungen'];
+  subs.forEach(sub=>{
+    db.collection('globalTN').doc(tnId).collection(sub).get().then(snap=>{
+      const batch=db.batch();
+      let count=0;
+      snap.forEach(doc=>{
+        const d=doc.data();
+        if(!('firmaUid' in d)){
+          batch.update(doc.ref, {firmaUid: _uid});
+          count++;
+        }
+      });
+      if(count>0){batch.commit().catch(()=>{});}
+    }).catch(()=>{});
   });
 }
 
@@ -1327,11 +1580,12 @@ function approveAntrag(tnId){
   if(!p) return;
   const name=((p.vorname||'')+' '+(p.nachname||'')).trim()||'Mitarbeiter';
   if(!confirm('✓ '+name+' mit Ihrem Betrieb verknüpfen?\n\nDanach kann '+name+':\n• Arbeitszeiten erfassen\n• Aufträge sehen und bearbeiten\n• Urlaub beantragen\n\nDer Firmencode wird zurückgesetzt — für den nächsten Mitarbeiter müssen Sie einen neuen Code generieren.')) return;
-  // 1. globalTN: firmaUid setzen + firmaPending löschen
+  // 1. globalTN: firmaUid setzen + firmaPending löschen + Verknüpfungs-Beginn merken
   db.collection('globalTN').doc(tnId).update({
     firmaUid: _uid,
     firma: _firma,
-    firmaPending: firebase.firestore.FieldValue.delete()
+    firmaPending: firebase.firestore.FieldValue.delete(),
+    _verknuepftSeit: Date.now()
   }).then(()=>{
     // 2. Firmencode löschen (einmalig - AG muss neuen für nächsten Azubi generieren)
     return db.collection('users').doc(_uid).update({
@@ -2140,9 +2394,9 @@ function trennAzubiVerknuepfung(tnId){
   const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
   const isMA=az.typ==='arbeitnehmer';
   const rolle=isMA?'Mitarbeiter':'Azubi';
-  if(!confirm('⚠️ Verknüpfung mit '+rolle+' "'+name+'" wirklich aufheben?\n\nFolgende Daten werden DAUERHAFT GELÖSCHT:\n• Alle Stempelzeiten\n• Alle Aufträge\n• Alle Urlaubsanträge\n• Alle Baustellen\n• Alle Betriebs-Meldungen\n\n'+name+' wird per E-Mail benachrichtigt.\n\nDiese Aktion kann nicht rückgängig gemacht werden!')) return;
-  if(!confirm('Letzte Bestätigung: WIRKLICH alle Daten von '+name+' löschen und Verknüpfung aufheben?')) return;
-  toast('⏳ Daten werden gelöscht…');
+  if(!confirm('⚠️ Verknüpfung mit '+rolle+' "'+name+'" aufheben?\n\n• '+name+' kann ab sofort keine Arbeitszeiten mehr stempeln\n• '+name+' wird per E-Mail benachrichtigt\n\nAlle bisherigen Daten (Stempelzeiten, Aufträge, Urlaubsanträge) bleiben für Sie weiterhin einsehbar im Bereich "Ehemalige Mitarbeiter" — wichtig für Abrechnung und gesetzliche Aufbewahrungspflichten (6 Jahre).')) return;
+  if(!confirm('Letzte Bestätigung: Verknüpfung mit '+name+' wirklich aufheben?')) return;
+  toast('⏳ Trenne Verknüpfung…');
   _doFirmaTrennung(tnId, _uid, _firma, 'ag').then(()=>{
     toast('✓ Verknüpfung mit '+name+' aufgehoben');
   }).catch(err=>{
@@ -2150,71 +2404,70 @@ function trennAzubiVerknuepfung(tnId){
   });
 }
 
-// Trennt Azubi/MA vom Betrieb - löscht alle arbeitsbezogenen Daten + Verknüpfungs-Felder
+// Trennt Azubi/MA vom Betrieb - Daten BLEIBEN erhalten (rechtssicher fuer Aufbewahrung)
 function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
-  const subs=['zeiterfassung','urlaubsantraege','baustellen','auftraege','betriebMeldungen'];
   const tnRef=db.collection('globalTN').doc(tnId);
-  const deletePromises=subs.map(sub=>{
-    return tnRef.collection(sub).get().then(snap=>{
-      const batch=db.batch();
-      snap.forEach(doc=>batch.delete(doc.ref));
-      return snap.size>0?batch.commit():Promise.resolve();
-    }).catch(err=>{console.warn('Sub-Delete '+sub+' Fehler:',err);return null;});
-  });
-  return Promise.all(deletePromises).then(()=>{
+  return tnRef.get().then(doc=>{
+    if(!doc.exists) throw new Error('TN nicht gefunden');
+    const tn=doc.data();
+    const verknuepftSeit=tn._verknuepftSeit||null;
+    const histEntry={
+      firmaUid: firmaUid,
+      firma: firmaName,
+      bis: Date.now(),
+      beendetVon: initiator
+    };
+    if(verknuepftSeit) histEntry.von=verknuepftSeit;
+    return tnRef.collection('firmaHistorie').add(histEntry).then(()=>tn).catch(err=>{
+      console.warn('History-Eintrag-Fehler:',err);
+      return tn;
+    });
+  }).then(tn=>{
     return tnRef.update({
       firmaUid: firebase.firestore.FieldValue.delete(),
       firma: firebase.firestore.FieldValue.delete(),
       arbeitgeberId: firebase.firestore.FieldValue.delete(),
       betriebId: firebase.firestore.FieldValue.delete(),
-      arbeitszeitPlan: firebase.firestore.FieldValue.delete(),
-      kundenListe: firebase.firestore.FieldValue.delete(),
-      materialListe: firebase.firestore.FieldValue.delete(),
-      geofence: firebase.firestore.FieldValue.delete()
-    });
-  }).then(()=>{
-    return tnRef.get().then(doc=>{
-      const tn=doc.exists?doc.data():{};
-      const tnName=((tn.vorname||'')+' '+(tn.nachname||'')).trim()||'Mitarbeiter';
-      const tnEmail=tn.kontaktEmail||tn.email||'';
-      // Mail an Gegenseite
-      if(initiator==='ag' && tnEmail){
+      _verknuepftSeit: firebase.firestore.FieldValue.delete()
+    }).then(()=>tn);
+  }).then(tn=>{
+    const tnName=((tn.vorname||'')+' '+(tn.nachname||'')).trim()||'Mitarbeiter';
+    const tnEmail=tn.kontaktEmail||tn.email||'';
+    if(initiator==='ag' && tnEmail){
+      const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+        +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:#fef2f2;border:2px solid #fecaca;border-radius:12px">'
+        +'<div style="font-size:1.1rem;font-weight:800;color:#991b1b">⚠️ Verknüpfung aufgehoben</div></div>'
+        +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
+        +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo '+esc(tnName)+',</p>'
+        +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">dein Arbeitgeber <b>'+esc(firmaName)+'</b> hat die Verknüpfung mit dir aufgehoben.</p>'
+        +'<div style="padding:10px;background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:8px;margin-bottom:10px">'
+        +'<p style="margin:0;font-size:.8rem;color:#065f46"><b>Deine Daten bleiben erhalten:</b> Du kannst deine alten Stempelzeiten, Aufträge und Urlaubsanträge weiterhin einsehen (Read-Only). Wechsle dazu in den jeweiligen Bereichen auf <b>"Vorherige Firmen"</b>.</p></div>'
+        +'<p style="margin:0;font-size:.78rem;color:#475569;line-height:1.55">Bei Fragen wende dich bitte direkt an deinen Arbeitgeber.</p>'
+        +'</div></div>';
+      db.collection('mail').add({
+        to: tnEmail,
+        message: { subject: '⚠️ Verknüpfung mit '+firmaName+' aufgehoben', html: html }
+      }).catch(()=>{});
+    }
+    if(initiator==='azubi'){
+      db.collection('users').doc(firmaUid).get().then(agDoc=>{
+        const agEmail=agDoc.exists?agDoc.data().email:'';
+        if(!agEmail) return;
         const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
           +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:#fef2f2;border:2px solid #fecaca;border-radius:12px">'
           +'<div style="font-size:1.1rem;font-weight:800;color:#991b1b">⚠️ Verknüpfung aufgehoben</div></div>'
           +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
-          +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo '+esc(tnName)+',</p>'
-          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">dein Arbeitgeber <b>'+esc(firmaName)+'</b> hat die Verknüpfung mit dir aufgehoben.</p>'
-          +'<div style="padding:10px;background:#fef3c7;border:1.5px solid #fde68a;border-radius:8px;margin-bottom:10px">'
-          +'<p style="margin:0;font-size:.8rem;color:#92400e">Alle arbeitsbezogenen Daten (Stempelzeiten, Aufträge, Urlaubsanträge, Baustellen, Meldungen) wurden gelöscht.</p></div>'
-          +'<p style="margin:0;font-size:.78rem;color:#475569;line-height:1.55">Bei Fragen wende dich bitte direkt an deinen Arbeitgeber.</p>'
+          +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo,</p>'
+          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55"><b>'+esc(tnName)+'</b> hat die Verknüpfung mit Ihrem Betrieb <b>'+esc(firmaName)+'</b> aufgehoben.</p>'
+          +'<div style="padding:10px;background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:8px;margin-bottom:10px">'
+          +'<p style="margin:0;font-size:.8rem;color:#065f46"><b>Wichtig:</b> Alle Stempelzeiten, Aufträge und Urlaubsanträge bleiben für Sie weiterhin einsehbar (Read-Only) im Bereich <b>"Ehemalige Mitarbeiter"</b>. Sie können diese für Abrechnung und Aufbewahrungspflichten nutzen.</p></div>'
           +'</div></div>';
         db.collection('mail').add({
-          to: tnEmail,
-          message: { subject: '⚠️ Verknüpfung mit '+firmaName+' aufgehoben', html: html }
+          to: agEmail,
+          message: { subject: '⚠️ '+tnName+' hat die Verknüpfung aufgehoben', html: html }
         }).catch(()=>{});
-      }
-      if(initiator==='azubi'){
-        // Mail an AG
-        db.collection('users').doc(firmaUid).get().then(agDoc=>{
-          const agEmail=agDoc.exists?agDoc.data().email:'';
-          if(!agEmail) return;
-          const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
-            +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:#fef2f2;border:2px solid #fecaca;border-radius:12px">'
-            +'<div style="font-size:1.1rem;font-weight:800;color:#991b1b">⚠️ Verknüpfung aufgehoben</div></div>'
-            +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
-            +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo,</p>'
-            +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55"><b>'+esc(tnName)+'</b> hat die Verknüpfung mit Ihrem Betrieb <b>'+esc(firmaName)+'</b> aufgehoben.</p>'
-            +'<div style="padding:10px;background:#fef3c7;border:1.5px solid #fde68a;border-radius:8px;margin-bottom:10px">'
-            +'<p style="margin:0;font-size:.8rem;color:#92400e">Alle arbeitsbezogenen Daten wurden gelöscht.</p></div>'
-            +'</div></div>';
-          db.collection('mail').add({
-            to: agEmail,
-            message: { subject: '⚠️ '+tnName+' hat die Verknüpfung aufgehoben', html: html }
-          }).catch(()=>{});
-        });
-      }
-    });
+      });
+    }
   });
 }
 function toggleUeblView(){
@@ -3638,7 +3891,8 @@ function agZeitNachtragen(){
   if(!confirm('Zeit nachtragen für '+azName+'?\n\n'+datum+': '+ein+' – '+aus+' ('+minToStr(istMin)+')')) return;
   db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum).set({
     datum, eingang:ein, ausgang:aus, pauseLog:[], pauseMinuten:0, istMinuten:istMin,
-    agBestaetigt:true, agNachgetragen:true, agNachgetragenAm:Date.now(), agNachgetragenVon:_firma||_email
+    agBestaetigt:true, agNachgetragen:true, agNachgetragenAm:Date.now(), agNachgetragenVon:_firma||_email,
+    firmaUid: _uid
   },{merge:true}).then(()=>{
     document.getElementById('agNachDatum').value='';
     document.getElementById('agNachEin').value='';
@@ -3765,11 +4019,15 @@ function loadAgZeiten(){
   }
   const promises=_azubis.map(az=>{
     // Query erweitert: Alle Tage BIS Monatsende (fuer kumulierten Gleitzeit-Saldo inkl. Vormonate)
+    // Filter firmaUid==_uid: nur Zeiten der aktuellen Verknuepfung (alte Beziehungen ausgeblendet)
     const p1=db.collection('globalTN').doc(az.id).collection('zeiterfassung')
+      .where('firmaUid','==',_uid)
       .where('datum','<=',ym+'-31').orderBy('datum').get();
     const p2=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('firmaUid','==',_uid)
       .where('type','==','krank').get();
     const p3=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+      .where('firmaUid','==',_uid)
       .where('status','==','genehmigt').get();
     return Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlSnap])=>{
       const zeitMap={};
@@ -4010,6 +4268,7 @@ function loadAgAuftraege(){
   elO.innerHTML='<div class="empty">Lädt…</div>';
   const promises=_azubis.map(az=>
     db.collection('globalTN').doc(az.id).collection('auftraege')
+      .where('firmaUid','==',_uid)
       .orderBy('erstelltAm','desc').get()
       .then(snap=>{
         const docs=snap.docs.map(d=>({id:d.id,tnId:az.id,tnName:((az.vorname||'')+' '+(az.nachname||'')).trim(),...d.data()}));
@@ -4132,7 +4391,7 @@ function agAuftragErstellen(){
   if(!kunde){err.textContent='Bitte Kunde eingeben';return;}
   if(!maIds.length){err.textContent='Bitte mind. einen Mitarbeiter auswählen';return;}
   err.textContent='Wird erstellt…';
-  const baseData={kunde, adresse, beschreibung:beschr, status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma};
+  const baseData={kunde, adresse, beschreibung:beschr, status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma, firmaUid:_uid};
   if(kundeEmail) baseData.kundeEmail=kundeEmail;
   if(terminDatum) baseData.terminDatum=terminDatum;
   if(terminUhrzeit) baseData.terminUhrzeit=terminUhrzeit;
@@ -5124,7 +5383,7 @@ function _computeNachtMin(datum, eingang, ausgang, pauseMin){
 function monatsAbschluss(tnId,name,ym){
   if(!confirm('Monat '+ym+' für '+name+' abschließen?\n\nDanach sind keine Änderungen mehr möglich.')) return;
   const ref=db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc('abschluss-'+ym);
-  ref.set({abgeschlossen:true,abgeschlossenAm:Date.now(),abgeschlossenVon:_email||_firma}).then(()=>{
+  ref.set({abgeschlossen:true,abgeschlossenAm:Date.now(),abgeschlossenVon:_email||_firma,firmaUid:_uid}).then(()=>{
     toast('🔒 Monat abgeschlossen');
     loadAgZeiten();
   });
@@ -5811,9 +6070,10 @@ function setupLiveMeldungen(){
   _meldUnsubs.forEach(u=>u());
   _meldUnsubs=[];
   if(!_azubis.length) return;
-  // Pro Azubi einen Live-Listener auf ungelesene betriebMeldungen
+  // Pro Azubi einen Live-Listener auf ungelesene betriebMeldungen (nur eigene Firma-Beziehung)
   _azubis.forEach(az=>{
     const unsub=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+      .where('firmaUid','==',_uid)
       .where('gelesen','==',false).onSnapshot(snap=>{
         // Toast bei neuen Meldungen
         snap.docChanges().forEach(ch=>{

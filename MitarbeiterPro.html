@@ -373,6 +373,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
       <div id="betriebContent">
+      <!-- Firma-Switcher (nur sichtbar wenn historische Firmen vorhanden) -->
+      <div id="firmaSwitcher" style="display:none;margin-bottom:10px"></div>
+      <!-- Read-Only-Banner -->
+      <div id="firmaReadOnlyBanner" style="display:none;margin-bottom:10px"></div>
       <!-- Sub-Tabs -->
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="betriebTabs">
         <button class="stab active" onclick="showBetriebTab('baustellen')" title="Aufträge anzeigen">Aufträge</button>
@@ -988,6 +992,7 @@ function loadData(){
   checkDsgvoConsent();
   checkAzubiBadges();
   checkFirmaCodeUI();
+  loadFirmaHistorie();
   initHomeZeiten();
 
   // Live-Listener auf TN-Dokument – Echtzeit-Benachrichtigungen
@@ -1181,10 +1186,12 @@ function confirmKrankmeldung(){
 }
 
 function _doSendBetriebMeldung(type, text){
+  if(!_firmaReadOnlyGuard()) return;
   const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Mitarbeiter';
   const firma=_tnData?.firma||'';
   db.collection('globalTN').doc(_tnId).collection('betriebMeldungen').add({
     type, text, name, firma,
+    firmaUid: _tnData?.firmaUid||null,
     tnId: _tnId,
     zeit: new Date().toISOString(),
     datum: localDate(),
@@ -1251,8 +1258,11 @@ function loadBetriebMeldungen(){
       if(snap.empty){el.innerHTML='<div class="empty">Keine Meldungen</div>';return;}
       const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
       let html='';
+      let count=0;
       snap.forEach(doc=>{
         const d=doc.data();
+        if(!_firmaFilterMatches(d)) return;
+        count++;
         const zeit=d.zeit?new Date(d.zeit).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
         const statusCol=d.gelesen?'var(--mu)':'var(--acc)';
         html+='<div style="padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:8px">'
@@ -1500,6 +1510,7 @@ function checkGleitzeit(jetzt, typ){
 })();
 
 function zeitStempeln(){
+  if(!_firmaReadOnlyGuard()) return;
   if(!_tnId||!db) return;
   const today=localDate();
   const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
@@ -1515,7 +1526,7 @@ function zeitStempeln(){
         
       }
       checkGleitzeit(jetzt,'ein');
-      const data={eingang:jetzt,pauseLog:[],datum:today};
+      const data={eingang:jetzt,pauseLog:[],datum:today,firmaUid:_tnData?.firmaUid||null};
       if(gps) data.gpsEingang=gps;
       if(geoResult==='no-gps'){data.ohneGPS=true;data.ohneGPSGrund=gpsGrund;}
       ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
@@ -1543,6 +1554,7 @@ function zeitStempeln(){
 let _asJetzt='',_asPhotos=[];
 function asClose(){document.getElementById('asModal').classList.remove('open');}
 function asConfirm(){
+  if(!_firmaReadOnlyGuard()) return;
   if(!_auftragId) return;
   const ref=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_auftragId);
   const update={status:'erledigt',erledigtAm:Date.now()};
@@ -2005,6 +2017,7 @@ function loadUeberKonto(currentYm){
 
 // ═══════════════════════════════════
 function zeitNachtragen(){
+  if(!_firmaReadOnlyGuard()) return;
   const datum=document.getElementById('zeitNachDatum').value;
   const ein=document.getElementById('zeitNachEin').value;
   const aus=document.getElementById('zeitNachAus').value;
@@ -2018,6 +2031,7 @@ function zeitNachtragen(){
   db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(datum).set({
     datum, eingang:ein, ausgang:aus, pauseLog:[], pauseMinuten:0, istMinuten:istMin,
     manuell:true, agBestaetigt:false,
+    firmaUid: _tnData?.firmaUid||null,
     bemerkung:bem,
     nachgetragenAm:Date.now(),
     historie:firebase.firestore.FieldValue.arrayUnion({aktion:'nachgetragen',von:_email||'Mitarbeiter',am:Date.now(),eingang:ein,ausgang:aus})
@@ -2079,6 +2093,7 @@ function loadJahresUebersicht(){
 }
 
 function urlaubBeantragen(){
+  if(!_firmaReadOnlyGuard()) return;
   const art=document.getElementById('urlArt').value;
   const von=document.getElementById('urlVon').value;
   const bis=document.getElementById('urlBis').value;
@@ -2100,7 +2115,8 @@ function urlaubBeantragen(){
   db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').add({
     von, bis, tage, grund, art, status:'beantragt', beantragAm:Date.now(),
     tnName:((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim(),
-    firma:_tnData?.firma||''
+    firma:_tnData?.firma||'',
+    firmaUid: _tnData?.firmaUid||null
   }).then(()=>{
     document.getElementById('urlVon').value='';
     document.getElementById('urlBis').value='';
@@ -2118,8 +2134,11 @@ function loadUrlaubAntraege(){
   db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').orderBy('beantragAm','desc').limit(20).get().then(snap=>{
     if(snap.empty){el.innerHTML='<div class="empty">Keine Anträge</div>';return;}
     let html='';
+    let count=0;
     snap.forEach(doc=>{
       const d=doc.data();
+      if(!_firmaFilterMatches(d)) return;
+      count++;
       const statusCol=d.status==='genehmigt'?'#059669':d.status==='abgelehnt'||d.status==='widerrufen'?'#ef4444':'#d97706';
       const statusIcon=d.status==='genehmigt'?'✅':d.status==='abgelehnt'?'❌':d.status==='widerrufen'?'🗑':'⏳';
       const artIcon=d.art==='ueberstunden'?'⏱':'🏖';
@@ -2141,13 +2160,95 @@ function loadUrlaubAntraege(){
 // AUFTRÄGE
 // ═══════════════════════════════════
 let _auftraege=[];
+let _firmaFilter='aktuell';
+let _firmaHistorie=[];
+let _firmaHistUnsub=null;
+
+function _firmaFilterMatches(dat){
+  if(!dat) return true;
+  if(_firmaFilter==='aktuell'){
+    const aktUid=_tnData?.firmaUid||null;
+    if(!aktUid) return true;
+    return (dat.firmaUid||null)===aktUid || !('firmaUid' in dat);
+  }
+  return (dat.firmaUid||null)===_firmaFilter;
+}
+
+function _firmaReadOnlyGuard(){
+  if(_firmaFilter!=='aktuell'){
+    toast('🔒 Read-Only-Ansicht. Wechsle auf "Aktuelle Firma" um Änderungen zu machen.','bad');
+    return false;
+  }
+  return true;
+}
+
+function loadFirmaHistorie(){
+  if(!_tnId||!db) return;
+  if(_firmaHistUnsub){_firmaHistUnsub();_firmaHistUnsub=null;}
+  _firmaHistUnsub=db.collection('globalTN').doc(_tnId).collection('firmaHistorie')
+    .orderBy('bis','desc').onSnapshot(snap=>{
+      _firmaHistorie=[];
+      snap.forEach(doc=>_firmaHistorie.push({id:doc.id,...doc.data()}));
+      renderFirmaSwitcher();
+    },err=>{console.warn('firmaHistorie-Fehler:',err);});
+}
+
+function renderFirmaSwitcher(){
+  const sw=document.getElementById('firmaSwitcher');
+  const banner=document.getElementById('firmaReadOnlyBanner');
+  if(!sw) return;
+  const aktName=_tnData?.firma||'';
+  const aktUid=_tnData?.firmaUid||null;
+  if(!aktUid && !_firmaHistorie.length){sw.style.display='none';if(banner)banner.style.display='none';return;}
+  if(aktUid && !_firmaHistorie.length){sw.style.display='none';if(banner)banner.style.display='none';return;}
+  sw.style.display='';
+  let h='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(37,99,235,.04);border:1.5px solid rgba(37,99,235,.15);border-radius:10px">';
+  h+='<span style="font-size:.62rem;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0">Ansicht:</span>';
+  h+='<select id="firmaFilterSel" onchange="setFirmaFilter(this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--brd);border-radius:6px;font-size:.74rem;font-family:\'Sora\',sans-serif;background:#fff;color:var(--tx)">';
+  if(aktUid){
+    h+='<option value="aktuell"'+(_firmaFilter==='aktuell'?' selected':'')+'>📌 '+esc(aktName)+' (aktuell)</option>';
+  }
+  _firmaHistorie.forEach(hist=>{
+    const vonStr=hist.von?new Date(hist.von).toLocaleDateString('de-DE',{year:'2-digit',month:'2-digit'}):'?';
+    const bisStr=hist.bis?new Date(hist.bis).toLocaleDateString('de-DE',{year:'2-digit',month:'2-digit'}):'?';
+    h+='<option value="'+esc(hist.firmaUid)+'"'+(_firmaFilter===hist.firmaUid?' selected':'')+'>📂 '+esc(hist.firma||'?')+' ('+vonStr+'–'+bisStr+')</option>';
+  });
+  h+='</select>';
+  h+='</div>';
+  sw.innerHTML=h;
+  if(banner){
+    if(_firmaFilter!=='aktuell'){
+      const hist=_firmaHistorie.find(h=>h.firmaUid===_firmaFilter);
+      const firmaName=hist?hist.firma||'Vorherige Firma':'Vorherige Firma';
+      banner.style.display='';
+      banner.innerHTML='<div style="padding:9px 12px;background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.3);border-radius:10px;font-size:.7rem;color:#92400e;font-weight:700;text-align:center">🔒 Read-Only-Ansicht · Daten von '+esc(firmaName)+'</div>';
+    } else {
+      banner.style.display='none';
+      banner.innerHTML='';
+    }
+  }
+}
+
+function setFirmaFilter(val){
+  _firmaFilter=val;
+  renderFirmaSwitcher();
+  if(typeof loadAuftraege==='function') loadAuftraege();
+  if(typeof loadZeitkonto==='function') loadZeitkonto();
+  if(typeof loadZeitHeute==='function') loadZeitHeute();
+  if(typeof loadJahresUebersicht==='function') loadJahresUebersicht();
+  if(typeof loadUrlaubAntraege==='function') loadUrlaubAntraege();
+  if(typeof loadBetriebMeldungen==='function') loadBetriebMeldungen();
+}
 function loadAuftraege(){
   if(!_tnId||!db) return;
   loadKundenListe();
   db.collection('globalTN').doc(_tnId).collection('auftraege')
     .orderBy('erstelltAm','desc').onSnapshot(snap=>{
       _auftraege=[];
-      snap.forEach(doc=>_auftraege.push({id:doc.id,...doc.data()}));
+      snap.forEach(doc=>{
+        const d={id:doc.id,...doc.data()};
+        if(_firmaFilterMatches(d)) _auftraege.push(d);
+      });
       renderAuftraege();
     },err=>{
       const el=document.getElementById('auftraegeOffen');
@@ -2572,6 +2673,7 @@ let _aufStempelTimer=null;
 let _aufStempelBusy=false;
 
 function auftragStempelToggle(aufId){
+  if(!_firmaReadOnlyGuard()) return;
   if(_aufStempelBusy) return;
   if(!_tnId||!aufId) return;
   _aufStempelBusy=true;
@@ -2862,13 +2964,15 @@ function saveMaterialien(){
 }
 
 function eigenenAuftragErstellen(){
+  if(!_firmaReadOnlyGuard()) return;
   const kunde=document.getElementById('selfAufKunde').value.trim();
   const adresse=document.getElementById('selfAufAdresse').value.trim();
   const beschr=document.getElementById('selfAufBeschr').value.trim();
   if(!kunde){toast('Bitte Kunde eingeben','bad');return;}
   db.collection('globalTN').doc(_tnId).collection('auftraege').add({
     kunde, adresse, beschreibung:beschr,
-    status:'offen', erstelltAm:Date.now(), erstelltVon:'selbst'
+    status:'offen', erstelltAm:Date.now(), erstelltVon:'selbst',
+    firmaUid: _tnData?.firmaUid||null
   }).then(()=>{
     saveKunde(kunde,adresse);
     document.getElementById('selfAufKunde').value='';
@@ -2908,6 +3012,7 @@ function saveKunde(kunde,adresse){
 
 // Status-Flow
 function auftragStarten(id){
+  if(!_firmaReadOnlyGuard()) return;
   db.collection('globalTN').doc(_tnId).collection('auftraege').doc(id).update({
     status:'inArbeit', gestartetAm:Date.now()
   }).then(()=>toast('▶ Auftrag gestartet'));

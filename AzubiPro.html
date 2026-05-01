@@ -490,6 +490,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <!-- Sub-Tabs + Content (nur sichtbar wenn AG verbunden) -->
       <div id="betriebContent">
+      <!-- Firma-Switcher (nur sichtbar wenn historische Firmen vorhanden) -->
+      <div id="firmaSwitcher" style="display:none;margin-bottom:10px"></div>
+      <!-- Read-Only-Banner (sichtbar wenn vorherige Firma gewählt) -->
+      <div id="firmaReadOnlyBanner" style="display:none;margin-bottom:10px"></div>
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="betriebTabs">
         <button class="stab active" onclick="showBetriebTab('zeiten')" title="Zeiten anzeigen">Zeiten</button>
         <button class="stab" onclick="showBetriebTab('baustellen')" title="Aufträge anzeigen">Aufträge</button>
@@ -1783,6 +1787,7 @@ function loadData(){
   checkDsgvoConsent();
   checkAzubiBadges();
   checkFirmaCodeUI();
+  loadFirmaHistorie();
   // Home Kurs-Info aktualisieren
   const ki=document.getElementById('homeKursInfo');
   if(ki&&_tnData?.aktiverKursId){
@@ -1903,6 +1908,7 @@ function _doSendMeldung(type, kursId){
           // Parallel auch als Betriebsmeldung speichern + Mail
           db.collection('globalTN').doc(_tnId).collection('betriebMeldungen').add({
             type, text, name, firma,
+            firmaUid: _tnData?.firmaUid||null,
             tnId: _tnId,
             zeit: new Date().toISOString(),
             datum: localDate(),
@@ -2060,14 +2066,13 @@ function initBetrieb(){
   // AG-Hinweis Banner
   const agBanner=document.getElementById('agHintBanner');
   const agContent=document.getElementById('betriebContent');
-  // Echte AG-Verknüpfung: nur firmaUid oder arbeitgeberId zaehlt.
-  // _tnData.firma als reiner Text-Name (z.B. "Mustermann GmbH") aus Self-Registration
-  // ist KEINE Verknuepfung - der Azubi sieht sonst Funktionen die ohne AG-Kontext nichts bringen.
   const hasAG=_tnData&&(_tnData.firmaUid||_tnData.arbeitgeberId||_tnData.betriebId);
   const hasPending=_tnData&&_tnData.firmaPending;
-  // Banner: nur wenn weder verknuepft NOCH pending (sonst zeigt firmaCodeInput-Card schon den Pending-Status)
-  if(agBanner) agBanner.style.display=(hasAG||hasPending)?'none':'block';
-  if(agContent) agContent.style.display=hasAG?'block':'none';
+  const hasHistory=_firmaHistorie&&_firmaHistorie.length>0;
+  // Banner: nur wenn weder verknuepft NOCH pending NOCH History
+  if(agBanner) agBanner.style.display=(hasAG||hasPending||hasHistory)?'none':'block';
+  // Content: bei aktiver Verknuepfung ODER wenn Historie da ist (Read-Only-Modus)
+  if(agContent) agContent.style.display=(hasAG||hasHistory)?'block':'none';
   if(!_betriebInit){
     _betriebInit=true;
     loadBetriebMeldungen();
@@ -2163,10 +2168,12 @@ function sendBetriebMeldung(type){
 let _pendingBetriebMeld=null;
 
 function _doSendBetriebMeldung(type, text){
+  if(!_firmaReadOnlyGuard()) return;
   const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Azubi';
   const firma=_tnData?.firma||'';
   db.collection('globalTN').doc(_tnId).collection('betriebMeldungen').add({
     type, text, name, firma,
+    firmaUid: _tnData?.firmaUid||null,
     tnId: _tnId,
     zeit: new Date().toISOString(),
     datum: localDate(),
@@ -2248,8 +2255,11 @@ function loadBetriebMeldungen(){
       if(snap.empty){el.innerHTML='<div class="empty">Keine Meldungen</div>';return;}
       const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
       let html='';
+      let count=0;
       snap.forEach(doc=>{
         const d=doc.data();
+        if(!_firmaFilterMatches(d)) return;
+        count++;
         const zeit=d.zeit?new Date(d.zeit).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
         const statusCol=d.gelesen?'var(--mu)':'var(--acc)';
         html+='<div style="padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:8px">'
@@ -2258,6 +2268,7 @@ function loadBetriebMeldungen(){
           +'<div style="font-size:.55rem;color:var(--mu)">'+zeit+(d.gelesen?' · ✓ gelesen':'')+'</div></div>'
           +'</div>';
       });
+      if(!count){el.innerHTML='<div class="empty">Keine Meldungen</div>';return;}
       el.innerHTML=html;
     }).catch(()=>{});
 }
@@ -2502,6 +2513,7 @@ function checkGleitzeit(jetzt, typ){
 })();
 
 function zeitStempeln(){
+  if(!_firmaReadOnlyGuard()) return;
   if(!_tnId||!db) return;
   const today=localDate();
   const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
@@ -2517,7 +2529,7 @@ function zeitStempeln(){
         
       }
       checkGleitzeit(jetzt,'ein');
-      const data={eingang:jetzt,pauseLog:[],datum:today};
+      const data={eingang:jetzt,pauseLog:[],datum:today,firmaUid:_tnData?.firmaUid||null};
       if(gps) data.gpsEingang=gps;
       if(geoResult==='no-gps'){data.ohneGPS=true;data.ohneGPSGrund=gpsGrund;}
       ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
@@ -2548,6 +2560,7 @@ let _asJetzt='',_asPhotos=[];
 function asClose(){document.getElementById('asModal').classList.remove('open');}
 
 function asConfirm(){
+  if(!_firmaReadOnlyGuard()) return;
   if(!_auftragId) return;
   const ref=db.collection('globalTN').doc(_tnId).collection('auftraege').doc(_auftragId);
   const update={status:'erledigt',erledigtAm:Date.now()};
@@ -2765,6 +2778,7 @@ function sigGetData(){
 }
 
 function zeitPause(){
+  if(!_firmaReadOnlyGuard()) return;
   if(!_tnId||!db||!_zeitHeute) return;
   const today=localDate();
   const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
@@ -2839,12 +2853,13 @@ function loadZeitkonto(){
   Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlaubSnap])=>{
     // Krank-Tage: ALLE (nicht nur ym) — fuer Uebertragskonto
     const krankDatesAll=new Set();
-    krankSnap.forEach(doc=>{const d=doc.data();if(d.datum) krankDatesAll.add(d.datum);});
+    krankSnap.forEach(doc=>{const d=doc.data();if(_firmaFilterMatches(d)&&d.datum) krankDatesAll.add(d.datum);});
     const krankDates=new Set([...krankDatesAll].filter(d=>d.startsWith(ym)));
     // Urlaub-Tage: ALLE (nicht nur ym)
     const urlaubDatesAll=new Set();
     urlaubSnap.forEach(doc=>{
       const d=doc.data();
+      if(!_firmaFilterMatches(d)) return;
       if(!d.von||!d.bis) return;
       const start=new Date(d.von+'T12:00'), end=new Date(d.bis+'T12:00');
       for(let dt=new Date(start);dt<=end;dt.setDate(dt.getDate()+1)){
@@ -2853,10 +2868,11 @@ function loadZeitkonto(){
       }
     });
     const urlaubDates=new Set([...urlaubDatesAll].filter(d=>d.startsWith(ym)));
-    // Zeiterfassung-Map (alle, inkl. Vormonate)
+    // Zeiterfassung-Map (alle, inkl. Vormonate) - mit Firma-Filter
     const zeitMap={};
     zeitSnap.forEach(doc=>{
       const dd=doc.data();
+      if(!_firmaFilterMatches(dd)) return;
       if(dd.datum) zeitMap[dd.datum]=dd;  // Abschluss-Docs filtern (kein "datum"-Feld)
     });
     // Alle Tage des Monats (inkl. Sa/So wenn konfiguriert)
@@ -3055,6 +3071,7 @@ function loadUeberKonto(currentYm){
 }
 
 function zeitNachtragen(){
+  if(!_firmaReadOnlyGuard()) return;
   const datum=document.getElementById('zeitNachDatum').value;
   const ein=document.getElementById('zeitNachEin').value;
   const aus=document.getElementById('zeitNachAus').value;
@@ -3068,6 +3085,7 @@ function zeitNachtragen(){
   db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(datum).set({
     datum, eingang:ein, ausgang:aus, pauseLog:[], pauseMinuten:0, istMinuten:istMin,
     manuell:true, agBestaetigt:false,
+    firmaUid: _tnData?.firmaUid||null,
     bemerkung:bem,
     nachgetragenAm:Date.now(),
     historie:firebase.firestore.FieldValue.arrayUnion({aktion:'nachgetragen',von:_email||'Azubi',am:Date.now(),eingang:ein,ausgang:aus})
@@ -3100,6 +3118,7 @@ function loadJahresUebersicht(){
     let urlaubTage=0, ueberTage=0, urlaubGen=0, ueberGen=0, beantragt=0;
     urlSnap.forEach(doc=>{
       const d=doc.data();
+      if(!_firmaFilterMatches(d)) return;
       const tage=d.tage||0;
       const art=d.art||'urlaub';
       if(d.status==='genehmigt'){
@@ -3112,6 +3131,7 @@ function loadJahresUebersicht(){
     const krankDates=new Set();
     krankSnap.forEach(doc=>{
       const d=doc.data();
+      if(!_firmaFilterMatches(d)) return;
       if(d.datum) krankDates.add(d.datum);
     });
     const krankTage=krankDates.size;
@@ -3129,6 +3149,7 @@ function loadJahresUebersicht(){
 }
 
 function urlaubBeantragen(){
+  if(!_firmaReadOnlyGuard()) return;
   const art=document.getElementById('urlArt').value;
   const von=document.getElementById('urlVon').value;
   const bis=document.getElementById('urlBis').value;
@@ -3150,7 +3171,8 @@ function urlaubBeantragen(){
   db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').add({
     von, bis, tage, grund, art, status:'beantragt', beantragAm:Date.now(),
     tnName:((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim(),
-    firma:_tnData?.firma||''
+    firma:_tnData?.firma||'',
+    firmaUid: _tnData?.firmaUid||null
   }).then(()=>{
     document.getElementById('urlVon').value='';
     document.getElementById('urlBis').value='';
@@ -3168,8 +3190,11 @@ function loadUrlaubAntraege(){
   db.collection('globalTN').doc(_tnId).collection('urlaubsantraege').orderBy('beantragAm','desc').limit(20).get().then(snap=>{
     if(snap.empty){el.innerHTML='<div class="empty">Keine Anträge</div>';return;}
     let html='';
+    let count=0;
     snap.forEach(doc=>{
       const d=doc.data();
+      if(!_firmaFilterMatches(d)) return;
+      count++;
       const statusCol=d.status==='genehmigt'?'#059669':d.status==='abgelehnt'||d.status==='widerrufen'?'#ef4444':'#d97706';
       const statusIcon=d.status==='genehmigt'?'✅':d.status==='abgelehnt'?'❌':d.status==='widerrufen'?'🗑':'⏳';
       const artIcon=d.art==='ueberstunden'?'⏱':'🏖';
@@ -3183,6 +3208,7 @@ function loadUrlaubAntraege(){
         +'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">'+artLabel+' · '+d.tage+' Tage'+(d.grund?' · '+esc(d.grund):'')+'</div>'
         +'</div>';
     });
+    if(!count){el.innerHTML='<div class="empty">Keine Anträge</div>';return;}
     el.innerHTML=html;
   }).catch(()=>{});
 }
@@ -3192,13 +3218,117 @@ function loadUrlaubAntraege(){
 // ═══════════════════════════════════
 // ── Aufträge ──
 let _auftraege=[];
+// Firma-Filter fuer Daten-Anzeige in Azubi-Tabs
+// 'aktuell' = nur Daten der aktuell verknuepften Firma (firmaUid==_tnData.firmaUid)
+// firmaUid-String = nur Daten dieser Firma (Read-Only)
+let _firmaFilter='aktuell';
+let _firmaHistorie=[]; // [{id, firmaUid, firma, von, bis, beendetVon}]
+let _firmaHistUnsub=null;
+
+function loadFirmaHistorie(){
+  if(!_tnId||!db) return;
+  if(_firmaHistUnsub){_firmaHistUnsub();_firmaHistUnsub=null;}
+  _firmaHistUnsub=db.collection('globalTN').doc(_tnId).collection('firmaHistorie')
+    .orderBy('bis','desc').onSnapshot(snap=>{
+      _firmaHistorie=[];
+      snap.forEach(doc=>_firmaHistorie.push({id:doc.id,...doc.data()}));
+      renderFirmaSwitcher();
+      // hasHistory hat sich evtl. geändert → checkAzubiBadges + Tab-Sichtbarkeit
+      if(typeof checkAzubiBadges==='function') checkAzubiBadges();
+      // Trigger UI-Update fuer betriebContent
+      if(_tnData){
+        const agContent=document.getElementById('betriebContent');
+        const agBanner=document.getElementById('agHintBanner');
+        const hasAG=_tnData&&(_tnData.firmaUid||_tnData.arbeitgeberId||_tnData.betriebId);
+        const hasPending=_tnData&&_tnData.firmaPending;
+        const hasHistory=_firmaHistorie.length>0;
+        if(agBanner) agBanner.style.display=(hasAG||hasPending||hasHistory)?'none':'block';
+        if(agContent) agContent.style.display=(hasAG||hasHistory)?'block':'none';
+      }
+    },err=>{console.warn('firmaHistorie-Listener-Fehler:',err);});
+}
+
+function renderFirmaSwitcher(){
+  const sw=document.getElementById('firmaSwitcher');
+  const banner=document.getElementById('firmaReadOnlyBanner');
+  if(!sw) return;
+  const aktName=_tnData?.firma||'';
+  const aktUid=_tnData?.firmaUid||null;
+  // Wenn weder aktive Firma noch Historie → nichts anzeigen
+  if(!aktUid && !_firmaHistorie.length){sw.style.display='none';if(banner)banner.style.display='none';return;}
+  // Wenn nur aktive Firma und keine Historie → Switcher unnötig
+  if(aktUid && !_firmaHistorie.length){sw.style.display='none';if(banner)banner.style.display='none';return;}
+  // Switcher rendern
+  sw.style.display='';
+  let h='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(37,99,235,.04);border:1.5px solid rgba(37,99,235,.15);border-radius:10px">';
+  h+='<span style="font-size:.62rem;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0">Ansicht:</span>';
+  h+='<select id="firmaFilterSel" onchange="setFirmaFilter(this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--brd);border-radius:6px;font-size:.74rem;font-family:\'Sora\',sans-serif;background:#fff;color:var(--tx)">';
+  if(aktUid){
+    h+='<option value="aktuell"'+(_firmaFilter==='aktuell'?' selected':'')+'>📌 '+esc(aktName)+' (aktuell)</option>';
+  }
+  _firmaHistorie.forEach(hist=>{
+    const vonStr=hist.von?new Date(hist.von).toLocaleDateString('de-DE',{year:'2-digit',month:'2-digit'}):'?';
+    const bisStr=hist.bis?new Date(hist.bis).toLocaleDateString('de-DE',{year:'2-digit',month:'2-digit'}):'?';
+    h+='<option value="'+esc(hist.firmaUid)+'"'+(_firmaFilter===hist.firmaUid?' selected':'')+'>📂 '+esc(hist.firma||'?')+' ('+vonStr+'–'+bisStr+')</option>';
+  });
+  h+='</select>';
+  h+='</div>';
+  sw.innerHTML=h;
+  // Read-Only-Banner wenn nicht 'aktuell'
+  if(banner){
+    if(_firmaFilter!=='aktuell'){
+      const hist=_firmaHistorie.find(h=>h.firmaUid===_firmaFilter);
+      const firmaName=hist?hist.firma||'Vorherige Firma':'Vorherige Firma';
+      banner.style.display='';
+      banner.innerHTML='<div style="padding:9px 12px;background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.3);border-radius:10px;font-size:.7rem;color:#92400e;font-weight:700;text-align:center">🔒 Read-Only-Ansicht · Daten von '+esc(firmaName)+'</div>';
+    } else {
+      banner.style.display='none';
+      banner.innerHTML='';
+    }
+  }
+}
+
+function setFirmaFilter(val){
+  _firmaFilter=val;
+  renderFirmaSwitcher();
+  // Daten neu laden in allen Tabs
+  if(typeof loadAuftraege==='function') loadAuftraege();
+  if(typeof loadZeitkonto==='function') loadZeitkonto();
+  if(typeof loadZeitHeute==='function') loadZeitHeute();
+  if(typeof loadJahresUebersicht==='function') loadJahresUebersicht();
+  if(typeof loadUrlaubAntraege==='function') loadUrlaubAntraege();
+  if(typeof loadBetriebMeldungen==='function') loadBetriebMeldungen();
+}
+
+function _firmaReadOnlyGuard(){
+  if(_firmaFilter!=='aktuell'){
+    toast('🔒 Read-Only-Ansicht. Wechsle auf "Aktuelle Firma" um Änderungen zu machen.','bad');
+    return false;
+  }
+  return true;
+}
+
+function _firmaFilterMatches(dat){
+  if(!dat) return true;
+  if(_firmaFilter==='aktuell'){
+    const aktUid=_tnData?.firmaUid||null;
+    if(!aktUid) return true; // keine aktuelle Firma → alles zeigen
+    return (dat.firmaUid||null)===aktUid || !('firmaUid' in dat);
+  }
+  // Spezifische Firma (Vorherige)
+  return (dat.firmaUid||null)===_firmaFilter;
+}
+
 function loadAuftraege(){
   if(!_tnId||!db) return;
   loadKundenListe();
   db.collection('globalTN').doc(_tnId).collection('auftraege')
     .orderBy('erstelltAm','desc').onSnapshot(snap=>{
       _auftraege=[];
-      snap.forEach(doc=>_auftraege.push({id:doc.id,...doc.data()}));
+      snap.forEach(doc=>{
+        const d={id:doc.id,...doc.data()};
+        if(_firmaFilterMatches(d)) _auftraege.push(d);
+      });
       renderAuftraege();
     },err=>{
       const el=document.getElementById('auftraegeOffen');
@@ -3624,6 +3754,7 @@ let _aufStempelTimer=null;
 let _aufStempelBusy=false;
 
 function auftragStempelToggle(aufId){
+  if(!_firmaReadOnlyGuard()) return;
   if(_aufStempelBusy) return;
   if(!_tnId||!aufId) return;
   _aufStempelBusy=true;
@@ -3929,13 +4060,15 @@ function saveMaterialien(){
 }
 
 function eigenenAuftragErstellen(){
+  if(!_firmaReadOnlyGuard()) return;
   const kunde=document.getElementById('selfAufKunde').value.trim();
   const adresse=document.getElementById('selfAufAdresse').value.trim();
   const beschr=document.getElementById('selfAufBeschr').value.trim();
   if(!kunde){toast('Bitte Kunde eingeben','bad');return;}
   db.collection('globalTN').doc(_tnId).collection('auftraege').add({
     kunde, adresse, beschreibung:beschr,
-    status:'offen', erstelltAm:Date.now(), erstelltVon:'selbst'
+    status:'offen', erstelltAm:Date.now(), erstelltVon:'selbst',
+    firmaUid: _tnData?.firmaUid||null
   }).then(()=>{
     saveKunde(kunde,adresse);
     document.getElementById('selfAufKunde').value='';
@@ -3975,6 +4108,7 @@ function saveKunde(kunde,adresse){
 
 // Status-Flow: offen → inArbeit → erledigt
 function auftragStarten(id){
+  if(!_firmaReadOnlyGuard()) return;
   db.collection('globalTN').doc(_tnId).collection('auftraege').doc(id).update({
     status:'inArbeit', gestartetAm:Date.now()
   }).then(()=>toast('▶ Auftrag gestartet'));
@@ -4100,78 +4234,83 @@ function trennFirmaVerknuepfung(){
   });
 }
 
-// Helper: löscht alle Subcollections + Verknüpfungs-Felder + benachrichtigt Gegenseite
+// Trennt Azubi vom Betrieb - Daten BLEIBEN erhalten (rechtssicher fuer Aufbewahrung)
+// Setzt nur Verknuepfungs-Felder zurueck + History-Eintrag
 // initiator: 'azubi' oder 'ag' - bestimmt wer benachrichtigt wird
 function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
-  // 1. Alle 5 Subcollections löschen (parallel)
-  const subs=['zeiterfassung','urlaubsantraege','baustellen','auftraege','betriebMeldungen'];
   const tnRef=db.collection('globalTN').doc(tnId);
-  const deletePromises=subs.map(sub=>{
-    return tnRef.collection(sub).get().then(snap=>{
-      const batch=db.batch();
-      snap.forEach(doc=>batch.delete(doc.ref));
-      return snap.size>0?batch.commit():Promise.resolve();
-    }).catch(err=>{console.warn('Sub-Delete '+sub+' Fehler:',err);return null;});
-  });
-  return Promise.all(deletePromises).then(()=>{
-    // 2. Verknüpfungs-Felder + arbeitsbezogene Daten löschen
+  // 1. TN-Daten holen (fuer History + Mail)
+  return tnRef.get().then(doc=>{
+    if(!doc.exists) throw new Error('TN nicht gefunden');
+    const tn=doc.data();
+    const tnName=((tn.vorname||'')+' '+(tn.nachname||'')).trim()||'Mitarbeiter';
+    const tnEmail=tn.kontaktEmail||tn.email||'';
+    // Beziehungs-Beginn aus History oder fallback auf 'unbekannt'
+    const verknuepftSeit=tn._verknuepftSeit||null;
+    // 2. History-Eintrag in firmaHistorie-Subcollection anlegen
+    const histEntry={
+      firmaUid: firmaUid,
+      firma: firmaName,
+      bis: Date.now(),
+      beendetVon: initiator
+    };
+    if(verknuepftSeit) histEntry.von=verknuepftSeit;
+    return tnRef.collection('firmaHistorie').add(histEntry).then(()=>tn).catch(err=>{
+      console.warn('History-Eintrag-Fehler:',err);
+      return tn; // History-Fehler nicht fatal
+    });
+  }).then(tn=>{
+    // 3. Verknuepfungs-Felder loeschen (Daten BLEIBEN)
     return tnRef.update({
       firmaUid: firebase.firestore.FieldValue.delete(),
       firma: firebase.firestore.FieldValue.delete(),
       arbeitgeberId: firebase.firestore.FieldValue.delete(),
       betriebId: firebase.firestore.FieldValue.delete(),
-      arbeitszeitPlan: firebase.firestore.FieldValue.delete(),
-      kundenListe: firebase.firestore.FieldValue.delete(),
-      materialListe: firebase.firestore.FieldValue.delete(),
-      geofence: firebase.firestore.FieldValue.delete()
-    });
-  }).then(()=>{
-    // 3. TN-Daten holen für Mail
-    return tnRef.get().then(doc=>{
-      const tn=doc.exists?doc.data():{};
-      const tnName=((tn.vorname||'')+' '+(tn.nachname||'')).trim()||'Mitarbeiter';
-      const tnEmail=tn.kontaktEmail||tn.email||'';
-      // 4. Mail an Gegenseite (basierend auf initiator)
-      if(initiator==='azubi'){
-        // Azubi hat getrennt → Mail an AG
-        db.collection('users').doc(firmaUid).get().then(agDoc=>{
-          const agEmail=agDoc.exists?agDoc.data().email:'';
-          if(!agEmail) return;
-          const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
-            +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:#fef2f2;border:2px solid #fecaca;border-radius:12px">'
-            +'<div style="font-size:1.1rem;font-weight:800;color:#991b1b">⚠️ Verknüpfung aufgehoben</div></div>'
-            +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
-            +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo,</p>'
-            +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55"><b>'+esc(tnName)+'</b> hat die Verknüpfung mit Ihrem Betrieb <b>'+esc(firmaName)+'</b> aufgehoben.</p>'
-            +'<div style="padding:10px;background:#fef3c7;border:1.5px solid #fde68a;border-radius:8px;margin-bottom:10px">'
-            +'<p style="margin:0;font-size:.8rem;color:#92400e">Alle arbeitsbezogenen Daten (Stempelzeiten, Aufträge, Urlaubsanträge, Baustellen, Meldungen) wurden gelöscht.</p></div>'
-            +'<p style="margin:0;font-size:.78rem;color:#475569;line-height:1.55">Bei Fragen wenden Sie sich bitte direkt an '+esc(tnName)+'.</p>'
-            +'</div></div>';
-          db.collection('mail').add({
-            to: agEmail,
-            message: { subject: '⚠️ '+tnName+' hat die Verknüpfung aufgehoben – '+firmaName, html: html }
-          }).catch(()=>{});
-        });
-      } else {
-        // AG hat getrennt → Mail an Azubi
-        if(tnEmail){
-          const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
-            +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:#fef2f2;border:2px solid #fecaca;border-radius:12px">'
-            +'<div style="font-size:1.1rem;font-weight:800;color:#991b1b">⚠️ Verknüpfung aufgehoben</div></div>'
-            +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
-            +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo '+esc(tnName)+',</p>'
-            +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">dein Arbeitgeber <b>'+esc(firmaName)+'</b> hat die Verknüpfung mit dir aufgehoben.</p>'
-            +'<div style="padding:10px;background:#fef3c7;border:1.5px solid #fde68a;border-radius:8px;margin-bottom:10px">'
-            +'<p style="margin:0;font-size:.8rem;color:#92400e">Alle arbeitsbezogenen Daten (Stempelzeiten, Aufträge, Urlaubsanträge, Baustellen, Meldungen) wurden gelöscht.</p></div>'
-            +'<p style="margin:0;font-size:.78rem;color:#475569;line-height:1.55">Bei Fragen wende dich bitte direkt an deinen Arbeitgeber.</p>'
-            +'</div></div>';
-          db.collection('mail').add({
-            to: tnEmail,
-            message: { subject: '⚠️ Verknüpfung mit '+firmaName+' aufgehoben', html: html }
-          }).catch(()=>{});
-        }
+      _verknuepftSeit: firebase.firestore.FieldValue.delete()
+    }).then(()=>tn);
+  }).then(tn=>{
+    // 4. Mail an Gegenseite
+    const tnName=((tn.vorname||'')+' '+(tn.nachname||'')).trim()||'Mitarbeiter';
+    const tnEmail=tn.kontaktEmail||tn.email||'';
+    if(initiator==='azubi'){
+      // Azubi hat getrennt → Mail an AG
+      db.collection('users').doc(firmaUid).get().then(agDoc=>{
+        const agEmail=agDoc.exists?agDoc.data().email:'';
+        if(!agEmail) return;
+        const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+          +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:#fef2f2;border:2px solid #fecaca;border-radius:12px">'
+          +'<div style="font-size:1.1rem;font-weight:800;color:#991b1b">⚠️ Verknüpfung aufgehoben</div></div>'
+          +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
+          +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo,</p>'
+          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55"><b>'+esc(tnName)+'</b> hat die Verknüpfung mit Ihrem Betrieb <b>'+esc(firmaName)+'</b> aufgehoben.</p>'
+          +'<div style="padding:10px;background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:8px;margin-bottom:10px">'
+          +'<p style="margin:0;font-size:.8rem;color:#065f46"><b>Wichtig:</b> Alle Stempelzeiten, Aufträge und Urlaubsanträge bleiben für Sie weiterhin einsehbar (Read-Only) im Bereich <b>"Ehemalige Mitarbeiter"</b>. Sie können diese für Abrechnung und Aufbewahrungspflichten nutzen.</p></div>'
+          +'<p style="margin:0;font-size:.78rem;color:#475569;line-height:1.55">Bei Fragen wenden Sie sich bitte direkt an '+esc(tnName)+'.</p>'
+          +'</div></div>';
+        db.collection('mail').add({
+          to: agEmail,
+          message: { subject: '⚠️ '+tnName+' hat die Verknüpfung aufgehoben – '+firmaName, html: html }
+        }).catch(()=>{});
+      });
+    } else {
+      // AG hat getrennt → Mail an Azubi
+      if(tnEmail){
+        const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+          +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:#fef2f2;border:2px solid #fecaca;border-radius:12px">'
+          +'<div style="font-size:1.1rem;font-weight:800;color:#991b1b">⚠️ Verknüpfung aufgehoben</div></div>'
+          +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
+          +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo '+esc(tnName)+',</p>'
+          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">dein Arbeitgeber <b>'+esc(firmaName)+'</b> hat die Verknüpfung mit dir aufgehoben.</p>'
+          +'<div style="padding:10px;background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:8px;margin-bottom:10px">'
+          +'<p style="margin:0;font-size:.8rem;color:#065f46"><b>Deine Daten bleiben erhalten:</b> Du kannst deine alten Stempelzeiten, Aufträge und Urlaubsanträge weiterhin einsehen (Read-Only). Wechsle dazu in den jeweiligen Bereichen auf <b>"Vorherige Firmen"</b>.</p></div>'
+          +'<p style="margin:0;font-size:.78rem;color:#475569;line-height:1.55">Bei Fragen wende dich bitte direkt an deinen Arbeitgeber.</p>'
+          +'</div></div>';
+        db.collection('mail').add({
+          to: tnEmail,
+          message: { subject: '⚠️ Verknüpfung mit '+firmaName+' aufgehoben', html: html }
+        }).catch(()=>{});
       }
-    });
+    }
   });
 }
 

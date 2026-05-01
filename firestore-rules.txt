@@ -105,12 +105,12 @@ service cloud.firestore {
       // Firmencode-Verknuepfungs-Antrag (pending) - Azubi setzt es bei Code-Eingabe
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaPending']);
-      // AG genehmigt: setzt firmaUid/firma + loescht firmaPending in einem Update
+      // AG genehmigt: setzt firmaUid/firma + loescht firmaPending + setzt Verknuepfungs-Beginn
       allow update: if request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','firmaPending']);
-      // Trennen: alle arbeitsbezogenen Felder loeschen in einem Update (Azubi oder AG)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','firmaPending','_verknuepftSeit']);
+      // Trennen: Verknuepfungs-Felder loeschen (Daten bleiben fuer Aufbewahrungspflicht)
       allow update: if request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','arbeitszeitPlan','kundenListe','materialListe','geofence']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','_verknuepftSeit']);
       // Pilot-Anonymisierung: Admin darf Datenminimierungs-Felder updaten
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
@@ -135,11 +135,20 @@ service cloud.firestore {
       match /betriebMeldungen/{meldDoc} {
         allow read, write: if request.auth != null;
       }
+      // Firma-Historie - speichert beendete Verknuepfungen mit Periode
+      match /firmaHistorie/{histDoc} {
+        allow read, write: if request.auth != null;
+      }
     }
 
     match /mail/{mailId} {
       allow create: if request.auth != null;
       allow read, update, delete: if false; // Nur Extension
+    }
+
+    // collectionGroup-Query auf firmaHistorie: AG findet alle Subcollection-Eintraege wo seine firmaUid drinsteht
+    match /{path=**}/firmaHistorie/{histDoc} {
+      allow read: if request.auth != null;
     }
 
     // Audit-Log: nur Admin darf schreiben, niemand darf modifizieren/loeschen
