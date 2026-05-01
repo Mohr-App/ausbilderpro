@@ -102,6 +102,12 @@ service cloud.firestore {
       // Firmencode-Verknüpfung: Azubi verknüpft sich mit Arbeitgeber
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId']);
+      // Firmencode-Verknuepfungs-Antrag (pending) - Azubi setzt es bei Code-Eingabe
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaPending']);
+      // AG genehmigt: setzt firmaUid/firma + loescht firmaPending in einem Update
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','firmaPending']);
       // Pilot-Anonymisierung: Admin darf Datenminimierungs-Felder updaten
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
