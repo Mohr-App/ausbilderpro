@@ -779,6 +779,17 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <div class="toast" id="toast"></div>
 
 <!-- AUFTRAG ANLEGEN MODAL -->
+<!-- MA-Details-Modal -->
+<div class="mdl" id="maDetailsModal">
+  <div class="mdl-box" style="max-width:540px">
+    <div class="mdl-head">
+      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center">👤</span><span id="maDetTitle">Mitarbeiter</span></div>
+      <button class="mdl-x" onclick="closeMaDetails()" title="Schließen">✕</button>
+    </div>
+    <div id="maDetBody"><div class="empty">Lädt…</div></div>
+  </div>
+</div>
+
 <div class="mdl" id="auftragModal">
   <div class="mdl-box" style="max-width:560px">
     <div class="mdl-head">
@@ -2510,21 +2521,23 @@ function _renderMaCard(az){
   const avaInner=az.photoUrl
     ? '<img src="'+esc(az.photoUrl)+'" style="width:100%;height:100%;object-fit:cover">'
     : initials;
-  return '<div class="card" style="display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:6px">'
-    +'<div onclick="openAvaEditModal(\''+esc(az.id)+'\')" title="Profilbild ändern" style="position:relative;width:48px;height:48px;border-radius:50%;background:'+avatarBg+';border:2px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:'+avatarColor+';flex-shrink:0;cursor:pointer;overflow:hidden">'
+  return '<div class="card" onclick="openMaDetails(\''+esc(az.id)+'\')" style="display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:6px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'rgba(37,99,235,.03)\'" onmouseout="this.style.background=\'\'">'
+    +'<div onclick="event.stopPropagation();openAvaEditModal(\''+esc(az.id)+'\')" title="Profilbild ändern" style="position:relative;width:48px;height:48px;border-radius:50%;background:'+avatarBg+';border:2px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:'+avatarColor+';flex-shrink:0;cursor:pointer;overflow:hidden">'
     +avaInner
     +'<div style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:#fff;border:1.5px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.58rem">📷</div>'
     +'</div>'
     +'<div style="flex:1;min-width:0">'
     +'<div style="font-size:.88rem;font-weight:800">'+esc(name)+'</div>'
     +(beruf||lj?'<div style="font-size:.65rem;color:var(--mu)">'+esc([beruf,lj].filter(Boolean).join(' · '))+'</div>':'')
-    +(tel?'<a href="tel:'+esc(tel)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:6px 14px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:#059669">📞 '+esc(tel)+'</a>':'')
-    +(email?'<a href="mailto:'+esc(email)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-left:'+(tel?'6px':'0')+';padding:6px 14px;background:rgba(37,99,235,.1);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:var(--acc)">✉ '+esc(email)+'</a>':'')
+    +(tel?'<a href="tel:'+esc(tel)+'" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:6px 14px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:#059669">📞 '+esc(tel)+'</a>':'')
+    +(email?'<a href="mailto:'+esc(email)+'" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-left:'+(tel?'6px':'0')+';padding:6px 14px;background:rgba(37,99,235,.1);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:var(--acc)">✉ '+esc(email)+'</a>':'')
     +(!tel&&!email?'<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Keine Kontaktdaten hinterlegt</div>':'')
     +'</div>'
     +'<div style="position:relative;flex-shrink:0">'
     +'<button onclick="event.stopPropagation();_toggleMaMenu(\''+esc(az.id)+'\')" title="Mehr" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:6px 8px;border-radius:6px;font-size:1.1rem;line-height:1" onmouseover="this.style.background=\'rgba(148,163,184,.15)\'" onmouseout="this.style.background=\'none\'">⋮</button>'
     +'<div id="maMenu_'+esc(az.id)+'" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--brd);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);min-width:180px;z-index:10;overflow:hidden">'
+    +'<button onclick="event.stopPropagation();_closeMaMenus();openMaDetails(\''+esc(az.id)+'\')" style="width:100%;text-align:left;padding:10px 14px;background:#fff;border:none;color:var(--tx);font-size:.74rem;font-weight:600;cursor:pointer;font-family:\'Sora\',sans-serif;border-bottom:1px solid var(--brd)" onmouseover="this.style.background=\'rgba(37,99,235,.06)\'" onmouseout="this.style.background=\'#fff\'">📋 Details anzeigen</button>'
+    +'<button onclick="event.stopPropagation();_closeMaMenus();openMaEditModal(\''+esc(az.id)+'\')" style="width:100%;text-align:left;padding:10px 14px;background:#fff;border:none;color:var(--tx);font-size:.74rem;font-weight:600;cursor:pointer;font-family:\'Sora\',sans-serif;border-bottom:1px solid var(--brd)" onmouseover="this.style.background=\'rgba(37,99,235,.06)\'" onmouseout="this.style.background=\'#fff\'">✏️ Bearbeiten</button>'
     +'<button onclick="event.stopPropagation();_closeMaMenus();trennAzubiVerknuepfung(\''+esc(az.id)+'\')" style="width:100%;text-align:left;padding:10px 14px;background:#fff;border:none;color:#ef4444;font-size:.74rem;font-weight:600;cursor:pointer;font-family:\'Sora\',sans-serif" onmouseover="this.style.background=\'rgba(239,68,68,.06)\'" onmouseout="this.style.background=\'#fff\'">🔗 Verknüpfung aufheben</button>'
     +'</div></div>'
     +'</div>';
@@ -2532,6 +2545,168 @@ function _renderMaCard(az){
 
 function _closeMaMenus(){
   document.querySelectorAll('[id^="maMenu_"]').forEach(m=>m.style.display='none');
+}
+
+// MA-Details-Modal: zeigt alle Infos zum Mitarbeiter/Azubi
+function openMaDetails(tnId){
+  const az=_azubis.find(a=>a.id===tnId);
+  if(!az){toast('Mitarbeiter nicht gefunden','bad');return;}
+  const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
+  document.getElementById('maDetTitle').textContent=name;
+  _renderMaDetails(az);
+  document.getElementById('maDetailsModal').classList.add('open');
+  // Stempel-Status, offene Aufträge, etc. nachladen (Stats-Block)
+  _loadMaDetailStats(tnId);
+}
+
+function closeMaDetails(){
+  document.getElementById('maDetailsModal').classList.remove('open');
+}
+
+function _renderMaDetails(az){
+  const body=document.getElementById('maDetBody');
+  if(!body) return;
+  const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
+  const initials=name.split(' ').map(w=>(w[0]||'').toUpperCase()).join('').slice(0,2);
+  const isMA=az.typ==='arbeitnehmer';
+  const typLabel=isMA?'Arbeitnehmer':'Azubi';
+  const typColor=isMA?'#d97706':'var(--acc)';
+  const typBg=isMA?'rgba(217,119,6,.1)':'rgba(37,99,235,.1)';
+  const avatarBg=isMA?'rgba(217,119,6,.1)':'rgba(37,99,235,.1)';
+  const avatarBorder=isMA?'rgba(217,119,6,.3)':'rgba(37,99,235,.3)';
+  const avatarColor=isMA?'#d97706':'var(--acc)';
+  const tel=az.kontaktTelefon||az.tel||'';
+  const email=az.kontaktEmail||az.email||'';
+  const beruf=az.beruf||'';
+  const lj=az.ausbjahr?az.ausbjahr+'. Lehrjahr':'';
+  const adresse=az.adresse||'';
+  const plz=az.plz||'';
+  const ort=az.ort||'';
+  const adrFull=[adresse,[plz,ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  const geb=az.geburtsdatum?new Date(az.geburtsdatum+'T12:00').toLocaleDateString('de-DE'):'';
+  // Alter berechnen
+  let alter='';
+  if(az.geburtsdatum){
+    const g=new Date(az.geburtsdatum+'T12:00');
+    const heute=new Date();
+    let a=heute.getFullYear()-g.getFullYear();
+    const m=heute.getMonth()-g.getMonth();
+    if(m<0||(m===0&&heute.getDate()<g.getDate())) a--;
+    alter=a+' Jahre';
+  }
+  let h='';
+  // Header: Avatar + Name + Typ-Badge
+  h+='<div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">';
+  h+='<div style="width:64px;height:64px;border-radius:50%;background:'+avatarBg+';border:2.5px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:800;color:'+avatarColor+';flex-shrink:0;overflow:hidden">';
+  h+=az.photoUrl?'<img src="'+esc(az.photoUrl)+'" style="width:100%;height:100%;object-fit:cover">':initials;
+  h+='</div>';
+  h+='<div style="flex:1;min-width:0">';
+  h+='<div style="font-size:1rem;font-weight:800;color:var(--tx)">'+esc(name)+'</div>';
+  h+='<div style="display:inline-block;font-size:.6rem;font-weight:700;background:'+typBg+';color:'+typColor+';padding:2px 8px;border-radius:5px;margin-top:4px;text-transform:uppercase;letter-spacing:.04em">'+typLabel+'</div>';
+  if(beruf||lj) h+='<div style="font-size:.7rem;color:var(--mu);margin-top:4px">'+esc([beruf,lj].filter(Boolean).join(' · '))+'</div>';
+  h+='</div></div>';
+  // Quick-Stats (wird per _loadMaDetailStats befüllt)
+  h+='<div id="maDetStats" class="stat-row" style="margin-bottom:10px">';
+  h+='<div class="stat-card"><div class="stat-num" id="maDetStatStunden" style="color:#475569">–</div><div class="stat-label">Stunden (Monat)</div></div>';
+  h+='<div class="stat-card"><div class="stat-num" id="maDetStatAuftraege" style="color:#475569">–</div><div class="stat-label">Offene Aufträge</div></div>';
+  h+='<div class="stat-card"><div class="stat-num" id="maDetStatStempel" style="color:#475569">–</div><div class="stat-label">Stempel-Status</div></div>';
+  h+='</div>';
+  // Kontakt
+  if(tel||email){
+    h+='<div style="padding:12px;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">';
+    h+='<div style="font-size:.62rem;color:var(--mu);font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">📞 Kontakt</div>';
+    const acts=[];
+    if(tel) acts.push('<a href="tel:'+esc(tel.replace(/\s/g,''))+'" style="display:flex;align-items:center;gap:6px;padding:9px 12px;background:rgba(16,185,129,.1);color:#059669;border:1.5px solid rgba(16,185,129,.3);border-radius:8px;font-size:.72rem;font-weight:700;text-decoration:none;flex:1;justify-content:center">📞 '+esc(tel)+'</a>');
+    if(email) acts.push('<a href="mailto:'+esc(email)+'" style="display:flex;align-items:center;gap:6px;padding:9px 12px;background:rgba(37,99,235,.1);color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;font-size:.72rem;font-weight:700;text-decoration:none;flex:1;justify-content:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">✉ '+esc(email)+'</a>');
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap">'+acts.join('')+'</div>';
+    h+='</div>';
+  }
+  // Adresse
+  if(adrFull){
+    const mapsUrl='https://maps.google.com/?q='+encodeURIComponent(adrFull);
+    h+='<div style="padding:12px;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">';
+    h+='<div style="font-size:.62rem;color:var(--mu);font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">🏠 Adresse</div>';
+    h+='<a href="'+mapsUrl+'" target="_blank" style="display:flex;align-items:center;gap:6px;padding:9px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;text-decoration:none;font-size:.74rem;color:#2563eb;font-weight:600">📍 '+esc(adrFull)+' <span style="margin-left:auto;font-size:.65rem">→ Maps</span></a>';
+    h+='</div>';
+  }
+  // Persönliche Daten
+  if(geb||alter||az.svnr){
+    h+='<div style="padding:12px;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">';
+    h+='<div style="font-size:.62rem;color:var(--mu);font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">📋 Persönliche Daten</div>';
+    h+='<div style="font-size:.78rem;line-height:1.7">';
+    if(geb) h+='<div><span style="color:var(--mu);min-width:100px;display:inline-block">Geburtstag:</span><b>'+esc(geb)+(alter?' ('+alter+')':'')+'</b></div>';
+    h+='</div></div>';
+  }
+  // Berufliche Daten
+  if(beruf||lj||az.aktiverKursId){
+    h+='<div style="padding:12px;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">';
+    h+='<div style="font-size:.62rem;color:var(--mu);font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">🎓 Beruflich</div>';
+    h+='<div style="font-size:.78rem;line-height:1.7">';
+    if(beruf) h+='<div><span style="color:var(--mu);min-width:100px;display:inline-block">Beruf:</span><b>'+esc(beruf)+'</b></div>';
+    if(lj) h+='<div><span style="color:var(--mu);min-width:100px;display:inline-block">Lehrjahr:</span><b>'+esc(lj)+'</b></div>';
+    if(az.aktiverKursId){
+      const kd=_kurse&&_kurse[az.aktiverKursId];
+      const kursName=kd?(kd.name||kd.id):az.aktiverKursId;
+      h+='<div><span style="color:var(--mu);min-width:100px;display:inline-block">Aktiver Kurs:</span><b>'+esc(kursName)+'</b></div>';
+    }
+    h+='</div></div>';
+  }
+  // Verknüpfungs-Status
+  if(az.firmaUid&&az._verknuepftSeit){
+    h+='<div style="padding:12px;background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.2);border-radius:10px;margin-bottom:10px">';
+    h+='<div style="font-size:.62rem;color:#059669;font-weight:800;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">✅ Verknüpft</div>';
+    h+='<div style="font-size:.7rem;color:var(--mu)">Seit '+new Date(az._verknuepftSeit).toLocaleDateString('de-DE')+'</div>';
+    h+='</div>';
+  }
+  // Action-Buttons
+  h+='<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">';
+  h+='<button onclick="closeMaDetails();openMaEditModal(\''+esc(az.id)+'\')" style="width:100%;padding:11px;background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.3);color:var(--acc);border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✏️ Daten bearbeiten</button>';
+  h+='<button onclick="closeMaDetails();trennAzubiVerknuepfung(\''+esc(az.id)+'\')" style="width:100%;padding:11px;background:#fff;border:1.5px solid #ef4444;color:#ef4444;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">🔗 Verknüpfung aufheben</button>';
+  h+='</div>';
+  body.innerHTML=h;
+}
+
+// Lädt Quick-Stats für die Detail-Anzeige
+function _loadMaDetailStats(tnId){
+  if(!tnId||!db||!_uid) return;
+  const ym=new Date().toISOString().slice(0,7);
+  // Stunden im aktuellen Monat
+  db.collection('globalTN').doc(tnId).collection('zeiterfassung')
+    .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').get().then(snap=>{
+      let totalMin=0;
+      let isStempelt=false;
+      snap.forEach(d=>{
+        const dd=d.data();
+        if(dd.firmaUid && dd.firmaUid !== _uid) return;
+        if(dd.istMinuten) totalMin+=dd.istMinuten;
+        // Heute eingestempelt?
+        if(dd.datum===localDate() && dd.eingang && !dd.ausgang) isStempelt=true;
+      });
+      const elS=document.getElementById('maDetStatStunden');
+      if(elS) elS.textContent=Math.round(totalMin/60)+'h';
+      const elSt=document.getElementById('maDetStatStempel');
+      if(elSt){
+        elSt.textContent=isStempelt?'⏱':'-';
+        elSt.style.color=isStempelt?'#059669':'#94a3b8';
+      }
+    }).catch(()=>{});
+  // Offene Aufträge
+  db.collection('globalTN').doc(tnId).collection('auftraege').get().then(snap=>{
+    let offen=0;
+    snap.forEach(d=>{
+      const dd=d.data();
+      if(dd.firmaUid && dd.firmaUid !== _uid) return;
+      if(dd.status!=='erledigt') offen++;
+    });
+    const el=document.getElementById('maDetStatAuftraege');
+    if(el) el.textContent=offen;
+  }).catch(()=>{});
+}
+
+// Stub für später - öffnet Bearbeiten-Modal (existiert noch nicht)
+function openMaEditModal(tnId){
+  toast('✏️ Bearbeiten-Funktion folgt in Kürze','info');
+  // TODO: Implementieren - Modal mit allen editierbaren Feldern
 }
 
 function _toggleMaMenu(id){
