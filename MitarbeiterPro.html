@@ -462,10 +462,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="display:flex;flex-direction:column;gap:6px">
         <button class="card" onclick="showPage('profil')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Profil"><span style="font-size:1.4rem">👤</span><div><div style="font-weight:700;font-size:.85rem">Mein Profil</div><div style="font-size:.65rem;color:var(--mu)">Name, Kontakt, Passwort</div></div></button>
         <button class="card" onclick="showPage('docs')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Dokumente"><span style="font-size:1.4rem">📁</span><div><div style="font-weight:700;font-size:.85rem">Dokumente</div><div style="font-size:.65rem;color:var(--mu)">Kursunterlagen, Betrieb, eigene Dateien</div></div></button>
+        <button class="card" id="mehrFirmaBtn" onclick="showPage('firma')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px;display:none" title="Betriebsverknüpfung"><span style="font-size:1.4rem">🔗</span><div><div style="font-weight:700;font-size:.85rem">Betriebsverknüpfung</div><div style="font-size:.65rem;color:var(--mu)" id="mehrFirmaSub">Mit Betrieb verbunden</div></div></button>
         <button class="card" onclick="showPage('hilfe')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Hilfe"><span style="font-size:1.4rem">❓</span><div><div style="font-weight:700;font-size:.85rem">Hilfe</div><div style="font-size:.65rem;color:var(--mu)">Anleitung & Tipps</div></div></button>
         <button title="Rolle wechseln" onclick="switchRole()" style="margin-top:8px;width:100%;padding:12px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.2);border-radius:12px;color:var(--acc);font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">↩ Rolle wechseln</button>
         <button title="Abmelden" onclick="doLogout()" style="margin-top:8px;width:100%;padding:12px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Abmelden</button>
       </div>
+    </div>
+
+    <!-- BETRIEBSVERKNÜPFUNG -->
+    <div class="page" id="page-firma">
+      <button onclick="showPage('mehr')" style="background:none;border:none;color:var(--acc);font-size:.78rem;font-weight:600;cursor:pointer;padding:0;margin-bottom:12px" title="Zurück">← Zurück</button>
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:14px">🔗 Betriebsverknüpfung</div>
+      <div id="firmaPageContent"></div>
     </div>
 
     <!-- HILFE -->
@@ -963,7 +971,7 @@ function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
-  const navMap={'docs':'mehr','profil':'mehr','hilfe':'mehr'};
+  const navMap={'docs':'mehr','profil':'mehr','hilfe':'mehr','firma':'mehr'};
   const navId=navMap[id]||id;
   const nb=document.getElementById('nav-'+navId);
   if(nb) nb.classList.add('active');
@@ -971,6 +979,79 @@ function showPage(id){
   if(id==='profil'){ loadProfil(); loadAzubiUrlaub(); }
   if(id==='betrieb') initBetrieb();
   if(id==='home') initHomeZeiten();
+  if(id==='mehr') updateMehrFirmaBtn();
+  if(id==='firma') renderFirmaPage();
+}
+
+function updateMehrFirmaBtn(){
+  const btn=document.getElementById('mehrFirmaBtn');
+  const sub=document.getElementById('mehrFirmaSub');
+  if(!btn) return;
+  const verknuepft=_tnData?.firmaUid;
+  const pending=_tnData?.firmaPending;
+  const hasHistory=_firmaHistorie&&_firmaHistorie.length>0;
+  if(!verknuepft && !pending && !hasHistory){
+    btn.style.display='none';
+    return;
+  }
+  btn.style.display='flex';
+  if(verknuepft){
+    if(sub) sub.textContent='Verknüpft mit '+(_tnData.firma||'Betrieb');
+  } else if(pending){
+    if(sub) sub.textContent='⏳ Antrag wartet auf Bestätigung';
+  } else {
+    if(sub) sub.textContent='Vorherige Verknüpfungen verwalten';
+  }
+}
+
+function renderFirmaPage(){
+  const el=document.getElementById('firmaPageContent');
+  if(!el) return;
+  const verknuepft=_tnData?.firmaUid;
+  const pending=_tnData?.firmaPending;
+  let h='';
+  if(verknuepft){
+    h+='<div style="padding:14px;background:rgba(16,185,129,.06);border:1.5px solid rgba(16,185,129,.25);border-radius:10px;margin-bottom:12px">';
+    h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+    h+='<span style="font-size:1.3rem">✅</span>';
+    h+='<div style="flex:1"><div style="font-size:.62rem;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Verknüpft mit</div>';
+    h+='<div style="font-size:.95rem;font-weight:800;color:var(--tx);margin-top:1px">'+esc(_tnData.firma||'Betrieb')+'</div></div></div>';
+    if(_tnData._verknuepftSeit){
+      h+='<div style="font-size:.65rem;color:var(--mu);margin-top:6px">Verknüpft seit: '+new Date(_tnData._verknuepftSeit).toLocaleDateString('de-DE')+'</div>';
+    }
+    h+='</div>';
+    h+='<div style="padding:14px;background:rgba(239,68,68,.04);border:1.5px solid rgba(239,68,68,.25);border-radius:10px">';
+    h+='<div style="font-size:.78rem;font-weight:800;color:#991b1b;margin-bottom:6px">⚠️ Verknüpfung aufheben</div>';
+    h+='<div style="font-size:.7rem;color:var(--mu);line-height:1.5;margin-bottom:10px">Wenn du den Betrieb wechselst oder die Verknüpfung nicht mehr brauchst, kannst du sie hier aufheben.</div>';
+    h+='<div style="font-size:.65rem;color:#475569;line-height:1.5;margin-bottom:10px;padding:8px;background:rgba(16,185,129,.08);border-radius:6px"><b style="color:#065f46">Wichtig:</b> Deine Stempelzeiten, Aufträge und Urlaubsanträge bleiben für Abrechnung und gesetzliche Aufbewahrungspflicht (6 Jahre) erhalten. Du kannst sie weiterhin im Betrieb-Bereich unter "Vorherige Firmen" einsehen (Read-Only).</div>';
+    h+='<button onclick="trennFirmaVerknuepfung()" style="width:100%;padding:11px;background:#fff;border:1.5px solid #ef4444;color:#ef4444;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">🔗 Verknüpfung mit '+esc(_tnData.firma||'Betrieb')+' aufheben</button>';
+    h+='</div>';
+  } else if(pending){
+    h+='<div style="padding:14px;background:rgba(245,158,11,.06);border:1.5px solid rgba(245,158,11,.3);border-radius:10px">';
+    h+='<div style="font-size:.85rem;font-weight:800;color:#92400e;margin-bottom:6px">⏳ Antrag wartet auf Bestätigung</div>';
+    h+='<div style="font-size:.72rem;color:#475569;line-height:1.5;margin-bottom:10px">Dein Antrag an <b>'+esc(pending.firma||'Betrieb')+'</b> wurde gesendet. Sobald der Arbeitgeber bestätigt, werden die Mitarbeiter-Funktionen aktiv.</div>';
+    h+='<button onclick="cancelFirmaPending()" style="width:100%;padding:10px;background:#fff;border:1.5px solid #ef4444;color:#ef4444;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Antrag zurückziehen</button>';
+    h+='</div>';
+  } else {
+    h+='<div style="padding:14px;background:rgba(148,163,184,.05);border:1.5px solid var(--brd);border-radius:10px">';
+    h+='<div style="font-size:.78rem;color:var(--mu);line-height:1.5">Du bist aktuell mit keinem Betrieb verknüpft. Wechsle zum Betrieb-Tab und gib dort den Code deines Arbeitgebers ein.</div>';
+    h+='</div>';
+  }
+  if(_firmaHistorie&&_firmaHistorie.length){
+    h+='<div style="margin-top:18px"><div style="font-size:.78rem;font-weight:800;color:var(--tx);margin-bottom:8px">📂 Frühere Verknüpfungen</div>';
+    _firmaHistorie.forEach(hist=>{
+      const vonStr=hist.von?new Date(hist.von).toLocaleDateString('de-DE'):'?';
+      const bisStr=hist.bis?new Date(hist.bis).toLocaleDateString('de-DE'):'?';
+      const beendetText=hist.beendetVon==='ag'?'durch Arbeitgeber':'durch dich';
+      h+='<div style="padding:11px;background:rgba(148,163,184,.04);border:1px solid var(--brd);border-radius:9px;margin-bottom:5px">';
+      h+='<div style="font-size:.78rem;font-weight:700;color:var(--tx)">'+esc(hist.firma||'Vorheriger Betrieb')+'</div>';
+      h+='<div style="font-size:.65rem;color:var(--mu);margin-top:2px;font-family:\'JetBrains Mono\',monospace">'+vonStr+' – '+bisStr+'</div>';
+      h+='<div style="font-size:.6rem;color:var(--mu);margin-top:1px">Beendet '+beendetText+'</div>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+  el.innerHTML=h;
 }
 
 // ── Load Data ──
@@ -1043,21 +1124,37 @@ function submitFirmaCodeHome(){
   const code=(inp?.value||'').trim().toUpperCase();
   if(!code){ if(err) err.textContent='Bitte Firmencode eingeben'; return; }
   if(err){ err.textContent='Prüfe…'; err.style.color='var(--mu)'; }
-  // Suche users-Doc mit matching firmaCode
-  db.collection('users').where('firmaCode','==',code).limit(1).get().then(snap=>{
+  db.collection('users').where('firmaCode','==',code).where('role','==','arbeitgeber').limit(1).get().then(snap=>{
     if(snap.empty){ if(err){err.textContent='❌ Firmencode ungültig';err.style.color='#ef4444';} return; }
     const agDoc=snap.docs[0];
+    const agData=agDoc.data();
     const agUid=agDoc.id;
-    const agFirma=agDoc.data().firma||'';
-    // Teilnehmer-Dokument aktualisieren
+    const agFirma=agData.firma||'';
+    if(!confirm('Verknüpfungs-Antrag an „'+agFirma+'" senden?\n\n• Antrag muss vom Arbeitgeber bestätigt werden\n• Bis dahin sind keine Mitarbeiter-Funktionen aktiv\n• Der Arbeitgeber wird per E-Mail informiert')){if(err)err.textContent='';return;}
+    const tnName=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Mitarbeiter';
+    const tnEmail=_tnData?.kontaktEmail||_tnData?.email||'';
     db.collection('globalTN').doc(_tnId).update({
-      firmaUid:agUid,
-      firma:agFirma
+      firmaPending: {firmaUid:agUid,firma:agFirma,code:code,requestedAt:Date.now(),tnName,tnEmail}
     }).then(()=>{
-      if(err){err.textContent='✓ Erfolgreich mit '+agFirma+' verknüpft';err.style.color='#059669';}
+      if(err){err.textContent='⏳ Antrag gesendet — warten auf Bestätigung';err.style.color='#059669';}
       if(inp) inp.value='';
-      // _tnData wird durch onSnapshot automatisch aktualisiert
-      setTimeout(()=>{ initHomeZeiten(); }, 500);
+      toast('⏳ Antrag an '+agFirma+' gesendet');
+      // Mail an AG
+      if(agData.email){
+        const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+          +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:12px">'
+          +'<div style="font-size:1.3rem;font-weight:800;color:#fff">🔗 Neuer Verknüpfungs-Antrag</div></div>'
+          +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px">'
+          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55"><b>'+esc(tnName)+'</b> möchte sich mit Ihrem Betrieb <b>'+esc(agFirma)+'</b> verknüpfen.</p>'
+          +'<div style="padding:12px;background:#fef3c7;border:2px solid #fde68a;border-radius:8px">'
+          +'<p style="margin:0;font-size:.8rem;color:#92400e;font-weight:700">⏳ Bitte in ArbeitgeberPro bestätigen oder ablehnen.</p></div>'
+          +(tnEmail?'<p style="margin:8px 0 0;font-size:.78rem;color:#475569">E-Mail: '+esc(tnEmail)+'</p>':'')
+          +'</div></div>';
+        db.collection('mail').add({
+          to: agData.email,
+          message: { subject: '🔗 Verknüpfungs-Antrag von '+tnName+' – '+agFirma, html: html }
+        }).catch(()=>{});
+      }
     }).catch(e=>{
       if(err){err.textContent='❌ '+e.message;err.style.color='#ef4444';}
     });
@@ -1073,9 +1170,11 @@ let _betriebInit=false;
 function initBetrieb(){
   const agBanner=document.getElementById('agHintBanner');
   const agContent=document.getElementById('betriebContent');
-  const hasAG=_tnData&&(_tnData.arbeitgeberId||_tnData.betriebId||_tnData.arbeitszeitPlan||_tnData.firma||_tnData.firmaUid);
-  if(agBanner) agBanner.style.display=hasAG?'none':'block';
-  if(agContent) agContent.style.display=hasAG?'block':'none';
+  const hasAG=_tnData&&(_tnData.arbeitgeberId||_tnData.betriebId||_tnData.firmaUid);
+  const hasPending=_tnData&&_tnData.firmaPending;
+  const hasHistory=_firmaHistorie&&_firmaHistorie.length>0;
+  if(agBanner) agBanner.style.display=(hasAG||hasPending||hasHistory)?'none':'block';
+  if(agContent) agContent.style.display=(hasAG||hasHistory)?'block':'none';
   if(!_betriebInit){
     _betriebInit=true;
     loadBetriebMeldungen();
@@ -3087,7 +3186,7 @@ function checkFirmaCodeUI(){
   const card=document.getElementById('firmaCodeInput');
   if(!card||!_tnData) return;
   if(_tnData.firmaUid){
-    // Dezente 1-Zeilen-Anzeige statt voller Card
+    // Dezente 1-Zeilen-Anzeige (kein ⚙ - Trennen ist unter Mehr → Betriebsverknüpfung)
     card.style.padding='0';
     card.style.background='transparent';
     card.style.border='none';
@@ -3098,7 +3197,100 @@ function checkFirmaCodeUI(){
       +'<span style="font-weight:700;color:var(--tx);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(_tnData.firma||'Betrieb')+'</span>'
       +'</div>';
     _loadFirmaLogo();
+    return;
   }
+  if(_tnData.firmaPending){
+    // Antrag wartet auf Bestätigung
+    const fp=_tnData.firmaPending;
+    const dateStr=fp.requestedAt?new Date(fp.requestedAt).toLocaleDateString('de-DE'):'';
+    card.style.padding='14px';
+    card.style.background='rgba(245,158,11,.06)';
+    card.style.border='2px solid rgba(245,158,11,.3)';
+    card.style.borderRadius='10px';
+    card.style.marginBottom='10px';
+    card.innerHTML='<div style="font-size:.78rem;font-weight:800;color:#92400e;margin-bottom:6px">⏳ Wartet auf Bestätigung</div>'
+      +'<div style="font-size:.72rem;color:#475569;line-height:1.5;margin-bottom:10px">Dein Antrag an <b>'+esc(fp.firma||'Betrieb')+'</b> wurde gesendet'+(dateStr?' am '+dateStr:'')+'.<br>Sobald der Arbeitgeber bestätigt, werden die Mitarbeiter-Funktionen aktiv.</div>'
+      +'<button onclick="cancelFirmaPending()" style="width:100%;padding:8px;background:#fff;border:1.5px solid #ef4444;color:#ef4444;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Antrag zurückziehen</button>';
+    return;
+  }
+}
+
+function trennFirmaVerknuepfung(){
+  if(!_tnId||!db||!_tnData?.firmaUid) return;
+  const firmaName=_tnData.firma||'deinem Betrieb';
+  const firmaUid=_tnData.firmaUid;
+  if(!confirm('⚠️ Verknüpfung mit "'+firmaName+'" wirklich aufheben?\n\n• Du kannst ab sofort keine Arbeitszeiten mehr stempeln\n• Der Arbeitgeber wird per E-Mail benachrichtigt\n\nWichtig: Deine bisherigen Stempelzeiten, Aufträge und Urlaubsanträge bleiben für Abrechnung und gesetzliche Aufbewahrungspflicht (6 Jahre) erhalten. Du kannst sie unter "Vorherige Firmen" einsehen (Read-Only).')) return;
+  if(!confirm('Letzte Bestätigung: Verknüpfung mit "'+firmaName+'" wirklich aufheben?')) return;
+  toast('⏳ Trenne Verknüpfung…');
+  _doFirmaTrennung(_tnId, firmaUid, firmaName, 'azubi').then(()=>{
+    toast('✓ Verknüpfung aufgehoben');
+    setTimeout(()=>location.reload(), 800);
+  }).catch(err=>{
+    toast('Fehler: '+err.message,'bad');
+  });
+}
+
+function cancelFirmaPending(){
+  if(!_tnId||!db) return;
+  if(!confirm('Verknüpfungs-Antrag wirklich zurückziehen?')) return;
+  db.collection('globalTN').doc(_tnId).update({
+    firmaPending: firebase.firestore.FieldValue.delete()
+  }).then(()=>{
+    if(_tnData) delete _tnData.firmaPending;
+    toast('✕ Antrag zurückgezogen');
+    location.reload();
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// Trennt Mitarbeiter vom Betrieb - Daten BLEIBEN erhalten
+function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
+  const tnRef=db.collection('globalTN').doc(tnId);
+  return tnRef.get().then(doc=>{
+    if(!doc.exists) throw new Error('TN nicht gefunden');
+    const tn=doc.data();
+    const verknuepftSeit=tn._verknuepftSeit||null;
+    const histEntry={
+      firmaUid: firmaUid,
+      firma: firmaName,
+      bis: Date.now(),
+      beendetVon: initiator
+    };
+    if(verknuepftSeit) histEntry.von=verknuepftSeit;
+    return tnRef.collection('firmaHistorie').add(histEntry).then(()=>tn).catch(err=>{
+      console.warn('History-Eintrag-Fehler:',err);
+      return tn;
+    });
+  }).then(tn=>{
+    return tnRef.update({
+      firmaUid: firebase.firestore.FieldValue.delete(),
+      firma: firebase.firestore.FieldValue.delete(),
+      arbeitgeberId: firebase.firestore.FieldValue.delete(),
+      betriebId: firebase.firestore.FieldValue.delete(),
+      _verknuepftSeit: firebase.firestore.FieldValue.delete()
+    }).then(()=>tn);
+  }).then(tn=>{
+    const tnName=((tn.vorname||'')+' '+(tn.nachname||'')).trim()||'Mitarbeiter';
+    if(initiator==='azubi'){
+      // Mail an AG
+      db.collection('users').doc(firmaUid).get().then(agDoc=>{
+        const agEmail=agDoc.exists?agDoc.data().email:'';
+        if(!agEmail) return;
+        const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+          +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:#fef2f2;border:2px solid #fecaca;border-radius:12px">'
+          +'<div style="font-size:1.1rem;font-weight:800;color:#991b1b">⚠️ Verknüpfung aufgehoben</div></div>'
+          +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
+          +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo,</p>'
+          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55"><b>'+esc(tnName)+'</b> hat die Verknüpfung mit Ihrem Betrieb <b>'+esc(firmaName)+'</b> aufgehoben.</p>'
+          +'<div style="padding:10px;background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:8px;margin-bottom:10px">'
+          +'<p style="margin:0;font-size:.8rem;color:#065f46"><b>Wichtig:</b> Alle Stempelzeiten, Aufträge und Urlaubsanträge bleiben für Sie weiterhin einsehbar (Read-Only) im Bereich <b>"Ehemalige Mitarbeiter"</b>. Sie können diese für Abrechnung und Aufbewahrungspflichten nutzen.</p></div>'
+          +'</div></div>';
+        db.collection('mail').add({
+          to: agEmail,
+          message: { subject: '⚠️ '+tnName+' hat die Verknüpfung aufgehoben – '+firmaName, html: html }
+        }).catch(()=>{});
+      });
+    }
+  });
 }
 
 function _loadFirmaLogo(){
@@ -3129,12 +3321,41 @@ function submitFirmaCode(){
     const agData=agDoc.data();
     const agUid=agDoc.id;
     const firma=agData.firma||'';
-    if(!confirm('Mit „'+firma+'" verknüpfen?')){err.textContent='';return;}
-    db.collection('globalTN').doc(_tnId).update({firmaUid:agUid,firma:firma}).then(()=>{
-      _tnData.firmaUid=agUid;_tnData.firma=firma;
+    if(!confirm('Verknüpfungs-Antrag an „'+firma+'" senden?\n\n• Dein Antrag muss vom Arbeitgeber bestätigt werden\n• Bis dahin sind keine Mitarbeiter-Funktionen aktiv\n• Der Arbeitgeber wird per E-Mail informiert')){err.textContent='';return;}
+    const tnName=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Mitarbeiter';
+    const tnEmail=_tnData?.kontaktEmail||_tnData?.email||'';
+    db.collection('globalTN').doc(_tnId).update({
+      firmaPending: {
+        firmaUid: agUid,
+        firma: firma,
+        code: code,
+        requestedAt: Date.now(),
+        tnName: tnName,
+        tnEmail: tnEmail
+      }
+    }).then(()=>{
+      _tnData.firmaPending={firmaUid:agUid,firma:firma,code:code,requestedAt:Date.now(),tnName,tnEmail};
       inp.value='';
-      err.style.color='#059669';err.textContent='✅ Erfolgreich verknüpft mit '+firma;
-      toast('✅ Betrieb verknüpft: '+firma);
+      err.style.color='#059669';err.textContent='✅ Antrag gesendet — warten auf Bestätigung';
+      toast('⏳ Antrag an '+firma+' gesendet');
+      // Mail an AG
+      if(agData.email){
+        const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+          +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:12px">'
+          +'<div style="font-size:1.3rem;font-weight:800;color:#fff">🔗 Neuer Verknüpfungs-Antrag</div></div>'
+          +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px">'
+          +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo,</p>'
+          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55"><b>'+esc(tnName)+'</b> möchte sich mit Ihrem Betrieb <b>'+esc(firma)+'</b> verknüpfen.</p>'
+          +'<div style="padding:12px;background:#fef3c7;border:2px solid #fde68a;border-radius:8px;margin-bottom:12px">'
+          +'<p style="margin:0;font-size:.8rem;color:#92400e;font-weight:700">⏳ Bitte in ArbeitgeberPro bestätigen oder ablehnen.</p></div>'
+          +(tnEmail?'<p style="margin:0 0 8px;font-size:.78rem;color:#475569">Antragsteller-E-Mail: '+esc(tnEmail)+'</p>':'')
+          +'<p style="margin:0;font-size:.75rem;color:#64748b">Eingegebener Code: <code style="font-family:monospace;background:#f1f5f9;padding:2px 6px;border-radius:4px">'+esc(code)+'</code></p>'
+          +'</div></div>';
+        db.collection('mail').add({
+          to: agData.email,
+          message: { subject: '🔗 Verknüpfungs-Antrag von '+tnName+' – '+firma, html: html }
+        }).catch(()=>{});
+      }
       checkFirmaCodeUI();
     }).catch(e=>{err.style.color='#ef4444';err.textContent='Fehler: '+e.message;});
   }).catch(e=>{err.style.color='#ef4444';err.textContent='Fehler: '+e.message;});
