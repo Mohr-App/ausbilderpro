@@ -576,16 +576,21 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </div>
     <div id="aufdSub" style="font-size:.65rem;color:var(--mu);margin-bottom:10px"></div>
     <div class="aufd-tab">
+      <button class="stab active" id="aufdTabInfo" onclick="showAufdTab('info')">ℹ Info</button>
+      <button class="stab" id="aufdTabChat" onclick="showAufdTab('chat')">💬 Chat</button>
       <button class="stab" id="aufdTabProt" onclick="showAufdTab('prot')">📋 Protokoll</button>
-      <button class="stab active" id="aufdTabChat" onclick="showAufdTab('chat')">💬 Chat</button>
       <button class="stab" id="aufdTabNach" onclick="showAufdTab('nach')">➕ Nachträge</button>
+    </div>
+    <!-- Info-Bereich: Briefing für Mitarbeiter -->
+    <div class="aufd-pane active" id="aufd-info">
+      <div id="aufdInfoBody"><div class="empty">Lädt…</div></div>
     </div>
     <!-- Protokoll-Bereich (read-only) -->
     <div class="aufd-pane" id="aufd-prot">
       <div id="aufdProtBody"><div class="empty">Lädt…</div></div>
     </div>
     <!-- Chat-Bereich -->
-    <div class="aufd-pane active" id="aufd-chat">
+    <div class="aufd-pane" id="aufd-chat">
       <div class="chat-box" id="aufdChatBox"><div class="chat-empty">Noch keine Nachrichten</div></div>
       <div class="chat-input-row">
         <textarea id="aufdChatInput" placeholder="Nachricht an den Chef…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMaChatMsg();}"></textarea>
@@ -2378,11 +2383,18 @@ function openAufDetails(aufId){
   _aufdAufId=aufId;
   const a=_auftraege.find(x=>x.id===aufId);
   if(!a){toast('Auftrag nicht gefunden','bad');return;}
-  document.getElementById('aufdTitle').textContent=a.kunde||'Auftrag';
-  document.getElementById('aufdSub').textContent=a.beschreibung||'';
-  // Bei erledigten Aufträgen direkt mit Protokoll öffnen, sonst Chat
+  // Title: Kunde + Auftragsnr-Suffix
+  const titleHtml=esc(a.kunde||'Auftrag')+(a.auftragsNr?' <span style="font-size:.6rem;color:var(--mu);font-weight:500;font-family:\'JetBrains Mono\',monospace">#'+esc(a.auftragsNr)+'</span>':'');
+  document.getElementById('aufdTitle').innerHTML=titleHtml;
+  // Subtitle: Prio-Badge + Kategorie
+  let sub='';
+  if(a.prioritaet==='eilig') sub+='<span style="display:inline-block;padding:1px 6px;background:rgba(245,158,11,.18);color:#92400e;border-radius:4px;font-size:.6rem;font-weight:700;margin-right:6px">⚡ EILIG</span>';
+  else if(a.prioritaet==='notfall') sub+='<span style="display:inline-block;padding:1px 6px;background:rgba(239,68,68,.18);color:#991b1b;border-radius:4px;font-size:.6rem;font-weight:700;margin-right:6px">🚨 NOTFALL</span>';
+  if(a.kategorie) sub+='<span style="display:inline-block;padding:1px 6px;background:rgba(37,99,235,.08);color:var(--acc);border-radius:4px;font-size:.6rem;font-weight:700;margin-right:6px">'+esc(a.kategorie)+'</span>';
+  document.getElementById('aufdSub').innerHTML=sub;
   const isErledigt=a.status==='erledigt';
-  showAufdTab(isErledigt?'prot':'chat');
+  showAufdTab(isErledigt?'prot':'info');
+  _renderAufdInfo(a);
   _renderAufdProtokoll(a);
   document.getElementById('aufdChatInput').value='';
   document.getElementById('aufdChatErr').textContent='';
@@ -2391,6 +2403,88 @@ function openAufDetails(aufId){
   db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).update({[seenKey]:Date.now()}).catch(()=>{});
   _subscribeAufdChat();
   document.getElementById('aufDetailsModal').classList.add('open');
+}
+
+// Briefing-View für Mitarbeiter
+function _renderAufdInfo(a){
+  const body=document.getElementById('aufdInfoBody');
+  if(!body||!a) return;
+  const isRunning=a.status==='inArbeit';
+  const isErledigt=a.status==='erledigt';
+  const mapsUrl=a.adresse?'https://maps.google.com/?q='+encodeURIComponent(a.adresse):'';
+  let h='';
+  if(isRunning && a.gestartetAm){
+    const min=Math.round((Date.now()-a.gestartetAm)/60000);
+    const seit=min<60?min+'min':Math.floor(min/60)+'h '+min%60+'min';
+    h+='<div style="padding:8px 12px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;margin-bottom:10px;font-size:.72rem;font-weight:700;color:#059669">▶ In Arbeit seit '+seit+'</div>';
+  }
+  // Kunde
+  h+='<div style="padding:12px;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">';
+  h+='<div style="font-size:.62rem;color:var(--mu);font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">👤 Kunde</div>';
+  if(a.kunde) h+='<div style="font-size:.92rem;font-weight:800;color:var(--tx);margin-bottom:6px">'+esc(a.kunde)+'</div>';
+  const actions=[];
+  if(a.kundeTel) actions.push('<a href="tel:'+esc(a.kundeTel.replace(/\s/g,''))+'" style="display:flex;align-items:center;gap:6px;padding:9px 12px;background:rgba(16,185,129,.1);color:#059669;border:1.5px solid rgba(16,185,129,.3);border-radius:8px;font-size:.72rem;font-weight:700;text-decoration:none;flex:1;justify-content:center">📞 '+esc(a.kundeTel)+'</a>');
+  if(a.kundeEmail) actions.push('<a href="mailto:'+esc(a.kundeEmail)+'" style="display:flex;align-items:center;gap:6px;padding:9px 12px;background:rgba(37,99,235,.1);color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;font-size:.72rem;font-weight:700;text-decoration:none;flex:1;justify-content:center">✉ E-Mail</a>');
+  if(actions.length) h+='<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">'+actions.join('')+'</div>';
+  if(a.adresse) h+='<a href="'+mapsUrl+'" target="_blank" style="display:flex;align-items:center;gap:6px;padding:9px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;text-decoration:none;font-size:.74rem;color:#2563eb;font-weight:600">📍 '+esc(a.adresse)+' <span style="margin-left:auto;font-size:.65rem">→ Maps</span></a>';
+  h+='</div>';
+  // Aufgabe
+  if(a.beschreibung || a.aufwandStunden || a.terminDatum || a.frist){
+    h+='<div style="padding:12px;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">';
+    h+='<div style="font-size:.62rem;color:var(--mu);font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">📋 Aufgabe</div>';
+    if(a.beschreibung) h+='<div style="font-size:.84rem;color:var(--tx);margin-bottom:8px;line-height:1.5;white-space:pre-wrap">'+esc(a.beschreibung)+'</div>';
+    const meta=[];
+    if(a.aufwandStunden) meta.push('<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 9px;background:#fff;border:1px solid var(--brd);border-radius:6px;font-size:.7rem;font-family:\'JetBrains Mono\',monospace"><b>⏱ ca. '+a.aufwandStunden+'h</b></span>');
+    if(a.terminDatum){
+      const d=new Date(a.terminDatum+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+      meta.push('<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 9px;background:#fff;border:1px solid var(--brd);border-radius:6px;font-size:.7rem"><b>📅 '+d+(a.terminUhrzeit?' '+esc(a.terminUhrzeit):'')+'</b></span>');
+    }
+    if(a.frist){
+      const fOver=a.frist<localDate();
+      const fd=new Date(a.frist+'T12:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+      meta.push('<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 9px;background:'+(fOver?'rgba(239,68,68,.1)':'rgba(245,158,11,.1)')+';border:1px solid '+(fOver?'rgba(239,68,68,.3)':'rgba(245,158,11,.3)')+';color:'+(fOver?'#dc2626':'#d97706')+';border-radius:6px;font-size:.7rem;font-weight:700">⏳ Frist: '+fd+(fOver?' ÜBERFÄLLIG':'')+'</span>');
+    }
+    if(meta.length) h+='<div style="display:flex;gap:5px;flex-wrap:wrap">'+meta.join('')+'</div>';
+    h+='</div>';
+  }
+  // Material
+  if(a.material && a.material.length){
+    h+='<div style="padding:12px;background:rgba(37,99,235,.04);border:1.5px solid rgba(37,99,235,.2);border-radius:10px;margin-bottom:10px">';
+    h+='<div style="font-size:.62rem;color:var(--acc);font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">🔧 Material vorbereiten</div>';
+    h+='<div style="font-size:.6rem;color:var(--mu);margin-bottom:8px">Vom Chef vorbereitet — abhaken nicht nötig, dient als Erinnerung</div>';
+    a.material.forEach(m=>{
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#fff;border:1px solid var(--brd);border-radius:7px;margin-bottom:4px;font-size:.78rem">';
+      h+='<span style="color:var(--mu);font-size:1rem">▢</span>';
+      h+='<span style="flex:1">'+esc(m)+'</span>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+  // Referenzbilder
+  if(a.fotosAG && a.fotosAG.length){
+    h+='<div style="padding:12px;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:10px">';
+    h+='<div style="font-size:.62rem;color:var(--mu);font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">📷 Referenzbilder ('+a.fotosAG.length+')</div>';
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    a.fotosAG.forEach(f=>{h+='<img src="'+f+'" onclick="showAufImgFull&&showAufImgFull(this.src)" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--brd);cursor:pointer" loading="lazy">';});
+    h+='</div></div>';
+  }
+  // Service-Info
+  const meta2=[];
+  if(a.stundensatz) meta2.push('Stundensatz: <b>'+a.stundensatz+'€/h</b>');
+  if(a.wiederholend) meta2.push('🔄 Wiederholt alle '+(a.wiederholungsAnzahl||1)+' '+esc(a.wiederholungsFrequenz||''));
+  if(a.erstelltVon) meta2.push('Von: '+esc(a.erstelltVon));
+  if(meta2.length) h+='<div style="padding:8px 10px;font-size:.6rem;color:var(--mu);text-align:center">'+meta2.join(' · ')+'</div>';
+  // Action-Buttons
+  if(!isErledigt){
+    h+='<div style="margin-top:12px">';
+    if(isRunning){
+      h+='<button onclick="closeAufDetails();auftragErledigen(\''+a.id+'\')" style="width:100%;padding:11px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Auftrag erledigen</button>';
+    } else {
+      h+='<button onclick="closeAufDetails();auftragStarten(\''+a.id+'\')" style="width:100%;padding:11px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">▶ Auftrag starten</button>';
+    }
+    h+='</div>';
+  }
+  body.innerHTML=h;
 }
 function _subscribeAufdChat(){
   if(!_tnId||!_aufdAufId) return;
@@ -2426,7 +2520,7 @@ function showAufdTab(tab){
   document.querySelectorAll('#aufDetailsModal .aufd-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('#aufDetailsModal .aufd-tab .stab').forEach(t=>t.classList.remove('active'));
   const pane=document.getElementById('aufd-'+tab); if(pane) pane.classList.add('active');
-  const btnMap={prot:'aufdTabProt',chat:'aufdTabChat',nach:'aufdTabNach'};
+  const btnMap={info:'aufdTabInfo',prot:'aufdTabProt',chat:'aufdTabChat',nach:'aufdTabNach'};
   const btn=document.getElementById(btnMap[tab]); if(btn) btn.classList.add('active');
   if(tab==='chat'&&_tnId&&_aufdAufId){
     _subscribeAufdChat();
@@ -2887,13 +2981,19 @@ function renderAuftraege(){
       const dat=a.erstelltAm?new Date(a.erstelltAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
       const mapsUrl=a.adresse?'https://maps.google.com/?q='+encodeURIComponent(a.adresse):'';
       const isRunning=a.status==='inArbeit';
-      const borderCol=isRunning?'rgba(16,185,129,.4)':'rgba(37,99,235,.2)';
-      const bgCol=isRunning?'rgba(16,185,129,.04)':'rgba(37,99,235,.03)';
+      let borderCol=isRunning?'rgba(16,185,129,.4)':'rgba(37,99,235,.2)';
+      let bgCol=isRunning?'rgba(16,185,129,.04)':'rgba(37,99,235,.03)';
+      if(a.prioritaet==='eilig'){borderCol='rgba(245,158,11,.5)';bgCol='rgba(245,158,11,.05)';}
+      else if(a.prioritaet==='notfall'){borderCol='rgba(239,68,68,.5)';bgCol='rgba(239,68,68,.05)';}
       let seit='';
       if(isRunning&&a.gestartetAm){const min=Math.round((Date.now()-a.gestartetAm)/60000);seit=min<60?min+'min':Math.floor(min/60)+'h '+min%60+'min';}
+      let prioBadge='';
+      if(a.prioritaet==='eilig') prioBadge='<span style="display:inline-block;font-size:.55rem;font-weight:800;background:rgba(245,158,11,.18);color:#92400e;padding:2px 7px;border-radius:5px;margin-right:6px">⚡ EILIG</span>';
+      else if(a.prioritaet==='notfall') prioBadge='<span style="display:inline-block;font-size:.55rem;font-weight:800;background:rgba(239,68,68,.18);color:#991b1b;padding:2px 7px;border-radius:5px;margin-right:6px">🚨 NOTFALL</span>';
+      const nrLine=(a.auftragsNr||a.kategorie)?'<div style="font-size:.55rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace;margin-bottom:3px">'+(a.auftragsNr?'#'+esc(a.auftragsNr):'')+(a.auftragsNr&&a.kategorie?' · ':'')+(a.kategorie?esc(a.kategorie):'')+'</div>':'';
       const refBilder=(a.fotosAG&&a.fotosAG.length)
         ? '<div class="aufimg-ag"><div class="aufimg-ag-title">📎 Referenzbilder vom Arbeitgeber ('+a.fotosAG.length+')</div>'
-          +a.fotosAG.map(f=>'<img src="'+f+'" onclick="showAufImgFull(this.src)" loading="lazy">').join('')
+          +a.fotosAG.map(f=>'<img src="'+f+'" onclick="event.stopPropagation();showAufImgFull&&showAufImgFull(this.src)" loading="lazy">').join('')
           +'</div>'
         : '';
       const nachList=a.nachtraege||[];
@@ -2907,7 +3007,7 @@ function renderAuftraege(){
             const lc=nachUnread?'#ef4444':'#d97706';
             const tc=nachUnread?'#991b1b':'#92400e';
             const badge=nachUnread?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.54rem;font-weight:800;border-radius:50%;padding:0 4px">!</span>':'';
-            return '<button onclick="openAufDetails(\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:6px;padding:8px 10px;background:'+bg+';border:1px solid '+bc+';border-left:3px solid '+lc+';border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:8px">'
+            return '<button onclick="event.stopPropagation();openAufDetails(\''+a.id+'\');setTimeout(()=>showAufdTab(\'nach\'),100)" style="width:100%;margin-top:6px;padding:8px 10px;background:'+bg+';border:1px solid '+bc+';border-left:3px solid '+lc+';border-radius:6px;text-align:left;cursor:pointer;font-family:\'Sora\',sans-serif;display:flex;align-items:center;gap:8px">'
               +'<span style="font-size:.68rem;font-weight:800;color:'+tc+'">➕ '+nachList.length+' Nachtrag'+(nachList.length>1?'e':'')+'</span>'
               +badge
               +(nachStd>0?'<span style="font-size:.6rem;color:'+tc+';font-family:\'JetBrains Mono\',monospace">'+nachStd+'h</span>':'')
@@ -2919,21 +3019,32 @@ function renderAuftraege(){
         : '';
       const unread=_maAufUnread(a);
       const chatBadge=unread?'<span class="chat-fab-badge">'+unread+'</span>':'';
-      h+='<div style="padding:12px;border:1.5px solid '+borderCol+';border-radius:10px;margin-bottom:8px;background:'+bgCol+'">'
+      const quickInfo=[];
+      if(a.aufwandStunden) quickInfo.push('⏱ ca. '+a.aufwandStunden+'h');
+      if(a.terminUhrzeit) quickInfo.push('🕐 '+a.terminUhrzeit);
+      if(a.material&&a.material.length) quickInfo.push('🔧 '+a.material.length+' Mat.');
+      const quickLine=quickInfo.length?'<div style="font-size:.62rem;color:var(--mu);margin-top:6px;font-family:\'JetBrains Mono\',monospace">'+quickInfo.join(' · ')+'</div>':'';
+      const telBtn=a.kundeTel?'<a href="tel:'+esc(a.kundeTel.replace(/\s/g,''))+'" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:4px;padding:6px 10px;background:rgba(16,185,129,.1);color:#059669;border:1px solid rgba(16,185,129,.3);border-radius:8px;font-size:.68rem;font-weight:700;text-decoration:none;margin-right:6px">📞 Anrufen</a>':'';
+      h+='<div onclick="openAufDetails(\''+a.id+'\')" style="padding:12px;border:1.5px solid '+borderCol+';border-radius:10px;margin-bottom:8px;background:'+bgCol+';cursor:pointer">'
+        +nrLine
         +(isRunning?'<div style="font-size:.6rem;font-weight:700;color:#059669;margin-bottom:4px">▶ In Arbeit'+(seit?' seit '+seit:'')+'</div>':'')
-        +'<div style="display:flex;justify-content:space-between;align-items:center">'
-        +'<span style="font-size:.9rem;font-weight:800">'+esc(a.kunde||'Ohne Kunde')+'</span>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">'
+        +'<span style="font-size:.9rem;font-weight:800">'+prioBadge+esc(a.kunde||'Ohne Kunde')+'</span>'
         +'<span style="font-size:.58rem;color:var(--mu)">'+dat+'</span></div>'
-        +(a.adresse?'<a href="'+mapsUrl+'" target="_blank" style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:8px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:8px;text-decoration:none;font-size:.72rem;color:#2563eb;font-weight:600">📍 '+esc(a.adresse)+' <span style="margin-left:auto;font-size:.65rem">→ Maps</span></a>':'')
+        +(a.adresse?'<a href="'+mapsUrl+'" target="_blank" onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:8px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:8px;text-decoration:none;font-size:.72rem;color:#2563eb;font-weight:600">📍 '+esc(a.adresse)+' <span style="margin-left:auto;font-size:.65rem">→ Maps</span></a>':'')
         +(a.beschreibung?'<div style="font-size:.78rem;color:var(--tx);margin-top:8px;padding:8px 10px;background:rgba(0,0,0,.02);border-radius:6px;line-height:1.5">'+esc(a.beschreibung)+'</div>':'')
+        +quickLine
         +refBilder
         +nachBlock
         +(a.erstelltVon&&a.erstelltVon!=='selbst'?'<div style="font-size:.58rem;color:var(--mu);margin-top:4px">Von: '+esc(a.erstelltVon)+'</div>':'')
         +(a.frist?'<div style="font-size:.62rem;margin-top:2px;'+(a.frist<localDate()?'color:#dc2626;font-weight:700':'color:#d97706')+'">📅 Frist: '+new Date(a.frist+"T12:00").toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"2-digit"})+(a.frist<localDate()?' ⚠ ÜBERFÄLLIG':'')+'</div>':'')
-        +'<button class="chat-fab" onclick="openAufDetails(\''+a.id+'\')">💬 Chat mit Chef'+chatBadge+'</button>'
+        +'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'
+        +telBtn
+        +'<button class="chat-fab" onclick="event.stopPropagation();openAufDetails(\''+a.id+'\')" style="flex:1;min-width:140px">💬 Chat mit Chef'+chatBadge+'</button>'
+        +'</div>'
         +(isRunning
-          ?'<button title="✅ Auftrag erledigen" onclick="auftragErledigen(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Auftrag erledigen</button>'
-          :'<button title="▶ Auftrag starten" onclick="auftragStarten(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">▶ Auftrag starten</button>')
+          ?'<button title="✅ Auftrag erledigen" onclick="event.stopPropagation();auftragErledigen(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✅ Auftrag erledigen</button>'
+          :'<button title="▶ Auftrag starten" onclick="event.stopPropagation();auftragStarten(\''+a.id+'\')" style="margin-top:8px;width:100%;padding:10px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">▶ Auftrag starten</button>')
         +'</div>';
     });
     elO.innerHTML=h;
