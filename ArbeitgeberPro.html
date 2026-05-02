@@ -251,13 +251,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;align-items:flex-start" id="agLiveTabs">
         <button class="stab active" data-tab="heute" title="Heute" onclick="showAgLiveTab('heute')">Heute</button>
-        <div class="stab-dd" data-tab="mitarbeiter">
-          <button class="stab" id="agMaTabBtn" title="Mitarbeiter" onclick="toggleMaDropdown(event)">👥 Mitarbeiter ▾</button>
-          <div class="stab-dd-menu" id="agMaDropdown">
-            <div class="stab-dd-item" id="ddItemArbeitnehmer" onclick="selectAgMaType('arbeitnehmer')"><span class="ddi-ic">👤</span>Arbeitnehmer</div>
-            <div class="stab-dd-item" id="ddItemAzubi" onclick="selectAgMaType('azubi')"><span class="ddi-ic">🎓</span>Azubis</div>
-          </div>
-        </div>
+        <button class="stab" data-tab="mitarbeiter" title="Mitarbeiter" onclick="showAgLiveTab('mitarbeiter')">👥 Mitarbeiter</button>
         <button class="stab" data-tab="auftraege" title="Aufträge" onclick="showAgLiveTab('auftraege')">Aufträge</button>
         <button class="stab" data-tab="meldungen" title="Meldungen" onclick="showAgLiveTab('meldungen')">Meldungen</button>
       </div>
@@ -282,51 +276,73 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div id="ehemaligeListe"></div>
           </div>
         </details>
-        <!-- Arbeitnehmer -->
-        <div class="abtab2 active" id="abtab-ma-arbeitnehmer">
-          <button class="big-btn" onclick="openMaAnlegenModal('arbeitnehmer')" style="margin-bottom:12px">
-            <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">👤+</span>
-            <span class="bb-tx"><span class="bb-t">Arbeitnehmer anlegen</span><span class="bb-s">Zugang für BetriebPro</span></span>
-            <span class="bb-arr">›</span>
-          </button>
-          <div id="agArbeitnehmerListe"><div class="empty">Lädt…</div></div>
-        </div>
+        <!-- Arbeitnehmer (aufklappbar) -->
+        <details class="coll-card" id="sectArbeitnehmer" open style="margin-bottom:10px">
+          <summary>
+            <span style="display:flex;align-items:center;gap:8px;flex:1">
+              <span style="font-size:1.05rem">👤</span>
+              <span>Arbeitnehmer</span>
+              <span id="cntArbeitnehmer" style="font-size:.6rem;background:rgba(217,119,6,.12);color:#92400e;padding:2px 7px;border-radius:8px;font-weight:700">0</span>
+            </span>
+          </summary>
+          <div class="coll-body">
+            <div class="abtab2 active" id="abtab-ma-arbeitnehmer">
+              <button class="big-btn" onclick="openMaAnlegenModal('arbeitnehmer')" style="margin-bottom:12px">
+                <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">👤+</span>
+                <span class="bb-tx"><span class="bb-t">Arbeitnehmer anlegen</span><span class="bb-s">Zugang für BetriebPro</span></span>
+                <span class="bb-arr">›</span>
+              </button>
+              <div id="agArbeitnehmerListe"><div class="empty">Lädt…</div></div>
+            </div>
+          </div>
+        </details>
 
-        <!-- Azubis -->
-        <div class="abtab2" id="abtab-ma-azubis">
-          <button class="big-btn" onclick="openMaAnlegenModal('azubi')" style="margin-bottom:12px">
-            <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">🎓+</span>
-            <span class="bb-tx"><span class="bb-t">Azubi anlegen</span><span class="bb-s">Zugang für AzubiPro</span></span>
-            <span class="bb-arr">›</span>
-          </button>
-          <div class="stat-row" style="margin-bottom:10px">
-            <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Azubis</div></div>
-            <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Kursen</div></div>
-            <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
-          </div>
-          <div id="agNotifBanner"></div>
-          <!-- Collapsible ÜBL-Kursansicht -->
-          <div style="margin-bottom:12px">
-            <button onclick="toggleUeblView()" id="ueblToggleBtn" style="width:100%;padding:12px 14px;background:rgba(245,158,11,.06);border:1.5px solid rgba(245,158,11,.25);border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:'Sora',sans-serif;color:var(--tx)">
-              <span style="font-size:1rem">🎓</span>
-              <div style="flex:1;text-align:left"><div style="font-size:.78rem;font-weight:700">ÜBL-Kursansicht</div><div style="font-size:.6rem;color:var(--mu)">Lehrgänge, Anwesenheit, Noten</div></div>
-              <span id="ueblArrow" style="font-size:.9rem;color:var(--mu)">▾</span>
-            </button>
-            <div id="ueblCollapse" style="display:none;padding:12px 2px 0">
-              <div id="azubiList"><div class="empty">Lädt…</div></div>
+        <!-- Azubis (aufklappbar) -->
+        <details class="coll-card" id="sectAzubis" style="margin-bottom:10px">
+          <summary>
+            <span style="display:flex;align-items:center;gap:8px;flex:1">
+              <span style="font-size:1.05rem">🎓</span>
+              <span>Azubis</span>
+              <span id="cntAzubis" style="font-size:.6rem;background:rgba(37,99,235,.12);color:var(--acc);padding:2px 7px;border-radius:8px;font-weight:700">0</span>
+            </span>
+          </summary>
+          <div class="coll-body">
+            <div class="abtab2 active" id="abtab-ma-azubis">
+              <button class="big-btn" onclick="openMaAnlegenModal('azubi')" style="margin-bottom:12px">
+                <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">🎓+</span>
+                <span class="bb-tx"><span class="bb-t">Azubi anlegen</span><span class="bb-s">Zugang für AzubiPro</span></span>
+                <span class="bb-arr">›</span>
+              </button>
+              <div class="stat-row" style="margin-bottom:10px">
+                <div class="stat-card"><div class="stat-num" id="statAzubis">–</div><div class="stat-label">Azubis</div></div>
+                <div class="stat-card"><div class="stat-num" id="statAktiv">–</div><div class="stat-label">In Kursen</div></div>
+                <div class="stat-card"><div class="stat-num" id="statAnw">–</div><div class="stat-label">⌀ Anwesenheit</div></div>
+              </div>
+              <div id="agNotifBanner"></div>
+              <!-- Collapsible ÜBL-Kursansicht -->
+              <div style="margin-bottom:12px">
+                <button onclick="toggleUeblView()" id="ueblToggleBtn" style="width:100%;padding:12px 14px;background:rgba(245,158,11,.06);border:1.5px solid rgba(245,158,11,.25);border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:'Sora',sans-serif;color:var(--tx)">
+                  <span style="font-size:1rem">🎓</span>
+                  <div style="flex:1;text-align:left"><div style="font-size:.78rem;font-weight:700">ÜBL-Kursansicht</div><div style="font-size:.6rem;color:var(--mu)">Lehrgänge, Anwesenheit, Noten</div></div>
+                  <span id="ueblArrow" style="font-size:.9rem;color:var(--mu)">▾</span>
+                </button>
+                <div id="ueblCollapse" style="display:none;padding:12px 2px 0">
+                  <div id="azubiList"><div class="empty">Lädt…</div></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-title">👥 Azubi-Kontakte</div>
+                <div id="agAzubiListe"><div class="empty">Lädt…</div></div>
+              </div>
+              <details class="coll-card" id="agHVKontaktCard" style="display:none">
+                <summary>📞 Kontakt Verwaltung (HBZ)</summary>
+                <div class="coll-body">
+                  <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
+                </div>
+              </details>
             </div>
           </div>
-          <div class="card">
-            <div class="card-title">👥 Azubi-Kontakte</div>
-            <div id="agAzubiListe"><div class="empty">Lädt…</div></div>
-          </div>
-          <details class="coll-card" id="agHVKontaktCard" style="display:none">
-            <summary>📞 Kontakt Verwaltung (HBZ)</summary>
-            <div class="coll-body">
-              <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
-            </div>
-          </details>
-        </div>
+        </details>
       </div>
 
       <!-- LIVE: Aufträge -->
@@ -2348,7 +2364,6 @@ function showDoku(tnId,datum){
 function renderAgAzubiKontakte(){
   const elAn=document.getElementById('agArbeitnehmerListe');
   const elAz=document.getElementById('agAzubiListe');
-  if(!elAn&&!elAz) return;
   const arbeitnehmer=_azubis.filter(a=>a.typ==='arbeitnehmer');
   const azubis=_azubis.filter(a=>a.typ!=='arbeitnehmer');
   if(elAn) elAn.innerHTML=arbeitnehmer.length
@@ -2357,6 +2372,11 @@ function renderAgAzubiKontakte(){
   if(elAz) elAz.innerHTML=azubis.length
     ? azubis.map(_renderMaCard).join('')
     : '<div class="empty">Noch keine Azubis angelegt</div>';
+  // Counts in den Section-Headern updaten
+  const cntAn=document.getElementById('cntArbeitnehmer');
+  const cntAz=document.getElementById('cntAzubis');
+  if(cntAn) cntAn.textContent=arbeitnehmer.length;
+  if(cntAz) cntAz.textContent=azubis.length;
 }
 function _renderMaCard(az){
   const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
@@ -2726,16 +2746,11 @@ function selectAgMaType(type){
   _applyAgMaType();
 }
 function _applyAgMaType(){
-  const lbl=_agMaType==='azubi'?'🎓 Azubis ▾':'👤 Arbeitnehmer ▾';
-  const btn=document.getElementById('agMaTabBtn');
-  if(btn) btn.textContent=lbl;
-  // Panes switchen
-  document.querySelectorAll('#abtab-mitarbeiter .abtab2').forEach(t=>t.classList.remove('active'));
-  const pane=document.getElementById('abtab-ma-'+(_agMaType==='azubi'?'azubis':'arbeitnehmer'));
-  if(pane) pane.classList.add('active');
-  // Dropdown-Items active-markieren
-  document.getElementById('ddItemArbeitnehmer').classList.toggle('active', _agMaType==='arbeitnehmer');
-  document.getElementById('ddItemAzubi').classList.toggle('active', _agMaType==='azubi');
+  // No-op: Beide Sektionen (Arbeitnehmer + Azubis) sind jetzt
+  // gleichzeitig sichtbar als aufklappbare details-Cards.
+  // Funktion bleibt fuer Rueckwaerts-Kompatibilitaet (wird an mehreren Stellen aufgerufen).
+  // Sicherheits-Halber beide abtab2 als active setzen falls etwas active-Klasse erwartet:
+  document.querySelectorAll('#abtab-mitarbeiter .abtab2').forEach(t=>t.classList.add('active'));
 }
 // Klick außerhalb schließt Dropdowns
 document.addEventListener('click', e=>{
