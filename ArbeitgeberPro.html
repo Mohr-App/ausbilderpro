@@ -1751,11 +1751,13 @@ function renderAusfallBanner(){
 function renderStats(){
   const elA=document.getElementById('statAzubis');
   if(!elA) return; // ÜBL-Modal ist nicht mehr Teil von AG
-  elA.textContent=_azubis.length;
-  const inKurs=_azubis.filter(a=>a.aktiverKursId).length;
+  // Nur echte Azubis zaehlen (Arbeitnehmer ausschliessen)
+  const azubisOnly=_azubis.filter(a=>a.typ!=='arbeitnehmer');
+  elA.textContent=azubisOnly.length;
+  const inKurs=azubisOnly.filter(a=>a.aktiverKursId).length;
   const elK=document.getElementById('statAktiv'); if(elK) elK.textContent=inKurs;
   let tp=0,cp=0;
-  _azubis.forEach(a=>{
+  azubisOnly.forEach(a=>{
     if(!a.aktiverKursId)return;
     const kd=_kurse[a.aktiverKursId];
     if(!kd||!kd.tnData||!kd.tnData[a.id])return;
@@ -1765,7 +1767,7 @@ function renderStats(){
   const elAnw=document.getElementById('statAnw'); if(elAnw) elAnw.textContent=cp?Math.round(tp/cp)+'%':'–';
   // ÜBL-Hinweis wenn keine Azubis in Kursen
   const banner=document.getElementById('agNotifBanner');
-  if(banner&&_azubis.length>0&&inKurs===0&&!banner.innerHTML.includes('kurs_ausfall')){
+  if(banner&&azubisOnly.length>0&&inKurs===0&&!banner.innerHTML.includes('kurs_ausfall')){
     banner.innerHTML='<div style="padding:12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:10px;font-size:.75rem;color:var(--acc);margin-bottom:12px">ℹ Aktuell ist kein Auszubildender in einem ÜBL-Kurs eingeschrieben. Sobald ein Bildungszentrum Ihre Azubis einem Kurs zuweist, erscheinen hier die Kursinfos.</div>';
   }
 }
