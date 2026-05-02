@@ -2765,10 +2765,10 @@ function _aufGenerateNummer(){
   // Alle Auftraege dieses Jahres zaehlen
   let maxN=0;
   const promises=_azubis.map(az=>
-    db.collection('globalTN').doc(az.id).collection('auftraege')
-      .where('firmaUid','==',_uid).get().then(snap=>{
+    db.collection('globalTN').doc(az.id).collection('auftraege').get().then(snap=>{
         snap.forEach(doc=>{
           const d=doc.data();
+          if(d.firmaUid && d.firmaUid !== _uid) return;
           if(d.auftragsNr){
             const m=d.auftragsNr.match(/^(\d{4})-(\d+)$/);
             if(m && m[1]==String(year)){
@@ -2845,10 +2845,10 @@ function _aufFillKundenSelect(){
   // Kunden aus allen Auftraegen sammeln (deduplicate by kunde+adresse)
   const seen=new Set();
   const promises=_azubis.map(az=>
-    db.collection('globalTN').doc(az.id).collection('auftraege')
-      .where('firmaUid','==',_uid).get().then(snap=>{
+    db.collection('globalTN').doc(az.id).collection('auftraege').get().then(snap=>{
         snap.forEach(doc=>{
           const d=doc.data();
+          if(d.firmaUid && d.firmaUid !== _uid) return;
           if(!d.kunde) return;
           const key=(d.kunde||'').toLowerCase()+'|'+(d.adresse||'').toLowerCase();
           if(seen.has(key)) return;
@@ -4322,29 +4322,34 @@ function loadAgZeiten(){
   }
   const promises=_azubis.map(az=>{
     // Query erweitert: Alle Tage BIS Monatsende (fuer kumulierten Gleitzeit-Saldo inkl. Vormonate)
-    // Filter firmaUid==_uid: nur Zeiten der aktuellen Verknuepfung (alte Beziehungen ausgeblendet)
+    // firmaUid-Filter erfolgt im JS (vermeidet composite index)
     const p1=db.collection('globalTN').doc(az.id).collection('zeiterfassung')
-      .where('firmaUid','==',_uid)
       .where('datum','<=',ym+'-31').orderBy('datum').get();
     const p2=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
-      .where('firmaUid','==',_uid)
       .where('type','==','krank').get();
     const p3=db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
-      .where('firmaUid','==',_uid)
       .where('status','==','genehmigt').get();
     return Promise.all([p1,p2,p3]).then(([zeitSnap,krankSnap,urlSnap])=>{
       const zeitMap={};
       zeitSnap.forEach(d=>{
         const dd=d.data();
+        // Filter: nur eigene firmaUid oder Daten ohne Stempel (alt)
+        if(dd.firmaUid && dd.firmaUid !== _uid) return;
         // Abschluss-Docs ausfiltern (die haben kein "datum"-Feld, sondern nur "abgeschlossen")
         if(dd.datum) zeitMap[dd.datum]={id:d.id,...dd};
       });
       // Krank + Urlaub: Alle Daten, nicht nur aktueller Monat
       const krankDatesAll=new Set();
-      krankSnap.forEach(d=>{const dd=d.data();if(dd.datum)krankDatesAll.add(dd.datum);});
+      krankSnap.forEach(d=>{
+        const dd=d.data();
+        if(dd.firmaUid && dd.firmaUid !== _uid) return;
+        if(dd.datum)krankDatesAll.add(dd.datum);
+      });
       const urlaubDatesAll=new Set();
       urlSnap.forEach(d=>{
-        const dd=d.data();if(!dd.von||!dd.bis)return;
+        const dd=d.data();
+        if(dd.firmaUid && dd.firmaUid !== _uid) return;
+        if(!dd.von||!dd.bis)return;
         const s=new Date(dd.von+'T12:00'),e=new Date(dd.bis+'T12:00');
         for(let dt=new Date(s);dt<=e;dt.setDate(dt.getDate()+1)){
           const ds=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
@@ -4571,12 +4576,18 @@ function loadAgAuftraege(){
   elO.innerHTML='<div class="empty">Lädt…</div>';
   const promises=_azubis.map(az=>
     db.collection('globalTN').doc(az.id).collection('auftraege')
-      .where('firmaUid','==',_uid)
       .orderBy('erstelltAm','desc').get()
       .then(snap=>{
-        const docs=snap.docs.map(d=>({id:d.id,tnId:az.id,tnName:((az.vorname||'')+' '+(az.nachname||'')).trim(),...d.data()}));
+        const docs=[];
+        snap.forEach(d=>{
+          const data=d.data();
+          // Filter im JS statt Firestore-Query (kein composite index noetig)
+          // Kein firmaUid-Feld = alte Daten ohne Stempel = Migration faengt das ab
+          if(data.firmaUid && data.firmaUid !== _uid) return;
+          docs.push({id:d.id,tnId:az.id,tnName:((az.vorname||'')+' '+(az.nachname||'')).trim(),...data});
+        });
         return docs;
-      }).catch(()=>[])
+      }).catch(err=>{console.warn('loadAgAuftraege fehler:',err);return [];})
   );
   Promise.all(promises).then(results=>{
     _agAuftraege=results.flat();
@@ -6439,16 +6450,18 @@ function setupLiveMeldungen(){
   _meldUnsubs.forEach(u=>u());
   _meldUnsubs=[];
   if(!_azubis.length) return;
-  // Pro Azubi einen Live-Listener auf ungelesene betriebMeldungen (nur eigene Firma-Beziehung)
+  // Pro Azubi einen Live-Listener auf ungelesene betriebMeldungen
+  // firmaUid-Filter erfolgt im JS (vermeidet composite index)
   _azubis.forEach(az=>{
     const unsub=db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
-      .where('firmaUid','==',_uid)
       .where('gelesen','==',false).onSnapshot(snap=>{
         // Toast bei neuen Meldungen
         snap.docChanges().forEach(ch=>{
           if(ch.type==='added'&&!_meldSeen.has(ch.doc.id)){
-            _meldSeen.add(ch.doc.id);
             const m=ch.doc.data();
+            // Filter: nur eigene firmaUid oder alte Daten ohne Stempel
+            if(m.firmaUid && m.firmaUid !== _uid) return;
+            _meldSeen.add(ch.doc.id);
             const icons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
             toast((icons[m.type]||'💬')+' '+esc(m.azName||m.name||'Azubi')+': '+esc(m.text||''));
           }
