@@ -626,9 +626,17 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="display:flex;flex-direction:column;gap:6px">
         <button class="card" onclick="showPage('profil')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Profil"><span style="font-size:1.4rem">👤</span><div><div style="font-weight:700;font-size:.85rem">Mein Profil</div><div style="font-size:.65rem;color:var(--mu)">Name, Kontakt, Passwort</div></div></button>
         <button class="card" onclick="showPage('docs')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Dokumente"><span style="font-size:1.4rem">📁</span><div><div style="font-weight:700;font-size:.85rem">Dokumente</div><div style="font-size:.65rem;color:var(--mu)">Kursunterlagen, Betrieb, eigene Dateien</div></div></button>
+        <button class="card" id="mehrFirmaBtn" onclick="showPage('firma')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px;display:none" title="Betriebsverknüpfung"><span style="font-size:1.4rem">🔗</span><div><div style="font-weight:700;font-size:.85rem">Betriebsverknüpfung</div><div style="font-size:.65rem;color:var(--mu)" id="mehrFirmaSub">Mit Betrieb verbunden</div></div></button>
         <button class="card" onclick="showPage('hilfe')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Hilfe"><span style="font-size:1.4rem">❓</span><div><div style="font-weight:700;font-size:.85rem">Hilfe</div><div style="font-size:.65rem;color:var(--mu)">Anleitung & Tipps</div></div></button>
         <button title="Abmelden" onclick="doLogout()" style="margin-top:8px;width:100%;padding:12px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Abmelden</button>
       </div>
+    </div>
+
+    <!-- BETRIEBSVERKNÜPFUNG -->
+    <div class="page" id="page-firma">
+      <button onclick="showPage('mehr')" style="background:none;border:none;color:var(--acc);font-size:.78rem;font-weight:600;cursor:pointer;padding:0;margin-bottom:12px" title="Zurück">← Zurück</button>
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:14px">🔗 Betriebsverknüpfung</div>
+      <div id="firmaPageContent"></div>
     </div>
 
     <!-- KURSDETAIL -->
@@ -1753,7 +1761,7 @@ function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
-  const navMap={'docs':'mehr','profil':'mehr','hilfe':'mehr','kursdetail':'uebl'};
+  const navMap={'docs':'mehr','profil':'mehr','hilfe':'mehr','firma':'mehr','kursdetail':'uebl'};
   const navId=navMap[id]||id;
   const nb=document.getElementById('nav-'+navId);
   if(nb) nb.classList.add('active');
@@ -1761,6 +1769,84 @@ function showPage(id){
   if(id==='profil'){ loadProfil(); loadAzubiUrlaub(); }
   if(id==='betrieb') initBetrieb();
   if(id==='uebl') loadKurse();
+  if(id==='mehr') updateMehrFirmaBtn();
+  if(id==='firma') renderFirmaPage();
+}
+
+function updateMehrFirmaBtn(){
+  const btn=document.getElementById('mehrFirmaBtn');
+  const sub=document.getElementById('mehrFirmaSub');
+  if(!btn) return;
+  const verknuepft=_tnData?.firmaUid;
+  const pending=_tnData?.firmaPending;
+  // Nur sichtbar wenn verknuepft, pending oder Historie
+  const hasHistory=_firmaHistorie&&_firmaHistorie.length>0;
+  if(!verknuepft && !pending && !hasHistory){
+    btn.style.display='none';
+    return;
+  }
+  btn.style.display='flex';
+  if(verknuepft){
+    if(sub) sub.textContent='Verknüpft mit '+(_tnData.firma||'Betrieb');
+  } else if(pending){
+    if(sub) sub.textContent='⏳ Antrag wartet auf Bestätigung';
+  } else {
+    if(sub) sub.textContent='Vorherige Verknüpfungen verwalten';
+  }
+}
+
+function renderFirmaPage(){
+  const el=document.getElementById('firmaPageContent');
+  if(!el) return;
+  const verknuepft=_tnData?.firmaUid;
+  const pending=_tnData?.firmaPending;
+  let h='';
+  if(verknuepft){
+    // Aktive Verknuepfung anzeigen + Trennen-Option
+    h+='<div style="padding:14px;background:rgba(16,185,129,.06);border:1.5px solid rgba(16,185,129,.25);border-radius:10px;margin-bottom:12px">';
+    h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+    h+='<span style="font-size:1.3rem">✅</span>';
+    h+='<div style="flex:1"><div style="font-size:.62rem;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Verknüpft mit</div>';
+    h+='<div style="font-size:.95rem;font-weight:800;color:var(--tx);margin-top:1px">'+esc(_tnData.firma||'Betrieb')+'</div></div></div>';
+    if(_tnData._verknuepftSeit){
+      h+='<div style="font-size:.65rem;color:var(--mu);margin-top:6px">Verknüpft seit: '+new Date(_tnData._verknuepftSeit).toLocaleDateString('de-DE')+'</div>';
+    }
+    h+='</div>';
+    // Trennen-Bereich (rote Zone, deutlich getrennt)
+    h+='<div style="padding:14px;background:rgba(239,68,68,.04);border:1.5px solid rgba(239,68,68,.25);border-radius:10px">';
+    h+='<div style="font-size:.78rem;font-weight:800;color:#991b1b;margin-bottom:6px">⚠️ Verknüpfung aufheben</div>';
+    h+='<div style="font-size:.7rem;color:var(--mu);line-height:1.5;margin-bottom:10px">Wenn du den Betrieb wechselst oder die Verknüpfung nicht mehr brauchst, kannst du sie hier aufheben.</div>';
+    h+='<div style="font-size:.65rem;color:#475569;line-height:1.5;margin-bottom:10px;padding:8px;background:rgba(16,185,129,.08);border-radius:6px"><b style="color:#065f46">Wichtig:</b> Deine Stempelzeiten, Aufträge und Urlaubsanträge bleiben für Abrechnung und gesetzliche Aufbewahrungspflicht (6 Jahre) erhalten. Du kannst sie weiterhin im Mitarbeiter-Bereich unter "Vorherige Firmen" einsehen (Read-Only).</div>';
+    h+='<button onclick="trennFirmaVerknuepfung()" style="width:100%;padding:11px;background:#fff;border:1.5px solid #ef4444;color:#ef4444;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">🔗 Verknüpfung mit '+esc(_tnData.firma||'Betrieb')+' aufheben</button>';
+    h+='</div>';
+  } else if(pending){
+    // Pending wird schon im Mitarbeiter-Tab angezeigt - hier kurze Info
+    h+='<div style="padding:14px;background:rgba(245,158,11,.06);border:1.5px solid rgba(245,158,11,.3);border-radius:10px">';
+    h+='<div style="font-size:.85rem;font-weight:800;color:#92400e;margin-bottom:6px">⏳ Antrag wartet auf Bestätigung</div>';
+    h+='<div style="font-size:.72rem;color:#475569;line-height:1.5;margin-bottom:10px">Dein Antrag an <b>'+esc(pending.firma||'Betrieb')+'</b> wurde gesendet. Sobald der Arbeitgeber bestätigt, werden die Mitarbeiter-Funktionen aktiv.</div>';
+    h+='<button onclick="cancelFirmaPending()" style="width:100%;padding:10px;background:#fff;border:1.5px solid #ef4444;color:#ef4444;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Antrag zurückziehen</button>';
+    h+='</div>';
+  } else {
+    h+='<div style="padding:14px;background:rgba(148,163,184,.05);border:1.5px solid var(--brd);border-radius:10px">';
+    h+='<div style="font-size:.78rem;color:var(--mu);line-height:1.5">Du bist aktuell mit keinem Betrieb verknüpft. Wechsle zum Mitarbeiter-Tab und gib dort den Code deines Arbeitgebers ein.</div>';
+    h+='</div>';
+  }
+  // Historie anzeigen
+  if(_firmaHistorie&&_firmaHistorie.length){
+    h+='<div style="margin-top:18px"><div style="font-size:.78rem;font-weight:800;color:var(--tx);margin-bottom:8px">📂 Frühere Verknüpfungen</div>';
+    _firmaHistorie.forEach(hist=>{
+      const vonStr=hist.von?new Date(hist.von).toLocaleDateString('de-DE'):'?';
+      const bisStr=hist.bis?new Date(hist.bis).toLocaleDateString('de-DE'):'?';
+      const beendetText=hist.beendetVon==='ag'?'durch Arbeitgeber':'durch dich';
+      h+='<div style="padding:11px;background:rgba(148,163,184,.04);border:1px solid var(--brd);border-radius:9px;margin-bottom:5px">';
+      h+='<div style="font-size:.78rem;font-weight:700;color:var(--tx)">'+esc(hist.firma||'Vorheriger Betrieb')+'</div>';
+      h+='<div style="font-size:.65rem;color:var(--mu);margin-top:2px;font-family:\'JetBrains Mono\',monospace">'+vonStr+' – '+bisStr+'</div>';
+      h+='<div style="font-size:.6rem;color:var(--mu);margin-top:1px">Beendet '+beendetText+'</div>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+  el.innerHTML=h;
 }
 
 // ── Load Data ──
@@ -4184,7 +4270,7 @@ function checkFirmaCodeUI(){
   const card=document.getElementById('firmaCodeInput');
   if(!card||!_tnData) return;
   if(_tnData.firmaUid){
-    // Verknüpft ✓ - dezente 1-Zeilen-Anzeige + Trennen-Menü
+    // Verknüpft ✓ - dezente 1-Zeilen-Anzeige (ohne Trennen-Button - der ist unter Mehr → Betriebsverknüpfung)
     card.style.padding='0';
     card.style.background='transparent';
     card.style.border='none';
@@ -4193,7 +4279,6 @@ function checkFirmaCodeUI(){
       +'<span style="color:#059669">✅</span>'
       +'<span style="color:var(--mu)">Verknüpft mit</span>'
       +'<span style="font-weight:700;color:var(--tx);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(_tnData.firma||'Betrieb')+'</span>'
-      +'<button onclick="trennFirmaVerknuepfung()" title="Verknüpfung aufheben" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:4px 6px;border-radius:5px;font-size:.85rem;line-height:1" onmouseover="this.style.background=\'rgba(239,68,68,.12)\';this.style.color=\'#ef4444\'" onmouseout="this.style.background=\'none\';this.style.color=\'#94a3b8\'">⚙</button>'
       +'</div>';
     _loadFirmaLogo();
     return;

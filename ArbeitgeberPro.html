@@ -2384,9 +2384,28 @@ function _renderMaCard(az){
     +(email?'<a href="mailto:'+esc(email)+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-left:'+(tel?'6px':'0')+';padding:6px 14px;background:rgba(37,99,235,.1);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;text-decoration:none;font-size:.72rem;font-weight:700;color:var(--acc)">✉ '+esc(email)+'</a>':'')
     +(!tel&&!email?'<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Keine Kontaktdaten hinterlegt</div>':'')
     +'</div>'
-    +'<button onclick="trennAzubiVerknuepfung(\''+esc(az.id)+'\')" title="Verknüpfung aufheben" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:6px 8px;border-radius:6px;font-size:1rem;line-height:1;flex-shrink:0" onmouseover="this.style.background=\'rgba(239,68,68,.12)\';this.style.color=\'#ef4444\'" onmouseout="this.style.background=\'none\';this.style.color=\'#94a3b8\'">⚙</button>'
+    +'<div style="position:relative;flex-shrink:0">'
+    +'<button onclick="event.stopPropagation();_toggleMaMenu(\''+esc(az.id)+'\')" title="Mehr" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:6px 8px;border-radius:6px;font-size:1.1rem;line-height:1" onmouseover="this.style.background=\'rgba(148,163,184,.15)\'" onmouseout="this.style.background=\'none\'">⋮</button>'
+    +'<div id="maMenu_'+esc(az.id)+'" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--brd);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);min-width:180px;z-index:10;overflow:hidden">'
+    +'<button onclick="event.stopPropagation();_closeMaMenus();trennAzubiVerknuepfung(\''+esc(az.id)+'\')" style="width:100%;text-align:left;padding:10px 14px;background:#fff;border:none;color:#ef4444;font-size:.74rem;font-weight:600;cursor:pointer;font-family:\'Sora\',sans-serif" onmouseover="this.style.background=\'rgba(239,68,68,.06)\'" onmouseout="this.style.background=\'#fff\'">🔗 Verknüpfung aufheben</button>'
+    +'</div></div>'
     +'</div>';
 }
+
+function _closeMaMenus(){
+  document.querySelectorAll('[id^="maMenu_"]').forEach(m=>m.style.display='none');
+}
+
+function _toggleMaMenu(id){
+  const m=document.getElementById('maMenu_'+id);
+  if(!m) return;
+  const isOpen=m.style.display!=='none';
+  _closeMaMenus();
+  if(!isOpen) m.style.display='block';
+}
+
+// Bei Klick außerhalb: Menü schließen
+document.addEventListener('click',()=>_closeMaMenus());
 
 function trennAzubiVerknuepfung(tnId){
   const az=_azubis.find(a=>a.id===tnId);
