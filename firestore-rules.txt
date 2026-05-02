@@ -111,6 +111,13 @@ service cloud.firestore {
       // Trennen: Verknuepfungs-Felder loeschen (Daten bleiben fuer Aufbewahrungspflicht)
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','_verknuepftSeit']);
+      // AG darf Stammdaten seiner verknuepften MAs editieren (Vorname/Nachname/Geb./Adresse/Tel/Email/Beruf/Lehrjahr/Foto)
+      allow update: if request.auth != null
+        && resource.data.firmaUid == request.auth.uid
+        && request.resource.data.firmaUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['vorname','nachname','geburtsdatum','kontaktTelefon','kontaktEmail','adresse','plz','ort','beruf','ausbjahr','photoUrl']
+        );
       // Pilot-Anonymisierung: Admin darf Datenminimierungs-Felder updaten
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(

@@ -1074,6 +1074,77 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- MA-Edit-Modal: Bestehenden Mitarbeiter bearbeiten -->
+<div class="mdl" id="maEditModal">
+  <div class="mdl-box" style="max-width:520px">
+    <div class="mdl-head">
+      <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center">✏️</span><span id="maEditTitle">Bearbeiten</span></div>
+      <button class="mdl-x" onclick="closeMaEditModal()" title="Schließen">✕</button>
+    </div>
+    <input type="hidden" id="maEditId">
+
+    <!-- Profilbild -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;padding:12px;background:var(--sur2);border-radius:10px">
+      <div style="position:relative;width:64px;height:64px;border-radius:50%;background:rgba(148,163,184,.15);border:2px solid var(--brd);display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:800;color:#475569;flex-shrink:0;overflow:hidden" id="maEditAvaWrap">
+        <span id="maEditAvaInitials">--</span>
+        <img id="maEditAvaImg" style="display:none;width:100%;height:100%;object-fit:cover">
+      </div>
+      <div style="flex:1">
+        <div style="font-size:.7rem;font-weight:700;color:var(--tx);margin-bottom:6px">Profilbild</div>
+        <label style="display:inline-block;padding:6px 12px;background:rgba(37,99,235,.08);color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">
+          📷 Bild ändern
+          <input type="file" id="maEditPhoto" accept="image/*" onchange="_onMaEditPhoto(event)" style="display:none">
+        </label>
+      </div>
+    </div>
+
+    <!-- 👤 PERSON -->
+    <div class="auf-section">
+      <div class="auf-sect-title">👤 Person</div>
+      <div style="display:flex;gap:6px">
+        <div style="flex:1"><label class="fl">Vorname</label><input class="fi" id="maEditVorname" style="font-size:.8rem"></div>
+        <div style="flex:1"><label class="fl">Nachname</label><input class="fi" id="maEditNachname" style="font-size:.8rem"></div>
+      </div>
+      <div style="margin-top:6px"><label class="fl">Geburtsdatum</label><input class="fi" type="date" id="maEditGeburtsdatum" style="font-size:.8rem"></div>
+    </div>
+
+    <!-- 📞 KONTAKT -->
+    <div class="auf-section">
+      <div class="auf-sect-title">📞 Kontakt</div>
+      <div><label class="fl">Telefon</label><input class="fi" type="tel" id="maEditTel" placeholder="0171 1234567" style="font-size:.8rem;font-family:'JetBrains Mono',monospace"></div>
+      <div style="margin-top:6px"><label class="fl">E-Mail</label><input class="fi" type="email" id="maEditEmail" placeholder="kontakt@example.com" style="font-size:.8rem"></div>
+      <div style="font-size:.6rem;color:var(--mu);margin-top:3px">Hinweis: Diese E-Mail dient als Kontaktadresse. Die Login-E-Mail kann nicht geändert werden.</div>
+    </div>
+
+    <!-- 🏠 ADRESSE -->
+    <div class="auf-section">
+      <div class="auf-sect-title">🏠 Adresse</div>
+      <div><label class="fl">Straße & Hausnr.</label><input class="fi" id="maEditAdresse" placeholder="Musterstr. 12" style="font-size:.8rem"></div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <div style="flex:0 0 100px"><label class="fl">PLZ</label><input class="fi" id="maEditPlz" inputmode="numeric" maxlength="5" style="font-size:.8rem;font-family:'JetBrains Mono',monospace"></div>
+        <div style="flex:1"><label class="fl">Ort</label><input class="fi" id="maEditOrt" style="font-size:.8rem"></div>
+      </div>
+    </div>
+
+    <!-- 🎓 BERUFLICH (nur Azubis) -->
+    <div class="auf-section" id="maEditBerufSect">
+      <div class="auf-sect-title">🎓 Beruflich</div>
+      <div><label class="fl">Beruf</label><select class="fi" id="maEditBeruf" style="font-size:.8rem"><option value="">– Beruf wählen –</option></select></div>
+      <div id="maEditFachRow" style="display:none;margin-top:6px"><label class="fl">Fachrichtung</label><select class="fi" id="maEditFachrichtung" style="font-size:.8rem"><option value="">– erst Beruf wählen –</option></select></div>
+      <div style="margin-top:6px"><label class="fl">Lehrjahr</label><select class="fi" id="maEditLehrjahr" style="font-size:.8rem">
+        <option value="">– Lehrjahr wählen –</option>
+        <option value="1">1. Lehrjahr</option>
+        <option value="2">2. Lehrjahr</option>
+        <option value="3">3. Lehrjahr</option>
+        <option value="4">4. Lehrjahr</option>
+      </select></div>
+    </div>
+
+    <button class="btn" onclick="saveMaEdit()" style="margin-top:14px;width:100%;font-size:.85rem;padding:12px">💾 Speichern</button>
+    <div class="err" id="maEditErr" style="margin-top:6px"></div>
+  </div>
+</div>
+
 <!-- PROFILBILD ÄNDERN MODAL (für bestehende MAs) -->
 <div class="mdl" id="avaEditModal">
   <div class="mdl-box" style="max-width:360px">
@@ -2703,10 +2774,150 @@ function _loadMaDetailStats(tnId){
   }).catch(()=>{});
 }
 
-// Stub für später - öffnet Bearbeiten-Modal (existiert noch nicht)
+// MA-Edit-Modal: Bestehenden Mitarbeiter bearbeiten
+let _maEditPendingPhoto=null;
+
 function openMaEditModal(tnId){
-  toast('✏️ Bearbeiten-Funktion folgt in Kürze','info');
-  // TODO: Implementieren - Modal mit allen editierbaren Feldern
+  const az=_azubis.find(a=>a.id===tnId);
+  if(!az){toast('Mitarbeiter nicht gefunden','bad');return;}
+  const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
+  const isMA=az.typ==='arbeitnehmer';
+  // Felder befüllen
+  document.getElementById('maEditId').value=tnId;
+  document.getElementById('maEditTitle').textContent=name;
+  document.getElementById('maEditVorname').value=az.vorname||'';
+  document.getElementById('maEditNachname').value=az.nachname||'';
+  document.getElementById('maEditGeburtsdatum').value=az.geburtsdatum||'';
+  document.getElementById('maEditTel').value=az.kontaktTelefon||az.tel||'';
+  document.getElementById('maEditEmail').value=az.kontaktEmail||'';
+  document.getElementById('maEditAdresse').value=az.adresse||'';
+  document.getElementById('maEditPlz').value=az.plz||'';
+  document.getElementById('maEditOrt').value=az.ort||'';
+  document.getElementById('maEditErr').textContent='';
+  _maEditPendingPhoto=null;
+  // Avatar setzen
+  const initials=name.split(' ').map(w=>(w[0]||'').toUpperCase()).join('').slice(0,2);
+  const avaInitials=document.getElementById('maEditAvaInitials');
+  const avaImg=document.getElementById('maEditAvaImg');
+  if(az.photoUrl){
+    avaInitials.style.display='none';
+    avaImg.style.display='block';
+    avaImg.src=az.photoUrl;
+  } else {
+    avaInitials.style.display='block';
+    avaInitials.textContent=initials;
+    avaImg.style.display='none';
+    avaImg.src='';
+  }
+  // Beruf-Sektion: nur bei Azubis
+  const berufSect=document.getElementById('maEditBerufSect');
+  if(isMA){
+    berufSect.style.display='none';
+  } else {
+    berufSect.style.display='';
+    // Beruf-Dropdown füllen
+    _fillMaEditBerufSelect(az);
+    document.getElementById('maEditLehrjahr').value=az.ausbjahr?String(az.ausbjahr):'';
+  }
+  document.getElementById('maEditModal').classList.add('open');
+}
+
+function closeMaEditModal(){
+  document.getElementById('maEditModal').classList.remove('open');
+  _maEditPendingPhoto=null;
+}
+
+function _fillMaEditBerufSelect(az){
+  const sel=document.getElementById('maEditBeruf');
+  if(!sel) return;
+  sel.innerHTML='<option value="">– Beruf wählen –</option>';
+  // Berufsgruppen aus _berufsgruppen wenn vorhanden
+  if(typeof _berufsgruppen==='object'&&_berufsgruppen){
+    Object.keys(_berufsgruppen).sort().forEach(bg=>{
+      const opt=document.createElement('option');
+      opt.value=bg;
+      opt.textContent=bg;
+      if(az.beruf===bg) opt.selected=true;
+      sel.appendChild(opt);
+    });
+  } else if(az.beruf){
+    // Fallback: nur den aktuellen Beruf zeigen
+    const opt=document.createElement('option');
+    opt.value=az.beruf;
+    opt.textContent=az.beruf;
+    opt.selected=true;
+    sel.appendChild(opt);
+  }
+}
+
+function _onMaEditPhoto(ev){
+  const f=ev.target.files&&ev.target.files[0];
+  if(!f) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    // Bild auf 200×200 skalieren wie beim Anlegen
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const size=200;
+      canvas.width=size;canvas.height=size;
+      const ctx=canvas.getContext('2d');
+      const scale=Math.max(size/img.width, size/img.height);
+      const w=img.width*scale, h=img.height*scale;
+      ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
+      const dataUrl=canvas.toDataURL('image/jpeg',.85);
+      _maEditPendingPhoto=dataUrl;
+      // Preview
+      const avaInitials=document.getElementById('maEditAvaInitials');
+      const avaImg=document.getElementById('maEditAvaImg');
+      avaInitials.style.display='none';
+      avaImg.style.display='block';
+      avaImg.src=dataUrl;
+    };
+    img.src=reader.result;
+  };
+  reader.readAsDataURL(f);
+}
+
+function saveMaEdit(){
+  const tnId=document.getElementById('maEditId').value;
+  const err=document.getElementById('maEditErr');
+  err.textContent='';
+  if(!tnId){err.textContent='Fehler: keine ID';return;}
+  const vorname=document.getElementById('maEditVorname').value.trim();
+  const nachname=document.getElementById('maEditNachname').value.trim();
+  if(!vorname||!nachname){err.textContent='Vorname und Nachname sind Pflicht';return;}
+  const data={
+    vorname,
+    nachname,
+    geburtsdatum: document.getElementById('maEditGeburtsdatum').value||null,
+    kontaktTelefon: document.getElementById('maEditTel').value.trim(),
+    kontaktEmail: document.getElementById('maEditEmail').value.trim().toLowerCase(),
+    adresse: document.getElementById('maEditAdresse').value.trim(),
+    plz: document.getElementById('maEditPlz').value.trim(),
+    ort: document.getElementById('maEditOrt').value.trim()
+  };
+  // Beruf nur bei Azubis
+  const az=_azubis.find(a=>a.id===tnId);
+  const isMA=az&&az.typ==='arbeitnehmer';
+  if(!isMA){
+    const beruf=document.getElementById('maEditBeruf').value;
+    const lj=document.getElementById('maEditLehrjahr').value;
+    if(beruf) data.beruf=beruf;
+    if(lj) data.ausbjahr=parseInt(lj,10);
+  }
+  if(_maEditPendingPhoto) data.photoUrl=_maEditPendingPhoto;
+  err.textContent='Wird gespeichert…';
+  err.style.color='var(--mu)';
+  db.collection('globalTN').doc(tnId).update(data).then(()=>{
+    // Lokal aktualisieren
+    if(az) Object.assign(az, data);
+    toast('✓ Gespeichert');
+    closeMaEditModal();
+  }).catch(e=>{
+    err.textContent='Fehler: '+e.message;
+    err.style.color='#ef4444';
+  });
 }
 
 function _toggleMaMenu(id){
