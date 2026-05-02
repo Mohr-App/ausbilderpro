@@ -155,6 +155,25 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .tab-order-btn:hover:not(:disabled){border-color:var(--acc);color:var(--acc)}
 .tab-order-btn:disabled{opacity:.3;cursor:not-allowed}
 .coll-card{background:var(--sur);border:1px solid var(--brd);border-radius:12px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.02)}
+/* Auftrag-Modal-Sections */
+.auf-section{padding:12px;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:8px;}
+.auf-sect-title{font-size:.7rem;font-weight:800;color:var(--tx);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;}
+.auf-section-coll{padding:0;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:8px;overflow:hidden;}
+.auf-section-coll>summary{padding:11px 12px;cursor:pointer;list-style:none;font-size:.7rem;font-weight:800;color:var(--tx);text-transform:uppercase;letter-spacing:.05em;}
+.auf-section-coll>summary::-webkit-details-marker{display:none}
+.auf-section-coll>summary::after{content:'▾';float:right;color:var(--mu);transition:transform .15s}
+.auf-section-coll[open]>summary::after{transform:rotate(180deg)}
+.auf-section-coll[open]>summary{border-bottom:1px solid var(--brd);background:rgba(248,250,252,.8)}
+.auf-section-coll>div:not([class*="auf-sect"]){padding:0 12px 12px}
+.auf-sect-title-coll{display:block}
+/* Prio-Buttons aktiv */
+.auf-prio-btn[data-active="1"][data-prio="normal"]{background:rgba(148,163,184,.15);border-color:rgba(148,163,184,.6)!important;color:#475569!important}
+.auf-prio-btn[data-active="1"][data-prio="eilig"]{background:rgba(245,158,11,.15);border-color:#d97706!important;color:#92400e!important}
+.auf-prio-btn[data-active="1"][data-prio="notfall"]{background:rgba(239,68,68,.15);border-color:#dc2626!important;color:#991b1b!important}
+/* Material-Item */
+.auf-mat-item{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#fff;border:1px solid var(--brd);border-radius:7px;font-size:.74rem}
+.auf-mat-item button{background:none;border:none;color:#94a3b8;cursor:pointer;padding:0;font-size:1rem;line-height:1}
+.auf-mat-item button:hover{color:#ef4444}
 .coll-card summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:10px;font-weight:800;font-size:.9rem;color:var(--tx);user-select:none;transition:background .12s}
 .coll-card summary::-webkit-details-marker,.coll-card summary::marker{display:none;content:''}
 .coll-card summary::after{content:'▾';margin-left:auto;font-size:.85rem;color:var(--mu);transition:transform .2s;flex-shrink:0}
@@ -761,38 +780,135 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <!-- AUFTRAG ANLEGEN MODAL -->
 <div class="mdl" id="auftragModal">
-  <div class="mdl-box">
+  <div class="mdl-box" style="max-width:560px">
     <div class="mdl-head">
       <div class="mdl-title"><span style="width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);color:var(--acc);display:flex;align-items:center;justify-content:center">📋</span>Neuen Auftrag erstellen</div>
       <button class="mdl-x" onclick="closeAuftragModal()" title="Schließen">✕</button>
     </div>
-    <div><label class="fl">Kunde</label><input class="fi" id="aufKunde" placeholder="z.B. Familie Müller" style="font-size:.8rem"></div>
-    <div><label class="fl">Adresse</label><input class="fi" id="aufAdresse" placeholder="Straße, PLZ Ort" style="font-size:.8rem"></div>
-    <div><label class="fl">E-Mail Kunde (optional, für Terminbestätigung + Bescheinigung)</label><input class="fi" type="email" id="aufKundeEmail" placeholder="kunde@example.com" style="font-size:.8rem"></div>
-    <div><label class="fl">Beschreibung</label><input class="fi" id="aufBeschr" placeholder="z.B. Steckdosen installieren" style="font-size:.8rem"></div>
-    <div style="display:flex;gap:6px">
-      <div style="flex:1"><label class="fl">Termin (optional)</label><input class="fi" type="date" id="aufTerminDatum" style="font-size:.8rem"></div>
-      <div style="flex:1"><label class="fl">Uhrzeit</label><input class="fi" type="time" id="aufTerminUhrzeit" style="font-size:.8rem"></div>
+
+    <!-- 📋 GRUNDDATEN -->
+    <div class="auf-section">
+      <div class="auf-sect-title">📋 Grunddaten</div>
+      <div style="display:flex;gap:6px">
+        <div style="flex:0 0 130px"><label class="fl">Auftrags-Nr.</label><input class="fi" id="aufNummer" readonly style="font-size:.78rem;background:rgba(148,163,184,.06);font-family:'JetBrains Mono',monospace" placeholder="wird generiert"></div>
+        <div style="flex:1"><label class="fl">Kategorie</label><select class="fi" id="aufKategorie" onchange="_aufKategorieChange()" style="font-size:.78rem">
+          <option value="installation">Installation</option>
+          <option value="reparatur">Reparatur</option>
+          <option value="wartung">Wartung</option>
+          <option value="beratung">Beratung</option>
+          <option value="notdienst">Notdienst</option>
+          <option value="sonstiges">Sonstiges</option>
+          <option value="__custom__">+ Neue Kategorie…</option>
+        </select></div>
+      </div>
+      <div id="aufKategorieCustomBox" style="display:none;margin-top:6px"><input class="fi" id="aufKategorieCustom" placeholder="Eigene Kategorie eingeben" style="font-size:.78rem"></div>
+      <div style="margin-top:8px"><label class="fl">Beschreibung *</label><textarea class="fi" id="aufBeschr" rows="2" placeholder="z.B. Steckdosen installieren im Gartenhaus" style="font-size:.78rem;resize:vertical"></textarea></div>
+      <div style="margin-top:8px"><label class="fl">Priorität</label>
+        <div style="display:flex;gap:4px" id="aufPrioRow">
+          <button type="button" class="auf-prio-btn" data-prio="normal" onclick="_setAufPrio('normal')" style="flex:1;padding:9px;border:1.5px solid rgba(148,163,184,.4);background:#fff;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Normal</button>
+          <button type="button" class="auf-prio-btn" data-prio="eilig" onclick="_setAufPrio('eilig')" style="flex:1;padding:9px;border:1.5px solid rgba(245,158,11,.3);background:#fff;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;color:#d97706">⚡ Eilig</button>
+          <button type="button" class="auf-prio-btn" data-prio="notfall" onclick="_setAufPrio('notfall')" style="flex:1;padding:9px;border:1.5px solid rgba(239,68,68,.3);background:#fff;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;color:#dc2626">🚨 Notfall</button>
+        </div>
+      </div>
     </div>
-    <label style="display:flex;align-items:center;gap:8px;margin:6px 0;padding:8px 10px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.15);border-radius:8px;cursor:pointer;user-select:none;font-size:.7rem;color:var(--tx)">
-      <input type="checkbox" id="aufTerminMail" checked style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb">
-      <span>📧 Kunde per E-Mail über Termin informieren</span>
-    </label>
-    <div><label class="fl">Frist (optional)</label><input class="fi" type="date" id="aufFrist" style="font-size:.8rem"></div>
-    <div><label class="fl">Zuweisen an (Mehrfach möglich)</label><select class="fi" id="aufMa" multiple style="font-size:.8rem;min-height:80px"><option value="" disabled>Bitte wählen…</option></select></div>
-    <label class="fl" style="margin-top:8px">Bilder anfügen (optional)</label>
-    <div style="display:flex;gap:6px;margin-bottom:6px">
-      <label style="flex:1;padding:10px;background:rgba(37,99,235,.08);color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:10px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
-        📷 Kamera
-        <input type="file" id="aufCamFile" accept="image/*" capture="environment" onchange="_onAufPhotos(event)" style="display:none">
-      </label>
-      <label style="flex:1;padding:10px;background:rgba(37,99,235,.08);color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:10px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
-        🖼 Datei(en)
-        <input type="file" id="aufGalFile" accept="image/*" multiple onchange="_onAufPhotos(event)" style="display:none">
-      </label>
+
+    <!-- 👤 KUNDE -->
+    <div class="auf-section">
+      <div class="auf-sect-title">👤 Kunde</div>
+      <div style="margin-bottom:6px"><label class="fl">Bestehender Kunde wählen</label><select class="fi" id="aufKundenSel" onchange="_aufKundenSelChange()" style="font-size:.78rem"><option value="">— Neu eingeben —</option></select></div>
+      <div><label class="fl">Name *</label><input class="fi" id="aufKunde" placeholder="z.B. Familie Müller" style="font-size:.78rem"></div>
+      <div style="margin-top:6px"><label class="fl">Adresse</label><input class="fi" id="aufAdresse" placeholder="Straße, PLZ Ort" style="font-size:.78rem"></div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <div style="flex:1"><label class="fl">Telefon</label><input class="fi" type="tel" id="aufKundeTel" placeholder="0171 1234567" style="font-size:.78rem;font-family:'JetBrains Mono',monospace"></div>
+        <div style="flex:1"><label class="fl">E-Mail</label><input class="fi" type="email" id="aufKundeEmail" placeholder="kunde@example.com" style="font-size:.78rem"></div>
+      </div>
     </div>
-    <div id="aufPhotosPreview" style="display:none;margin-bottom:10px"></div>
-    <button class="btn" title="📋 Auftrag erstellen" onclick="agAuftragErstellen()" style="margin-top:10px;width:100%;font-size:.85rem;padding:12px">📋 Auftrag erstellen</button>
+
+    <!-- 📅 TERMIN & AUFWAND -->
+    <div class="auf-section">
+      <div class="auf-sect-title">📅 Termin & Aufwand</div>
+      <div style="display:flex;gap:6px">
+        <div style="flex:1"><label class="fl">Termin (optional)</label><input class="fi" type="date" id="aufTerminDatum" style="font-size:.78rem"></div>
+        <div style="flex:0 0 110px"><label class="fl">Uhrzeit</label><input class="fi" type="time" id="aufTerminUhrzeit" style="font-size:.78rem"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin:6px 0;padding:7px 10px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.15);border-radius:8px;cursor:pointer;user-select:none;font-size:.68rem;color:var(--tx)">
+        <input type="checkbox" id="aufTerminMail" checked style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb">
+        <span>📧 Kunde per E-Mail über Termin informieren</span>
+      </label>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <div style="flex:1"><label class="fl">Aufwand (Stunden)</label><input class="fi" type="number" min="0" step="0.5" id="aufAufwandH" placeholder="z.B. 4" style="font-size:.78rem;font-family:'JetBrains Mono',monospace"></div>
+        <div style="flex:1"><label class="fl">Frist (optional)</label><input class="fi" type="date" id="aufFrist" style="font-size:.78rem"></div>
+      </div>
+      <!-- Wiederkehrend -->
+      <details style="margin-top:8px"><summary style="cursor:pointer;font-size:.7rem;color:var(--mu);padding:6px 0">🔄 Wiederkehrender Auftrag…</summary>
+        <div style="padding:8px;background:rgba(148,163,184,.04);border-radius:8px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:.7rem;cursor:pointer">
+            <input type="checkbox" id="aufWiederholend" onchange="_aufWiederholendChange()" style="width:16px;height:16px;accent-color:#2563eb">
+            <span>Auftrag wiederkehrend</span>
+          </label>
+          <div id="aufWiederholendBox" style="display:none;margin-top:8px;display:flex;gap:6px;align-items:center">
+            <span style="font-size:.7rem;color:var(--mu)">Alle</span>
+            <input class="fi" type="number" min="1" id="aufWdhAnzahl" value="1" style="width:60px;font-size:.78rem;font-family:'JetBrains Mono',monospace">
+            <select class="fi" id="aufWdhFrequenz" style="flex:1;font-size:.78rem">
+              <option value="tage">Tage</option>
+              <option value="wochen">Wochen</option>
+              <option value="monate" selected>Monate</option>
+              <option value="jahre">Jahre</option>
+            </select>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- 🔧 MATERIAL -->
+    <details class="auf-section-coll">
+      <summary class="auf-sect-title-coll">🔧 Material-Vorbereitung (optional)</summary>
+      <div style="padding:8px 0">
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <input class="fi" id="aufMatInput" placeholder="z.B. 10× Steckdose" onkeydown="if(event.key==='Enter'){event.preventDefault();_addAufMat();}" style="flex:1;font-size:.78rem">
+          <button type="button" onclick="_addAufMat()" style="padding:0 14px;background:rgba(37,99,235,.1);color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">+ Add</button>
+        </div>
+        <div id="aufMatList" style="display:flex;flex-direction:column;gap:3px"></div>
+      </div>
+    </details>
+
+    <!-- 👷 ZUWEISUNG & SATZ -->
+    <div class="auf-section">
+      <div class="auf-sect-title">👷 Zuweisung</div>
+      <div><label class="fl">Mitarbeiter zuweisen (Mehrfach möglich)</label><select class="fi" id="aufMa" multiple style="font-size:.78rem;min-height:80px"><option value="" disabled>Bitte wählen…</option></select></div>
+      <div style="margin-top:6px"><label class="fl">Stundensatz (optional, für Kalkulation)</label>
+        <div style="display:flex;align-items:center;gap:6px"><input class="fi" type="number" min="0" step="0.5" id="aufStundensatz" placeholder="z.B. 65" style="font-size:.78rem;font-family:'JetBrains Mono',monospace"><span style="font-size:.7rem;color:var(--mu)">€/h</span></div>
+      </div>
+    </div>
+
+    <!-- 📷 BILDER -->
+    <details class="auf-section-coll">
+      <summary class="auf-sect-title-coll">📷 Bilder anfügen (optional)</summary>
+      <div style="padding:8px 0">
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <label style="flex:1;padding:9px;background:rgba(37,99,235,.08);color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
+            📷 Kamera
+            <input type="file" id="aufCamFile" accept="image/*" capture="environment" onchange="_onAufPhotos(event)" style="display:none">
+          </label>
+          <label style="flex:1;padding:9px;background:rgba(37,99,235,.08);color:var(--acc);border:1.5px solid rgba(37,99,235,.3);border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;text-align:center">
+            🖼 Datei(en)
+            <input type="file" id="aufGalFile" accept="image/*" multiple onchange="_onAufPhotos(event)" style="display:none">
+          </label>
+        </div>
+        <div id="aufPhotosPreview" style="display:none"></div>
+      </div>
+    </details>
+
+    <!-- 🔒 INTERN -->
+    <details class="auf-section-coll">
+      <summary class="auf-sect-title-coll">🔒 Interne Notiz (nur für Sie sichtbar)</summary>
+      <div style="padding:8px 0">
+        <textarea class="fi" id="aufInternNotiz" rows="2" placeholder="z.B. Kunde zahlt schlecht — bar nehmen!" style="font-size:.78rem;resize:vertical"></textarea>
+        <div style="font-size:.6rem;color:var(--mu);margin-top:3px">⓵ Wird Mitarbeitern und Kunden NICHT angezeigt</div>
+      </div>
+    </details>
+
+    <button class="btn" title="Auftrag erstellen" onclick="agAuftragErstellen()" style="margin-top:14px;width:100%;font-size:.85rem;padding:12px">📋 Auftrag erstellen</button>
     <div class="err" id="aufErr" style="margin-top:6px"></div>
   </div>
 </div>
@@ -2599,24 +2715,175 @@ function _aufRenderPhotos(){
 }
 function _aufRemovePhoto(idx){_pendingAufPhotos.splice(idx,1);_aufRenderPhotos();}
 
+let _aufMaterial=[];
+let _aufPrio='normal';
+let _aufKundenIndex=[]; // {kunde,adresse,email,tel}
+
 function openAuftragModal(){
+  // Felder zurücksetzen
   document.getElementById('aufKunde').value='';
   document.getElementById('aufAdresse').value='';
   document.getElementById('aufKundeEmail').value='';
+  document.getElementById('aufKundeTel').value='';
   document.getElementById('aufBeschr').value='';
   document.getElementById('aufTerminDatum').value='';
   document.getElementById('aufTerminUhrzeit').value='';
   document.getElementById('aufTerminMail').checked=true;
   document.getElementById('aufFrist').value='';
+  document.getElementById('aufKategorie').value='installation';
+  document.getElementById('aufKategorieCustom').value='';
+  document.getElementById('aufKategorieCustomBox').style.display='none';
+  document.getElementById('aufAufwandH').value='';
+  document.getElementById('aufStundensatz').value='';
+  document.getElementById('aufWiederholend').checked=false;
+  document.getElementById('aufWiederholendBox').style.display='none';
+  document.getElementById('aufWdhAnzahl').value='1';
+  document.getElementById('aufWdhFrequenz').value='monate';
+  document.getElementById('aufInternNotiz').value='';
   document.getElementById('aufErr').textContent='';
+  document.getElementById('aufMatInput').value='';
+  _aufMaterial=[];
+  _aufRenderMatList();
+  _setAufPrio('normal');
   _pendingAufPhotos=[];
   _aufRenderPhotos();
   const cf=document.getElementById('aufCamFile'); if(cf) cf.value='';
   const gf=document.getElementById('aufGalFile'); if(gf) gf.value='';
   fillAgAzubiSelect();
+  _aufFillKundenSelect();
+  _aufGenerateNummer();
   document.getElementById('auftragModal').classList.add('open');
 }
 function closeAuftragModal(){document.getElementById('auftragModal').classList.remove('open');}
+
+// Auftrags-Nummer generieren: YYYY-NNNN, jaehrlich neu
+function _aufGenerateNummer(){
+  const year=new Date().getFullYear();
+  const inp=document.getElementById('aufNummer');
+  if(!inp) return;
+  inp.value='wird generiert…';
+  // Alle Auftraege dieses Jahres zaehlen
+  let maxN=0;
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('auftraege')
+      .where('firmaUid','==',_uid).get().then(snap=>{
+        snap.forEach(doc=>{
+          const d=doc.data();
+          if(d.auftragsNr){
+            const m=d.auftragsNr.match(/^(\d{4})-(\d+)$/);
+            if(m && m[1]==String(year)){
+              const n=parseInt(m[2],10);
+              if(n>maxN) maxN=n;
+            }
+          }
+        });
+      }).catch(()=>{})
+  );
+  Promise.all(promises).then(()=>{
+    const next=String(maxN+1).padStart(4,'0');
+    inp.value=year+'-'+next;
+  });
+}
+
+function _setAufPrio(prio){
+  _aufPrio=prio;
+  document.querySelectorAll('.auf-prio-btn').forEach(b=>{
+    b.dataset.active=b.dataset.prio===prio?'1':'0';
+  });
+}
+
+function _aufKategorieChange(){
+  const sel=document.getElementById('aufKategorie');
+  const box=document.getElementById('aufKategorieCustomBox');
+  if(!sel||!box) return;
+  if(sel.value==='__custom__'){
+    box.style.display='';
+    setTimeout(()=>document.getElementById('aufKategorieCustom').focus(),50);
+  } else {
+    box.style.display='none';
+  }
+}
+
+function _aufWiederholendChange(){
+  const cb=document.getElementById('aufWiederholend');
+  const box=document.getElementById('aufWiederholendBox');
+  if(!cb||!box) return;
+  box.style.display=cb.checked?'flex':'none';
+}
+
+function _addAufMat(){
+  const inp=document.getElementById('aufMatInput');
+  if(!inp) return;
+  const v=(inp.value||'').trim();
+  if(!v) return;
+  _aufMaterial.push(v);
+  inp.value='';
+  inp.focus();
+  _aufRenderMatList();
+}
+
+function _removeAufMat(idx){
+  _aufMaterial.splice(idx,1);
+  _aufRenderMatList();
+}
+
+function _aufRenderMatList(){
+  const el=document.getElementById('aufMatList');
+  if(!el) return;
+  if(!_aufMaterial.length){el.innerHTML='';return;}
+  el.innerHTML=_aufMaterial.map((m,i)=>
+    '<div class="auf-mat-item"><span style="flex:1">'+esc(m)+'</span><button onclick="_removeAufMat('+i+')" title="Entfernen">×</button></div>'
+  ).join('');
+}
+
+// Bestehende Kunden aus vergangenen Auftraegen
+function _aufFillKundenSelect(){
+  const sel=document.getElementById('aufKundenSel');
+  if(!sel) return;
+  sel.innerHTML='<option value="">— Neu eingeben —</option>';
+  _aufKundenIndex=[];
+  // Kunden aus allen Auftraegen sammeln (deduplicate by kunde+adresse)
+  const seen=new Set();
+  const promises=_azubis.map(az=>
+    db.collection('globalTN').doc(az.id).collection('auftraege')
+      .where('firmaUid','==',_uid).get().then(snap=>{
+        snap.forEach(doc=>{
+          const d=doc.data();
+          if(!d.kunde) return;
+          const key=(d.kunde||'').toLowerCase()+'|'+(d.adresse||'').toLowerCase();
+          if(seen.has(key)) return;
+          seen.add(key);
+          _aufKundenIndex.push({
+            kunde:d.kunde||'',
+            adresse:d.adresse||'',
+            email:d.kundeEmail||'',
+            tel:d.kundeTel||''
+          });
+        });
+      }).catch(()=>{})
+  );
+  Promise.all(promises).then(()=>{
+    _aufKundenIndex.sort((a,b)=>(a.kunde||'').localeCompare(b.kunde||'','de'));
+    _aufKundenIndex.forEach((k,i)=>{
+      const opt=document.createElement('option');
+      opt.value=String(i);
+      opt.textContent=k.kunde+(k.adresse?' · '+k.adresse:'');
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function _aufKundenSelChange(){
+  const sel=document.getElementById('aufKundenSel');
+  if(!sel) return;
+  const v=sel.value;
+  if(v===''||!_aufKundenIndex[v]) return;
+  const k=_aufKundenIndex[v];
+  document.getElementById('aufKunde').value=k.kunde||'';
+  document.getElementById('aufAdresse').value=k.adresse||'';
+  document.getElementById('aufKundeEmail').value=k.email||'';
+  document.getElementById('aufKundeTel').value=k.tel||'';
+}
 
 let _pendingNewMaPhoto=null;
 function openMaAnlegenModal(typ){
@@ -4338,13 +4605,24 @@ function renderAgAuftraege(){
       const nachUnread=_aufdNachUnread(a);
       const chatBadge=unread?'<span style="display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.52rem;font-weight:800;border-radius:50%;padding:0 4px;margin-left:4px">'+unread+'</span>':'';
       const nachBadge=nachUnread?' <span style="display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;padding:0 3px;margin-left:2px">!</span>':'';
-      h+='<div onclick="openAufDetails(\''+a.tnId+'\',\''+a.id+'\')" style="padding:10px;border:1.5px solid rgba(37,99,235,.2);border-radius:10px;margin-bottom:8px;background:rgba(37,99,235,.03);cursor:pointer">'
-        +'<div style="display:flex;justify-content:space-between;align-items:center">'
-        +'<span style="font-size:.82rem;font-weight:700">'+esc(a.kunde||'')+'</span>'
+      // Prio-Badge
+      let prioBadge='';
+      if(a.prioritaet==='eilig') prioBadge='<span style="display:inline-block;font-size:.55rem;font-weight:800;background:rgba(245,158,11,.18);color:#92400e;padding:2px 6px;border-radius:5px;margin-left:6px">⚡ EILIG</span>';
+      else if(a.prioritaet==='notfall') prioBadge='<span style="display:inline-block;font-size:.55rem;font-weight:800;background:rgba(239,68,68,.18);color:#991b1b;padding:2px 6px;border-radius:5px;margin-left:6px">🚨 NOTFALL</span>';
+      // Auftragsnr-Header
+      const nrLine=a.auftragsNr?'<div style="font-size:.55rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace;margin-bottom:2px">#'+esc(a.auftragsNr)+(a.kategorie?' · '+esc(a.kategorie):'')+'</div>':'';
+      // Border-Color je Priorität
+      const borderColor=a.prioritaet==='notfall'?'rgba(239,68,68,.5)':a.prioritaet==='eilig'?'rgba(245,158,11,.4)':'rgba(37,99,235,.2)';
+      const bgColor=a.prioritaet==='notfall'?'rgba(239,68,68,.04)':a.prioritaet==='eilig'?'rgba(245,158,11,.04)':'rgba(37,99,235,.03)';
+      h+='<div onclick="openAufDetails(\''+a.tnId+'\',\''+a.id+'\')" style="padding:10px;border:1.5px solid '+borderColor+';border-radius:10px;margin-bottom:8px;background:'+bgColor+';cursor:pointer">'
+        +nrLine
+        +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">'
+        +'<span style="font-size:.82rem;font-weight:700">'+esc(a.kunde||'')+prioBadge+'</span>'
         +'<span style="font-size:.55rem;color:var(--mu)">'+dat+'</span></div>'
         +(a.adresse?'<div style="font-size:.68rem;color:var(--mu)">📍 '+esc(a.adresse)+'</div>':'')
         +(a.beschreibung?'<div style="font-size:.68rem;color:var(--mu)">'+esc(a.beschreibung)+'</div>':'')
         +'<div style="font-size:.6rem;color:var(--acc);margin-top:4px">👤 '+esc(a.tnName)
+          +(a.aufwandStunden?' · ⏱ ca. '+a.aufwandStunden+'h':'')
           +(a.fotosAG&&a.fotosAG.length?' · 📎 '+a.fotosAG.length:'')
           +(nachCount?' · ➕ '+nachCount+' Nachtrag'+(nachCount>1?'e':'')+nachBadge:'')
           +' · 💬'+chatBadge
@@ -4416,22 +4694,52 @@ function agAuftragErstellen(){
   const kunde=document.getElementById('aufKunde').value.trim();
   const adresse=document.getElementById('aufAdresse').value.trim();
   const kundeEmail=document.getElementById('aufKundeEmail').value.trim().toLowerCase();
+  const kundeTel=document.getElementById('aufKundeTel').value.trim();
   const beschr=document.getElementById('aufBeschr').value.trim();
   const terminDatum=document.getElementById('aufTerminDatum').value;
   const terminUhrzeit=document.getElementById('aufTerminUhrzeit').value;
   const frist=document.getElementById('aufFrist').value;
+  const auftragsNr=document.getElementById('aufNummer').value.trim();
+  let kategorie=document.getElementById('aufKategorie').value;
+  if(kategorie==='__custom__'){
+    kategorie=(document.getElementById('aufKategorieCustom').value||'').trim()||'sonstiges';
+  }
+  const aufwandH=parseFloat(document.getElementById('aufAufwandH').value)||null;
+  const stundensatz=parseFloat(document.getElementById('aufStundensatz').value)||null;
+  const wiederholend=document.getElementById('aufWiederholend').checked;
+  const wdhAnzahl=parseInt(document.getElementById('aufWdhAnzahl').value,10)||1;
+  const wdhFrequenz=document.getElementById('aufWdhFrequenz').value;
+  const internNotiz=document.getElementById('aufInternNotiz').value.trim();
   const sel=document.getElementById('aufMa');
   const maIds=Array.from(sel.selectedOptions).map(o=>o.value).filter(Boolean);
   const err=document.getElementById('aufErr');
   err.textContent='';
   if(!kunde){err.textContent='Bitte Kunde eingeben';return;}
+  if(!beschr){err.textContent='Bitte Beschreibung eingeben';return;}
   if(!maIds.length){err.textContent='Bitte mind. einen Mitarbeiter auswählen';return;}
   err.textContent='Wird erstellt…';
-  const baseData={kunde, adresse, beschreibung:beschr, status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma, firmaUid:_uid};
+  const baseData={
+    kunde, adresse, beschreibung:beschr,
+    status:'offen', erstelltAm:Date.now(), erstelltVon:_email||_firma,
+    firmaUid:_uid,
+    auftragsNr: auftragsNr||null,
+    kategorie: kategorie||'sonstiges',
+    prioritaet: _aufPrio||'normal'
+  };
   if(kundeEmail) baseData.kundeEmail=kundeEmail;
+  if(kundeTel) baseData.kundeTel=kundeTel;
   if(terminDatum) baseData.terminDatum=terminDatum;
   if(terminUhrzeit) baseData.terminUhrzeit=terminUhrzeit;
   if(frist) baseData.frist=frist;
+  if(aufwandH!=null) baseData.aufwandStunden=aufwandH;
+  if(stundensatz!=null) baseData.stundensatz=stundensatz;
+  if(_aufMaterial.length) baseData.material=_aufMaterial.slice();
+  if(internNotiz) baseData.internNotiz=internNotiz;
+  if(wiederholend){
+    baseData.wiederholend=true;
+    baseData.wiederholungsAnzahl=wdhAnzahl;
+    baseData.wiederholungsFrequenz=wdhFrequenz;
+  }
   if(_pendingAufPhotos.length) baseData.fotosAG=_pendingAufPhotos.slice();
   const promises=maIds.map(id=>{
     const az=_azubis.find(a=>a.id===id);
@@ -4440,13 +4748,6 @@ function agAuftragErstellen(){
   });
   Promise.all(promises).then(refs=>{
     err.textContent='';
-    document.getElementById('aufKunde').value='';
-    document.getElementById('aufAdresse').value='';
-    document.getElementById('aufKundeEmail').value='';
-    document.getElementById('aufBeschr').value='';
-    document.getElementById('aufTerminDatum').value='';
-    document.getElementById('aufTerminUhrzeit').value='';
-    document.getElementById('aufFrist').value='';
     sel.selectedIndex=-1;
     _pendingAufPhotos=[];
     _aufRenderPhotos();
@@ -4652,8 +4953,19 @@ function openAufDetails(tnId, aufId){
   _aufdTn=tnId; _aufdAufId=aufId;
   const a=_agAuftraege.find(x=>x.tnId===tnId&&x.id===aufId);
   if(!a){toast('Auftrag nicht gefunden','bad');return;}
-  document.getElementById('aufdTitle').textContent=a.kunde||'Auftrag';
-  document.getElementById('aufdSub').textContent=(a.beschreibung||'')+' · '+(a.tnName||'');
+  // Title: Kunde + Auftragsnr-Suffix
+  const titleHtml=esc(a.kunde||'Auftrag')+(a.auftragsNr?' <span style="font-size:.6rem;color:var(--mu);font-weight:500;font-family:\'JetBrains Mono\',monospace">#'+esc(a.auftragsNr)+'</span>':'');
+  document.getElementById('aufdTitle').innerHTML=titleHtml;
+  // Subtitle: Kategorie · Beschreibung kurz · MA · Prio-Badge · Tel-Button
+  let sub='';
+  if(a.kategorie) sub+='<span style="display:inline-block;padding:1px 6px;background:rgba(37,99,235,.08);color:var(--acc);border-radius:4px;font-size:.6rem;font-weight:700;margin-right:6px">'+esc(a.kategorie)+'</span>';
+  if(a.prioritaet==='eilig') sub+='<span style="display:inline-block;padding:1px 6px;background:rgba(245,158,11,.18);color:#92400e;border-radius:4px;font-size:.6rem;font-weight:700;margin-right:6px">⚡ EILIG</span>';
+  else if(a.prioritaet==='notfall') sub+='<span style="display:inline-block;padding:1px 6px;background:rgba(239,68,68,.18);color:#991b1b;border-radius:4px;font-size:.6rem;font-weight:700;margin-right:6px">🚨 NOTFALL</span>';
+  if(a.beschreibung) sub+=esc(a.beschreibung).slice(0,60);
+  if(a.tnName) sub+=' · '+esc(a.tnName);
+  // Telefon-Button (Quick-Aktion)
+  if(a.kundeTel) sub+='<a href="tel:'+esc(a.kundeTel.replace(/\s/g,''))+'" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:2px 7px;background:rgba(16,185,129,.1);color:#059669;border:1px solid rgba(16,185,129,.3);border-radius:5px;font-size:.6rem;font-weight:700;text-decoration:none">📞 '+esc(a.kundeTel)+'</a>';
+  document.getElementById('aufdSub').innerHTML=sub;
   // Bei erledigten Aufträgen direkt mit Protokoll öffnen, sonst Chat
   const isErledigt=a.status==='erledigt';
   showAufdTab(isErledigt?'prot':'chat');
@@ -4741,12 +5053,33 @@ function _renderAufdProtokoll(a){
   h+='</div>';
   // Basis-Daten
   h+='<div style="padding:10px;background:var(--sur2);border-radius:8px;margin-bottom:10px;font-size:.7rem;line-height:1.6">';
+  if(a.auftragsNr) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Auftrags-Nr:</span><b style="font-family:\'JetBrains Mono\',monospace">'+esc(a.auftragsNr)+'</b></div>';
+  if(a.kategorie) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Kategorie:</span>'+esc(a.kategorie)+'</div>';
   if(a.kunde) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Kunde:</span><b>'+esc(a.kunde)+'</b></div>';
   if(a.adresse) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Adresse:</span>'+esc(a.adresse)+'</div>';
+  if(a.kundeTel) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Telefon:</span><a href="tel:'+esc(a.kundeTel.replace(/\s/g,''))+'" style="color:#059669;text-decoration:none;font-weight:700">📞 '+esc(a.kundeTel)+'</a></div>';
+  if(a.kundeEmail) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">E-Mail:</span><a href="mailto:'+esc(a.kundeEmail)+'" style="color:var(--acc);text-decoration:none">'+esc(a.kundeEmail)+'</a></div>';
   if(a.beschreibung) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Auftrag:</span>'+esc(a.beschreibung)+'</div>';
   if(maName) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Mitarbeiter:</span>'+esc(maName)+'</div>';
+  if(a.terminDatum) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Termin:</span>'+esc(a.terminDatum)+(a.terminUhrzeit?' '+esc(a.terminUhrzeit):'')+'</div>';
+  if(a.aufwandStunden) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Aufwand:</span>ca. <b>'+a.aufwandStunden+' h</b>'+(a.stundensatz?' · '+a.stundensatz+'€/h':'')+'</div>';
   if(a.frist) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Frist:</span>'+esc(a.frist)+'</div>';
+  if(a.wiederholend) h+='<div><span style="color:var(--mu);min-width:70px;display:inline-block">Wiederholt:</span>alle '+(a.wiederholungsAnzahl||1)+' '+esc(a.wiederholungsFrequenz||'')+'</div>';
   h+='</div>';
+  // Material-Vorbereitung (vom AG vorab eingegeben - separat von 'verwendetes Material' bei Erledigung)
+  if(a.material&&a.material.length&&!a.taetigkeit){
+    h+='<div style="font-size:.7rem;font-weight:700;color:#2563eb;margin:10px 0 6px">🔧 Material-Vorbereitung</div>';
+    h+='<div style="padding:8px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.15);border-radius:6px;margin-bottom:8px">';
+    a.material.forEach(m=>{h+='<div style="padding:4px 0;font-size:.7rem">• '+esc(m)+'</div>';});
+    h+='</div>';
+  }
+  // Interne Notiz (nur fuer AG sichtbar)
+  if(a.internNotiz){
+    h+='<div style="padding:8px 10px;background:rgba(245,158,11,.06);border:1.5px solid rgba(245,158,11,.25);border-radius:8px;margin:10px 0;font-size:.7rem">';
+    h+='<div style="font-weight:700;color:#92400e;margin-bottom:3px">🔒 Interne Notiz <span style="font-weight:500;color:var(--mu);font-size:.6rem">(nicht für MA/Kunde)</span></div>';
+    h+='<div style="white-space:pre-wrap;color:#451a03">'+esc(a.internNotiz)+'</div>';
+    h+='</div>';
+  }
   // Referenzbilder AG
   if(a.fotosAG&&a.fotosAG.length){
     h+='<div style="font-size:.7rem;font-weight:700;color:#2563eb;margin:10px 0 6px">📎 Referenzbilder vom Betrieb</div>';
