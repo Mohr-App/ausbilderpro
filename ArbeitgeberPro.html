@@ -366,6 +366,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <span class="bb-tx"><span class="bb-t">Neuen Auftrag erstellen</span><span class="bb-s">Kunde, Adresse, Zuweisung</span></span>
           <span class="bb-arr">›</span>
         </button>
+        <!-- Suchfeld -->
+        <div style="position:relative;margin-bottom:10px">
+          <input type="text" id="agAufSearch" placeholder="🔍 Suche: Name, Auftragsnr, Adresse, Kunde..." oninput="renderAgAuftraege()" style="width:100%;padding:11px 38px 11px 14px;border:1.5px solid var(--brd);border-radius:10px;font-size:.78rem;font-family:'Sora',sans-serif;background:#fff;outline:none" onfocus="this.style.borderColor='var(--acc)'" onblur="this.style.borderColor='var(--brd)'">
+          <button id="agAufSearchClear" onclick="document.getElementById('agAufSearch').value='';renderAgAuftraege();this.style.display='none'" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(148,163,184,.15);border:none;color:#64748b;cursor:pointer;width:24px;height:24px;border-radius:50%;font-size:.7rem;font-weight:700">✕</button>
+        </div>
         <details class="card" style="padding:0;margin-bottom:8px">
           <summary style="padding:14px 16px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-weight:700;font-size:.85rem">
             <span style="flex:1">📋 Offene Aufträge <span id="agAufOffenCount" style="display:inline-block;font-size:.6rem;font-weight:700;background:rgba(37,99,235,.1);color:var(--acc);padding:2px 8px;border-radius:5px;margin-left:6px">0</span></span>
@@ -5044,9 +5049,26 @@ function loadAgAuftraege(){
 }
 
 function renderAgAuftraege(){
+  // Suchbegriff holen
+  const inp=document.getElementById('agAufSearch');
+  const q=(inp&&inp.value||'').toLowerCase().trim();
+  // Clear-Button anzeigen wenn was eingegeben
+  const clr=document.getElementById('agAufSearchClear');
+  if(clr) clr.style.display=q?'block':'none';
+  // Filter-Helper
+  const matches=(a)=>{
+    if(!q) return true;
+    const fields=[
+      a.kunde,a.adresse,a.beschreibung,a.tnName,a.kategorie,
+      a.auftragsNr,a.kundeTel,a.kundeEmail,a.prioritaet
+    ].filter(Boolean).map(s=>String(s).toLowerCase());
+    // Auftragsnr auch ohne # finden ("2026-0001" matched "#2026-0001")
+    const qStripped=q.replace(/^#/,'');
+    return fields.some(f=>f.includes(q)||f.includes(qStripped));
+  };
   // Sortierung: neueste zuerst (erstelltAm absteigend)
-  const offen=_agAuftraege.filter(a=>a.status!=='erledigt').sort((a,b)=>(b.erstelltAm||0)-(a.erstelltAm||0));
-  const erledigt=_agAuftraege.filter(a=>a.status==='erledigt').sort((a,b)=>(b.erstelltAm||0)-(a.erstelltAm||0));
+  const offen=_agAuftraege.filter(a=>a.status!=='erledigt'&&matches(a)).sort((a,b)=>(b.erstelltAm||0)-(a.erstelltAm||0));
+  const erledigt=_agAuftraege.filter(a=>a.status==='erledigt'&&matches(a)).sort((a,b)=>(b.erstelltAm||0)-(a.erstelltAm||0));
   const elO=document.getElementById('agAufOffen');
   const elE=document.getElementById('agAufErledigt');
   // Count-Badges aktualisieren
@@ -5054,7 +5076,14 @@ function renderAgAuftraege(){
   const cE=document.getElementById('agAufErledigtCount');
   if(cO) cO.textContent=offen.length;
   if(cE) cE.textContent=erledigt.length;
-  if(!offen.length){elO.innerHTML='<div class="empty">Keine offenen Aufträge</div>';}
+  // Bei aktiver Suche: Sektionen automatisch aufklappen wenn Treffer
+  if(q){
+    const detO=elO&&elO.closest('details');
+    const detE=elE&&elE.closest('details');
+    if(detO) detO.open=offen.length>0;
+    if(detE) detE.open=erledigt.length>0;
+  }
+  if(!offen.length){elO.innerHTML='<div class="empty">'+(q?'Keine Treffer in offenen Aufträgen':'Keine offenen Aufträge')+'</div>';}
   else{
     let h='';
     offen.forEach(a=>{
@@ -5098,7 +5127,7 @@ function renderAgAuftraege(){
     });
     elO.innerHTML=h;
   }
-  if(!erledigt.length){elE.innerHTML='<div class="empty">Keine erledigten Aufträge</div>';}
+  if(!erledigt.length){elE.innerHTML='<div class="empty">'+(q?'Keine Treffer in erledigten Aufträgen':'Keine erledigten Aufträge')+'</div>';}
   else{
     let h='';
     erledigt.forEach(a=>{
