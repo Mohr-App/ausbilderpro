@@ -366,14 +366,24 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <span class="bb-tx"><span class="bb-t">Neuen Auftrag erstellen</span><span class="bb-s">Kunde, Adresse, Zuweisung</span></span>
           <span class="bb-arr">›</span>
         </button>
-        <div class="card">
-          <div class="card-title">📋 Offene Aufträge</div>
-          <div id="agAufOffen"><div class="empty">Keine offenen Aufträge</div></div>
-        </div>
-        <div class="card">
-          <div class="card-title">✅ Erledigte Aufträge</div>
-          <div id="agAufErledigt"><div class="empty">Keine erledigten Aufträge</div></div>
-        </div>
+        <details class="card" style="padding:0;margin-bottom:8px">
+          <summary style="padding:14px 16px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-weight:700;font-size:.85rem">
+            <span style="flex:1">📋 Offene Aufträge <span id="agAufOffenCount" style="display:inline-block;font-size:.6rem;font-weight:700;background:rgba(37,99,235,.1);color:var(--acc);padding:2px 8px;border-radius:5px;margin-left:6px">0</span></span>
+            <span style="color:var(--mu);font-size:1rem">▾</span>
+          </summary>
+          <div style="padding:0 14px 14px">
+            <div id="agAufOffen"><div class="empty">Keine offenen Aufträge</div></div>
+          </div>
+        </details>
+        <details class="card" style="padding:0;margin-bottom:8px">
+          <summary style="padding:14px 16px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-weight:700;font-size:.85rem">
+            <span style="flex:1">✅ Erledigte Aufträge <span id="agAufErledigtCount" style="display:inline-block;font-size:.6rem;font-weight:700;background:rgba(16,185,129,.1);color:#059669;padding:2px 8px;border-radius:5px;margin-left:6px">0</span></span>
+            <span style="color:var(--mu);font-size:1rem">▾</span>
+          </summary>
+          <div style="padding:0 14px 14px">
+            <div id="agAufErledigt"><div class="empty">Keine erledigten Aufträge</div></div>
+          </div>
+        </details>
       </div>
 
       <!-- LIVE: Meldungen -->
@@ -5034,10 +5044,16 @@ function loadAgAuftraege(){
 }
 
 function renderAgAuftraege(){
-  const offen=_agAuftraege.filter(a=>a.status!=='erledigt');
-  const erledigt=_agAuftraege.filter(a=>a.status==='erledigt');
+  // Sortierung: neueste zuerst (erstelltAm absteigend)
+  const offen=_agAuftraege.filter(a=>a.status!=='erledigt').sort((a,b)=>(b.erstelltAm||0)-(a.erstelltAm||0));
+  const erledigt=_agAuftraege.filter(a=>a.status==='erledigt').sort((a,b)=>(b.erstelltAm||0)-(a.erstelltAm||0));
   const elO=document.getElementById('agAufOffen');
   const elE=document.getElementById('agAufErledigt');
+  // Count-Badges aktualisieren
+  const cO=document.getElementById('agAufOffenCount');
+  const cE=document.getElementById('agAufErledigtCount');
+  if(cO) cO.textContent=offen.length;
+  if(cE) cE.textContent=erledigt.length;
   if(!offen.length){elO.innerHTML='<div class="empty">Keine offenen Aufträge</div>';}
   else{
     let h='';
