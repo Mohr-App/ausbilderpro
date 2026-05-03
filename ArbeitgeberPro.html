@@ -2671,9 +2671,10 @@ function _renderMaDetails(az){
   h+='<div style="display:inline-block;font-size:.6rem;font-weight:700;background:'+typBg+';color:'+typColor+';padding:2px 8px;border-radius:5px;margin-top:4px;text-transform:uppercase;letter-spacing:.04em">'+typLabel+'</div>';
   if(beruf||lj) h+='<div style="font-size:.7rem;color:var(--mu);margin-top:4px">'+esc([beruf,lj].filter(Boolean).join(' · '))+'</div>';
   h+='</div></div>';
-  // Quick-Stats (wird per _loadMaDetailStats befüllt)
-  h+='<div id="maDetStats" class="stat-row" style="margin-bottom:10px">';
+  // Quick-Stats (wird per _loadMaDetailStats befüllt) - 2x2 Grid für 4 Cards
+  h+='<div id="maDetStats" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">';
   h+='<div class="stat-card"><div class="stat-num" id="maDetStatStunden" style="color:#475569">–</div><div class="stat-label">Stunden (Monat)</div></div>';
+  h+='<div class="stat-card"><div class="stat-num" id="maDetStatSaldo" style="color:#475569">–</div><div class="stat-label">Saldo (Monat)</div></div>';
   h+='<div class="stat-card"><div class="stat-num" id="maDetStatAuftraege" style="color:#475569">–</div><div class="stat-label">Offene Aufträge</div></div>';
   h+='<div class="stat-card"><div class="stat-num" id="maDetStatStempel" style="color:#475569">–</div><div class="stat-label">Stempel-Status</div></div>';
   h+='</div>';
@@ -2735,18 +2736,31 @@ function _renderMaDetails(az){
 // Lädt Quick-Stats für die Detail-Anzeige
 function _loadMaDetailStats(tnId){
   if(!tnId||!db||!_uid) return;
+  const az=_azubis.find(a=>a.id===tnId);
+  const plan=az&&az.arbeitszeitPlan;
+  // Soll-Minuten pro Wochentag aus Plan (mo=Mo, ...)
+  const planMin={mo:0,di:0,mi:0,do:0,fr:0,sa:0,so:0};
+  if(plan){
+    ['mo','di','mi','do','fr','sa','so'].forEach(k=>{
+      planMin[k]=Math.round((Number(plan[k])||0)*60);
+    });
+  }
+  // Map Wochentag-Index (0=So in JS, 1=Mo, ...) zu Plan-Key
+  const wdMap=['so','mo','di','mi','do','fr','sa'];
   const ym=new Date().toISOString().slice(0,7);
+  const heute=localDate();
   // Stunden im aktuellen Monat
   db.collection('globalTN').doc(tnId).collection('zeiterfassung')
     .where('datum','>=',ym+'-01').where('datum','<=',ym+'-31').get().then(snap=>{
       let totalMin=0;
       let isStempelt=false;
+      const istProTag={};
       snap.forEach(d=>{
         const dd=d.data();
         if(dd.firmaUid && dd.firmaUid !== _uid) return;
-        if(dd.istMinuten) totalMin+=dd.istMinuten;
+        if(dd.istMinuten){totalMin+=dd.istMinuten; istProTag[dd.datum]=dd.istMinuten;}
         // Heute eingestempelt?
-        if(dd.datum===localDate() && dd.eingang && !dd.ausgang) isStempelt=true;
+        if(dd.datum===heute && dd.eingang && !dd.ausgang) isStempelt=true;
       });
       const elS=document.getElementById('maDetStatStunden');
       if(elS) elS.textContent=Math.round(totalMin/60)+'h';
@@ -2755,7 +2769,49 @@ function _loadMaDetailStats(tnId){
         elSt.textContent=isStempelt?'⏱':'-';
         elSt.style.color=isStempelt?'#059669':'#94a3b8';
       }
-    }).catch(()=>{});
+      // Saldo berechnen: Soll bis heute - Ist bis heute
+      const elSaldo=document.getElementById('maDetStatSaldo');
+      if(elSaldo){
+        if(!plan){
+          elSaldo.textContent='–';
+          elSaldo.style.color='#94a3b8';
+          elSaldo.title='Kein Arbeitszeitplan hinterlegt';
+        } else {
+          // Soll-Minuten ab Monatsanfang bis heute
+          const heuteDate=new Date(heute+'T12:00');
+          const m=heuteDate.getMonth();
+          const y=heuteDate.getFullYear();
+          let sollMin=0;
+          for(let d=1;d<=heuteDate.getDate();d++){
+            const dt=new Date(y,m,d);
+            const wd=wdMap[dt.getDay()];
+            sollMin+=planMin[wd];
+          }
+          const saldo=totalMin-sollMin; // positiv = Mehrstunden, negativ = Minderstunden
+          const stunden=saldo/60;
+          const sign=saldo>=0?'+':'-';
+          const abs=Math.abs(stunden);
+          // Format: +5h 30min oder -2h 15min
+          const h=Math.floor(abs);
+          const mi=Math.round((abs-h)*60);
+          let txt;
+          if(Math.abs(saldo)<5){ // Toleranz <5 min
+            txt='±0';
+            elSaldo.style.color='#475569';
+          } else {
+            txt=sign+(h>0?h+'h':'')+(mi>0?(h>0?' ':'')+mi+'min':(h===0?'0':''));
+            if(saldo>0) elSaldo.style.color='#059669'; // Grün bei Plus
+            else elSaldo.style.color='#dc2626'; // Rot bei Minus
+          }
+          elSaldo.textContent=txt;
+          elSaldo.title='Saldo seit '+ym+'-01: Soll '+Math.round(sollMin/60)+'h, Ist '+Math.round(totalMin/60)+'h';
+        }
+      }
+    }).catch(()=>{
+      // Bei Fehler Saldo grau lassen
+      const elSaldo=document.getElementById('maDetStatSaldo');
+      if(elSaldo){elSaldo.textContent='–';elSaldo.style.color='#94a3b8';}
+    });
   // Offene Aufträge
   db.collection('globalTN').doc(tnId).collection('auftraege').get().then(snap=>{
     let offen=0;
