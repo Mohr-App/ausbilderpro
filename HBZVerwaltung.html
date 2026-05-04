@@ -1288,13 +1288,24 @@ service cloud.firestore {
               </div>
             </div>
             <div class="scard-body" onclick="event.stopPropagation()">
-              <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px">Test-Accounts und deren gesamte Daten löschen: globalTN + Sub-Collections (Zeiterfassung, Aufträge, Urlaub, Meldungen, Dokumente) + users-Doc + Kurs-Teilnahmen. Auth-Account muss danach manuell in der Firebase Console gelöscht werden.</div>
+              <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px">Test-Accounts und deren gesamte Daten löschen: globalTN + Sub-Collections (Zeiterfassung, Aufträge, Urlaub, Meldungen, Dokumente, FirmaHistorie, Messages, Baustellen) + users-Doc + Sub-Collections (data, belege, courseDocs, files, seatDocs) + Kurs-Teilnahmen. Auth-Account muss danach manuell in der Firebase Console gelöscht werden.</div>
               <div id="cleanupList" style="max-height:300px;overflow-y:auto"><div class="empty">Lädt...</div></div>
+              <!-- Zusatz-Optionen -->
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;padding:8px 10px;background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.12);border-radius:6px">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.7rem;color:#475569">
+                  <input type="checkbox" id="cleanupIncludeStorage" style="accent-color:#ef4444;width:14px;height:14px">
+                  <span>Auch <b>Storage-Dateien</b> (Profilbilder, hochgeladene PDFs) löschen</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.7rem;color:#475569">
+                  <input type="checkbox" id="cleanupIncludeMails" style="accent-color:#ef4444;width:14px;height:14px">
+                  <span>Auch <b>Mail-Logs</b> (gesendete E-Mails an diese Adressen) löschen</span>
+                </label>
+              </div>
               <div style="display:flex;gap:6px;margin-top:10px">
                 <button class="btn-sm btn-ok" onclick="loadCleanupList()" style="flex:1;font-size:.72rem;padding:8px" title="OK">Aktualisieren</button>
                 <button class="btn-sm" onclick="executeCleanup()" style="flex:1;font-size:.72rem;padding:8px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#ef4444" id="cleanupExecBtn" disabled title="Ausgewählte löschen">Ausgewählte löschen</button>
               </div>
-              <div id="cleanupLog" style="margin-top:8px;font-size:.62rem;color:var(--mu);font-family:'JetBrains Mono',monospace;max-height:150px;overflow-y:auto"></div>
+              <div id="cleanupLog" style="margin-top:8px;font-size:.62rem;color:var(--mu);font-family:'JetBrains Mono',monospace;max-height:200px;overflow-y:auto"></div>
             </div>
           </div>
 
@@ -3234,7 +3245,7 @@ function loadCleanupList(){
       const isSelf=key===_uid;
       const displayName=a.tnName||a.name;
       html+='<label style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid rgba(0,0,0,.04);cursor:'+(isSelf?'not-allowed':'pointer')+';opacity:'+(isSelf?'.5':'1')+'">'
-        +'<input type="checkbox" class="cleanup-cb" value="'+esc(key)+'" data-uid="'+esc(a.uid)+'" data-tnid="'+esc(a.tnId||'')+'"'+(isSelf?' disabled':'')+' onchange="updateCleanupBtn()" style="accent-color:#ef4444;width:16px;height:16px">'
+        +'<input type="checkbox" class="cleanup-cb" value="'+esc(key)+'" data-uid="'+esc(a.uid)+'" data-tnid="'+esc(a.tnId||'')+'" data-email="'+esc(a.email||'')+'"'+(isSelf?' disabled':'')+' onchange="updateCleanupBtn()" style="accent-color:#ef4444;width:16px;height:16px">'
         +'<span style="padding:2px 6px;background:'+col+'15;color:'+col+';border-radius:4px;font-size:.52rem;font-weight:700;min-width:60px;text-align:center">'+label+'</span>'
         +'<span style="flex:1;font-size:.72rem;font-weight:600">'+esc(displayName)+'</span>'
         +'<span style="font-size:.58rem;color:var(--mu)">'+esc(a.email)+'</span>'
@@ -3252,11 +3263,121 @@ function updateCleanupBtn(){
   btn.textContent=checked?checked+' Account'+(checked>1?'s':'')+' löschen':'Ausgewählte löschen';
 }
 
+// Subcollections die unter einem globalTN-Doc existieren koennen
+// (auftraege wird speziell behandelt - hat selbst noch messages-Subcollection)
+const _CLEANUP_TN_SUBCOLLS = [
+  'zeiterfassung', 'urlaubsantraege', 'betriebMeldungen',
+  'dokumente', 'firmaHistorie', 'baustellen'
+];
+
+// Subcollections die unter einem users-Doc existieren koennen
+const _CLEANUP_USER_SUBCOLLS = [
+  'data', 'belege', 'courseDocs', 'files', 'seatDocs'
+];
+
+// Helper: alle Docs einer Subcollection in Batches loeschen (max 500/Batch)
+async function _cleanupDeleteSubcollection(parentRef, subName, log){
+  try{
+    let total=0;
+    while(true){
+      const snap=await parentRef.collection(subName).limit(450).get();
+      if(snap.empty) break;
+      const batch=db.batch();
+      snap.forEach(d=>batch.delete(d.ref));
+      await batch.commit();
+      total+=snap.size;
+      if(snap.size<450) break;
+    }
+    if(total) log('  ✓ '+subName+': '+total+' Docs gelöscht');
+    return total;
+  }catch(e){ log('  ✗ '+subName+': '+e.message); return 0; }
+}
+
+// Helper: auftraege-Subcollection inkl. tiefer 'messages'-Subcollections
+async function _cleanupDeleteAuftraege(tnRef, log){
+  try{
+    let totalAuf=0, totalMsg=0;
+    const aufSnap=await tnRef.collection('auftraege').get();
+    if(aufSnap.empty){ return 0; }
+    // Pro Auftrag: erst messages-Subcollection leeren, dann Auftrag selbst
+    for(const aufDoc of aufSnap.docs){
+      const msgSnap=await aufDoc.ref.collection('messages').get();
+      if(!msgSnap.empty){
+        const batch=db.batch();
+        msgSnap.forEach(d=>batch.delete(d.ref));
+        await batch.commit();
+        totalMsg+=msgSnap.size;
+      }
+      await aufDoc.ref.delete();
+      totalAuf++;
+    }
+    if(totalAuf) log('  ✓ auftraege: '+totalAuf+' Docs gelöscht'+(totalMsg?' (inkl. '+totalMsg+' Chat-Nachrichten)':''));
+    return totalAuf+totalMsg;
+  }catch(e){ log('  ✗ auftraege: '+e.message); return 0; }
+}
+
+// Helper: Storage-Path rekursiv loeschen
+async function _cleanupDeleteStoragePath(prefix, log){
+  if(!firebase.storage) return 0;
+  try{
+    const ref=firebase.storage().ref().child(prefix);
+    const result=await ref.listAll();
+    let total=0;
+    // Files in diesem Folder
+    for(const item of result.items){
+      try{ await item.delete(); total++; }catch(e){}
+    }
+    // Sub-folders rekursiv
+    for(const folder of result.prefixes){
+      total += await _cleanupDeleteStoragePath(folder.fullPath, log);
+    }
+    if(total && prefix.split('/').length<=2) log('  ✓ Storage '+prefix+': '+total+' Dateien gelöscht');
+    return total;
+  }catch(e){
+    // 404 ist OK (keine Dateien) - andere Fehler loggen
+    if(!e.message.includes('does not exist')&&!e.message.includes('not found')){
+      log('  ✗ Storage '+prefix+': '+e.message);
+    }
+    return 0;
+  }
+}
+
+// Helper: Mail-Logs zu einer E-Mail-Adresse loeschen
+async function _cleanupDeleteMails(email, log){
+  if(!email) return 0;
+  try{
+    const snap=await db.collection('mail').where('to','==',email).get();
+    if(snap.empty) return 0;
+    let total=0;
+    // In 450er-Batches loeschen
+    let batch=db.batch();
+    let count=0;
+    for(const d of snap.docs){
+      batch.delete(d.ref);
+      count++; total++;
+      if(count>=450){
+        await batch.commit();
+        batch=db.batch();
+        count=0;
+      }
+    }
+    if(count>0) await batch.commit();
+    log('  ✓ mail-Logs ('+email+'): '+total+' Mails gelöscht');
+    return total;
+  }catch(e){ log('  ✗ mail: '+e.message); return 0; }
+}
+
 async function executeCleanup(){
   const checks=[...document.querySelectorAll('.cleanup-cb:checked:not(:disabled)')];
   if(!checks.length) return;
+  const includeMails = document.getElementById('cleanupIncludeMails')?.checked || false;
+  const includeStorage = document.getElementById('cleanupIncludeStorage')?.checked || false;
   const names=checks.map(c=>c.closest('label').querySelector('span:nth-child(3)').textContent).join(', ');
-  if(!confirm('ACHTUNG: Folgende Accounts und ALLE zugehörigen Daten werden unwiderruflich gelöscht:\n\n'+names+'\n\nDies kann NICHT rückgängig gemacht werden!\n\nFortfahren?')) return;
+  let extras=[];
+  if(includeStorage) extras.push('Storage-Dateien (Bilder/PDFs)');
+  if(includeMails) extras.push('Mail-Logs (gesendete E-Mails)');
+  const extraText = extras.length ? '\n\nZUSÄTZLICH werden gelöscht:\n• '+extras.join('\n• ') : '';
+  if(!confirm('ACHTUNG: Folgende Accounts und ALLE zugehörigen Daten werden unwiderruflich gelöscht:\n\n'+names+extraText+'\n\nDies kann NICHT rückgängig gemacht werden!\n\nFortfahren?')) return;
   if(!confirm('Letzte Warnung: Wirklich '+checks.length+' Account(s) komplett löschen?')) return;
 
   const log=document.getElementById('cleanupLog');
@@ -3264,69 +3385,92 @@ async function executeCleanup(){
   btn.disabled=true;btn.textContent='Lösche...';
   log.innerHTML='';
 
-  function addLog(msg){log.innerHTML+=msg+'<br>';log.scrollTop=log.scrollHeight;}
+  function addLog(msg,color){
+    const t=new Date().toLocaleTimeString('de-DE');
+    log.innerHTML+='<div style="color:'+(color||'var(--mu)')+'">['+t+'] '+msg+'</div>';
+    log.scrollTop=log.scrollHeight;
+  }
+
+  let totalDocs=0, totalFiles=0, totalMails=0;
 
   for(const cb of checks){
     const uid=cb.dataset.uid;
     const tnId=cb.dataset.tnid;
+    const email=cb.dataset.email||'';
     const label=cb.closest('label').querySelector('span:nth-child(3)').textContent;
-    addLog('━━━ '+label+' ━━━');
+    addLog('━━━ '+label+' ━━━','#1e293b');
 
-    // 1. globalTN sub-collections
+    // 1. globalTN sub-collections (auftraege speziell wegen tiefer messages-Subcoll)
     if(tnId){
-      const subColls=['zeiterfassung','auftraege','urlaubsantraege','betriebMeldungen','dokumente'];
-      for(const sub of subColls){
-        try{
-          const snap=await db.collection('globalTN').doc(tnId).collection(sub).get();
-          if(snap.size){
-            const batch=db.batch();
-            snap.forEach(d=>batch.delete(d.ref));
-            await batch.commit();
-            addLog('  ✓ '+sub+': '+snap.size+' Docs gelöscht');
-          }
-        }catch(e){addLog('  ✗ '+sub+': '+e.message);}
+      const tnRef=db.collection('globalTN').doc(tnId);
+      // 1a. auftraege incl. messages
+      totalDocs += await _cleanupDeleteAuftraege(tnRef, addLog);
+      // 1b. restliche Subcollections
+      for(const sub of _CLEANUP_TN_SUBCOLLS){
+        totalDocs += await _cleanupDeleteSubcollection(tnRef, sub, addLog);
       }
-      // 2. globalTN doc
+      // 2. globalTN doc selbst
       try{
         await db.collection('globalTN').doc(tnId).delete();
         addLog('  ✓ globalTN/'+tnId+' gelöscht');
-      }catch(e){addLog('  ✗ globalTN: '+e.message);}
+        totalDocs++;
+      }catch(e){addLog('  ✗ globalTN: '+e.message,'#ef4444');}
+      // 2b. Storage fuer den TN
+      if(includeStorage){
+        totalFiles += await _cleanupDeleteStoragePath('globalTN/'+tnId, addLog);
+      }
     }
 
     // 3. Kurs-Teilnahmen entfernen
-    try{
-      const kursSnap=await db.collection('shared').doc('kurse').collection('list').get();
-      for(const kursDoc of kursSnap.docs){
-        if(!tnId) continue;
-        const tnRef=kursDoc.ref.collection('teilnehmer').doc(tnId);
-        const tnDoc=await tnRef.get();
-        if(tnDoc.exists){
-          await tnRef.delete();
-          addLog('  ✓ Kurs '+kursDoc.id+': TN-Eintrag entfernt');
-        }
-      }
-    }catch(e){addLog('  ✗ Kurse: '+e.message);}
-
-    // 4. users doc + sub-collections
-    if(uid){
+    if(tnId){
       try{
-        const dataSub=await db.collection('users').doc(uid).collection('data').get();
-        if(dataSub.size){
-          const batch=db.batch();
-          dataSub.forEach(d=>batch.delete(d.ref));
-          await batch.commit();
-          addLog('  ✓ users/data: '+dataSub.size+' Docs gelöscht');
+        const kursSnap=await db.collection('shared').doc('kurse').collection('list').get();
+        let removed=0;
+        for(const kursDoc of kursSnap.docs){
+          const tnRef=kursDoc.ref.collection('teilnehmer').doc(tnId);
+          const tnDoc=await tnRef.get();
+          if(tnDoc.exists){
+            await tnRef.delete();
+            removed++;
+            totalDocs++;
+          }
         }
-        await db.collection('users').doc(uid).delete();
-        addLog('  ✓ users/'+uid.substring(0,8)+'… gelöscht');
-      }catch(e){addLog('  ✗ users: '+e.message);}
+        if(removed) addLog('  ✓ Kurs-Teilnahmen: '+removed+' entfernt');
+      }catch(e){addLog('  ✗ Kurse: '+e.message,'#ef4444');}
     }
 
-    addLog('  ✅ '+label+' komplett bereinigt');
+    // 4. users sub-collections (alle 5)
+    if(uid){
+      for(const sub of _CLEANUP_USER_SUBCOLLS){
+        totalDocs += await _cleanupDeleteSubcollection(db.collection('users').doc(uid), sub, addLog);
+      }
+      // 5. users doc selbst
+      try{
+        await db.collection('users').doc(uid).delete();
+        addLog('  ✓ users/'+uid.substring(0,8)+'… gelöscht');
+        totalDocs++;
+      }catch(e){addLog('  ✗ users: '+e.message,'#ef4444');}
+      // 5b. Storage fuer den User
+      if(includeStorage){
+        totalFiles += await _cleanupDeleteStoragePath('users/'+uid, addLog);
+      }
+    }
+
+    // 6. Mail-Logs (optional)
+    if(includeMails && email){
+      totalMails += await _cleanupDeleteMails(email, addLog);
+    }
+
+    addLog('  ✅ '+label+' komplett bereinigt','#059669');
   }
 
-  addLog('');
-  addLog('Fertig! Auth-Accounts ggf. in Firebase Console → Authentication löschen.');
+  addLog('','');
+  addLog('═══ FERTIG ═══','#1e293b');
+  addLog('  '+totalDocs+' Firestore-Docs gelöscht','#059669');
+  if(includeStorage) addLog('  '+totalFiles+' Storage-Dateien gelöscht','#059669');
+  if(includeMails) addLog('  '+totalMails+' Mail-Logs gelöscht','#059669');
+  addLog('','');
+  addLog('⚠ Auth-Accounts müssen manuell in Firebase Console → Authentication gelöscht werden','#d97706');
   loadCleanupList();
   renderSbAusbTree();
   renderSbTnTree();
