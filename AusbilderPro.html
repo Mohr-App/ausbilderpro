@@ -1835,7 +1835,9 @@ function autoSelectCurrent(){
     }
   }
   if(bestKat&&bestInst){
-    S.curKat=bestKat; S.curInst=bestInst; S.kats[bestKat].open=true;
+    S.curKat=bestKat; S.curInst=bestInst;
+    // Nur die Kat des aktuell laufenden Lehrgangs offen, alle anderen zu
+    Object.keys(S.kats).forEach(k=>{ S.kats[k].open=(k===bestKat); });
   }
 }
 
@@ -2022,7 +2024,12 @@ function renderSidebar(){
 }
 
 function toggleKat(id){ S.kats[id].open=!S.kats[id].open; persist(); renderSidebar(); }
-function selInst(katId,instId){ S.curKat=katId;S.curInst=instId;S.kats[katId].open=true; persist();renderAll(); }
+function selInst(katId,instId){
+  S.curKat=katId;S.curInst=instId;
+  // Nur die Kat des aktuellen Lehrgangs offen halten, alle anderen zuklappen
+  Object.keys(S.kats).forEach(k=>{ S.kats[k].open=(k===katId); });
+  persist();renderAll();
+}
 
 function moveKat(id,dir,e){
   e.stopPropagation();
