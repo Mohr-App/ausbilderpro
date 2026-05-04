@@ -832,6 +832,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="copyright">© AusbilderPro v2.6.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
+<!-- AKTIONS-VERLAUF MODAL -->
+<div class="ov" id="aktionsVerlaufModal" title="Schließen" onclick="if(event.target===this)this.classList.remove('open')">
+<div class="modal" style="max-width:520px">
+<div class="mhd"><div class="mtit">📋 Aktions-Verlauf</div><button class="xcls" onclick="document.getElementById('aktionsVerlaufModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
+<div class="mbdy" style="max-height:70vh;overflow-y:auto" id="aktionsVerlaufBody"><div style="padding:8px 0;color:#6b7280">Lädt…</div></div>
+</div></div>
+
 <div class="ov" id="hilfeModal" title="Schließen" onclick="if(event.target===this)this.classList.remove('open')">
 <div class="modal" style="max-width:520px">
 <div class="mhd"><div class="mtit">❓ Hilfe – AusbilderPro</div><button class="xcls" onclick="document.getElementById('hilfeModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
@@ -5965,15 +5972,19 @@ async function showAktionsVerlauf(){
   const kursId=inst.sharedKursId;
   if(!kursId||!_db){toast('Kein verknüpfter Kurs','bad');return;}
   const kursLabel=S.kats[S.curKat]?.label||'Lehrgang';
+  const modal=document.getElementById('aktionsVerlaufModal');
+  const body=document.getElementById('aktionsVerlaufBody');
+  if(!modal||!body){toast('Modal nicht gefunden','bad');return;}
+  // Modal sofort öffnen mit Loading
+  body.innerHTML='<div style="padding:14px 0;text-align:center;color:#6b7280">Lädt Aktions-Verlauf…</div>';
+  modal.classList.add('open');
   // Alle TN-IDs aus Sitzplan sammeln
   const tnIds=new Set();
   Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
   if(!tnIds.size){
-    safeAlert('📋 Aktions-Verlauf','<div style="padding:8px 0;color:#6b7280">Keine verknüpften TN — kein Verlauf verfügbar.</div>');
+    body.innerHTML='<div style="padding:8px 0;color:#6b7280">Keine verknüpften TN — kein Verlauf verfügbar.</div>';
     return;
   }
-  // Loading-Modal
-  safeAlert('📋 Aktions-Verlauf','<div style="padding:8px 0;color:#6b7280">Lädt…</div>');
   // Alle relevanten Aktions-Typen sammeln (aus benachrichtigungen)
   const ausloeserTypen=['kurs_ausfall','ausbilder_spaeter'];
   const aktionen=new Map(); // key: erstellt-timestamp, value: aktion-meta
@@ -6043,7 +6054,7 @@ async function showAktionsVerlauf(){
       +'Falls das ein Versehen war, schreibe sofort eine korrigierende E-Mail an deine Azubis.'
       +'</div>';
   }
-  safeAlert('📋 Aktions-Verlauf',html);
+  body.innerHTML=html;
 }
 
 function ausbilderKommtSpaeter(){
