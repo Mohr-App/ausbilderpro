@@ -832,6 +832,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="copyright">© AusbilderPro v2.6.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
+<!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
+<div class="ov" id="aktionDatumModal" title="Schließen" onclick="if(event.target===this)this.classList.remove('open')">
+<div class="modal" style="max-width:460px">
+<div class="mhd"><div class="mtit" id="aktionDatumTitle">Ausfall / Verspätung melden</div><button class="xcls" onclick="document.getElementById('aktionDatumModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
+<div class="mbdy" id="aktionDatumBody"></div>
+</div></div>
+
 <!-- AKTIONS-VERLAUF MODAL -->
 <div class="ov" id="aktionsVerlaufModal" title="Schließen" onclick="if(event.target===this)this.classList.remove('open')">
 <div class="modal" style="max-width:520px">
@@ -5915,55 +5922,240 @@ function mtUpdateFachrichtungen(){
   });
 }
 
+// Zentraler Modal-Helper für Aktionen mit Datums-Auswahl (Ausfall + Verspätung)
+// opts: {typ, titel, icon, color, bgColor, borderColor, btnLabel, kursLabel, tnCount,
+//        needsZeit, needsFreitext, onConfirm: (datum, datumDE, wann, zeit?, freitext?)}
+function _openAktionDatumModal(opts){
+  const modal=document.getElementById('aktionDatumModal');
+  const titleEl=document.getElementById('aktionDatumTitle');
+  const body=document.getElementById('aktionDatumBody');
+  if(!modal||!body){toast('Modal nicht gefunden','bad');return;}
+  titleEl.textContent=opts.titel;
+  // Heute + 30 Tage in Zukunft
+  const today=new Date();
+  const todayISO=today.toISOString().slice(0,10);
+  const max=new Date(today); max.setDate(max.getDate()+30);
+  const maxISO=max.toISOString().slice(0,10);
+  // Modal-Body bauen
+  let html='<div style="font-size:.78rem;color:#475569;margin-bottom:12px;padding:8px 10px;background:'+opts.bgColor+';border:1px solid '+opts.borderColor+';border-radius:8px">'
+    +'<b>'+esc(opts.kursLabel)+'</b><br>'
+    +'<span style="font-size:.7rem">'+opts.tnCount+' Teilnehmer werden benachrichtigt</span>'
+    +'</div>';
+  // Datums-Schnellauswahl + Picker
+  html+='<div style="margin-bottom:12px">'
+    +'<label style="display:block;font-size:.72rem;font-weight:700;color:#475569;margin-bottom:6px">📅 Für welchen Tag?</label>'
+    +'<div style="display:flex;gap:6px;margin-bottom:8px">'
+    +'<button type="button" onclick="_aktionDatumQuick(\'heute\')" id="aktDatumBtnHeute" class="aktDatumBtn" style="flex:1;padding:10px;border:1.5px solid '+opts.borderColor+';background:'+opts.color+';color:#fff;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer">Heute</button>'
+    +'<button type="button" onclick="_aktionDatumQuick(\'morgen\')" id="aktDatumBtnMorgen" class="aktDatumBtn" style="flex:1;padding:10px;border:1.5px solid #cbd5e1;background:#fff;color:#475569;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer">Morgen</button>'
+    +'<button type="button" onclick="_aktionDatumQuick(\'pickFocus\')" id="aktDatumBtnPick" class="aktDatumBtn" style="flex:1;padding:10px;border:1.5px solid #cbd5e1;background:#fff;color:#475569;border-radius:8px;font-size:.74rem;font-weight:700;cursor:pointer">Anderes Datum</button>'
+    +'</div>'
+    +'<input type="date" id="aktDatumPick" min="'+todayISO+'" max="'+maxISO+'" value="'+todayISO+'" style="width:100%;padding:10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:.78rem;font-family:Sora,sans-serif" onchange="_aktionDatumQuick(\'pick\')">'
+    +'</div>';
+  // Uhrzeit-Feld (für Verspätung)
+  if(opts.needsZeit){
+    html+='<div style="margin-bottom:12px">'
+      +'<label style="display:block;font-size:.72rem;font-weight:700;color:#475569;margin-bottom:6px">🕐 Ab wann beginnt der Unterricht?</label>'
+      +'<input type="text" id="aktDatumZeit" placeholder="9:30" style="width:100%;padding:10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:.85rem;font-family:JetBrains Mono,monospace;font-weight:700">'
+      +'</div>';
+  }
+  // Freitext
+  if(opts.needsFreitext){
+    html+='<div style="margin-bottom:12px">'
+      +'<label style="display:block;font-size:.72rem;font-weight:700;color:#475569;margin-bottom:6px">💬 Optionale Nachricht (kann leer bleiben)</label>'
+      +'<textarea id="aktDatumFreitext" rows="2" placeholder="z.B. ggf. Material mitbringen..." style="width:100%;padding:10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:.78rem;font-family:Sora,sans-serif;resize:vertical"></textarea>'
+      +'</div>';
+  }
+  // Vorschau-Block
+  html+='<div id="aktDatumPreview" style="margin-bottom:12px;padding:10px;background:'+opts.bgColor+';border:1.5px solid '+opts.borderColor+';border-radius:8px;font-size:.78rem;line-height:1.5;color:#1e293b"></div>';
+  // Action-Buttons
+  html+='<div style="display:flex;gap:6px">'
+    +'<button type="button" onclick="document.getElementById(\'aktionDatumModal\').classList.remove(\'open\')" style="flex:1;padding:11px;background:#fff;border:1.5px solid #cbd5e1;color:#475569;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:Sora,sans-serif">Abbrechen</button>'
+    +'<button type="button" id="aktDatumConfirmBtn" style="flex:2;padding:11px;background:'+opts.color+';border:none;color:#fff;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:Sora,sans-serif">'+opts.btnLabel+'</button>'
+    +'</div>';
+  body.innerHTML=html;
+  // State + Logic
+  window._aktDatumState={
+    typ:opts.typ,
+    color:opts.color,
+    bgColor:opts.bgColor,
+    borderColor:opts.borderColor,
+    needsZeit:!!opts.needsZeit,
+    needsFreitext:!!opts.needsFreitext,
+    onConfirm:opts.onConfirm,
+    todayISO:todayISO,
+    selected:'heute' // 'heute' | 'morgen' | 'pick'
+  };
+  // Vorschau initial rendern
+  _aktionDatumQuick('heute');
+  // Confirm-Button
+  document.getElementById('aktDatumConfirmBtn').onclick=()=>{
+    const st=window._aktDatumState;
+    let datum, wann;
+    if(st.selected==='heute'){
+      datum=st.todayISO; wann='heute';
+    } else if(st.selected==='morgen'){
+      const t=new Date(); t.setDate(t.getDate()+1);
+      datum=t.toISOString().slice(0,10); wann='morgen';
+    } else {
+      const inp=document.getElementById('aktDatumPick');
+      datum=inp.value;
+      if(!datum){toast('Bitte Datum wählen','bad');return;}
+      if(datum<st.todayISO){toast('Datum darf nicht in der Vergangenheit liegen','bad');return;}
+      // Datum-Vergleich für 'morgen'
+      const morgenISO=(()=>{const t=new Date();t.setDate(t.getDate()+1);return t.toISOString().slice(0,10);})();
+      wann = datum===st.todayISO ? 'heute' : (datum===morgenISO ? 'morgen' : 'spaeter');
+    }
+    const datumDE=new Date(datum+'T12:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+    let zeit, freitext;
+    if(st.needsZeit){
+      zeit=(document.getElementById('aktDatumZeit')?.value||'').trim();
+      if(!zeit){toast('Bitte Uhrzeit angeben','bad');return;}
+    }
+    if(st.needsFreitext){
+      freitext=(document.getElementById('aktDatumFreitext')?.value||'').trim();
+    }
+    modal.classList.remove('open');
+    if(st.onConfirm) st.onConfirm(datum, datumDE, wann, zeit, freitext);
+  };
+  modal.classList.add('open');
+}
+
+function _aktionDatumQuick(which){
+  const st=window._aktDatumState;
+  if(!st) return;
+  // Buttons-State
+  const btns={heute:'aktDatumBtnHeute', morgen:'aktDatumBtnMorgen', pick:'aktDatumBtnPick', pickFocus:'aktDatumBtnPick'};
+  ['heute','morgen','pick'].forEach(k=>{
+    const b=document.getElementById(btns[k]);
+    if(!b) return;
+    b.style.background='#fff';
+    b.style.color='#475569';
+    b.style.borderColor='#cbd5e1';
+  });
+  // Aktiv setzen
+  const target = which==='pickFocus' ? 'pick' : which;
+  st.selected=target;
+  const activeBtn=document.getElementById(btns[target]);
+  if(activeBtn){
+    activeBtn.style.background=st.color;
+    activeBtn.style.color='#fff';
+    activeBtn.style.borderColor=st.borderColor;
+  }
+  // Pick-Mode: Picker-Wert berücksichtigen
+  if(which==='pickFocus'){
+    const inp=document.getElementById('aktDatumPick');
+    if(inp){inp.focus();}
+  } else if(which==='heute'){
+    const inp=document.getElementById('aktDatumPick');
+    if(inp) inp.value=st.todayISO;
+  } else if(which==='morgen'){
+    const t=new Date(); t.setDate(t.getDate()+1);
+    const inp=document.getElementById('aktDatumPick');
+    if(inp) inp.value=t.toISOString().slice(0,10);
+  }
+  // Vorschau aktualisieren
+  _aktionDatumPreview();
+}
+
+function _aktionDatumPreview(){
+  const st=window._aktDatumState;
+  const prev=document.getElementById('aktDatumPreview');
+  if(!st||!prev) return;
+  let datum, wann;
+  if(st.selected==='heute'){
+    datum=st.todayISO; wann='heute';
+  } else if(st.selected==='morgen'){
+    const t=new Date(); t.setDate(t.getDate()+1);
+    datum=t.toISOString().slice(0,10); wann='morgen';
+  } else {
+    const inp=document.getElementById('aktDatumPick');
+    datum=inp?.value||st.todayISO;
+    const morgenISO=(()=>{const t=new Date();t.setDate(t.getDate()+1);return t.toISOString().slice(0,10);})();
+    wann = datum===st.todayISO ? 'heute' : (datum===morgenISO ? 'morgen' : 'spaeter');
+  }
+  const datumDE=new Date(datum+'T12:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  const tagWort = wann==='heute' ? 'heute' : (wann==='morgen' ? 'morgen' : 'am '+datumDE);
+  // Vorschau-Text je nach Typ
+  let text='';
+  if(st.typ==='ausfall'){
+    text = wann==='heute'
+      ? '<b>Vorschau:</b> Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen.'
+      : '<b>Vorschau:</b> Der Lehrgang fällt '+tagWort+' aus – bitte direkt zur Arbeit fahren.';
+  } else if(st.typ==='spaeter'){
+    text = '<b>Vorschau:</b> Der Unterricht beginnt '+tagWort+' voraussichtlich später. Bitte im Schulungsraum warten.';
+  }
+  prev.innerHTML=text;
+}
+
 function kursAusfall(){
   const inst=curInst();if(!inst)return;
   const kursId=inst.sharedKursId;
   if(!kursId||!_db){toast('Kein verknüpfter Kurs','bad');return;}
-  const today=new Date().toISOString().slice(0,10);
-  const todayDE=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  const tnIds=new Set();
+  Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
+  if(!tnIds.size){toast('Keine verknüpften TN','bad');return;}
   const kursLabel=S.kats[S.curKat]?.label||'Lehrgang';
-  safeConfirm(
-    '⚠️ Kurs fällt heute aus',
-    '<div style="margin-bottom:8px"><b>'+esc(kursLabel)+'</b></div>'
-    +'<div style="font-size:.75rem;color:#475569;margin-bottom:8px">Datum: '+todayDE+'</div>'
-    +'<div style="font-size:.78rem;line-height:1.5">Alle Teilnehmer und deren Betriebe werden <b>sofort</b> benachrichtigt:</div>'
-    +'<div style="margin:8px 0;padding:10px;background:rgba(239,68,68,.05);border-radius:8px;font-size:.78rem;font-style:italic">„Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages."</div>',
-    'Ja, ich möchte alle TN und Betriebe benachrichtigen',
-    '⚠️ Ausfall melden',
-    ()=>{
-      const tnIds=new Set();
-      Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
-      if(!tnIds.size){toast('Keine verknüpften TN','bad');return;}
-      const ausbilderName=_auth?.currentUser?.displayName||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
-      const notification={typ:'kurs_ausfall',kursId,kursName:kursLabel,datum:today,datumDE:todayDE,nachricht:'Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.',von:ausbilderName,erstellt:Date.now(),gelesen:false};
-      let ok=0,fail=0;
-      const promises=[];
-      tnIds.forEach(tnId=>{
-        promises.push(_db.collection('globalTN').doc(tnId).get().then(doc=>{
-          if(!doc.exists)return;
-          const tnData=doc.data();
-          const benach=(tnData.benachrichtigungen||[]);
-          if(benach.some(n=>n.typ==='kurs_ausfall'&&n.datum===today&&n.kursId===kursId))return;
-          benach.push(notification);
-          // E-Mail an Azubi
-          sendTnEmail(tnData, '🚨 Lehrgang "'+kursLabel+'" fällt heute aus!',
-            '<div style="padding:14px;background:#fef2f2;border:3px solid #ef4444;border-radius:10px;margin-bottom:12px">'
-            +'<p style="margin:0 0 8px;font-size:1rem;font-weight:800;color:#ef4444">🚨 LEHRGANG FÄLLT HEUTE AUS</p>'
-            +'<p style="margin:0;font-size:.9rem;color:#1e293b;font-weight:700">'+kursLabel+' – '+todayDE+'</p></div>'
-            +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen. Weitere Informationen folgen im Laufe des Tages.</p>'
-            +'<p style="margin:0;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
-          );
-          // E-Mail an Arbeitgeber des TN
-          sendKursAusfallEmailAG(tnData, kursLabel, todayDE, ausbilderName);
-          return _db.collection('globalTN').doc(tnId).update({benachrichtigungen:benach});
-        }).then(()=>ok++).catch(()=>fail++));
-      });
-      Promise.all(promises).then(()=>{
-        if(!fail)toast('⚠️ Ausfall an '+ok+' TN gesendet ✓');
-        else toast(ok+' gesendet, '+fail+' fehlgeschlagen','bad');
-      });
+  // Datums-Modal öffnen
+  _openAktionDatumModal({
+    typ:'ausfall',
+    titel:'⚠️ Kurs-Ausfall melden',
+    icon:'⚠️',
+    color:'#ef4444',
+    bgColor:'rgba(239,68,68,.05)',
+    borderColor:'rgba(239,68,68,.3)',
+    btnLabel:'⚠️ Ausfall melden',
+    kursLabel,
+    tnCount:tnIds.size,
+    onConfirm:(datum,datumDE,wann)=>{
+      _execKursAusfall(inst, kursId, kursLabel, datum, datumDE, wann);
     }
-  );
+  });
+}
+
+function _execKursAusfall(inst, kursId, kursLabel, datum, datumDE, wann){
+  const tnIds=new Set();
+  Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
+  if(!tnIds.size){toast('Keine verknüpften TN','bad');return;}
+  const ausbilderName=_auth?.currentUser?.displayName||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
+  // Wann-spezifischer Text
+  const wannText = wann==='heute' ? 'Heutiger Lehrgang fällt aus – bitte sofort den Betrieb aufsuchen.'
+    : wann==='morgen' ? 'Der Lehrgang fällt morgen ('+datumDE+') aus – bitte morgen direkt zur Arbeit fahren.'
+    : 'Der Lehrgang fällt am '+datumDE+' aus – bitte an diesem Tag direkt zur Arbeit fahren.';
+  const wannTextLong = wannText + ' Weitere Informationen folgen.';
+  const subject = wann==='heute' 
+    ? '🚨 Lehrgang "'+kursLabel+'" fällt heute aus!'
+    : '🚨 Lehrgang "'+kursLabel+'" fällt am '+datumDE+' aus!';
+  const headerLine = wann==='heute' ? 'LEHRGANG FÄLLT HEUTE AUS'
+    : wann==='morgen' ? 'LEHRGANG FÄLLT MORGEN AUS'
+    : 'LEHRGANG FÄLLT AUS';
+  const notification={typ:'kurs_ausfall',kursId,kursName:kursLabel,datum,datumDE,nachricht:wannTextLong,von:ausbilderName,erstellt:Date.now(),gelesen:false};
+  let ok=0,fail=0;
+  const promises=[];
+  tnIds.forEach(tnId=>{
+    promises.push(_db.collection('globalTN').doc(tnId).get().then(doc=>{
+      if(!doc.exists)return;
+      const tnData=doc.data();
+      const benach=(tnData.benachrichtigungen||[]);
+      // Dedup pro Datum + Kurs
+      if(benach.some(n=>n.typ==='kurs_ausfall'&&n.datum===datum&&n.kursId===kursId))return;
+      benach.push(notification);
+      // E-Mail an Azubi
+      sendTnEmail(tnData, subject,
+        '<div style="padding:14px;background:#fef2f2;border:3px solid #ef4444;border-radius:10px;margin-bottom:12px">'
+        +'<p style="margin:0 0 8px;font-size:1rem;font-weight:800;color:#ef4444">🚨 '+headerLine+'</p>'
+        +'<p style="margin:0;font-size:.9rem;color:#1e293b;font-weight:700">'+kursLabel+' – '+datumDE+'</p></div>'
+        +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">'+wannTextLong+'</p>'
+        +'<p style="margin:0;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
+      );
+      // E-Mail an Arbeitgeber
+      sendKursAusfallEmailAG(tnData, kursLabel, datumDE, ausbilderName, wann);
+      return _db.collection('globalTN').doc(tnId).update({benachrichtigungen:benach});
+    }).then(()=>ok++).catch(()=>fail++));
+  });
+  Promise.all(promises).then(()=>{
+    if(!fail)toast('⚠️ Ausfall an '+ok+' TN gesendet ✓');
+    else toast(ok+' gesendet, '+fail+' fehlgeschlagen','bad');
+  });
 }
 
 // Aktions-Verlauf: zeigt was der Ausbilder fuer diesen Kurs ausgeloest hat
@@ -6061,28 +6253,39 @@ function ausbilderKommtSpaeter(){
   const inst=curInst();if(!inst)return;
   const kursId=inst.sharedKursId;
   if(!kursId||!_db){toast('Kein verknüpfter Kurs','bad');return;}
-  const zeit=prompt('🕐 Um wie viel Uhr kommst du voraussichtlich?\n\nBeispiel: 9:30');
-  if(!zeit||!zeit.trim()) return;
-  const freitext=(prompt('Optional: Nachricht an die Azubis\n\n(leer lassen wenn keine Nachricht)')||'').trim();
-  const kursLabel=S.kats[S.curKat]?.label||'Lehrgang';
-  const ausbilderName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
-  const todayDE=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
   const tnIds=new Set();
   Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
   if(!tnIds.size){toast('Keine verknüpften TN','bad');return;}
-  safeConfirm(
-    '🕐 Unterricht beginnt später',
-    '<b>'+esc(ausbilderName)+'</b> startet den Unterricht heute um ca. <b>'+esc(zeit.trim())+' Uhr</b>.'
-    +(freitext?'<br><br><span style="font-style:italic;color:#6B7280">"'+esc(freitext)+'"</span>':'')
-    +'<br><br><span style="font-size:.75rem;color:#6B7280">Alle <b>'+tnIds.size+' Azubis</b> werden per App und E-Mail benachrichtigt.</span>',
-    'Ja, alle Azubis jetzt benachrichtigen',
-    '🕐 Benachrichtigen',
-    ()=>{ _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, todayDE, zeit.trim(), freitext); }
-  );
+  const kursLabel=S.kats[S.curKat]?.label||'Lehrgang';
+  const ausbilderName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
+  // Datums-Modal mit Uhrzeit-Feld
+  _openAktionDatumModal({
+    typ:'spaeter',
+    titel:'🕐 Späterer Unterrichtsbeginn melden',
+    icon:'🕐',
+    color:'#d97706',
+    bgColor:'rgba(245,158,11,.05)',
+    borderColor:'rgba(245,158,11,.3)',
+    btnLabel:'🕐 Benachrichtigen',
+    kursLabel,
+    tnCount:tnIds.size,
+    needsZeit:true,
+    needsFreitext:true,
+    onConfirm:(datum,datumDE,wann,zeit,freitext)=>{
+      _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, datum, datumDE, wann, zeit, freitext);
+    }
+  });
 }
-function _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, todayDE, zeit, freitext){
+function _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, datum, datumDE, wann, zeit, freitext){
   const tnIds=new Set();
   Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
+  // Tagsspezifischer Text
+  const tagWort = wann==='heute' ? 'heute' : (wann==='morgen' ? 'morgen' : 'am '+datumDE);
+  const subject = wann==='heute' 
+    ? '🕐 '+kursLabel+' – Unterricht beginnt heute später'
+    : wann==='morgen'
+      ? '🕐 '+kursLabel+' – Unterricht beginnt morgen später'
+      : '🕐 '+kursLabel+' – Unterricht beginnt am '+datumDE+' später';
   let ok=0,fail=0;
   const promises=[];
   tnIds.forEach(tnId=>{
@@ -6093,21 +6296,25 @@ function _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, todayDE, 
       return _db.collection('globalTN').doc(tnId).update({
         benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
           typ:'ausbilder_spaeter',
-          text: 'Der Unterricht beginnt heute voraussichtlich erst um '+zeit.trim()+' Uhr.'+(freitext?' '+freitext:'')+ ' Bitte wartet im Schulungsraum.',
+          text: 'Der Unterricht beginnt '+tagWort+' voraussichtlich erst um '+zeit.trim()+' Uhr.'+(freitext?' '+freitext:'')+ ' Bitte wartet im Schulungsraum.',
           kursName: kursLabel,
+          kursId: kursId,
           ausbilder: ausbilderName,
-          datum: new Date().toISOString(),
+          von: ausbilderName,
+          datum: datum,
+          datumDE: datumDE,
+          erstellt: Date.now(),
           gelesen: false
         })
       }).then(()=>{
         // E-Mail
-        sendTnEmail(tnData, '🕐 '+kursLabel+' – Unterricht beginnt später',
-          '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">der Unterricht im Lehrgang <b>"'+kursLabel+'"</b> beginnt heute voraussichtlich erst um <b style="color:#d97706">'+zeit.trim()+' Uhr</b>.</p>'
+        sendTnEmail(tnData, subject,
+          '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">der Unterricht im Lehrgang <b>"'+kursLabel+'"</b> beginnt '+tagWort+' voraussichtlich erst um <b style="color:#d97706">'+zeit.trim()+' Uhr</b>.</p>'
           +'<p style="margin:0 0 12px;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
           +(freitext?'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.6;font-style:italic">"'+freitext+'"</p>':'')
           +'<div style="padding:12px;background:#fffbeb;border:2px solid #fde68a;border-radius:8px;margin-bottom:12px">'
-          +'<p style="margin:0;font-size:.85rem;color:#92400e;font-weight:700">Bitte wartet im Schulungsraum.</p></div>'
-          +'<p style="margin:0;font-size:.75rem;color:#6b7280">'+todayDE+'</p>'
+          +'<p style="margin:0;font-size:.85rem;color:#92400e;font-weight:700">Bitte wartet '+tagWort+' im Schulungsraum.</p></div>'
+          +'<p style="margin:0;font-size:.75rem;color:#6b7280">'+datumDE+'</p>'
         );
       });
     }).then(()=>ok++).catch(()=>fail++));
@@ -6886,11 +7093,24 @@ function sendAgEmail(tnData, subject, htmlBody){
   }).catch(()=>{});
 }
 
-function sendKursAusfallEmailAG(tnData, kursLabel, todayDE, ausbilderName){
+function sendKursAusfallEmailAG(tnData, kursLabel, datumDE, ausbilderName, wann){
   if(!_db) return;
   const firma=tnData.firma||'';
   if(!firma) return;
   const tnName=((tnData.vorname||'')+' '+(tnData.nachname||'')).trim()||'Azubi';
+  // Tagsspezifischer Text
+  const tagWort = wann==='heute' ? 'heute' : (wann==='morgen' ? 'morgen' : 'am '+datumDE);
+  const headerLine = wann==='heute' ? 'LEHRGANG FÄLLT HEUTE AUS'
+    : wann==='morgen' ? 'LEHRGANG FÄLLT MORGEN AUS'
+    : 'LEHRGANG FÄLLT AUS';
+  const subject = wann==='heute'
+    ? '🚨 Lehrgang "'+kursLabel+'" fällt heute aus – '+tnName
+    : wann==='morgen'
+      ? '🚨 Lehrgang "'+kursLabel+'" fällt morgen aus – '+tnName
+      : '🚨 Lehrgang "'+kursLabel+'" fällt am '+datumDE+' aus – '+tnName;
+  const arbeitText = wann==='heute'
+    ? 'Er/Sie wurde gebeten, sofort den Betrieb aufzusuchen.'
+    : 'Er/Sie wurde gebeten, '+tagWort+' direkt zur Arbeit zu kommen.';
   _db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
     if(snap.empty) return;
     snap.forEach(doc=>{
@@ -6899,15 +7119,15 @@ function sendKursAusfallEmailAG(tnData, kursLabel, todayDE, ausbilderName){
       _db.collection('mail').add({
         to: u.email,
         message: {
-          subject: '🚨 Lehrgang "'+kursLabel+'" fällt heute aus – '+tnName,
+          subject: subject,
           html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
             +'<div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div>'
             +'<div style="padding:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">'
             +'<div style="padding:14px;background:#fef2f2;border:3px solid #ef4444;border-radius:10px;margin-bottom:12px">'
-            +'<p style="margin:0 0 8px;font-size:1rem;font-weight:800;color:#ef4444">🚨 LEHRGANG FÄLLT HEUTE AUS</p>'
-            +'<p style="margin:0;font-size:.9rem;color:#1e293b;font-weight:700">'+kursLabel+' – '+todayDE+'</p>'
+            +'<p style="margin:0 0 8px;font-size:1rem;font-weight:800;color:#ef4444">🚨 '+headerLine+'</p>'
+            +'<p style="margin:0;font-size:.9rem;color:#1e293b;font-weight:700">'+kursLabel+' – '+datumDE+'</p>'
             +'</div>'
-            +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">Ihr Auszubildender <b>'+tnName+'</b> ist vom heutigen Kursausfall betroffen. Er/Sie wurde gebeten, sofort den Betrieb aufzusuchen.</p>'
+            +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">Ihr Auszubildender <b>'+tnName+'</b> ist vom Lehrgangsausfall '+tagWort+' betroffen. '+arbeitText+'</p>'
             +'<p style="margin:0;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
             +'</div>'
             +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
