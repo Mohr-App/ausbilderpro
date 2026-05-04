@@ -2827,6 +2827,7 @@ function renderMain(){
     +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()" title="Kursunterlagen hochladen und verwalten">📁 Dokumente</button>'
     +'<button class="tbtn main-docs-btn" onclick="ausbilderKommtSpaeter()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
     +'<button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Kurs für heute als ausgefallen markieren">⚠️ Ausfall</button>'
+    +'<button class="tbtn main-docs-btn" onclick="showAktionsVerlauf()" style="background:rgba(100,116,139,.08);border-color:rgba(100,116,139,.25);color:#475569" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">📋 Aktions-Verlauf</button>'
     +'<button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">📋 TN-Liste</button>'
     +'<button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen</button>'
     +(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981" title="Teilnehmer manuell zum Kurs hinzufügen">👤+ TN</button><button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
@@ -5956,6 +5957,93 @@ function kursAusfall(){
       });
     }
   );
+}
+
+// Aktions-Verlauf: zeigt was der Ausbilder fuer diesen Kurs ausgeloest hat
+async function showAktionsVerlauf(){
+  const inst=curInst();if(!inst)return;
+  const kursId=inst.sharedKursId;
+  if(!kursId||!_db){toast('Kein verknüpfter Kurs','bad');return;}
+  const kursLabel=S.kats[S.curKat]?.label||'Lehrgang';
+  // Alle TN-IDs aus Sitzplan sammeln
+  const tnIds=new Set();
+  Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
+  if(!tnIds.size){
+    safeAlert('📋 Aktions-Verlauf','<div style="padding:8px 0;color:#6b7280">Keine verknüpften TN — kein Verlauf verfügbar.</div>');
+    return;
+  }
+  // Loading-Modal
+  safeAlert('📋 Aktions-Verlauf','<div style="padding:8px 0;color:#6b7280">Lädt…</div>');
+  // Alle relevanten Aktions-Typen sammeln (aus benachrichtigungen)
+  const ausloeserTypen=['kurs_ausfall','ausbilder_spaeter'];
+  const aktionen=new Map(); // key: erstellt-timestamp, value: aktion-meta
+  const promises=[];
+  tnIds.forEach(tnId=>{
+    promises.push(_db.collection('globalTN').doc(tnId).get().then(doc=>{
+      if(!doc.exists) return;
+      const benach=doc.data().benachrichtigungen||[];
+      benach.forEach(n=>{
+        if(!ausloeserTypen.includes(n.typ)) return;
+        if(n.kursId && n.kursId!==kursId) return; // nur dieser Kurs
+        // Gruppieren über erstellt+typ (gleiche Aktion an mehreren TN)
+        const key=(n.erstellt||0)+'_'+n.typ+'_'+(n.datum||'');
+        if(!aktionen.has(key)){
+          aktionen.set(key,{
+            typ:n.typ,
+            datum:n.datum||'',
+            datumDE:n.datumDE||n.datum||'',
+            nachricht:n.nachricht||'',
+            von:n.von||'',
+            erstellt:n.erstellt||0,
+            empfaengerCount:0
+          });
+        }
+        aktionen.get(key).empfaengerCount++;
+      });
+    }).catch(()=>{}));
+  });
+  await Promise.all(promises);
+  // Sortieren nach Zeitpunkt absteigend (neueste oben)
+  const list=Array.from(aktionen.values()).sort((a,b)=>(b.erstellt||0)-(a.erstellt||0));
+  // Nur letzte 30 Tage
+  const cutoff=Date.now()-30*24*60*60*1000;
+  const recent=list.filter(a=>a.erstellt>=cutoff);
+  // Anzeige bauen
+  let html='<div style="font-size:.78rem;color:#475569;margin-bottom:10px">Kurs: <b>'+esc(kursLabel)+'</b><br>Letzte 30 Tage</div>';
+  if(!recent.length){
+    html+='<div style="padding:14px;background:rgba(16,185,129,.06);border:1.5px solid rgba(16,185,129,.25);border-radius:10px;text-align:center">'
+      +'<div style="font-size:1.4rem;margin-bottom:4px">✓</div>'
+      +'<div style="font-size:.82rem;font-weight:700;color:#059669">Keine Aktionen ausgelöst</div>'
+      +'<div style="font-size:.7rem;color:#6b7280;margin-top:4px">Du hast in den letzten 30 Tagen weder einen Ausfall noch eine Verspätung gemeldet.</div>'
+      +'</div>';
+  } else {
+    const icons={kurs_ausfall:'⚠️',ausbilder_spaeter:'🕐'};
+    const labels={kurs_ausfall:'Kurs-Ausfall gemeldet',ausbilder_spaeter:'Verspätung gemeldet'};
+    const colors={kurs_ausfall:'#ef4444',ausbilder_spaeter:'#d97706'};
+    const bgs={kurs_ausfall:'rgba(239,68,68,.06)',ausbilder_spaeter:'rgba(245,158,11,.06)'};
+    recent.forEach(a=>{
+      const dt=a.erstellt?new Date(a.erstellt):null;
+      const dtStr=dt?dt.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):a.datumDE;
+      const isToday=a.datum===new Date().toISOString().slice(0,10);
+      html+='<div style="padding:10px 12px;background:'+bgs[a.typ]+';border:1.5px solid '+colors[a.typ]+';border-left:4px solid '+colors[a.typ]+';border-radius:8px;margin-bottom:8px">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        +'<span style="font-size:1.1rem">'+icons[a.typ]+'</span>'
+        +'<span style="font-size:.78rem;font-weight:800;color:'+colors[a.typ]+'">'+labels[a.typ]+'</span>'
+        +(isToday?'<span style="font-size:.55rem;font-weight:700;background:'+colors[a.typ]+';color:#fff;padding:1px 6px;border-radius:4px;margin-left:auto">HEUTE</span>':'')
+        +'</div>'
+        +'<div style="font-size:.72rem;color:#1e293b;line-height:1.5">'
+        +'<div><b>Für Termin:</b> '+esc(a.datumDE||a.datum)+'</div>'
+        +'<div><b>Ausgelöst:</b> '+esc(dtStr)+(a.von?' · von '+esc(a.von):'')+'</div>'
+        +'<div><b>Empfänger:</b> '+a.empfaengerCount+' TN (jeweils auch deren Betriebe per E-Mail)</div>'
+        +'</div>'
+        +'</div>';
+    });
+    html+='<div style="margin-top:12px;padding:10px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.2);border-radius:8px;font-size:.7rem;color:#475569;line-height:1.5">'
+      +'<b>💡 Hinweis:</b> Wenn TN nicht kommen und du eine "HEUTE"-Aktion hier siehst, wurden die TN per E-Mail informiert dass der Kurs ausfällt oder später beginnt. '
+      +'Falls das ein Versehen war, schreibe sofort eine korrigierende E-Mail an deine Azubis.'
+      +'</div>';
+  }
+  safeAlert('📋 Aktions-Verlauf',html);
 }
 
 function ausbilderKommtSpaeter(){
