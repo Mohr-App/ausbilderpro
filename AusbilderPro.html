@@ -6112,6 +6112,54 @@ function kursAusfall(){
   });
 }
 
+// Bestätigungs-Mail an Ausbilder selbst (Audit-Trail im eigenen Posteingang)
+function _sendAusbilderBestaetigung(typ, kursLabel, datumDE, wann, tnCount, ausbilderName, zeit){
+  if(!_db) return;
+  const ausbilderEmail=(_auth?.currentUser?.email||'').toLowerCase();
+  if(!ausbilderEmail) return;
+  const tagWort = wann==='heute' ? 'heute' : (wann==='morgen' ? 'morgen' : 'am '+datumDE);
+  const ausgeloestAm=new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  let subject, headerText, bodyText, color, bgColor, borderColor;
+  if(typ==='ausfall'){
+    subject='✓ Bestätigung: Ausfall '+kursLabel+' '+tagWort+' gemeldet';
+    headerText='⚠️ AUSFALL GEMELDET';
+    bodyText='Du hast den Kurs <b>"'+kursLabel+'"</b> für <b>'+datumDE+'</b> als ausgefallen gemeldet.';
+    color='#ef4444'; bgColor='#fef2f2'; borderColor='#fecaca';
+  } else {
+    subject='✓ Bestätigung: Verspätung '+kursLabel+' '+tagWort+' gemeldet';
+    headerText='🕐 VERSPÄTUNG GEMELDET';
+    bodyText='Du hast für den Kurs <b>"'+kursLabel+'"</b> '+tagWort+' (<b>'+datumDE+'</b>) einen späteren Beginn um <b>'+(zeit||'?')+' Uhr</b> gemeldet.';
+    color='#d97706'; bgColor='#fffbeb'; borderColor='#fde68a';
+  }
+  _db.collection('mail').add({
+    to: ausbilderEmail,
+    message: {
+      subject: subject,
+      html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
+        +'<div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div>'
+        +'<div style="padding:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">'
+        +'<div style="padding:14px;background:'+bgColor+';border:2px solid '+borderColor+';border-radius:10px;margin-bottom:16px">'
+        +'<p style="margin:0 0 6px;font-size:.95rem;font-weight:800;color:'+color+'">'+headerText+'</p>'
+        +'<p style="margin:0;font-size:.85rem;color:#1e293b">'+bodyText+'</p>'
+        +'</div>'
+        +'<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-bottom:14px">'
+        +'<tr><td style="padding:6px 0;color:#6b7280;width:140px">Lehrgang:</td><td style="padding:6px 0;color:#1e293b;font-weight:700">'+kursLabel+'</td></tr>'
+        +'<tr><td style="padding:6px 0;color:#6b7280">Betroffener Tag:</td><td style="padding:6px 0;color:#1e293b;font-weight:700">'+datumDE+'</td></tr>'
+        +(zeit?'<tr><td style="padding:6px 0;color:#6b7280">Beginn ab:</td><td style="padding:6px 0;color:#1e293b;font-weight:700">'+zeit+' Uhr</td></tr>':'')
+        +'<tr><td style="padding:6px 0;color:#6b7280">Empfänger:</td><td style="padding:6px 0;color:#1e293b;font-weight:700">'+tnCount+' TN'+(typ==='ausfall'?' + deren Betriebe':'')+'</td></tr>'
+        +'<tr><td style="padding:6px 0;color:#6b7280">Ausgelöst am:</td><td style="padding:6px 0;color:#1e293b">'+ausgeloestAm+'</td></tr>'
+        +'<tr><td style="padding:6px 0;color:#6b7280">Ausgelöst von:</td><td style="padding:6px 0;color:#1e293b">'+ausbilderName+'</td></tr>'
+        +'</table>'
+        +'<div style="padding:10px;background:#f8fafc;border-left:3px solid #3b82f6;border-radius:6px;font-size:.78rem;color:#475569;line-height:1.5">'
+        +'<b>💡 Tipp:</b> Falls die Aktion versehentlich war, schreibe sofort eine korrigierende E-Mail an deine Azubis. Du findest den Verlauf auch im Aktionen-Menü unter "📋 Aktions-Verlauf".'
+        +'</div>'
+        +'</div>'
+        +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Dies ist eine Bestätigungs-Mail an dich selbst. Sie dient als Beleg und Audit-Trail.</p>'
+        +'</div>'
+    }
+  }).catch(()=>{});
+}
+
 function _execKursAusfall(inst, kursId, kursLabel, datum, datumDE, wann){
   const tnIds=new Set();
   Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
@@ -6155,6 +6203,8 @@ function _execKursAusfall(inst, kursId, kursLabel, datum, datumDE, wann){
   Promise.all(promises).then(()=>{
     if(!fail)toast('⚠️ Ausfall an '+ok+' TN gesendet ✓');
     else toast(ok+' gesendet, '+fail+' fehlgeschlagen','bad');
+    // Bestätigungs-Mail an Ausbilder
+    _sendAusbilderBestaetigung('ausfall', kursLabel, datumDE, wann, ok, ausbilderName);
   });
 }
 
@@ -6307,7 +6357,7 @@ function _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, datum, da
           gelesen: false
         })
       }).then(()=>{
-        // E-Mail
+        // E-Mail an Azubi
         sendTnEmail(tnData, subject,
           '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">der Unterricht im Lehrgang <b>"'+kursLabel+'"</b> beginnt '+tagWort+' voraussichtlich erst um <b style="color:#d97706">'+zeit.trim()+' Uhr</b>.</p>'
           +'<p style="margin:0 0 12px;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
@@ -6316,12 +6366,16 @@ function _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, datum, da
           +'<p style="margin:0;font-size:.85rem;color:#92400e;font-weight:700">Bitte wartet '+tagWort+' im Schulungsraum.</p></div>'
           +'<p style="margin:0;font-size:.75rem;color:#6b7280">'+datumDE+'</p>'
         );
+        // E-Mail an Arbeitgeber
+        sendAusbilderSpaeterEmailAG(tnData, kursLabel, datumDE, ausbilderName, wann, zeit.trim(), freitext);
       });
     }).then(()=>ok++).catch(()=>fail++));
   });
   Promise.all(promises).then(()=>{
     if(!fail)toast('🕐 '+ok+' Azubis benachrichtigt ✓');
     else toast(ok+' gesendet, '+fail+' fehlgeschlagen','bad');
+    // Bestätigungs-Mail an Ausbilder
+    _sendAusbilderBestaetigung('spaeter', kursLabel, datumDE, wann, ok, ausbilderName, zeit);
   });
 }
 
@@ -7128,6 +7182,46 @@ function sendKursAusfallEmailAG(tnData, kursLabel, datumDE, ausbilderName, wann)
             +'<p style="margin:0;font-size:.9rem;color:#1e293b;font-weight:700">'+kursLabel+' – '+datumDE+'</p>'
             +'</div>'
             +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">Ihr Auszubildender <b>'+tnName+'</b> ist vom Lehrgangsausfall '+tagWort+' betroffen. '+arbeitText+'</p>'
+            +'<p style="margin:0;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
+            +'</div>'
+            +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
+            +'</div>'
+        }
+      }).catch(()=>{});
+    });
+  }).catch(()=>{});
+}
+
+// Verspätungs-Mail an Arbeitgeber des TN
+function sendAusbilderSpaeterEmailAG(tnData, kursLabel, datumDE, ausbilderName, wann, zeit, freitext){
+  if(!_db) return;
+  const firma=tnData.firma||'';
+  if(!firma) return;
+  const tnName=((tnData.vorname||'')+' '+(tnData.nachname||'')).trim()||'Azubi';
+  const tagWort = wann==='heute' ? 'heute' : (wann==='morgen' ? 'morgen' : 'am '+datumDE);
+  const subject = wann==='heute'
+    ? '🕐 '+kursLabel+' beginnt heute später – '+tnName
+    : wann==='morgen'
+      ? '🕐 '+kursLabel+' beginnt morgen später – '+tnName
+      : '🕐 '+kursLabel+' beginnt am '+datumDE+' später – '+tnName;
+  _db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
+    if(snap.empty) return;
+    snap.forEach(doc=>{
+      const u=doc.data();
+      if(!u.email) return;
+      _db.collection('mail').add({
+        to: u.email,
+        message: {
+          subject: subject,
+          html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
+            +'<div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div>'
+            +'<div style="padding:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">'
+            +'<div style="padding:14px;background:#fffbeb;border:2px solid #fde68a;border-radius:10px;margin-bottom:12px">'
+            +'<p style="margin:0 0 8px;font-size:1rem;font-weight:800;color:#d97706">🕐 UNTERRICHT BEGINNT '+tagWort.toUpperCase()+' SPÄTER</p>'
+            +'<p style="margin:0;font-size:.9rem;color:#1e293b;font-weight:700">'+kursLabel+' – '+datumDE+'</p>'
+            +'</div>'
+            +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">Ihr Auszubildender <b>'+tnName+'</b> wird '+tagWort+' voraussichtlich erst um <b style="color:#d97706">'+zeit+' Uhr</b> in den Lehrgang gehen können.</p>'
+            +(freitext?'<p style="margin:0 0 12px;font-size:.85rem;color:#1e293b;line-height:1.5;font-style:italic">"'+freitext+'"</p>':'')
             +'<p style="margin:0;font-size:.85rem;color:#374151">Ausbilder: '+ausbilderName+'</p>'
             +'</div>'
             +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
