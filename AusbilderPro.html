@@ -2903,12 +2903,12 @@ function renderSeats(){
   }
   // Nur hervorheben wenn:
   //  - mind. 1 leerer Sitz (sonst nix zu zeigen)
-  //  - NICHT alle leer (bei komplett leerem Plan ist der Pool-Hinweis schon da)
+  //  - kein Sitz belegt (Onboarding fuer leeren Plan; sobald 1 Sitz belegt = User hat verstanden)
   //  - User hat Hint nicht dauerhaft ausgeblendet
   const totalSeats=rows.reduce((m,r)=>m+r.seats.length,0);
   const filledSeats=Object.values(_seatsMap).filter(d=>d&&d.name).length;
   const hintDismissed=localStorage.getItem(_lsKey('firstSeatHintDismissed'))==='1';
-  const showFirstEmptyHint = _firstEmptySeatId && filledSeats>0 && filledSeats<totalSeats && !hintDismissed;
+  const showFirstEmptyHint = _firstEmptySeatId && filledSeats===0 && totalSeats>0 && !hintDismissed;
   if(!showFirstEmptyHint) _firstEmptySeatId=null;
   window._firstEmptySeatId = _firstEmptySeatId;
   const rowCount = rows.length;
