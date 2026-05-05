@@ -6832,24 +6832,36 @@ function markSeatAsAbsent(){
   const inst=S.kats[S.curKat].instances[S.curInst];
   const d=inst.seats?.[curSeat];
   if(!d||!d.name){toast('Sitzplatz ist leer','bad');return;}
-  if(!confirm('🚫 "'+d.name+'" als "Nicht angetreten" einstufen?\n\nDer Azubi wird benachrichtigt, der Kurs für ihn beendet, und der Arbeitgeber per E-Mail informiert.\n\nFortfahren?')) return;
-  // Daten sichern (analog zu _execDropToFehlt Fall 1)
-  const tnName=d.name;
-  const tnId=d.poolTnId;
-  const kursId=d.poolKursId||inst.sharedKursId;
-  if(!inst.fehltStudents) inst.fehltStudents=[];
-  if(!inst.fehltStudents.find(f=>f.name===tnName))
-    inst.fehltStudents.push({name:tnName,company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',poolTnId:tnId||null,poolKursId:kursId||null});
-  // Sitzplatz leeren (Felder loeschen, Sitz selbst bleibt)
-  ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst.seats[curSeat][k]);
-  persist(); renderSeats();
-  if(_db&&kursId&&tnId){
-    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-      .collection('teilnehmer').doc(tnId).update({status:'absent'}).then(()=>loadPool()).catch(()=>loadPool());
-    syncGlobalTNStatus(tnId,'absent');
-  } else loadPool();
-  closeModal();
-  toast('🚫 "'+tnName+'" als "Nicht angetreten" markiert');
+  // Frist-Modal oeffnen (statt sofortigem confirm)
+  const seatId = curSeat;
+  const tnName = d.name;
+  const tnId = d.poolTnId;
+  const kursId = d.poolKursId || inst.sharedKursId;
+  _openAbsentFristModal({
+    tnId: tnId,
+    tnName: tnName,
+    onConfirm: (fristIso)=>{
+      // Lokale Sitzplatz-Aktion + Firestore-Sync
+      const inst2 = S.kats[S.curKat]?.instances[S.curInst];
+      if(!inst2) return;
+      if(!inst2.fehltStudents) inst2.fehltStudents=[];
+      if(!inst2.fehltStudents.find(f=>f.name===tnName))
+        inst2.fehltStudents.push({name:tnName,company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',poolTnId:tnId||null,poolKursId:kursId||null});
+      // Sitzplatz leeren (Felder loeschen, Sitz selbst bleibt)
+      if(inst2.seats?.[seatId]){
+        ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst2.seats[seatId][k]);
+      }
+      persist(); renderSeats();
+      if(_db&&kursId&&tnId){
+        _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+          .collection('teilnehmer').doc(tnId).update({status:'absent'}).then(()=>loadPool()).catch(()=>loadPool());
+        // Mit Frist aufrufen → keine Modal-Wiederholung
+        syncGlobalTNStatus(tnId, 'absent', {frist: fristIso});
+      } else loadPool();
+      closeModal();
+      toast('🚫 "'+tnName+'" als "Nicht angetreten" markiert');
+    }
+  });
 }
 
 // Tap-Variante zu DnD: Sitz-Inhaber als 'Wiederholer' markieren
@@ -8018,15 +8030,20 @@ function dropToFehlt(e){
   const tnName=_seatDragId?(curSeats()[_seatDragId]?.name||''):(_poolDragId||'');
   if(!tnName) return;
   _seatDragId=null;_poolDragId=null;_poolDragTnId=null;_poolDragKursId=null;_wiederholerSeatId=null;
-  safeConfirm(
-    '🚫 Nicht angetreten',
-    '<b>'+esc(tnName)+'</b> als "Nicht angetreten" einstufen?<br><br><span style="font-size:.75rem;color:#6B7280">Der Azubi wird benachrichtigt und der Kurs wird für ihn beendet. <b>Diese Aktion kann nicht rückgängig gemacht werden.</b></span>',
-    'Ich bestätige, dass dieser TN nicht angetreten ist',
-    '🚫 Nicht angetreten',
-    ()=>{ _execDropToFehlt(saved); }
-  );
+  // tnId aus den gespeicherten Drag-Daten ermitteln (fuer Modal-Anzeige)
+  const tnIdForModal = saved.seatDragId
+    ? (curSeats()[saved.seatDragId]?.poolTnId || null)
+    : (saved.poolDragTnId || null);
+  // Frist-Modal oeffnen (statt safeConfirm)
+  _openAbsentFristModal({
+    tnId: tnIdForModal,
+    tnName: tnName,
+    onConfirm: (fristIso)=>{
+      _execDropToFehlt(saved, fristIso);
+    }
+  });
 }
-function _execDropToFehlt(s){
+function _execDropToFehlt(s, fristIso){
   // Fall 1: Vom Sitzplatz
   if(s.seatDragId){
     const inst=curInst(); if(!inst) return;
@@ -8041,7 +8058,7 @@ function _execDropToFehlt(s){
     if(_db&&kursId&&tnId){
       _db.collection('shared').doc('kurse').collection('list').doc(kursId)
         .collection('teilnehmer').doc(tnId).update({status:'absent'}).then(()=>loadPool()).catch(()=>loadPool());
-      syncGlobalTNStatus(tnId,'absent');
+      syncGlobalTNStatus(tnId,'absent', fristIso?{frist:fristIso}:undefined);
     } else loadPool();
     return;
   }
@@ -8060,7 +8077,7 @@ function _execDropToFehlt(s){
     }
     _db.collection('shared').doc('kurse').collection('list').doc(s.poolDragKursId)
       .collection('teilnehmer').doc(s.poolDragTnId).update({status:'absent'}).then(()=>loadPool()).catch(()=>loadPool());
-    syncGlobalTNStatus(s.poolDragTnId,'absent');
+    syncGlobalTNStatus(s.poolDragTnId,'absent', fristIso?{frist:fristIso}:undefined);
     return;
   }
   // Fall 3: Lokal
