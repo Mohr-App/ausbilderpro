@@ -7465,20 +7465,60 @@ function resetTNStatus(tnId, fromType, tnName){
 function _notifyVwEvent(typ, tnId, tnData, kursName, ausName, extra){
   if(!_db) return;
   const tnName=((tnData?.vorname||'')+' '+(tnData?.nachname||'')).trim()||'Azubi';
+  // Azubi-Mail-Status
+  const azubiEmail = tnData?.kontaktEmail || tnData?.email || '';
+  const azubiMailGesendet = !!azubiEmail;
+  const azubiMailGrund = azubiMailGesendet ? 'gesendet' : 'keine_email_hinterlegt';
+  // AG-Mail-Status muss async geprueft werden
+  const firma = tnData?.firma || '';
   const event={
     typ: typ,                                  // 'absent' | 'wiederholer'
     tnId: tnId,
     tnName: tnName,
     kursName: kursName||'',
     kursId: curInst()?.sharedKursId||'',
-    firma: tnData?.firma||'',
+    firma: firma,
     ausbilder: ausName||'',
     erstellt: Date.now(),
     erstelltAt: firebase.firestore.FieldValue.serverTimestamp(),
     gelesen: false,
-    grund: extra?.grund||''
+    quittiert: false,
+    grund: extra?.grund||'',
+    frist: extra?.frist||'',
+    azubiMailGesendet: azubiMailGesendet,
+    azubiMailGrund: azubiMailGrund,
+    azubiEmail: azubiEmail,
+    // AG-Mail-Status wird gleich nachgetragen
+    agMailGesendet: false,
+    agMailGrund: 'pruefung_laeuft',
+    agAnzahlEmpfaenger: 0
   };
-  _db.collection('vwEvents').add(event).catch(err=>console.warn('vwEvent failed:',err));
+  // Erst Event anlegen, dann AG-Status pruefen + nachtragen
+  _db.collection('vwEvents').add(event).then(ref=>{
+    if(!firma){
+      ref.update({agMailGesendet: false, agMailGrund: 'keine_firma_hinterlegt', agAnzahlEmpfaenger: 0}).catch(()=>{});
+      return;
+    }
+    // AG-Empfaenger zaehlen (alle users mit firma==X und role==arbeitgeber)
+    _db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
+      const anzahl = snap.size;
+      if(anzahl > 0){
+        ref.update({
+          agMailGesendet: true,
+          agMailGrund: 'gesendet',
+          agAnzahlEmpfaenger: anzahl
+        }).catch(()=>{});
+      } else {
+        ref.update({
+          agMailGesendet: false,
+          agMailGrund: 'kein_ag_app_account',
+          agAnzahlEmpfaenger: 0
+        }).catch(()=>{});
+      }
+    }).catch(()=>{
+      ref.update({agMailGrund: 'pruefung_fehlgeschlagen'}).catch(()=>{});
+    });
+  }).catch(err=>console.warn('vwEvent failed:',err));
 }
 
 // ─── FRIST-MODAL für 'Nicht angetreten' ───

@@ -162,10 +162,12 @@ service cloud.firestore {
         && request.resource.data.typ in ['absent','wiederholer']
         && request.resource.data.gelesen == false;
       allow read: if request.auth != null;
-      // Verwaltung darf nur Status-Felder (gelesen + Quittier-Felder) aendern
+      // Verwaltung darf gelesen + Quittier-Felder aendern
+      // Ausbilder darf direkt nach Anlage Mail-Status-Felder nachtragen (async-Check)
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-          ['gelesen','quittiert','quittiertAm','quittiertVon','quittiertNotiz']
+          ['gelesen','quittiert','quittiertAm','quittiertVon','quittiertNotiz',
+           'agMailGesendet','agMailGrund','agAnzahlEmpfaenger']
         );
       // Loeschen erlaubt - alte Events koennen aufgeraeumt werden
       allow delete: if request.auth != null;
