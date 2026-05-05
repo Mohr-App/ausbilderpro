@@ -654,13 +654,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         🔔 <span class="hdr-btn-text">Meldungen</span>
         <span id="vwBellBadge" style="display:none;position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.4;font-family:'JetBrains Mono',monospace">0</span>
       </button>
-      <div id="vwBellDD" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--brd);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);min-width:380px;max-width:440px;max-height:520px;overflow:hidden;z-index:100;flex-direction:column">
+      <div id="vwBellDD" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--brd);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);min-width:380px;max-width:440px;max-height:560px;overflow:hidden;z-index:100;flex-direction:column">
         <div style="padding:12px 14px;border-bottom:1px solid var(--brd);background:linear-gradient(135deg,#fef2f2,#fef9c3);display:flex;align-items:center;gap:8px">
           <span style="font-size:1rem">🔔</span>
           <span style="font-size:.78rem;font-weight:800;color:#0f172a">Meldungen vom Ausbilder</span>
-          <button onclick="markAllVwEventsRead()" style="margin-left:auto;font-size:.62rem;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#1e40af;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'Sora',sans-serif">Alle gelesen</button>
+          <button onclick="toggleVwBellTab(event)" id="vwBellTabBtn" title="Verlauf öffnen/schließen" style="margin-left:auto;font-size:.62rem;background:#fff;border:1px solid var(--brd);color:#475569;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600">📋 Verlauf</button>
         </div>
-        <div id="vwBellList" style="overflow-y:auto;max-height:420px"></div>
+        <div id="vwBellList" style="overflow-y:auto;max-height:460px"></div>
       </div>
     </div>
     <button class="hdr-btn" onclick="showHVHilfe()" style="opacity:.7" title="Anleitungen und FAQ"><span class="hdr-btn-text">Hilfe</span></button>
@@ -1704,6 +1704,27 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
         <span id="scmCheckLabel" style="font-size:.78rem;font-weight:700;color:#ef4444">Ich bestätige diese Aktion</span>
       </label>
       <button class="btn-sm" id="scmBtn" title="Fortfahren" onclick="scmExecute()" style="margin-top:12px;width:100%;padding:10px;font-size:.82rem;background:rgba(239,68,68,.25);border:2px solid rgba(239,68,68,.3);color:rgba(255,255,255,.7);transition:all .2s;cursor:not-allowed">Fortfahren</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quittieren-Modal fuer vwEvents -->
+<div id="vwQuittModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:14px;padding:0;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;font-family:'Sora',sans-serif">
+    <div style="padding:14px 18px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;display:flex;align-items:center;gap:10px">
+      <span style="font-size:1.2rem">✓</span>
+      <span style="font-size:.9rem;font-weight:800">Meldung quittieren</span>
+      <button onclick="closeVwQuittModal()" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:.9rem">✕</button>
+    </div>
+    <div style="padding:18px">
+      <div id="vwQuittInfo" style="padding:10px 12px;background:#f1f5f9;border-radius:8px;margin-bottom:12px;font-size:.78rem;color:#475569;line-height:1.5"></div>
+      <label style="display:block;font-size:.7rem;color:#475569;margin-bottom:6px;font-weight:600">Wie wurde der Betrieb informiert? <span style="color:#94a3b8;font-weight:400">(optional)</span></label>
+      <textarea id="vwQuittNotiz" placeholder="z.B. 'Mit Hr. Müller telefoniert um 14:30, nimmt Kontakt mit Azubi auf'" style="width:100%;min-height:70px;padding:10px 12px;border:2px solid #e2e8f0;border-radius:8px;font-family:'Sora',sans-serif;font-size:.78rem;resize:vertical;outline:none;color:#0f172a" oninput="this.style.borderColor='#10b981'" onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
+      <div style="font-size:.62rem;color:#94a3b8;margin-top:6px;line-height:1.5">Die Notiz wird gespeichert und kann später nachgelesen werden.</div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button onclick="closeVwQuittModal()" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;border-radius:8px;cursor:pointer;font-family:'Sora',sans-serif;font-size:.78rem;font-weight:600">Abbrechen</button>
+        <button onclick="confirmVwQuittieren()" style="flex:1.3;padding:10px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:8px;cursor:pointer;font-family:'Sora',sans-serif;font-size:.78rem;font-weight:800">✓ Quittieren</button>
+      </div>
     </div>
   </div>
 </div>
@@ -8985,8 +9006,8 @@ function _initVwEvents(){
       snap.docChanges().forEach(change=>{
         if(change.type !== 'added') return;
         const ev = {id: change.doc.id, ...change.doc.data()};
-        // Nur Live-Events poppen lassen, nicht beim Initial-Load
-        if(!isFirst && !ev.gelesen){
+        // Nur Live-Events poppen lassen (kein Initial-Load, nicht quittiert, ungelesen)
+        if(!isFirst && !ev.gelesen && !ev.quittiert){
           _showVwBigToast(ev);
           _showVwBrowserNotification(ev);
         }
@@ -8994,7 +9015,9 @@ function _initVwEvents(){
       // Liste komplett neu aufbauen
       _vwEvents = [];
       snap.forEach(d=> _vwEvents.push({id:d.id, ...d.data()}));
-      _renderVwBell();
+      // Je nach aktiver View neu rendern
+      if(_vwBellShowVerlauf) _renderVwVerlauf();
+      else _renderVwBell();
     }, err=>console.warn('vwEvents listener:', err));
 }
 
@@ -9010,18 +9033,27 @@ function _renderVwBell(){
   const list=document.getElementById('vwBellList');
   const badge=document.getElementById('vwBellBadge');
   if(!list||!badge) return;
-  const ungelesen = _vwEvents.filter(e=>!e.gelesen).length;
+  // Nicht quittierte Events sind in der Glocke sichtbar
+  const aktiv = _vwEvents.filter(e=>!e.quittiert);
+  // Badge: Anzahl der ungelesenen UND nicht-quittierten
+  const ungelesen = aktiv.filter(e=>!e.gelesen).length;
   if(ungelesen>0){
     badge.textContent = ungelesen>99?'99+':String(ungelesen);
     badge.style.display='';
+    badge.style.background='#ef4444';
+  } else if(aktiv.length>0){
+    // Alle gelesen aber noch offen → kleinere graue Anzeige
+    badge.textContent = String(aktiv.length);
+    badge.style.display='';
+    badge.style.background='#94a3b8';
   } else {
     badge.style.display='none';
   }
-  if(!_vwEvents.length){
-    list.innerHTML='<div style="padding:24px 16px;text-align:center;color:#94a3b8;font-size:.78rem">Keine Meldungen.</div>';
+  if(!aktiv.length){
+    list.innerHTML='<div style="padding:24px 16px;text-align:center;color:#94a3b8;font-size:.78rem">Keine offenen Meldungen.<br><span style="font-size:.66rem">Quittierte Meldungen sind im Verlauf einsehbar.</span></div>';
     return;
   }
-  list.innerHTML = _vwEvents.map(ev=>{
+  list.innerHTML = aktiv.map(ev=>{
     const isAbsent = ev.typ==='absent';
     const icon = isAbsent ? '🚫' : '↩';
     const label = isAbsent ? 'Nicht angetreten' : 'Wiederholer';
@@ -9031,17 +9063,18 @@ function _renderVwBell(){
     const dt = ev.erstellt ? new Date(ev.erstellt) : null;
     const dtStr = dt ? dt.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
     const bold = ev.gelesen ? '500' : '700';
-    // Erledigt-Button nur bei ungelesenen Meldungen
-    const erledigtBtn = !ev.gelesen
-      ? `<button onclick="event.stopPropagation();markVwEventReadOnly('${ev.id}')" title="Nur als erledigt markieren (ohne TN-Profil zu öffnen)" style="margin-left:auto;font-size:.62rem;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#059669;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:700;flex-shrink:0">✓ Erledigt</button>`
-      : `<span style="margin-left:auto;font-size:.55rem;color:#94a3b8;font-family:'JetBrains Mono',monospace;font-weight:600">erledigt</span>`;
-    return `<div style="padding:10px 14px;border-bottom:1px solid var(--brd);background:${ev.gelesen?'#fff':bg};border-left:4px solid ${borderL};cursor:pointer" onclick="markVwEventReadAndOpen('${ev.id}','${esc(ev.tnId||'')}')" title="Klicken um TN-Profil zu öffnen">
+    // Status-Indikator (links neben Label)
+    const statusInd = !ev.gelesen
+      ? '<span style="display:inline-block;width:8px;height:8px;background:'+color+';border-radius:50%" title="Noch nicht gelesen"></span>'
+      : '';
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--brd);background:${ev.gelesen?'#fff':bg};border-left:4px solid ${borderL}" onclick="markVwEventReadAndOpen('${ev.id}','${esc(ev.tnId||'')}')" title="Klicken um TN-Profil zu öffnen" style="cursor:pointer">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        ${statusInd}
         <span style="font-size:1rem">${icon}</span>
         <span style="font-size:.72rem;font-weight:800;color:${color}">${label}</span>
-        ${erledigtBtn}
+        <button onclick="event.stopPropagation();openVwQuittModal('${ev.id}')" title="Betrieb wurde informiert - Meldung abschließen" style="margin-left:auto;font-size:.62rem;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.35);color:#059669;padding:4px 9px;border-radius:6px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:700;flex-shrink:0;line-height:1.2">✓ Quittieren</button>
       </div>
-      <div style="font-size:.78rem;font-weight:${bold};color:#0f172a;line-height:1.4">${esc(ev.tnName||'?')}</div>
+      <div style="font-size:.78rem;font-weight:${bold};color:#0f172a;line-height:1.4;cursor:pointer" onclick="event.stopPropagation();markVwEventReadAndOpen('${ev.id}','${esc(ev.tnId||'')}')">${esc(ev.tnName||'?')}</div>
       <div style="font-size:.66rem;color:#64748b;margin-top:2px;line-height:1.4">
         ${esc(ev.kursName||'')}${ev.firma?' · '+esc(ev.firma):''}
       </div>
@@ -9074,7 +9107,7 @@ function toggleVwBell(ev){
 }
 
 function markAllVwEventsRead(){
-  const ungelesen = _vwEvents.filter(e=>!e.gelesen);
+  const ungelesen = _vwEvents.filter(e=>!e.gelesen && !e.quittiert);
   if(!ungelesen.length){ toast('Keine ungelesenen Meldungen'); return; }
   const batch = db.batch();
   ungelesen.forEach(e=>{
@@ -9085,7 +9118,8 @@ function markAllVwEventsRead(){
 
 function markVwEventReadAndOpen(eventId, tnId){
   if(!eventId) return;
-  // Als gelesen markieren
+  // Als gelesen markieren (passiv: zur Kenntnis genommen)
+  // - quittiert bleibt false, Eintrag bleibt in der Glocke sichtbar
   db.collection('vwEvents').doc(eventId).update({gelesen:true}).catch(()=>{});
   // Glocke schliessen
   const dd=document.getElementById('vwBellDD');
@@ -9096,12 +9130,105 @@ function markVwEventReadAndOpen(eventId, tnId){
   }
 }
 
-// Nur als gelesen markieren - Glocke bleibt offen, kein Profil
-function markVwEventReadOnly(eventId){
-  if(!eventId) return;
-  db.collection('vwEvents').doc(eventId).update({gelesen:true})
-    .then(()=>toast('✓ Als erledigt markiert'))
-    .catch(err=>toast('Fehler: '+err.message,'bad'));
+// ─── QUITTIEREN-MODAL ───
+let _vwQuittEventId = null;
+
+function openVwQuittModal(eventId){
+  const ev = _vwEvents.find(e=>e.id===eventId);
+  if(!ev) return;
+  _vwQuittEventId = eventId;
+  const isAbsent = ev.typ==='absent';
+  const icon = isAbsent ? '🚫' : '↩';
+  const label = isAbsent ? 'Nicht angetreten' : 'Wiederholer';
+  const info=document.getElementById('vwQuittInfo');
+  info.innerHTML = `<div style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:700">${icon} ${label}</div>
+    <div style="font-weight:700;color:#0f172a;font-size:.85rem;margin-bottom:2px">${esc(ev.tnName||'?')}</div>
+    <div style="font-size:.7rem;color:#64748b">${esc(ev.kursName||'')}${ev.firma?' · '+esc(ev.firma):''}</div>`;
+  document.getElementById('vwQuittNotiz').value = '';
+  document.getElementById('vwQuittModal').style.display='flex';
+  setTimeout(()=>document.getElementById('vwQuittNotiz').focus(), 100);
+}
+
+function closeVwQuittModal(){
+  document.getElementById('vwQuittModal').style.display='none';
+  _vwQuittEventId = null;
+}
+
+function confirmVwQuittieren(){
+  if(!_vwQuittEventId) return;
+  const notiz = (document.getElementById('vwQuittNotiz').value||'').trim();
+  const ev = _vwEvents.find(e=>e.id===_vwQuittEventId);
+  if(!ev){ closeVwQuittModal(); return; }
+  // Update mit Quittier-Daten + auch gelesen=true (falls noch nicht)
+  db.collection('vwEvents').doc(_vwQuittEventId).update({
+    quittiert: true,
+    quittiertAm: Date.now(),
+    quittiertVon: _email||'?',
+    quittiertNotiz: notiz,
+    gelesen: true
+  }).then(()=>{
+    toast('✓ Quittiert · "'+(ev.tnName||'?')+'"');
+    closeVwQuittModal();
+  }).catch(err=>{
+    toast('Fehler: '+err.message,'bad');
+  });
+}
+
+// ─── VERLAUF-TAB ───
+let _vwBellShowVerlauf = false;
+
+function toggleVwBellTab(e){
+  if(e) e.stopPropagation();
+  _vwBellShowVerlauf = !_vwBellShowVerlauf;
+  const btn=document.getElementById('vwBellTabBtn');
+  if(_vwBellShowVerlauf){
+    btn.textContent='🔔 Aktuell';
+    btn.style.background='rgba(16,185,129,.1)';
+    btn.style.borderColor='rgba(16,185,129,.35)';
+    btn.style.color='#059669';
+    _renderVwVerlauf();
+  } else {
+    btn.textContent='📋 Verlauf';
+    btn.style.background='#fff';
+    btn.style.borderColor='var(--brd)';
+    btn.style.color='#475569';
+    _renderVwBell();
+  }
+}
+
+function _renderVwVerlauf(){
+  const list=document.getElementById('vwBellList');
+  if(!list) return;
+  const quittiert = _vwEvents.filter(e=>e.quittiert).sort((a,b)=>(b.quittiertAm||0)-(a.quittiertAm||0));
+  if(!quittiert.length){
+    list.innerHTML='<div style="padding:24px 16px;text-align:center;color:#94a3b8;font-size:.78rem">Noch keine quittierten Meldungen.</div>';
+    return;
+  }
+  list.innerHTML = quittiert.map(ev=>{
+    const isAbsent = ev.typ==='absent';
+    const icon = isAbsent ? '🚫' : '↩';
+    const label = isAbsent ? 'Nicht angetreten' : 'Wiederholer';
+    const color = isAbsent ? '#ef4444' : '#d97706';
+    const dt = ev.erstellt ? new Date(ev.erstellt) : null;
+    const dtStr = dt ? dt.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    const qDt = ev.quittiertAm ? new Date(ev.quittiertAm) : null;
+    const qStr = qDt ? qDt.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--brd);background:#fff;border-left:4px solid #cbd5e1;cursor:pointer" onclick="markVwEventReadAndOpen('${ev.id}','${esc(ev.tnId||'')}')" title="TN-Profil öffnen">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:.9rem;opacity:.6">${icon}</span>
+        <span style="font-size:.7rem;font-weight:700;color:#94a3b8">${label}</span>
+        <span style="margin-left:auto;font-size:.55rem;color:#10b981;font-family:'JetBrains Mono',monospace;font-weight:700">✓ Quittiert</span>
+      </div>
+      <div style="font-size:.78rem;font-weight:600;color:#475569;line-height:1.4">${esc(ev.tnName||'?')}</div>
+      <div style="font-size:.66rem;color:#94a3b8;margin-top:2px;line-height:1.4">
+        ${esc(ev.kursName||'')}${ev.firma?' · '+esc(ev.firma):''}
+      </div>
+      ${ev.quittiertNotiz ? `<div style="font-size:.66rem;color:#475569;margin-top:6px;padding:6px 8px;background:rgba(16,185,129,.06);border-left:2px solid #10b981;border-radius:4px;line-height:1.45;font-style:italic">"${esc(ev.quittiertNotiz)}"</div>` : ''}
+      <div style="font-size:.58rem;color:#94a3b8;margin-top:4px;font-family:'JetBrains Mono',monospace">
+        gemeldet ${dtStr} · quittiert ${qStr}${ev.quittiertVon?' von '+esc(ev.quittiertVon):''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // Großer auffälliger Toast oben rechts

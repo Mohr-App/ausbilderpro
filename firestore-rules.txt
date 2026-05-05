@@ -155,16 +155,18 @@ service cloud.firestore {
 
     // Verwaltung-Events (Aufploppen-Notifications fuer VerwaltungPro)
     // - Ausbilder erstellt Events bei kritischen Status-Aenderungen (absent, wiederholer)
-    // - Verwaltung liest und markiert als gelesen
+    // - Verwaltung liest und quittiert (Betrieb informiert)
     match /vwEvents/{eventId} {
       allow create: if request.auth != null
         && request.resource.data.keys().hasAll(['typ','tnId','tnName','erstellt','gelesen'])
         && request.resource.data.typ in ['absent','wiederholer']
         && request.resource.data.gelesen == false;
       allow read: if request.auth != null;
-      // Nur 'gelesen' darf von Verwaltung umgeschrieben werden
+      // Verwaltung darf nur Status-Felder (gelesen + Quittier-Felder) aendern
       allow update: if request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gelesen']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['gelesen','quittiert','quittiertAm','quittiertVon','quittiertNotiz']
+        );
       // Loeschen erlaubt - alte Events koennen aufgeraeumt werden
       allow delete: if request.auth != null;
     }
