@@ -28,6 +28,18 @@ window.addEventListener('load', ()=>{
 <style>
 :root{--bg:#ffffff;--sur:#ffffff;--sur2:#f1f5f9;--brd:#e2e8f0;--acc:#3b82f6;--acc2:#f59e0b;--ok:#10b981;--bad:#ef4444;--tx:#0f172a;--mu:#94a3b8;--sw:238px;--hdr-bg:linear-gradient(135deg,#2563eb,#059669);}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+/* === Firefox-Defensive (ff-defensive) ===
+ * Klasse 'ff-row' fuer flex-Container mit Avatar+Name+Button-Pattern.
+ * Stellt sicher dass lange Inhalte nicht den Action-Button rauspressen.
+ * Anwenden auf: <div class="ff-row" style="display:flex;..."> */
+.ff-row{min-width:0;}
+.ff-row > .ff-shrink{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ff-row > .ff-fixed{flex-shrink:0;}
+
+/* Fallback fuer haeufiges Card-Pattern: alle .pool-card / .fehlt-card / .wiederholer-card / .sb-* / .kurs-card / .kat-row erben automatisch */
+.pool-card,.fehlt-card,.wiederholer-card,.kat-row{min-width:0;}
+.pool-card > div,.fehlt-card > div,.wiederholer-card > div{min-width:0;}
 body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;}
 
 /* HDR */
@@ -1938,6 +1950,7 @@ function renderSidebar(){
     row.addEventListener('dragstart',e=>{
       _dragSrcId=id;
       e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain', id); // Firefox-Pflicht
       row.classList.add('dragging');
     });
     row.addEventListener('dragend',()=>{
@@ -2322,6 +2335,7 @@ function loadHBZKurse(){
           _hbzDragData=k;
           card.classList.add('dragging');
           e.dataTransfer.effectAllowed='copy';
+          e.dataTransfer.setData('text/plain', k.id); // Firefox-Pflicht
         });
         card.addEventListener('dragend',()=>{
           card.classList.remove('dragging');
@@ -3504,6 +3518,7 @@ function mkSeat(id,seats){
   el.addEventListener('dragstart',e=>{ 
     _dragSeatId=id; 
     e.dataTransfer.effectAllowed='move'; 
+    e.dataTransfer.setData('text/plain', id); // Firefox-Pflicht
     el.classList.add('dragging');
     // Für Pool-Rückgabe: wenn Sitzplatz besetzt ist
     if(d&&d.name){ _seatDragId=id; }
@@ -7736,6 +7751,7 @@ function setupSeatDropTargets(){
       if(!d||!d.name||_poolDragId) return;
       _seatDragId=id;
       e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain', d.name||id); // Firefox-Pflicht
     });
     el.addEventListener('dragend',()=>{ _seatDragId=null; _poolDragId=null; _wiederholerSeatId=null; _fehltLocal=false; });
   });

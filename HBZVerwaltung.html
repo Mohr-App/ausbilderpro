@@ -25,6 +25,15 @@
   --ok:#059669;--bad:#dc2626;--warn:#d97706;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+
+/* === Firefox-Defensive (ff-defensive) ===
+ * Klasse 'ff-row' fuer flex-Container mit Avatar+Name+Button-Pattern.
+ * Verhindert dass lange Inhalte den Action-Button aus dem sichtbaren Bereich druecken (Firefox strikt). */
+.ff-row{min-width:0;}
+.ff-row > .ff-shrink{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ff-row > .ff-fixed{flex-shrink:0;}
+.pool-card,.fehlt-card,.wiederholer-card,.kat-row{min-width:0;}
+.pool-card > div,.fehlt-card > div,.wiederholer-card > div{min-width:0;}
 body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;-webkit-font-smoothing:antialiased;}
 
 /* LOGIN */
@@ -2317,6 +2326,7 @@ function renderSbAusbTree(){
       e.stopPropagation();
       _brancheDragKey=bKey; _brancheDragSection='ausb';
       e.dataTransfer.setData('application/beruf',bKey);
+      e.dataTransfer.setData('text/plain', bKey); // Firefox-Pflicht
       e.dataTransfer.effectAllowed='move';
       bDiv.style.opacity='.4';
     });
@@ -2487,6 +2497,7 @@ function renderSbTnTree(){
       e.stopPropagation();
       _brancheDragKey=key; _brancheDragSection='tn';
       e.dataTransfer.setData('application/beruf',key);
+      e.dataTransfer.setData('text/plain', key); // Firefox-Pflicht
       e.dataTransfer.effectAllowed='move';
       wrap.style.opacity='.4';
     });
