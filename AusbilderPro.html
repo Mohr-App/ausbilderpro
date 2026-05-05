@@ -7453,11 +7453,56 @@ function resetTNStatus(tnId, fromType, tnName){
     }).catch(()=>{});
   }
   toast('↺ Status zurückgesetzt');
+  // Verwaltung-Events automatisch quittieren (Verwaltung muss nicht mehr nachfragen)
+  _autoQuittiereVwEvents(tnId, fromType, ausName);
   // UI komplett neu laden (renderFehlt + renderWiederholer triggern)
   setTimeout(()=>{
     if(typeof renderSeats==='function') renderSeats();
     if(typeof loadPool==='function') loadPool();
   },400);
+}
+
+// Auto-Quittiert offene vwEvents fuer einen TN nach Reset.
+// Verhindert dass Verwaltung unnoetig beim Betrieb nachtelefoniert,
+// obwohl der Azubi inzwischen nachtraeglich erschienen ist.
+function _autoQuittiereVwEvents(tnId, fromType, ausName){
+  if(!_db || !tnId) return;
+  // Nur tnId in der Query, Rest clientseitig filtern (kein Composite-Index noetig)
+  _db.collection('vwEvents')
+    .where('tnId','==', tnId)
+    .get().then(snap=>{
+      if(snap.empty) return;
+      const cutoff = Date.now() - 30*24*60*60*1000;
+      const now = Date.now();
+      snap.forEach(doc=>{
+        const ev = doc.data();
+        // Filter: nur passender Typ, nicht quittiert, in Range
+        if(ev.typ !== fromType) return;
+        if(ev.quittiert === true) return;
+        if((ev.erstellt||0) < cutoff) return;
+        // Notiz je nach Frist-Status (nur bei 'absent' relevant)
+        let notiz = 'Azubi ist nachträglich erschienen — Status zurückgesetzt durch Ausbilder';
+        if(fromType==='absent' && ev.frist){
+          const fristMs = new Date(ev.frist).getTime();
+          if(!isNaN(fristMs)){
+            if(now <= fristMs){
+              notiz = 'Azubi ist rechtzeitig erschienen (vor Ablauf der Meldefrist) — Status zurückgesetzt durch Ausbilder';
+            } else {
+              notiz = 'Azubi ist nachträglich erschienen (nach Ablauf der Meldefrist) — Status zurückgesetzt durch Ausbilder';
+            }
+          }
+        } else if(fromType==='wiederholer'){
+          notiz = 'Wiederholer-Status zurückgesetzt durch Ausbilder — Azubi nimmt wieder normal am Kurs teil';
+        }
+        doc.ref.update({
+          quittiert: true,
+          quittiertAm: now,
+          quittiertVon: ausName ? '↺ '+ausName : '↺ Auto-Reset durch Ausbilder',
+          quittiertNotiz: notiz,
+          gelesen: true
+        }).catch(()=>{});
+      });
+    }).catch(err=>console.warn('Auto-Quittieren fehlgeschlagen:', err));
 }
 
 // Erzeugt ein Verwaltung-Event: aufploppen-Notification fuer VerwaltungPro
