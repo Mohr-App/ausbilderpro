@@ -1505,6 +1505,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <button class="bsave" id="btnSaveSeat" onclick="saveSeat()" title="Alle Änderungen am Sitzplatz speichern">💾 Speichern</button>
       <button class="bsave" id="btnBescheinigung" onclick="generateBescheinigungAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1;display:none" title="PDF-Bescheinigung mit Noten und Anwesenheit erstellen">📄 Bescheinigung</button>
+      <!-- Status-Aktionen (sichtbar nur wenn Sitz belegt) - geht auf Mobile + Desktop -->
+      <button class="bsave" id="btnAbsentSeat" onclick="markSeatAsAbsent()" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.3);color:#ef4444;display:none" title="Teilnehmer als Nicht angetreten markieren - er wird aus dem Kurs entfernt">🚫 Nicht angetreten</button>
+      <button class="bsave" id="btnWdhSeat" onclick="markSeatAsWdh()" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3);color:#d97706;display:none" title="Teilnehmer als Wiederholer markieren - Kurs muss wiederholt werden">↩ Wiederholer</button>
       <button class="bsave bdgr" id="btnClearSeat" onclick="clearSeat()" title="Teilnehmer vom Platz entfernen – Daten bleiben im Pool erhalten">🗑 Sitzplatz leeren</button>
     </div>
   </div>
@@ -4257,9 +4260,18 @@ function stab(t){
   const bs=document.getElementById('btnSaveSeat');
   const bc=document.getElementById('btnClearSeat');
   const bb=document.getElementById('btnBescheinigung');
+  const ba=document.getElementById('btnAbsentSeat');
+  const bw=document.getElementById('btnWdhSeat');
   if(bs) bs.style.display=hideAll?'none':'';
   if(bc) bc.style.display=hideAll?'none':'';
   if(bb) bb.style.display=hideAll?'none':(bb.dataset.show==='1'?'':'none');
+  // Status-Buttons nur wenn Sitz belegt ist (Name vorhanden)
+  const seatHasOccupant = (() => {
+    const inst=curInst(); if(!inst||!curSeat) return false;
+    const seat=inst.seats?.[curSeat]; return !!(seat&&seat.name);
+  })();
+  if(ba) ba.style.display=(hideAll||!seatHasOccupant)?'none':'';
+  if(bw) bw.style.display=(hideAll||!seatHasOccupant)?'none':'';
   if(t==='hist') loadKursHistorie();
 }
 const FIXED_GRADES=[{id:'fuehrung',label:'Führung',color:'#fcd34d'},{id:'mitarbeit',label:'Mitarbeit',color:'#60a5fa'},{id:'praxis',label:'Praxis',color:'#34d399'}];
@@ -6779,6 +6791,55 @@ function clearSeat(){
   delete inst.seats[curSeat];
   persist(); renderSeats(); updBadge(); renderSidebar(); closeModal(); loadPool();
   if(d&&d.name) toast('🗑 "'+d.name+'" entfernt – 30 Tage im Papierkorb');
+}
+
+// Tap-Variante zu DnD: Sitz-Inhaber als 'Nicht angetreten' markieren
+// Funktioniert auf Mobile + Desktop (DnD ist auf Touch nicht zuverlaessig)
+function markSeatAsAbsent(){
+  if(!curSeat||!S.curKat||!S.curInst) return;
+  const inst=S.kats[S.curKat].instances[S.curInst];
+  const d=inst.seats?.[curSeat];
+  if(!d||!d.name){toast('Sitzplatz ist leer','bad');return;}
+  if(!confirm('🚫 "'+d.name+'" als "Nicht angetreten" einstufen?\n\nDer Azubi wird benachrichtigt, der Kurs für ihn beendet, und der Arbeitgeber per E-Mail informiert.\n\nFortfahren?')) return;
+  // Daten sichern (analog zu _execDropToFehlt Fall 1)
+  const tnName=d.name;
+  const tnId=d.poolTnId;
+  const kursId=d.poolKursId||inst.sharedKursId;
+  if(!inst.fehltStudents) inst.fehltStudents=[];
+  if(!inst.fehltStudents.find(f=>f.name===tnName))
+    inst.fehltStudents.push({name:tnName,company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',poolTnId:tnId||null,poolKursId:kursId||null});
+  // Sitzplatz leeren (Felder loeschen, Sitz selbst bleibt)
+  ['name','company','profession','ausbjahr','poolTnId','poolKursId','wiederholer'].forEach(k=>delete inst.seats[curSeat][k]);
+  persist(); renderSeats();
+  if(_db&&kursId&&tnId){
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').doc(tnId).update({status:'absent'}).then(()=>loadPool()).catch(()=>loadPool());
+    syncGlobalTNStatus(tnId,'absent');
+  } else loadPool();
+  closeModal();
+  toast('🚫 "'+tnName+'" als "Nicht angetreten" markiert');
+}
+
+// Tap-Variante zu DnD: Sitz-Inhaber als 'Wiederholer' markieren
+function markSeatAsWdh(){
+  if(!curSeat||!S.curKat||!S.curInst) return;
+  const inst=S.kats[S.curKat].instances[S.curInst];
+  const d=inst.seats?.[curSeat];
+  if(!d||!d.name){toast('Sitzplatz ist leer','bad');return;}
+  if(!confirm('↩ "'+d.name+'" als "Wiederholer" einstufen?\n\nDer Azubi wird benachrichtigt, der Kurs für ihn beendet, und der Arbeitgeber per E-Mail informiert. Der Kurs wird zu einem späteren Zeitpunkt wiederholt.\n\nFortfahren?')) return;
+  const tnName=d.name;
+  const tnId=d.poolTnId;
+  const kursId=d.poolKursId||inst.sharedKursId;
+  // Wiederholer-Flag setzen (Sitz bleibt belegt mit Wiederholer-Markierung)
+  inst.seats[curSeat].wiederholer=true;
+  persist(); renderSeats();
+  if(_db&&kursId&&tnId){
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').doc(tnId).update({wiederholer:true,status:firebase.firestore.FieldValue.delete()}).then(()=>loadPool()).catch(()=>loadPool());
+    syncGlobalTNStatus(tnId,'wiederholer');
+  } else loadPool();
+  closeModal();
+  toast('↩ "'+tnName+'" als Wiederholer markiert');
 }
 
 // Export/Import – RC4 encrypted
