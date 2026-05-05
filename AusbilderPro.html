@@ -853,6 +853,38 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="mbdy" id="aktionDatumBody"></div>
 </div></div>
 
+<!-- FRIST-MODAL für 'Nicht angetreten' -->
+<div class="ov" id="absentFristModal" title="Schließen" onclick="if(event.target===this)this.classList.remove('open')">
+<div class="modal" style="max-width:480px">
+<div class="mhd"><div class="mtit">🚫 Nicht angetreten</div><button class="xcls" onclick="document.getElementById('absentFristModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
+<div class="mbdy">
+  <div id="absentFristInfo" style="padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:14px;font-size:.78rem;color:#991b1b;line-height:1.5"></div>
+  <label style="display:block;font-size:.72rem;color:#475569;margin-bottom:8px;font-weight:700">Meldefrist für den Azubi:</label>
+  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <button class="tbtn" onclick="absentFristQuick('0900')" style="flex:1;min-width:80px;font-size:.72rem">9:00 Uhr</button>
+    <button class="tbtn" onclick="absentFristQuick('0930')" style="flex:1;min-width:80px;font-size:.72rem">9:30 Uhr</button>
+    <button class="tbtn" onclick="absentFristQuick('1000')" style="flex:1;min-width:80px;font-size:.72rem">10:00 Uhr</button>
+  </div>
+  <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+    <button class="tbtn" onclick="absentFristQuick('+30')" style="flex:1;min-width:90px;font-size:.7rem;background:rgba(99,102,241,.08);color:#6366f1">+30 Min</button>
+    <button class="tbtn" onclick="absentFristQuick('+60')" style="flex:1;min-width:90px;font-size:.7rem;background:rgba(99,102,241,.08);color:#6366f1">+60 Min</button>
+    <button class="tbtn" onclick="absentFristQuick('+120')" style="flex:1;min-width:90px;font-size:.7rem;background:rgba(99,102,241,.08);color:#6366f1">+120 Min</button>
+  </div>
+  <div style="margin-bottom:14px">
+    <label style="display:block;font-size:.65rem;color:#64748b;margin-bottom:4px">Eigene Uhrzeit (optional):</label>
+    <input type="time" id="absentFristCustom" oninput="absentFristCustomInput(this.value)" style="width:100%;padding:8px 10px;border:2px solid #e2e8f0;border-radius:8px;font-family:'Sora',sans-serif;font-size:.85rem">
+  </div>
+  <div id="absentFristPreview" style="padding:10px 12px;background:#f1f5f9;border-radius:8px;margin-bottom:14px;font-size:.74rem;color:#475569;line-height:1.5;display:none"></div>
+  <div style="font-size:.66rem;color:#64748b;line-height:1.5;margin-bottom:14px;padding:8px 10px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:4px">
+    <b>Hinweis:</b> Falls der Azubi sich rechtzeitig meldet (z.B. Bahn-Verspätung), kannst du den Status mit dem Reset-Knopf (↺) im "Nicht angetreten"-Container wieder zurücksetzen.
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="tbtn" onclick="document.getElementById('absentFristModal').classList.remove('open')" style="flex:1;background:#fff;border:1.5px solid #e2e8f0;color:#64748b">Abbrechen</button>
+    <button class="tbtn" id="absentFristConfirmBtn" onclick="absentFristConfirm()" style="flex:1.3;background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;font-weight:700" disabled>🚫 Markieren</button>
+  </div>
+</div>
+</div></div>
+
 <!-- AKTIONS-VERLAUF MODAL -->
 <div class="ov" id="aktionsVerlaufModal" title="Schließen" onclick="if(event.target===this)this.classList.remove('open')">
 <div class="modal" style="max-width:520px">
@@ -7437,52 +7469,173 @@ function _notifyVwEvent(typ, tnId, tnData, kursName, ausName, extra){
   _db.collection('vwEvents').add(event).catch(err=>console.warn('vwEvent failed:',err));
 }
 
-function syncGlobalTNStatus(tnId, statusType){
+// ─── FRIST-MODAL für 'Nicht angetreten' ───
+let _absentFristState = { tnId:null, tnName:'', frist:'', onConfirm:null };
+
+function _openAbsentFristModal(opts){
+  _absentFristState = { tnId: opts.tnId, tnName: opts.tnName, frist:'', onConfirm: opts.onConfirm };
+  // Info-Text
+  const info=document.getElementById('absentFristInfo');
+  info.innerHTML = '<b>'+esc(opts.tnName||'?')+'</b> wird als <b>"Nicht angetreten"</b> markiert. Bevor das endgültig wird, bekommt der Azubi noch eine Mail mit einer Meldefrist – damit er sich melden kann (z.B. Bahn-Verspätung).';
+  // Reset
+  document.getElementById('absentFristCustom').value='';
+  document.getElementById('absentFristPreview').style.display='none';
+  document.getElementById('absentFristConfirmBtn').disabled=true;
+  // Standard: 9:00 Uhr vorausgewählt
+  setTimeout(()=>absentFristQuick('0900'), 50);
+  document.getElementById('absentFristModal').classList.add('open');
+}
+
+function absentFristQuick(val){
+  // val: 'HHMM' für Absolut-Zeit, oder '+30' / '+60' / '+120' für Plus-Minuten
+  let fristDate = new Date();
+  if(val.startsWith('+')){
+    const mins = parseInt(val.slice(1),10);
+    fristDate.setTime(fristDate.getTime() + mins*60*1000);
+  } else {
+    // HHMM-Format → heute zu dieser Zeit
+    const hh = parseInt(val.slice(0,2),10);
+    const mm = parseInt(val.slice(2,4),10);
+    fristDate.setHours(hh, mm, 0, 0);
+    // Falls die Zeit schon vorbei ist (theoretisch denkbar bei +30 Modus): morgen
+    if(fristDate.getTime() < Date.now()) fristDate.setDate(fristDate.getDate()+1);
+  }
+  _absentFristState.frist = fristDate.toISOString();
+  // Custom-Input zurücksetzen, da Quick-Button gewählt
+  document.getElementById('absentFristCustom').value='';
+  _absentFristPreview();
+}
+
+function absentFristCustomInput(timeStr){
+  if(!timeStr){ _absentFristState.frist=''; _absentFristPreview(); return; }
+  // timeStr: 'HH:MM' → heute zu dieser Zeit
+  const [hh, mm] = timeStr.split(':').map(x=>parseInt(x,10));
+  const fristDate = new Date();
+  fristDate.setHours(hh, mm, 0, 0);
+  if(fristDate.getTime() < Date.now()) fristDate.setDate(fristDate.getDate()+1);
+  _absentFristState.frist = fristDate.toISOString();
+  _absentFristPreview();
+}
+
+function _absentFristPreview(){
+  const prev=document.getElementById('absentFristPreview');
+  const btn=document.getElementById('absentFristConfirmBtn');
+  if(!_absentFristState.frist){
+    prev.style.display='none';
+    btn.disabled=true;
+    return;
+  }
+  const d = new Date(_absentFristState.frist);
+  const now = new Date();
+  const diffMs = d.getTime() - now.getTime();
+  const diffMin = Math.round(diffMs/60000);
+  const sameDay = d.toDateString()===now.toDateString();
+  const dateStr = d.toLocaleString('de-DE',{
+    weekday: sameDay?undefined:'short',
+    day:'2-digit', month:'2-digit',
+    hour:'2-digit', minute:'2-digit'
+  });
+  let durationText = '';
+  if(diffMin <= 0){
+    durationText = '<span style="color:#ef4444;font-weight:700">⚠ Frist liegt bereits in der Vergangenheit</span>';
+  } else if(diffMin < 60){
+    durationText = 'in ca. <b>'+diffMin+' Minuten</b>';
+  } else {
+    const h=Math.floor(diffMin/60), m=diffMin%60;
+    durationText = 'in ca. <b>'+h+'h '+(m?m+'min':'')+'</b>';
+  }
+  prev.innerHTML = '<b>Frist:</b> '+esc(dateStr)+(sameDay?' Uhr':'')+'<br>'+durationText;
+  prev.style.display='';
+  btn.disabled = (diffMin <= 0);
+}
+
+function absentFristConfirm(){
+  if(!_absentFristState.frist) return;
+  document.getElementById('absentFristModal').classList.remove('open');
+  const onConfirm = _absentFristState.onConfirm;
+  const fristIso = _absentFristState.frist;
+  if(typeof onConfirm === 'function') onConfirm(fristIso);
+}
+
+function syncGlobalTNStatus(tnId, statusType, opts){
   // tnId = globalTN doc ID (= kurs subcollection doc ID)
   // statusType: 'absent' | 'wiederholer' | 'clear'
+  // opts.frist (ISO-String) bei 'absent' optional - wenn gesetzt: Frist-Variante der Mail.
+  //   Wird leer gelassen, oeffnet sich das Frist-Modal (Standard-Workflow ueber UI).
   if(!_db || !tnId) return;
   const ref = _db.collection('globalTN').doc(tnId);
   const kursName=S.kats[S.curKat]?.label||'Lehrgang';
   const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
   const kursId=curInst()?.sharedKursId;
   if(statusType === 'absent'){
-    // Aktive Bestätigung mit Info zur Benachrichtigung
-    if(!confirm('🚫 Als "Nicht angetreten" markieren?\n\nDer Azubi wird über folgende Wege informiert:\n• App-Benachrichtigung in AzubiPro\n• E-Mail (sofern Adresse hinterlegt)\n• Der Arbeitgeber wird ebenfalls per E-Mail informiert\n\nFortfahren?')) return;
+    // Wenn keine Frist gegeben: Modal oeffnen statt blocking confirm.
+    // Modal ruft uns wieder auf mit gesetzter Frist.
+    if(!opts || !opts.frist){
+      // TN-Name aus globalTN holen fuer Modal-Anzeige
+      ref.get().then(d=>{
+        const data = d.exists ? d.data() : {};
+        const tnName = ((data.vorname||'')+' '+(data.nachname||'')).trim() || 'Azubi';
+        _openAbsentFristModal({
+          tnId: tnId,
+          tnName: tnName,
+          onConfirm: (fristIso)=>{
+            // Rekursiver Aufruf mit gesetzter Frist
+            syncGlobalTNStatus(tnId, 'absent', {frist: fristIso});
+          }
+        });
+      });
+      return;
+    }
+    // Frist liegt vor → echte Status-Aenderung durchfuehren
+    const fristDate = new Date(opts.frist);
+    const fristStr = fristDate.toLocaleString('de-DE',{
+      weekday:'long', day:'2-digit', month:'long',
+      hour:'2-digit', minute:'2-digit'
+    }) + ' Uhr';
     ref.update({status:'absent', wiederholer: firebase.firestore.FieldValue.delete()}).catch(()=>{});
     // kursHistory markieren + Benachrichtigung
     if(kursId) ref.get().then(doc=>{
       if(!doc.exists) return;
       const data=doc.data();
-      const hist=(data.kursHistory||[]).map(h=>h.kursId===kursId?{...h, nichtErschienen:true}:h);
+      const hist=(data.kursHistory||[]).map(h=>h.kursId===kursId?{...h, nichtErschienen:true, fristIso: opts.frist}:h);
       const upd={
         kursHistory: hist,
         benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
           typ:'kurs_nicht_angetreten',
-          text:'Für den Lehrgang "'+kursName+'" wurdest du leider als "Nicht angetreten" eingestuft. Du brauchst zu diesem Lehrgang nicht mehr zu erscheinen. Bitte informiere zeitnah deinen Ausbildungsbetrieb.',
+          text:'Für den Lehrgang "'+kursName+'" wurdest du als "Nicht angetreten" eingetragen. Bitte melde dich umgehend bis '+fristStr+' bei uns oder bei deinem Ausbildungsbetrieb. Solltest du dich nicht innerhalb der Frist melden, gilt der Lehrgang als nicht teilgenommen.',
           ausbilder: ausName,
           datum: new Date().toISOString(),
+          frist: opts.frist,
           gelesen: false
         })
       };
-      if(data.aktiverKursId===kursId) upd.aktiverKursId=firebase.firestore.FieldValue.delete();
+      // aktiverKursId NICHT loeschen – TN bleibt erstmal verknuepft bis Frist abgelaufen ist.
+      // Bei tatsaechlichem Versaeumen kann das spaeter manuell oder ueber Reset bereinigt werden.
       ref.update(upd).catch(()=>{});
-      // E-Mail an Azubi
-      sendTnEmail(data, '🚫 Lehrgang "'+kursName+'" – Nicht angetreten',
-        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">für den Lehrgang <b>"'+kursName+'"</b> wurdest du leider als <b style="color:#ef4444">"Nicht angetreten"</b> eingestuft.</p>'
-        +'<div style="padding:12px;background:#fef2f2;border:2px solid #fecaca;border-radius:8px;margin-bottom:12px">'
-        +'<p style="margin:0;font-size:.85rem;color:#991b1b;font-weight:700">Du brauchst zu diesem Lehrgang nicht mehr zu erscheinen.</p></div>'
-        +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">📞 Bitte informiere zeitnah deinen Ausbildungsbetrieb.</p>'
+      // E-Mail an Azubi (Frist-Variante)
+      sendTnEmail(data, '⚠ Lehrgang "'+kursName+'" – Du fehlst! Melde dich bis '+fristStr,
+        '<p style="margin:0 0 12px;font-size:.92rem;color:#1e293b;line-height:1.55">du wurdest heute zum Lehrgang <b>"'+kursName+'"</b> erwartet, bist aber bisher nicht erschienen.</p>'
+        +'<div style="padding:14px;background:#fef2f2;border:2px solid #ef4444;border-radius:8px;margin-bottom:14px">'
+        +'<p style="margin:0 0 6px;font-size:.78rem;color:#991b1b;font-weight:800;text-transform:uppercase;letter-spacing:.04em">⚠ Bitte sofort melden</p>'
+        +'<p style="margin:0;font-size:.92rem;color:#0f172a;font-weight:700;line-height:1.4">Bis spätestens <span style="color:#dc2626">'+fristStr+'</span></p></div>'
+        +'<p style="margin:0 0 10px;font-size:.85rem;color:#374151;line-height:1.6">Melde dich umgehend telefonisch oder per E-Mail – entweder direkt bei deinem Ausbildungsbetrieb oder beim Bildungszentrum. Auch eine kurze Nachricht über AzubiPro genügt.</p>'
+        +'<div style="padding:10px 12px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:4px;margin-bottom:10px">'
+        +'<p style="margin:0;font-size:.78rem;color:#92400e;line-height:1.55"><b>Wichtig:</b> Falls du dich nicht innerhalb der Frist meldest, gilt der Lehrgang als <b>nicht teilgenommen</b>.</p></div>'
+        +'<p style="margin:10px 0 0;font-size:.78rem;color:#64748b;line-height:1.55">Bist du krank, hattest Probleme auf dem Weg (Bahn, Verkehr) oder ist sonst etwas dazwischen gekommen? → Sag uns kurz Bescheid, wir finden eine Lösung.</p>'
       );
-      // E-Mail an Arbeitgeber
-      sendAgEmail(data, '🚫 Auszubildender als "Nicht angetreten" – '+kursName,
-        '<div style="padding:12px;background:#fef2f2;border:2px solid #fecaca;border-radius:8px;margin-bottom:12px">'
-        +'<p style="margin:0 0 6px;font-size:.85rem;color:#991b1b;font-weight:700">Status: Nicht angetreten</p>'
-        +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursName+'</p>'
-        +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
-        +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender ist nicht zum Lehrgang erschienen und wird zu diesem nicht mehr erwartet.</p>'
+      // E-Mail an Arbeitgeber (Frist-Variante mit Bitte um Erreichen)
+      sendAgEmail(data, '⚠ Auszubildender fehlt – '+kursName+' – bitte bis '+fristStr+' Rückmeldung',
+        '<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">Ihr Auszubildender wurde heute zum Lehrgang erwartet, ist bisher aber nicht erschienen.</p>'
+        +'<div style="padding:14px;background:#fef2f2;border:2px solid #ef4444;border-radius:8px;margin-bottom:14px">'
+        +'<p style="margin:0 0 6px;font-size:.7rem;color:#991b1b;font-weight:800;text-transform:uppercase;letter-spacing:.04em">Status: Nicht angetreten</p>'
+        +'<p style="margin:0 0 4px;font-size:.85rem;color:#0f172a"><b>Lehrgang:</b> '+kursName+'</p>'
+        +'<p style="margin:0 0 4px;font-size:.85rem;color:#0f172a"><b>Frist für Rückmeldung:</b> <span style="color:#dc2626;font-weight:700">'+fristStr+'</span></p>'
+        +'<p style="margin:0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
+        +'<p style="margin:0 0 10px;font-size:.85rem;color:#374151;line-height:1.6"><b>Bitte versuchen Sie kurzfristig, Ihren Azubi zu erreichen</b> und ihn zu informieren. Falls er sich rechtzeitig meldet (z.B. Bahn-Verspätung, Krankmeldung), kann der Status zurückgesetzt werden.</p>'
+        +'<p style="margin:10px 0 0;font-size:.78rem;color:#64748b;line-height:1.55">Erfolgt keine Rückmeldung innerhalb der Frist, gilt der Lehrgang für ihn als nicht teilgenommen.</p>'
       );
       // Verwaltung benachrichtigen (Aufploppen + Browser-Push)
-      _notifyVwEvent('absent', tnId, data, kursName, ausName);
+      _notifyVwEvent('absent', tnId, data, kursName, ausName, {frist: opts.frist});
     }).catch(()=>{});
   } else if(statusType === 'wiederholer'){
     if(!confirm('↩ Als Wiederholer markieren?\n\nDer Azubi wird über folgende Wege informiert:\n• App-Benachrichtigung in AzubiPro\n• E-Mail (sofern Adresse hinterlegt)\n• Der Arbeitgeber wird ebenfalls per E-Mail informiert\n\nFortfahren?')) return;
