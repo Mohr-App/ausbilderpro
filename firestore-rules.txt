@@ -153,6 +153,22 @@ service cloud.firestore {
       allow read, update, delete: if false; // Nur Extension
     }
 
+    // Verwaltung-Events (Aufploppen-Notifications fuer VerwaltungPro)
+    // - Ausbilder erstellt Events bei kritischen Status-Aenderungen (absent, wiederholer)
+    // - Verwaltung liest und markiert als gelesen
+    match /vwEvents/{eventId} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['typ','tnId','tnName','erstellt','gelesen'])
+        && request.resource.data.typ in ['absent','wiederholer']
+        && request.resource.data.gelesen == false;
+      allow read: if request.auth != null;
+      // Nur 'gelesen' darf von Verwaltung umgeschrieben werden
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gelesen']);
+      // Loeschen erlaubt - alte Events koennen aufgeraeumt werden
+      allow delete: if request.auth != null;
+    }
+
     // collectionGroup-Query auf firmaHistorie: AG findet alle Subcollection-Eintraege wo seine firmaUid drinsteht
     match /{path=**}/firmaHistorie/{histDoc} {
       allow read: if request.auth != null;

@@ -34,6 +34,9 @@
 .ff-row > .ff-fixed{flex-shrink:0;}
 .pool-card,.fehlt-card,.wiederholer-card,.kat-row{min-width:0;}
 .pool-card > div,.fehlt-card > div,.wiederholer-card > div{min-width:0;}
+
+/* Animation fuer VW-Bell Big-Toast */
+@keyframes vwToastIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;-webkit-font-smoothing:antialiased;}
 
 /* LOGIN */
@@ -645,6 +648,21 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <button class="hdr-btn" id="backupBtn" onclick="doFullBackup()" title="Alle Daten als JSON-Datei sichern" style="display:none">📦 <span class="hdr-btn-text">Backup</span></button>
     <button class="hdr-btn" id="restoreBtn" onclick="document.getElementById('restoreFileIn').click()" title="JSON-Backup wiederherstellen" style="opacity:.7;display:none"><span class="hdr-btn-text">Restore</span></button>
     <input type="file" id="restoreFileIn" accept=".json" style="display:none" onchange="doRestore(event)">
+    <!-- Glocke fuer Verwaltung-Events (vom Ausbilder gemeldete Status-Aenderungen) -->
+    <div style="position:relative;margin:0 4px">
+      <button class="hdr-btn" id="vwBellBtn" onclick="toggleVwBell(event)" title="Status-Meldungen vom Ausbilder" style="position:relative">
+        🔔 <span class="hdr-btn-text">Meldungen</span>
+        <span id="vwBellBadge" style="display:none;position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.4;font-family:'JetBrains Mono',monospace">0</span>
+      </button>
+      <div id="vwBellDD" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--brd);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);min-width:380px;max-width:440px;max-height:520px;overflow:hidden;z-index:100;flex-direction:column">
+        <div style="padding:12px 14px;border-bottom:1px solid var(--brd);background:linear-gradient(135deg,#fef2f2,#fef9c3);display:flex;align-items:center;gap:8px">
+          <span style="font-size:1rem">🔔</span>
+          <span style="font-size:.78rem;font-weight:800;color:#0f172a">Meldungen vom Ausbilder</span>
+          <button onclick="markAllVwEventsRead()" style="margin-left:auto;font-size:.62rem;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#1e40af;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'Sora',sans-serif">Alle gelesen</button>
+        </div>
+        <div id="vwBellList" style="overflow-y:auto;max-height:420px"></div>
+      </div>
+    </div>
     <button class="hdr-btn" onclick="showHVHilfe()" style="opacity:.7" title="Anleitungen und FAQ"><span class="hdr-btn-text">Hilfe</span></button>
     <div class="app-launcher-wrap" id="appLauncher">
       <button class="app-launcher-btn" onclick="toggleAppLauncher(event)" title="App wechseln (Admin)">
@@ -1848,6 +1866,8 @@ function grantAccess(u, role){
   document.getElementById('hdrUser').textContent = _email;
   // Pilot-Banner pruefen (einmalig pro User)
   checkPilotBanner();
+  // Verwaltung-Events Listener starten (Aufploppen-Notifications vom Ausbilder)
+  _initVwEvents();
   // Admin-Launcher: VerwaltungPro ist per Definition Admin/Verwaltung, also immer anzeigen
   const launcher=document.getElementById('appLauncher');
   if(launcher) launcher.style.display='inline-block';
@@ -8936,6 +8956,200 @@ function toast(msg,type){
   clearTimeout(_toastTimer);
   _toastTimer=setTimeout(()=>el.classList.remove('show'),2800);
 }
+
+// ─── VERWALTUNG-EVENTS (Aufploppen-Notifications vom Ausbilder) ───
+let _vwEvents = [];
+let _vwEventsUnsub = null;
+let _vwEventsInitialLoad = true;
+let _vwBellOpen = false;
+let _vwBigToastTimer = null;
+
+// Listener starten - Live aus 'vwEvents' Collection
+function _initVwEvents(){
+  if(!db || !_uid || _vwEventsUnsub) return;
+  // Browser-Notification-Permission proaktiv bei Login fragen (einmalig)
+  try{
+    if('Notification' in window && Notification.permission === 'default'){
+      Notification.requestPermission().catch(()=>{});
+    }
+  }catch(e){}
+  // Letzte 30 Tage abonnieren
+  const cutoff = Date.now() - 30*24*60*60*1000;
+  _vwEventsUnsub = db.collection('vwEvents')
+    .where('erstellt','>=', cutoff)
+    .orderBy('erstellt','desc')
+    .onSnapshot(snap=>{
+      const isFirst = _vwEventsInitialLoad;
+      _vwEventsInitialLoad = false;
+      // Neu hinzugefuegte Events erkennen
+      snap.docChanges().forEach(change=>{
+        if(change.type !== 'added') return;
+        const ev = {id: change.doc.id, ...change.doc.data()};
+        // Nur Live-Events poppen lassen, nicht beim Initial-Load
+        if(!isFirst && !ev.gelesen){
+          _showVwBigToast(ev);
+          _showVwBrowserNotification(ev);
+        }
+      });
+      // Liste komplett neu aufbauen
+      _vwEvents = [];
+      snap.forEach(d=> _vwEvents.push({id:d.id, ...d.data()}));
+      _renderVwBell();
+    }, err=>console.warn('vwEvents listener:', err));
+}
+
+// Stoppen bei Logout
+function _stopVwEvents(){
+  if(_vwEventsUnsub){ _vwEventsUnsub(); _vwEventsUnsub=null; }
+  _vwEvents = [];
+  _vwEventsInitialLoad = true;
+}
+
+// Glocke-Liste rendern
+function _renderVwBell(){
+  const list=document.getElementById('vwBellList');
+  const badge=document.getElementById('vwBellBadge');
+  if(!list||!badge) return;
+  const ungelesen = _vwEvents.filter(e=>!e.gelesen).length;
+  if(ungelesen>0){
+    badge.textContent = ungelesen>99?'99+':String(ungelesen);
+    badge.style.display='';
+  } else {
+    badge.style.display='none';
+  }
+  if(!_vwEvents.length){
+    list.innerHTML='<div style="padding:24px 16px;text-align:center;color:#94a3b8;font-size:.78rem">Keine Meldungen.</div>';
+    return;
+  }
+  list.innerHTML = _vwEvents.map(ev=>{
+    const isAbsent = ev.typ==='absent';
+    const icon = isAbsent ? '🚫' : '↩';
+    const label = isAbsent ? 'Nicht angetreten' : 'Wiederholer';
+    const color = isAbsent ? '#ef4444' : '#d97706';
+    const bg = isAbsent ? 'rgba(239,68,68,.04)' : 'rgba(245,158,11,.04)';
+    const borderL = ev.gelesen ? '#cbd5e1' : color;
+    const dt = ev.erstellt ? new Date(ev.erstellt) : null;
+    const dtStr = dt ? dt.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    const bold = ev.gelesen ? '500' : '700';
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--brd);background:${ev.gelesen?'#fff':bg};border-left:4px solid ${borderL};cursor:pointer" onclick="markVwEventReadAndOpen('${ev.id}','${esc(ev.tnId||'')}')">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:1rem">${icon}</span>
+        <span style="font-size:.72rem;font-weight:800;color:${color}">${label}</span>
+        ${!ev.gelesen?'<span style="margin-left:auto;width:8px;height:8px;background:'+color+';border-radius:50%"></span>':''}
+      </div>
+      <div style="font-size:.78rem;font-weight:${bold};color:#0f172a;line-height:1.4">${esc(ev.tnName||'?')}</div>
+      <div style="font-size:.66rem;color:#64748b;margin-top:2px;line-height:1.4">
+        ${esc(ev.kursName||'')}${ev.firma?' · '+esc(ev.firma):''}
+      </div>
+      <div style="font-size:.6rem;color:#94a3b8;margin-top:4px;font-family:'JetBrains Mono',monospace">
+        ${esc(ev.ausbilder||'?')} · ${dtStr}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleVwBell(ev){
+  if(ev) ev.stopPropagation();
+  const dd=document.getElementById('vwBellDD');
+  if(!dd) return;
+  _vwBellOpen = !_vwBellOpen;
+  dd.style.display = _vwBellOpen ? 'flex' : 'none';
+  if(_vwBellOpen){
+    // Click-outside zum Schliessen
+    setTimeout(()=>{
+      const closer = (e)=>{
+        if(!dd.contains(e.target) && !document.getElementById('vwBellBtn').contains(e.target)){
+          _vwBellOpen=false;
+          dd.style.display='none';
+          document.removeEventListener('click', closer);
+        }
+      };
+      document.addEventListener('click', closer);
+    }, 50);
+  }
+}
+
+function markAllVwEventsRead(){
+  const ungelesen = _vwEvents.filter(e=>!e.gelesen);
+  if(!ungelesen.length){ toast('Keine ungelesenen Meldungen'); return; }
+  const batch = db.batch();
+  ungelesen.forEach(e=>{
+    batch.update(db.collection('vwEvents').doc(e.id), {gelesen:true});
+  });
+  batch.commit().then(()=>toast(ungelesen.length+' als gelesen markiert ✓')).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+function markVwEventReadAndOpen(eventId, tnId){
+  if(!eventId) return;
+  // Als gelesen markieren
+  db.collection('vwEvents').doc(eventId).update({gelesen:true}).catch(()=>{});
+  // Glocke schliessen
+  const dd=document.getElementById('vwBellDD');
+  if(dd){ dd.style.display='none'; _vwBellOpen=false; }
+  // Falls TN bekannt: TN-Profil oeffnen
+  if(tnId && typeof openTNProfile==='function'){
+    setTimeout(()=>openTNProfile(tnId), 150);
+  }
+}
+
+// Großer auffälliger Toast oben rechts
+function _showVwBigToast(ev){
+  const isAbsent = ev.typ==='absent';
+  const icon = isAbsent ? '🚫' : '↩';
+  const label = isAbsent ? 'Nicht angetreten' : 'Wiederholer';
+  const color = isAbsent ? '#ef4444' : '#d97706';
+  const bg = isAbsent ? '#fef2f2' : '#fffbeb';
+  // Container fuer big-toasts (oben rechts)
+  let stack = document.getElementById('vwBigToastStack');
+  if(!stack){
+    stack = document.createElement('div');
+    stack.id = 'vwBigToastStack';
+    stack.style.cssText = 'position:fixed;top:64px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:380px';
+    document.body.appendChild(stack);
+  }
+  const card = document.createElement('div');
+  card.style.cssText = `background:${bg};border:2px solid ${color};border-left:6px solid ${color};border-radius:12px;padding:14px 16px;box-shadow:0 12px 32px rgba(0,0,0,.18);cursor:pointer;animation:vwToastIn .3s ease-out;font-family:'Sora',sans-serif`;
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <span style="font-size:1.3rem">${icon}</span>
+      <span style="font-size:.78rem;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.04em">${label}</span>
+      <span style="margin-left:auto;font-size:.6rem;color:#64748b;cursor:pointer;background:rgba(0,0,0,.04);padding:2px 7px;border-radius:5px" onclick="event.stopPropagation();this.closest('div[style*=position]').parentElement.removeChild(this.closest('div[style*=position]'))">✕</span>
+    </div>
+    <div style="font-size:.92rem;font-weight:700;color:#0f172a;line-height:1.3;margin-bottom:4px">${esc(ev.tnName||'?')}</div>
+    <div style="font-size:.72rem;color:#475569;line-height:1.45">${esc(ev.kursName||'')}${ev.firma?' · '+esc(ev.firma):''}</div>
+    <div style="font-size:.66rem;color:#64748b;margin-top:6px;font-family:'JetBrains Mono',monospace">vom Ausbilder: ${esc(ev.ausbilder||'?')}</div>
+    <div style="margin-top:10px;padding-top:8px;border-top:1px dashed ${color};font-size:.7rem;color:${color};font-weight:700">→ Bitte beim Betrieb nachfragen!</div>
+  `;
+  card.addEventListener('click', ()=>markVwEventReadAndOpen(ev.id, ev.tnId));
+  stack.appendChild(card);
+  // Auto-remove nach 12 Sekunden
+  setTimeout(()=>{
+    if(card.parentElement) card.parentElement.removeChild(card);
+  }, 12000);
+}
+
+// Browser-Notification (auch wenn Tab im Hintergrund)
+function _showVwBrowserNotification(ev){
+  try{
+    if(!('Notification' in window)) return;
+    if(Notification.permission !== 'granted') return;
+    const isAbsent = ev.typ==='absent';
+    const title = (isAbsent?'🚫 Nicht angetreten: ':'↩ Wiederholer: ') + (ev.tnName||'Azubi');
+    const body = (ev.kursName||'') + (ev.firma?' · '+ev.firma:'') + (ev.ausbilder?'\nGemeldet von: '+ev.ausbilder:'');
+    const n = new Notification(title, {
+      body: body,
+      icon: '/ausbilderpro/icon-192.png',
+      tag: 'vwEvent-'+ev.id,
+      requireInteraction: false
+    });
+    n.onclick = ()=>{
+      window.focus();
+      markVwEventReadAndOpen(ev.id, ev.tnId);
+      n.close();
+    };
+  }catch(e){ /* ignore */ }
+}
+
 function closeKursModal(){ document.getElementById('kursModal').classList.remove('open'); }
 
 // ── KOMPLETT-BACKUP ──

@@ -7355,6 +7355,27 @@ function resetTNStatus(tnId, fromType, tnName){
   },400);
 }
 
+// Erzeugt ein Verwaltung-Event: aufploppen-Notification fuer VerwaltungPro
+// Wird bei kritischen Status-Aenderungen (absent, wiederholer) aufgerufen.
+function _notifyVwEvent(typ, tnId, tnData, kursName, ausName, extra){
+  if(!_db) return;
+  const tnName=((tnData?.vorname||'')+' '+(tnData?.nachname||'')).trim()||'Azubi';
+  const event={
+    typ: typ,                                  // 'absent' | 'wiederholer'
+    tnId: tnId,
+    tnName: tnName,
+    kursName: kursName||'',
+    kursId: curInst()?.sharedKursId||'',
+    firma: tnData?.firma||'',
+    ausbilder: ausName||'',
+    erstellt: Date.now(),
+    erstelltAt: firebase.firestore.FieldValue.serverTimestamp(),
+    gelesen: false,
+    grund: extra?.grund||''
+  };
+  _db.collection('vwEvents').add(event).catch(err=>console.warn('vwEvent failed:',err));
+}
+
 function syncGlobalTNStatus(tnId, statusType){
   // tnId = globalTN doc ID (= kurs subcollection doc ID)
   // statusType: 'absent' | 'wiederholer' | 'clear'
@@ -7399,6 +7420,8 @@ function syncGlobalTNStatus(tnId, statusType){
         +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender ist nicht zum Lehrgang erschienen und wird zu diesem nicht mehr erwartet.</p>'
       );
+      // Verwaltung benachrichtigen (Aufploppen + Browser-Push)
+      _notifyVwEvent('absent', tnId, data, kursName, ausName);
     }).catch(()=>{});
   } else if(statusType === 'wiederholer'){
     if(!confirm('↩ Als Wiederholer markieren?\n\nDer Azubi wird über folgende Wege informiert:\n• App-Benachrichtigung in AzubiPro\n• E-Mail (sofern Adresse hinterlegt)\n• Der Arbeitgeber wird ebenfalls per E-Mail informiert\n\nFortfahren?')) return;
@@ -7435,6 +7458,8 @@ function syncGlobalTNStatus(tnId, statusType){
         +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender wurde als Wiederholer eingestuft und nimmt am aktuellen Kurs nicht mehr teil. Der Kurs wird zu einem späteren Zeitpunkt wiederholt.</p>'
       );
+      // Verwaltung benachrichtigen (Aufploppen + Browser-Push)
+      _notifyVwEvent('wiederholer', tnId, data, kursName, ausName, {grund:data.wdhGrund||''});
     }).catch(()=>{});
   } else {
     // clear – back to normal
