@@ -4660,8 +4660,16 @@ function saveSeat(){
   const extraGrades={};
   (inst.customGrades||[]).forEach(g=>{ const el=document.getElementById('ig_'+g.id); extraGrades[g.id]=el?el.value:''; });
   const oldSeat=S.kats[S.curKat].instances[S.curInst].seats[curSeat]||{};
+  // Im Pilot-Modus: Manuell eingetippte Namen automatisch pseudonymisieren
+  // (z.B. 'Maximilian Mustermann' -> 'Ma. Mu.')
+  // Bereits gekuerzte Namen bleiben unveraendert.
+  let _seatName=document.getElementById('iName').value.trim();
+  if(PILOT_MODE && _seatName){
+    const parts=_seatName.split(/\s+/).filter(Boolean);
+    _seatName=parts.map(p=>pilotShortName(p)).join(' ');
+  }
   S.kats[S.curKat].instances[S.curInst].seats[curSeat]={
-    name:document.getElementById('iName').value.trim(),
+    name:_seatName,
     company:document.getElementById('iCo').value.trim(),
     profession:document.getElementById('iProf').value.trim(),
     ausbjahr:document.getElementById('iAusbjahr').value,
@@ -7944,9 +7952,29 @@ function renderWiederholer(kursId){
       card.className='wiederholer-card';
       card.draggable=false;
       card.dataset.name=d.name; card.dataset.company=d.company||''; card.dataset.profession=d.profession||''; card.dataset.ausbjahr=d.ausbjahr||'';
+      const resetBtn='<button class="tn-reset-btn" title="Status zurücksetzen" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">↺</button>';
       card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
         +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#0f172a">'+esc(d.name)+'</div>'
-        +'<div class="pool-sub">↩ Kurs wiederholen</div></div>';
+        +'<div class="pool-sub">↩ Kurs wiederholen</div></div>'
+        +resetBtn;
+      // Reset-Button: lokal aus seats-Wiederholer-Flag entfernen (kein Firestore)
+      const btn=card.querySelector('.tn-reset-btn');
+      if(btn){
+        btn.addEventListener('click',ev=>{
+          ev.stopPropagation(); ev.preventDefault();
+          if(!confirm('↺ '+d.name+' aus "Wiederholer" zurück auf den Sitz?\n\n(Lokaler Eintrag - kein Firestore-Update.)')) return;
+          const inst3=curInst();
+          if(inst3 && inst3.seats && inst3.seats[sid]){
+            delete inst3.seats[sid].wiederholer;
+            persist();
+            loadPool();
+            renderSeats();
+            toast('↺ '+d.name+' zurückgesetzt');
+          }
+        });
+        btn.addEventListener('mouseover',()=>{ btn.style.background='rgba(100,116,139,.12)'; btn.style.color='#0f172a'; });
+        btn.addEventListener('mouseout',()=>{ btn.style.background='none'; btn.style.color='#64748b'; });
+      }
       card.addEventListener('dragstart',ev=>{
         _poolDragId=d.name; _poolDragTnId=null; _poolDragKursId=null;
         _wiederholerSeatId=sid;
@@ -8012,9 +8040,28 @@ function renderWiederholer(kursId){
         card.className='wiederholer-card';
         card.draggable=false;
         card.dataset.name=d.name; card.dataset.company=d.company||''; card.dataset.profession=d.profession||''; card.dataset.ausbjahr=d.ausbjahr||'';
+        const resetBtn='<button class="tn-reset-btn" title="Status zurücksetzen" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">↺</button>';
         card.innerHTML='<div class="pool-avatar" style="background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#d97706">'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name" style="color:#0f172a">'+esc(d.name)+'</div>'
-          +'<div class="pool-sub">↩ Kurs wiederholen</div></div>';
+          +'<div class="pool-sub">↩ Kurs wiederholen</div></div>'
+          +resetBtn;
+        const btn=card.querySelector('.tn-reset-btn');
+        if(btn){
+          btn.addEventListener('click',ev=>{
+            ev.stopPropagation(); ev.preventDefault();
+            if(!confirm('↺ '+d.name+' aus "Wiederholer" zurück auf den Sitz?\n\n(Lokaler Eintrag - kein Firestore-Update.)')) return;
+            const inst3=curInst();
+            if(inst3 && inst3.seats && inst3.seats[sid]){
+              delete inst3.seats[sid].wiederholer;
+              persist();
+              loadPool();
+              renderSeats();
+              toast('↺ '+d.name+' zurückgesetzt');
+            }
+          });
+          btn.addEventListener('mouseover',()=>{ btn.style.background='rgba(100,116,139,.12)'; btn.style.color='#0f172a'; });
+          btn.addEventListener('mouseout',()=>{ btn.style.background='none'; btn.style.color='#64748b'; });
+        }
         card.addEventListener('dragstart',ev=>{
           _poolDragId=d.name; _poolDragTnId=null; _poolDragKursId=null;
           _wiederholerSeatId=sid;
