@@ -3393,57 +3393,115 @@ function updateKurstage(val){
 // echten globalTN-Daten. Wird einmal nach Pilot-Modus-Ende benoetigt.
 async function refreshAllSeatNamesFromGlobalTN(){
   if(!_db) { toast('Keine Datenbankverbindung','bad'); return; }
-  if(!confirm('🔄 Sitzplatz-Namen aus echten Daten neu laden?\n\nAlle Sitzplätze in allen Lehrgängen werden gepruest. Wo der echte Name in der Datenbank vorhanden ist, wird die App-Anzeige aktualisiert.\n\nFortfahren?')) return;
-  let updated=0, skipped=0, missing=0, errors=0;
-  // Sammle alle (kat, inst, seatId, poolTnId) Tripel die einen TN haben
-  const jobs=[];
+  if(!confirm('🔄 Sitzplatz-Namen aus echten Daten neu laden?\n\nFuer alle Sitze wird die Datenbank durchsucht. Wenn der echte Name gefunden wird (entweder ueber poolTnId-Verknuepfung oder ueber Kurzform-Matching), wird die App-Anzeige aktualisiert.\n\nFortfahren?')) return;
+  let updated=0, missing=0, alreadyOk=0;
+  toast('Suche Datenbank-Eintraege...','warn');
+  // Helper: kuerzelt einen Namen wie pilotShortName es taete
+  const kuerzeln = (s)=> {
+    const v=(s||'').trim();
+    if(!v) return '';
+    const parts = v.split(/\s+/).filter(Boolean);
+    return parts.map(p=>{
+      const clean = p.replace(/[^A-Za-zÄÖÜäöüß]/g,'');
+      return clean.slice(0,2)+'.';
+    }).join(' ');
+  };
+  // 1. Sammle alle Sitze die einen Namen haben
+  const allJobs=[];
   Object.entries(S.kats).forEach(([katId, kat])=>{
     Object.entries(kat.instances||{}).forEach(([instId, inst])=>{
       Object.entries(inst.seats||{}).forEach(([seatId, seat])=>{
-        if(seat && seat.poolTnId){
-          jobs.push({katId, instId, seatId, poolTnId: seat.poolTnId, currentName: seat.name});
-        } else if(seat && seat.name){
-          skipped++;
+        if(seat && seat.name){
+          allJobs.push({katId, instId, seatId, seat, kursId: inst.sharedKursId});
         }
       });
     });
   });
-  if(!jobs.length){ toast('Keine TN mit Datenbank-Verknuepfung gefunden','bad'); return; }
-  toast('Lade '+jobs.length+' Datensaetze...','warn');
-  // Alle parallel holen
-  const results = await Promise.all(jobs.map(j=>
-    _db.collection('globalTN').doc(j.poolTnId).get()
-      .then(doc=>({job:j, doc, ok:true}))
-      .catch(err=>({job:j, err, ok:false}))
+  if(!allJobs.length){ toast('Keine belegten Sitze gefunden','bad'); return; }
+  // 2. Pro Lehrgang die TN-Liste holen (deduped)
+  const kursIds = [...new Set(allJobs.map(j=>j.kursId).filter(Boolean))];
+  const kursTnMap = {}; // kursId -> [{id, vorname, nachname, fullName, kurzform}]
+  await Promise.all(kursIds.map(kid=>
+    _db.collection('shared').doc('kurse').collection('list').doc(kid)
+      .collection('teilnehmer').get()
+      .then(snap=>{
+        kursTnMap[kid] = [];
+        snap.forEach(doc=>{
+          const d=doc.data();
+          const v=(d.vorname||'').trim();
+          const n=(d.nachname||'').trim();
+          const fullName=(v+' '+n).trim();
+          if(fullName){
+            kursTnMap[kid].push({
+              id: doc.id,
+              vorname: v,
+              nachname: n,
+              firma: d.firma||'',
+              beruf: d.beruf||'',
+              ausbjahr: d.ausbjahr||'',
+              fullName: fullName,
+              kurzform: kuerzeln(fullName)
+            });
+          }
+        });
+      })
+      .catch(()=>{ kursTnMap[kid]=[]; })
   ));
-  results.forEach(r=>{
-    if(!r.ok || !r.doc.exists){
+  // 3. Pro Sitz: matchen per poolTnId ODER per Kurzform-Vergleich
+  for(const j of allJobs){
+    const tnList = kursTnMap[j.kursId] || [];
+    let match = null;
+    // Strategie A: Wenn poolTnId vorhanden → direkt holen aus globalTN
+    if(j.seat.poolTnId){
+      try{
+        const gDoc = await _db.collection('globalTN').doc(j.seat.poolTnId).get();
+        if(gDoc.exists){
+          const d = gDoc.data();
+          const v=(d.vorname||'').trim();
+          const n=(d.nachname||'').trim();
+          const fullName=(v+' '+n).trim();
+          if(fullName){
+            match = {fullName, firma:d.firma||'', beruf:d.beruf||'', ausbjahr:d.ausbjahr||''};
+          }
+        }
+      }catch(e){}
+    }
+    // Strategie B: Wenn kein Match: Kurzform-Match in der Kurs-TN-Liste
+    if(!match){
+      const seatLower = (j.seat.name||'').trim().toLowerCase();
+      const found = tnList.find(t =>
+        t.kurzform.toLowerCase() === seatLower ||
+        t.fullName.toLowerCase() === seatLower
+      );
+      if(found){
+        match = {fullName: found.fullName, firma: found.firma, beruf: found.beruf, ausbjahr: found.ausbjahr, tnId: found.id};
+      }
+    }
+    if(!match){
       missing++;
-      return;
+      continue;
     }
-    const data = r.doc.data();
-    const vorname = (data.vorname||'').trim();
-    const nachname = (data.nachname||'').trim();
-    const fullName = (vorname+' '+nachname).trim();
-    if(!fullName){ missing++; return; }
-    // Nur aktualisieren wenn anders als aktuell
-    const seat = S.kats[r.job.katId]?.instances?.[r.job.instId]?.seats?.[r.job.seatId];
-    if(seat && seat.name !== fullName){
-      seat.name = fullName;
-      // Auch Firma + Beruf + Lehrjahr refreshen falls leer
-      if(!seat.company && data.firma) seat.company = data.firma;
-      if(!seat.profession && data.beruf) seat.profession = data.beruf;
-      if(!seat.ausbjahr && data.ausbjahr) seat.ausbjahr = data.ausbjahr;
-      updated++;
+    // Update
+    if(j.seat.name === match.fullName){
+      alreadyOk++;
+      continue;
     }
-  });
+    j.seat.name = match.fullName;
+    if(match.tnId && !j.seat.poolTnId) j.seat.poolTnId = match.tnId;
+    if(j.kursId && !j.seat.poolKursId) j.seat.poolKursId = j.kursId;
+    if(!j.seat.company && match.firma) j.seat.company = match.firma;
+    if(!j.seat.profession && match.beruf) j.seat.profession = match.beruf;
+    if(!j.seat.ausbjahr && match.ausbjahr) j.seat.ausbjahr = match.ausbjahr;
+    updated++;
+  }
   persist();
   renderSeats();
   if(typeof loadPool==='function') loadPool();
   let msg='✓ '+updated+' Sitzplaetze aktualisiert';
-  if(missing>0) msg += ' ('+missing+' ohne DB-Eintrag)';
-  if(errors>0) msg += ' ('+errors+' Fehler)';
-  toast(msg,'ok');
+  if(alreadyOk>0) msg += ', '+alreadyOk+' bereits ok';
+  if(missing>0) msg += ', '+missing+' kein Match';
+  toast(msg, updated>0?'ok':'warn');
+  console.log('Refresh-Ergebnis:', {updated, alreadyOk, missing, total: allJobs.length});
 }
 
 function markAlleAnwesend(){
