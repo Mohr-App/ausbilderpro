@@ -118,6 +118,10 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
           ['vorname','nachname','geburtsdatum','kontaktTelefon','kontaktEmail','adresse','plz','ort','beruf','ausbjahr','photoUrl']
         );
+      // Ausbilder darf Vorname/Nachname korrigieren (z.B. nach Pilot-Modus-Beendigung
+      // wenn Klarnamen wiederhergestellt werden muessen)
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['vorname','nachname']);
       // Pilot-Anonymisierung: Admin darf Datenminimierungs-Felder updaten
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(

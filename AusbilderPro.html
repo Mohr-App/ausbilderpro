@@ -4891,6 +4891,24 @@ function saveSeat(){
       .then(()=>toast('Beruf aktualisiert ✓'))
       .catch(err=>{console.error('Beruf sync error:',err);toast('⚠ Beruf-Sync fehlgeschlagen – Firestore Rules prüfen!','bad');});
   }
+  // Name zurück an globalTN synchen (Vor-/Nachname auseinanderpopeln)
+  // Greift insbesondere bei der manuellen Korrektur ehemals gekuerzter Namen.
+  if(_db && poolTnId && _seatName){
+    const parts = _seatName.split(/\s+/).filter(Boolean);
+    if(parts.length >= 2){
+      const vorname = parts[0];
+      const nachname = parts.slice(1).join(' ');  // mehrteilige Nachnamen unterstuetzen
+      _db.collection('globalTN').doc(poolTnId).get().then(d=>{
+        if(!d.exists) return;
+        const cur = d.data();
+        if(cur.vorname !== vorname || cur.nachname !== nachname){
+          d.ref.update({vorname: vorname, nachname: nachname})
+            .then(()=>toast('Name in Datenbank korrigiert ✓'))
+            .catch(err=>{console.error('Name sync error:',err);});
+        }
+      }).catch(()=>{});
+    }
+  }
 }
 
 // ─── ATTENDANCE → FIRESTORE SYNC ───
