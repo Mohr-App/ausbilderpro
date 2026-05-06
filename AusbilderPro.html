@@ -2894,6 +2894,7 @@ function renderMain(){
     +'<button class="kursact-close" onclick="toggleKursActions()" title="Schließen" aria-label="Schließen">✕</button>'
     +'<button class="tbtn main-docs-btn" onclick="markAlleAnwesend()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981" title="Alle TN heute als anwesend markieren (für leere Tage)">✓ Alle anwesend</button>'
     +'<button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
+    +'<button class="tbtn main-docs-btn" onclick="refreshAllSeatNamesFromGlobalTN()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1" title="Klarnamen aus Datenbank holen (für alle Sitzplätze in allen Lehrgängen)">🔄 Namen aktualisieren</button>'
     +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()" title="Kursunterlagen hochladen und verwalten">📁 Dokumente</button>'
     +'<button class="tbtn main-docs-btn" onclick="ausbilderKommtSpaeter()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
     +'<button class="tbtn main-docs-btn" onclick="kursAusfall()" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Kurs für heute als ausgefallen markieren">⚠️ Ausfall</button>'
@@ -3386,6 +3387,63 @@ function updateKurstage(val){
     if(d&&d.name&&d.poolTnId) syncAttendanceToFirestore(sid);
   });
   toast('Kurstage: '+days+' – Anwesenheit neu berechnet ✓');
+}
+
+// Repariert pseudonymisierte Sitzplatz-Namen ('Ma. Mu.') aus den
+// echten globalTN-Daten. Wird einmal nach Pilot-Modus-Ende benoetigt.
+async function refreshAllSeatNamesFromGlobalTN(){
+  if(!_db) { toast('Keine Datenbankverbindung','bad'); return; }
+  if(!confirm('🔄 Sitzplatz-Namen aus echten Daten neu laden?\n\nAlle Sitzplätze in allen Lehrgängen werden gepruest. Wo der echte Name in der Datenbank vorhanden ist, wird die App-Anzeige aktualisiert.\n\nFortfahren?')) return;
+  let updated=0, skipped=0, missing=0, errors=0;
+  // Sammle alle (kat, inst, seatId, poolTnId) Tripel die einen TN haben
+  const jobs=[];
+  Object.entries(S.kats).forEach(([katId, kat])=>{
+    Object.entries(kat.instances||{}).forEach(([instId, inst])=>{
+      Object.entries(inst.seats||{}).forEach(([seatId, seat])=>{
+        if(seat && seat.poolTnId){
+          jobs.push({katId, instId, seatId, poolTnId: seat.poolTnId, currentName: seat.name});
+        } else if(seat && seat.name){
+          skipped++;
+        }
+      });
+    });
+  });
+  if(!jobs.length){ toast('Keine TN mit Datenbank-Verknuepfung gefunden','bad'); return; }
+  toast('Lade '+jobs.length+' Datensaetze...','warn');
+  // Alle parallel holen
+  const results = await Promise.all(jobs.map(j=>
+    _db.collection('globalTN').doc(j.poolTnId).get()
+      .then(doc=>({job:j, doc, ok:true}))
+      .catch(err=>({job:j, err, ok:false}))
+  ));
+  results.forEach(r=>{
+    if(!r.ok || !r.doc.exists){
+      missing++;
+      return;
+    }
+    const data = r.doc.data();
+    const vorname = (data.vorname||'').trim();
+    const nachname = (data.nachname||'').trim();
+    const fullName = (vorname+' '+nachname).trim();
+    if(!fullName){ missing++; return; }
+    // Nur aktualisieren wenn anders als aktuell
+    const seat = S.kats[r.job.katId]?.instances?.[r.job.instId]?.seats?.[r.job.seatId];
+    if(seat && seat.name !== fullName){
+      seat.name = fullName;
+      // Auch Firma + Beruf + Lehrjahr refreshen falls leer
+      if(!seat.company && data.firma) seat.company = data.firma;
+      if(!seat.profession && data.beruf) seat.profession = data.beruf;
+      if(!seat.ausbjahr && data.ausbjahr) seat.ausbjahr = data.ausbjahr;
+      updated++;
+    }
+  });
+  persist();
+  renderSeats();
+  if(typeof loadPool==='function') loadPool();
+  let msg='✓ '+updated+' Sitzplaetze aktualisiert';
+  if(missing>0) msg += ' ('+missing+' ohne DB-Eintrag)';
+  if(errors>0) msg += ' ('+errors+' Fehler)';
+  toast(msg,'ok');
 }
 
 function markAlleAnwesend(){
