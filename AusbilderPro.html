@@ -2895,6 +2895,7 @@ function renderMain(){
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button></div></div>'
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="kursact-close" onclick="toggleKursActions()" title="Schließen" aria-label="Schließen">✕</button>'
+    +'<button class="tbtn main-docs-btn" onclick="markAlleAnwesend()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981" title="Alle TN heute als anwesend markieren (für leere Tage)">✓ Alle anwesend</button>'
     +'<button class="tbtn main-docs-btn" onclick="markBerufsschultag()" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#7c3aed" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
     +'<button class="tbtn main-docs-btn" onclick="openCourseDocsModal()" title="Kursunterlagen hochladen und verwalten">📁 Dokumente</button>'
     +'<button class="tbtn main-docs-btn" onclick="ausbilderKommtSpaeter()" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:#d97706" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
@@ -3388,6 +3389,32 @@ function updateKurstage(val){
     if(d&&d.name&&d.poolTnId) syncAttendanceToFirestore(sid);
   });
   toast('Kurstage: '+days+' – Anwesenheit neu berechnet ✓');
+}
+
+function markAlleAnwesend(){
+  const inst=curInst(); if(!inst) return;
+  const today=new Date().toISOString().slice(0,10);
+  if(!confirm('✓ Alle Schüler für heute als anwesend markieren?\n\nDatum: '+new Date(today).toLocaleDateString('de-DE')+'\n\nHinweis: Schüler die heute schon einen anderen Status haben (Berufsschule, Krank, ...) werden NICHT überschrieben.')) return;
+  let count=0, skipped=0;
+  const rows=getRows(inst);
+  rows.forEach(r=>{
+    r.seats.forEach(sid=>{
+      const d=inst.seats[sid];
+      if(!d||!d.name) return;
+      if(!d.attendance) d.attendance=[];
+      // Pruefe ob heute schon ein Eintrag existiert (egal welcher Typ)
+      if(d.attendance.some(a=>a.date===today)){ skipped++; return; }
+      d.attendance.push({type:'present',date:today});
+      count++;
+      // Firestore sync
+      syncAttendanceToFirestore(sid);
+    });
+  });
+  persist(); renderSeats();
+  if(_mobileListMode) renderMobileList();
+  let msg='✓ '+count+' Schüler als anwesend markiert';
+  if(skipped) msg+=' ('+skipped+' übersprungen, hatten schon Status)';
+  toast(msg);
 }
 
 function markBerufsschultag(){
