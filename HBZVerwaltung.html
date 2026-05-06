@@ -3419,6 +3419,30 @@ async function _cleanupDeleteMails(email, log){
   }catch(e){ log('  ✗ mail: '+e.message); return 0; }
 }
 
+// Helper: vwEvents fuer einen TN loeschen (Verwaltungs-Notifications)
+async function _cleanupDeleteVwEvents(tnId, log){
+  if(!tnId) return 0;
+  try{
+    const snap=await db.collection('vwEvents').where('tnId','==',tnId).get();
+    if(snap.empty) return 0;
+    let total=0;
+    let batch=db.batch();
+    let count=0;
+    for(const d of snap.docs){
+      batch.delete(d.ref);
+      count++; total++;
+      if(count>=450){
+        await batch.commit();
+        batch=db.batch();
+        count=0;
+      }
+    }
+    if(count>0) await batch.commit();
+    log('  ✓ vwEvents: '+total+' Meldungen gelöscht');
+    return total;
+  }catch(e){ log('  ✗ vwEvents: '+e.message); return 0; }
+}
+
 async function executeCleanup(){
   const checks=[...document.querySelectorAll('.cleanup-cb:checked:not(:disabled)')];
   if(!checks.length) return;
@@ -3461,6 +3485,8 @@ async function executeCleanup(){
       for(const sub of _CLEANUP_TN_SUBCOLLS){
         totalDocs += await _cleanupDeleteSubcollection(tnRef, sub, addLog);
       }
+      // 1c. vwEvents (Verwaltungs-Notifications) - sind eigene Collection mit tnId-Feld
+      totalDocs += await _cleanupDeleteVwEvents(tnId, addLog);
       // 2. globalTN doc selbst
       try{
         await db.collection('globalTN').doc(tnId).delete();
