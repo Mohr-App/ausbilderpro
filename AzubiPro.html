@@ -207,11 +207,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <!-- Schritt 1: Name -->
       <div class="wiz-step" data-step="1">
         <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">👋 Wie heißt du?</div>
-        <div style="background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.25);border-radius:8px;padding:9px 11px;margin:8px 0 12px;font-size:.7rem;color:#92400e;line-height:1.5">
-          ⚠ <b>Pilotphase:</b> Bitte nur die ersten 2 Buchstaben eingeben (z.B. „Ma." statt „Maximilian"). Datensparsamkeit während der Pilotphase.
-        </div>
-        <div><label class="fl">Vorname (Kürzel) <span style="color:#ef4444">*</span></label><input class="fi" id="jVorname" placeholder="Ma." autocomplete="off" maxlength="3"></div>
-        <div style="margin-top:8px"><label class="fl">Nachname (Kürzel) <span style="color:#ef4444">*</span></label><input class="fi" id="jNachname" placeholder="Mu." autocomplete="off" maxlength="3"></div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Bitte gib deinen vollständigen Namen ein.</div>
+        <div><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="jVorname" placeholder="Maximilian" autocomplete="given-name"></div>
+        <div style="margin-top:8px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="jNachname" placeholder="Müller" autocomplete="family-name"></div>
       </div>
 
       <!-- Schritt 2: Beruf -->
@@ -230,13 +228,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div><label class="fl">Betrieb / Firma <span style="color:#ef4444">*</span></label><input class="fi" id="jFirma" placeholder="Firma GmbH"></div>
       </div>
 
-      <!-- Schritt 4: Geburtsdatum (Pilotphase deaktiviert, Schritt bleibt für Wizard-Konsistenz) -->
+      <!-- Schritt 4: Geburtsdatum -->
       <div class="wiz-step" data-step="4" style="display:none">
         <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🎂 Geburtsdatum</div>
-        <div style="background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.25);border-radius:8px;padding:9px 11px;margin:8px 0 12px;font-size:.72rem;color:#92400e;line-height:1.5">
-          ⚠ In der Pilotphase wird das Geburtsdatum <b>nicht erfasst</b>. Klicke einfach auf „Weiter".
-        </div>
-        <div><label class="fl" style="color:var(--mu)">Geburtsdatum (Pilotphase: gesperrt)</label><input type="date" class="fi" id="jGeburt" disabled style="opacity:.45;cursor:not-allowed;background:var(--sur2)"></div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Wird für die Ausbildungsverwaltung benötigt.</div>
+        <div><label class="fl">Geburtsdatum</label><input type="date" class="fi" id="jGeburt"></div>
       </div>
 
       <!-- Schritt 5: Kontakt -->
@@ -244,7 +240,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">📧 Wie erreichen wir dich?</div>
         <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Email ist nötig zum Einloggen.</div>
         <div><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jEmail" placeholder="deine@email.de" autocomplete="email"></div>
-        <div style="margin-top:8px"><label class="fl" style="color:var(--mu)">Telefon <span style="font-size:.6rem;font-weight:400">(Pilotphase: gesperrt)</span></label><input class="fi" type="tel" id="jTelefon" placeholder="—" disabled style="opacity:.45;cursor:not-allowed;background:var(--sur2)"></div>
+        <div style="margin-top:8px"><label class="fl">Telefon <span style="font-size:.6rem;font-weight:400;color:var(--mu)">(optional)</span></label><input class="fi" type="tel" id="jTelefon" placeholder="0151 12345678" autocomplete="tel"></div>
       </div>
 
       <!-- Schritt 6: Passwort + DSGVO -->
@@ -413,13 +409,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <div class="card-title" style="margin-bottom:0">🏭 Vom Betrieb</div>
-          <span id="azSendToAGWrap" style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(148,163,184,.3);border-radius:6px;background:rgba(148,163,184,.06);color:var(--mu);cursor:not-allowed;font-weight:600;opacity:.55" title="Upload in Pilotphase deaktiviert">📤 Upload (Pilot: gesperrt)</span>
+          <label for="azSendToAGFileIn" id="azSendToAGWrap" style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(99,102,241,.3);border-radius:6px;background:rgba(99,102,241,.08);color:#6366f1;cursor:pointer;font-weight:700" title="Dokument an Betrieb senden">📤 Upload</label>
+          <input type="file" id="azSendToAGFileIn" style="display:none" onchange="azSendToAG(event)">
         </div>
         <div id="docsAG" style="margin-top:6px"><div class="empty">Keine Dokumente vom Betrieb</div></div>
       </div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div class="card-title" style="margin-bottom:0">📎 Meine Dokumente</div></div>
-        <button class="upload-btn" onclick="myDocsUpload()" title="Upload in Pilotphase deaktiviert" disabled style="opacity:.55;cursor:not-allowed">📁 Upload (Pilot: gesperrt)</button>
+        <button class="upload-btn" onclick="myDocsUpload()" title="Eigene Dokumente hochladen">📁 Upload</button>
         <input type="file" id="myDocsFileIn" style="display:none" onchange="myDocsHandleUpload(event)" multiple>
         <div id="docsMy" style="margin-top:10px"><div class="empty">Noch keine eigenen Dokumente</div></div>
       </div>
@@ -874,17 +871,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 </div>
 
 <script>
-// ─── PILOT-MODUS: Datensparsamkeit waehrend Pilotphase ───
-const PILOT_MODE = true;
-function pilotShortName(s){
-  if(!PILOT_MODE) return s;
-  const v = (s||'').trim();
-  if(!v) return '';
-  if(/^[A-Za-zÄÖÜäöüß]{1,2}\.?$/.test(v)) {
-    return v.replace(/\.$/,'') + '.';
-  }
-  return v.replace(/[^A-Za-zÄÖÜäöüß]/g,'').slice(0,2) + '.';
-}
 // ── Firebase ──
 const _fbCfg={
   apiKey:"AIzaSyCI5hJLj22FTiAJoVIPis7VhoQqJiMLAZQ",
@@ -1613,19 +1599,15 @@ document.addEventListener('keydown', e=>{
 function submitJoinRegistration(){
   let vorname=(document.getElementById('jVorname').value||'').trim();
   let nachname=(document.getElementById('jNachname').value||'').trim();
-  // ── PILOT-MODUS: Namen automatisch auf 2-Buchstaben-Kuerzel reduzieren ──
-  vorname = pilotShortName(vorname);
-  nachname = pilotShortName(nachname);
   const firma=(document.getElementById('jFirma').value||'').trim();
   const berufSel=document.getElementById('jBeruf');
   const fachSel=document.getElementById('jFachrichtung');
   const beruf=fachSel&&fachSel.value?fachSel.value:(berufSel?berufSel.value:'');
   const berufGruppe=berufSel?berufSel.value:'';
   const ausbjahr=document.getElementById('jLehrjahr').value||'';
-  // ── PILOT-MODUS: Geburtsdatum und Telefon nicht erfasst ──
-  const geburtsdatum='';
+  const geburtsdatum=(document.getElementById('jGeburt').value||'').trim();
   const email=(document.getElementById('jEmail').value||'').trim().toLowerCase();
-  const telefon='';
+  const telefon=(document.getElementById('jTelefon').value||'').trim();
   const passwort=document.getElementById('jPasswort').value||'';
   const errEl=document.getElementById('jErr');
   errEl.textContent='';
@@ -5202,8 +5184,6 @@ function azDeleteAGDoc(docId){
 
 function azSendToAG(e){
   e.target.value='';
-  // ── PILOT-MODUS: Upload deaktiviert ──
-  if(PILOT_MODE){ toast('Upload in Pilotphase deaktiviert','bad'); return; }
   const file=e.target.files[0];
   if(!file||!_tnId) return;
   if(file.size>2*1024*1024){toast('Max. 2 MB','bad');return;}
@@ -5225,15 +5205,11 @@ function azSendToAG(e){
 }
 
 function myDocsUpload(){
-  // ── PILOT-MODUS: Upload deaktiviert ──
-  if(PILOT_MODE){ toast('Upload in Pilotphase deaktiviert','bad'); return; }
   document.getElementById('myDocsFileIn').click();
 }
 
 function myDocsHandleUpload(e){
   e.target.value='';
-  // ── PILOT-MODUS: Upload deaktiviert ──
-  if(PILOT_MODE){ toast('Upload in Pilotphase deaktiviert','bad'); return; }
   const files=e.target.files;
   if(!files.length||!_tnId) return;
   Array.from(files).forEach(file=>{
