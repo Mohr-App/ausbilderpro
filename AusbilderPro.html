@@ -4931,72 +4931,136 @@ function saveSeat(){
   }
 }
 
-// ─── RECOVERY: Verwaiste Sitze nachtraeglich in globalTN + Kurs-TN anlegen ───
-// Findet alle Sitze mit Namen aber ohne poolTnId in Cloud-verbundenen Kursen
-// und legt sie als regulaere TN an (analog zu saveManualTN). Pro Sitz Bestaetigung.
+// ─── RECOVERY: Verwaiste Sitze + kaputte Kurs-TN-Verknüpfungen reparieren ───
+// Behandelt 3 Fälle:
+//  1) Sitz mit Name, ohne poolTnId → globalTN + Kurs-TN anlegen
+//  2) Sitz mit poolTnId, aber globalTN-Doc fehlt → globalTN nachlegen
+//  3) Sitz mit poolTnId + globalTN, aber aktiverKursId stimmt nicht oder Kurs-TN-Eintrag fehlt → fixen
 async function recoverOrphanSeats(){
   if(!_db){alert('Nicht mit Cloud verbunden – bitte erst einloggen.');return;}
-  const orphans=[];
+  // Alle Cloud-verbundenen Sitze sammeln
+  const allSeats=[];
   Object.entries(S.kats).forEach(([katId,kat])=>{
     Object.entries(kat.instances||{}).forEach(([instId,inst])=>{
       if(!inst.sharedKursId) return;
       Object.entries(inst.seats||{}).forEach(([sid,seat])=>{
         if(!seat) return;
         const nm=(seat.name||'').trim();
-        if(!nm || seat.poolTnId) return;
-        const parts=nm.split(/\s+/).filter(Boolean);
-        if(parts.length>=2){
-          orphans.push({katId,instId,sid,seat,kursId:inst.sharedKursId,
-            kursName:kat.label||'Kurs',inst});
-        }
+        if(!nm) return;
+        allSeats.push({katId,instId,sid,seat,kursId:inst.sharedKursId,
+          kursName:kat.label||'Kurs',inst});
       });
     });
   });
-  if(!orphans.length){alert('✓ Alle Sitze sind sauber verknüpft. Nichts zu tun.');return;}
-  if(!confirm(orphans.length+' verwaiste Sitz(e) gefunden.\n\nFür jeden wirst du einzeln gefragt, ob er in die Kurs-Liste übernommen werden soll.\n\nWeiter?')) return;
-  let angelegt=0, uebersprungen=0, fehler=0;
-  for(const o of orphans){
-    const parts=o.seat.name.trim().split(/\s+/).filter(Boolean);
-    const vn=parts[0], nn=parts.slice(1).join(' ');
-    const ok=confirm('Anlegen: '+vn+' '+nn+'\nKurs: '+o.kursName+'\nFirma: '+(o.seat.company||'(leer)')+'\nBeruf: '+(o.seat.profession||'(leer)')+'\nLehrjahr: '+(o.seat.ausbjahr||'(leer)')+'\n\nOK = anlegen, Abbrechen = überspringen');
-    if(!ok){uebersprungen++;continue;}
+  if(!allSeats.length){alert('Keine belegten Sitze in Cloud-Kursen gefunden.');return;}
+  // Pro Sitz: Status checken
+  const probleme=[];
+  for(const s of allSeats){
+    const parts=s.seat.name.trim().split(/\s+/).filter(Boolean);
+    if(parts.length<2){
+      probleme.push({...s, typ:'nur1wort'});
+      continue;
+    }
+    if(!s.seat.poolTnId){
+      probleme.push({...s, typ:'orphan', vn:parts[0], nn:parts.slice(1).join(' ')});
+      continue;
+    }
+    // poolTnId vorhanden — globalTN-Doc holen
     try{
+      const tnDoc=await _db.collection('globalTN').doc(s.seat.poolTnId).get();
+      if(!tnDoc.exists){
+        probleme.push({...s, typ:'globalTNFehlt', vn:parts[0], nn:parts.slice(1).join(' ')});
+        continue;
+      }
+      const t=tnDoc.data();
+      const aktKursOk=t.aktiverKursId===s.kursId;
+      const kursTnDoc=await _db.collection('shared').doc('kurse').collection('list').doc(s.kursId)
+        .collection('teilnehmer').doc(s.seat.poolTnId).get();
+      const kursTnOk=kursTnDoc.exists;
+      if(!aktKursOk || !kursTnOk){
+        probleme.push({...s, typ:'verknuepfungKaputt', vn:parts[0], nn:parts.slice(1).join(' '),
+          aktKursOk, kursTnOk, currentAktKurs:t.aktiverKursId||'(leer)'});
+      }
+    }catch(err){
+      console.error('Diagnose-Fehler:',err);
+      probleme.push({...s, typ:'lesefehler', err:err.message});
+    }
+  }
+  if(!probleme.length){alert('✓ Alle '+allSeats.length+' Sitze sind sauber verknüpft.');return;}
+  // Übersicht
+  const summary=probleme.map(p=>{
+    const nmStr=(p.vn?p.vn+' '+p.nn:p.seat.name)+' ('+p.kursName+')';
+    if(p.typ==='orphan') return '➕ '+nmStr+' – nicht in DB';
+    if(p.typ==='globalTNFehlt') return '⚠ '+nmStr+' – globalTN-Eintrag fehlt';
+    if(p.typ==='verknuepfungKaputt'){
+      const teile=[];
+      if(!p.aktKursOk) teile.push('aktiverKursId='+p.currentAktKurs);
+      if(!p.kursTnOk) teile.push('kein Kurs-TN-Eintrag');
+      return '🔧 '+nmStr+' – '+teile.join(', ');
+    }
+    if(p.typ==='nur1wort') return '⏭ '+p.seat.name+' – nur ein Wort, kein Vor-/Nachname';
+    if(p.typ==='lesefehler') return '✗ '+nmStr+' – '+p.err;
+    return '?';
+  }).join('\n');
+  if(!confirm(probleme.length+' Probleme gefunden:\n\n'+summary+'\n\nReparieren?')) return;
+  let angelegt=0, fixiert=0, uebersprungen=0, fehler=0;
+  for(const p of probleme){
+    try{
+      if(p.typ==='nur1wort' || p.typ==='lesefehler'){uebersprungen++;continue;}
       const tnData={
-        vorname:vn, nachname:nn,
-        firma:(o.seat.company||'').trim(),
-        beruf:(o.seat.profession||'').trim(),
-        ausbjahr:o.seat.ausbjahr||'',
+        vorname:p.vn, nachname:p.nn,
+        firma:(p.seat.company||'').trim(),
+        beruf:(p.seat.profession||'').trim(),
+        ausbjahr:p.seat.ausbjahr||'',
         typ:'azubi',
-        aktiverKursId:o.kursId,
-        kursHistory:[{kursId:o.kursId,kursName:o.kursName,
-          von:o.inst.sY+'-'+o.inst.sM+'-'+o.inst.sD,
-          bis:o.inst.eY+'-'+o.inst.eM+'-'+o.inst.eD,
+        aktiverKursId:p.kursId,
+        kursHistory:[{kursId:p.kursId,kursName:p.kursName,
+          von:p.inst.sY+'-'+p.inst.sM+'-'+p.inst.sD,
+          bis:p.inst.eY+'-'+p.inst.eM+'-'+p.inst.eD,
           addedAt:Date.now()}],
         manuellAngelegt:true,
         angelegtViaRecovery:true,
         angelegtAm:Date.now(),
         angelegtVon:(_auth&&_auth.currentUser&&_auth.currentUser.email)||''
       };
-      const ref=await _db.collection('globalTN').add(tnData);
-      await _db.collection('shared').doc('kurse').collection('list').doc(o.kursId)
-        .collection('teilnehmer').doc(ref.id).set({
-          vorname:vn, nachname:nn,
+      let tnId;
+      if(p.typ==='orphan'){
+        const ref=await _db.collection('globalTN').add(tnData);
+        tnId=ref.id;
+        // poolTnId am Sitz nachziehen
+        const k=S.kats[p.katId];
+        const i=k && k.instances && k.instances[p.instId];
+        const ss=i && i.seats && i.seats[p.sid];
+        if(ss){ss.poolTnId=tnId; ss.poolKursId=p.kursId;}
+        persist();
+        angelegt++;
+      } else if(p.typ==='globalTNFehlt'){
+        // Sitz hat poolTnId, aber globalTN fehlt → mit dieser ID neu anlegen
+        await _db.collection('globalTN').doc(p.seat.poolTnId).set(tnData);
+        tnId=p.seat.poolTnId;
+        angelegt++;
+      } else if(p.typ==='verknuepfungKaputt'){
+        // globalTN-Doc fixieren (aktiverKursId + Historie ergänzen)
+        tnId=p.seat.poolTnId;
+        const updates={aktiverKursId:p.kursId};
+        // Historie-Eintrag nur ergänzen wenn nicht schon drin
+        // (best-effort, nicht idempotent-blockierend)
+        await _db.collection('globalTN').doc(tnId).set(updates,{merge:true});
+        fixiert++;
+      }
+      // Kurs-TN-Eintrag immer (re)schreiben damit er garantiert existiert
+      await _db.collection('shared').doc('kurse').collection('list').doc(p.kursId)
+        .collection('teilnehmer').doc(tnId).set({
+          vorname:p.vn, nachname:p.nn,
           firma:tnData.firma, beruf:tnData.beruf, ausbjahr:tnData.ausbjahr,
           status:'active', addedAt:Date.now()
-        });
-      // poolTnId/poolKursId am Sitz nachziehen
-      const k=S.kats[o.katId];
-      const i=k && k.instances && k.instances[o.instId];
-      const s=i && i.seats && i.seats[o.sid];
-      if(s){s.poolTnId=ref.id; s.poolKursId=o.kursId;}
-      persist();
-      angelegt++;
+        },{merge:true});
     }catch(err){
-      console.error('Recovery-Fehler bei',vn,nn,':',err);
+      console.error('Recovery-Fehler:',p,err);
       fehler++;
     }
   }
-  alert('Fertig.\n\n✓ Angelegt: '+angelegt+'\n⏭ Übersprungen: '+uebersprungen+(fehler?'\n✗ Fehler: '+fehler+' (siehe Konsole)':'')+'\n\nBitte Strg+Shift+R für sauberen Reload.');
+  alert('Fertig.\n\n➕ Neu angelegt: '+angelegt+'\n🔧 Verknüpfung gefixt: '+fixiert+'\n⏭ Übersprungen: '+uebersprungen+(fehler?'\n✗ Fehler: '+fehler+' (siehe Konsole)':'')+'\n\nBitte Strg+Shift+R für sauberen Reload + VerwaltungPro öffnen.');
   renderSeats();
 }
 
