@@ -4909,6 +4909,63 @@ function saveSeat(){
       }).catch(()=>{});
     }
   }
+
+  // ── AUTO-ANLAGE: Sitzplatz manuell befüllt aber noch nicht in Kurs-TN-Liste ──
+  // Wenn am Platz selbst Name eingetippt wurde (ohne Drag aus Pool und ohne +TN-Button),
+  // legen wir den TN automatisch in globalTN + shared/kurse/.../teilnehmer/ an, damit
+  // er auch in VerwaltungPro erscheint und die Anwesenheits-/Noten-Sync greifen kann.
+  const sharedKursId = inst.sharedKursId;
+  if(_db && _seatName && !poolTnId && sharedKursId && !_demoMode){
+    const parts = _seatName.split(/\s+/).filter(Boolean);
+    if(parts.length >= 2){
+      const vn = parts[0];
+      const nn = parts.slice(1).join(' ');
+      const firma = (document.getElementById('iCo').value||'').trim();
+      const beruf = (document.getElementById('iProf').value||'').trim();
+      const ausbjahr = document.getElementById('iAusbjahr').value||'';
+      const tnData = {
+        vorname:vn, nachname:nn, firma, beruf, ausbjahr,
+        typ:'azubi',
+        aktiverKursId: sharedKursId,
+        kursHistory: [{
+          kursId: sharedKursId,
+          kursName: (S.kats[_saveKatId] && S.kats[_saveKatId].label) || 'Kurs',
+          von: inst.sY+'-'+inst.sM+'-'+inst.sD,
+          bis: inst.eY+'-'+inst.eM+'-'+inst.eD,
+          addedAt: Date.now()
+        }],
+        manuellAngelegt: true,
+        angelegtAmSitz: true,
+        angelegtVon: (_auth && _auth.currentUser && _auth.currentUser.email)||''
+      };
+      _db.collection('globalTN').add(tnData).then(ref=>{
+        const newTnId = ref.id;
+        // poolTnId/poolKursId am Sitz setzen
+        const k=S.kats[_saveKatId];
+        const i=k && k.instances && k.instances[_saveInstId];
+        const seat=i && i.seats && i.seats[_saveSeatId];
+        if(seat){
+          seat.poolTnId = newTnId;
+          seat.poolKursId = sharedKursId;
+          persist();
+        }
+        // Kurs-TN eintragen
+        return _db.collection('shared').doc('kurse').collection('list').doc(sharedKursId)
+          .collection('teilnehmer').doc(newTnId).set({
+            vorname:vn, nachname:nn, firma, beruf, ausbjahr,
+            status:'active', addedAt: Date.now()
+          }).then(()=>newTnId);
+      }).then(newTnId=>{
+        toast('TN in Kurs-Liste angelegt ✓');
+        // Sync nochmal triggern jetzt mit poolTnId, damit Noten/Anwesenheit greifen
+        syncAttendanceToFirestore(_saveSeatId);
+      }).catch(err=>{
+        console.error('Auto-Anlage fehlgeschlagen:',err);
+        toast('⚠ Auto-Anlage fehlgeschlagen: '+err.message,'bad');
+      });
+    }
+    // Nur Vorname/Nachname als 1 Wort → keine Auto-Anlage, User soll Vor- und Nachname eingeben
+  }
 }
 
 // ─── ATTENDANCE → FIRESTORE SYNC ───
