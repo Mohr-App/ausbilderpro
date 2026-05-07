@@ -1,4 +1,4 @@
-const CACHE = 'verwaltungpro-v209';
+const CACHE = 'verwaltungpro-v210';
 const ASSETS = [
   './HBZVerwaltung.html',
   './manifest-vp.json',
@@ -11,12 +11,9 @@ const ASSETS = [
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js'
 ];
 
-// Install: cache shell assets
-// (kein skipWaiting hier — die neue Version wartet bis User in der App
-// auf "Aktualisieren" klickt, sonst kommt es zum Doppel-Load durch
-// automatischen controllerchange→reload-Trigger)
+// Install: cache shell assets — skipWaiting fuer silent Auto-Update
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
 
 // Activate: remove old caches
