@@ -1,4 +1,4 @@
-const CACHE = 'ausbilderpro-v384';
+const CACHE = 'ausbilderpro-v383';
 const ASSETS = [
   './AusbilderPro.html',
   './manifest.json',
@@ -12,22 +12,13 @@ const ASSETS = [
 ];
 
 // Install: pre-cache assets als Offline-Fallback
-// (kein automatisches skipWaiting — neue Version wartet bis User auf
-// "Aktualisieren" im Update-Banner klickt, sonst Doppel-Load durch
-// controllerchange→reload)
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
       .then(c => c.addAll(ASSETS.map(u => new Request(u, {mode: 'no-cors'}))))
       .catch(() => {})
   );
-});
-
-// Skip-Waiting auf Anfrage (für Update-Knopf in der App)
-self.addEventListener('message', e => {
-  if(e.data && e.data.type === 'SKIP_WAITING'){
-    self.skipWaiting();
-  }
+  self.skipWaiting();
 });
 
 // Activate: alte Caches löschen
