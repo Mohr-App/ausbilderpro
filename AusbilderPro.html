@@ -5041,10 +5041,13 @@ async function recoverOrphanSeats(){
         angelegt++;
       } else if(p.typ==='verknuepfungKaputt'){
         // globalTN-Doc fixieren (aktiverKursId + Historie ergänzen)
+        // Auch alte Status-Marker bereinigen — der TN startet im neuen Kurs neutral.
         tnId=p.seat.poolTnId;
-        const updates={aktiverKursId:p.kursId};
-        // Historie-Eintrag nur ergänzen wenn nicht schon drin
-        // (best-effort, nicht idempotent-blockierend)
+        const updates={
+          aktiverKursId:p.kursId,
+          status:firebase.firestore.FieldValue.delete(),
+          wiederholer:firebase.firestore.FieldValue.delete()
+        };
         await _db.collection('globalTN').doc(tnId).set(updates,{merge:true});
         fixiert++;
       }

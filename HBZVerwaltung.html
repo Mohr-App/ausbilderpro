@@ -6037,10 +6037,15 @@ function dropTNIntoKurs(e){
   const kurs=_kurse.find(k=>k.id===kursId);
   const kursName=kurs?.name||kursId;
   const histEntry={kursId,kursName,von:kurs?.von||'',bis:kurs?.bis||'',ausbilderName:kurs?.ausbilderName||'',lehrgangsartId:kurs?.lehrgangsartId||'',addedAt:Date.now()};
-  db.collection('globalTN').doc(_dragTNId).update({
+  // Beim Hinzufügen zu neuem Kurs: alte Status-Marker (Wiederholer, Nicht erschienen) entfernen
+  // — die galten für den vorherigen Kurs, im neuen Kurs starten alle wieder neutral.
+  const tnUpdate={
     aktiverKursId:kursId,
     kursHistory:firebase.firestore.FieldValue.arrayUnion(histEntry)
-  }).then(()=>db.collection('shared').doc('kurse').collection('list').doc(kursId)
+  };
+  if(tn.status) tnUpdate.status=firebase.firestore.FieldValue.delete();
+  if(tn.wiederholer) tnUpdate.wiederholer=firebase.firestore.FieldValue.delete();
+  db.collection('globalTN').doc(_dragTNId).update(tnUpdate).then(()=>db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(_dragTNId).set({
       vorname:tn.vorname||'',nachname:tn.nachname||'',
       firma:tn.firma||'',beruf:tn.beruf||'',ausbjahr:tn.ausbjahr||'',
