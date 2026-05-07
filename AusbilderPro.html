@@ -9356,9 +9356,47 @@ init();
 // PWA Service Worker
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('./sw.js')
-      .then(()=>console.log('SW registriert'))
-      .catch(e=>console.warn('SW Fehler:',e));
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      console.log('SW registriert');
+      // Periodisch nach Update suchen (alle 60s)
+      setInterval(()=>{ try{reg.update();}catch(e){} }, 60000);
+      // Wenn neue Version verfügbar → User informieren
+      reg.addEventListener('updatefound', ()=>{
+        const newSw = reg.installing;
+        if(!newSw) return;
+        newSw.addEventListener('statechange', ()=>{
+          if(newSw.state === 'installed' && navigator.serviceWorker.controller){
+            showApUpdateBanner();
+          }
+        });
+      });
+    }).catch(e=>console.warn('SW Fehler:',e));
+    // Wenn neuer SW aktiviert wird, Seite neu laden
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+      if(refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  });
+}
+
+// Update-Banner zeigen
+function showApUpdateBanner(){
+  if(document.getElementById('apUpdateBanner')) return;
+  const b=document.createElement('div');
+  b.id='apUpdateBanner';
+  b.style.cssText='position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10000;padding:14px 20px;background:#2563eb;color:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-family:Sora,sans-serif;font-size:.85rem;font-weight:700;display:flex;align-items:center;gap:14px;max-width:90vw';
+  b.innerHTML='<span>Neue Version verfügbar</span><button onclick="applyApUpdate()" style="background:#fff;color:#2563eb;border:none;padding:8px 16px;border-radius:8px;font-weight:800;cursor:pointer">Aktualisieren</button>';
+  document.body.appendChild(b);
+}
+function applyApUpdate(){
+  navigator.serviceWorker.getRegistration().then(reg=>{
+    if(reg && reg.waiting){
+      reg.waiting.postMessage({type:'SKIP_WAITING'});
+    } else {
+      window.location.reload();
+    }
   });
 }
 
