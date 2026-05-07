@@ -1372,6 +1372,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tab" onclick="stab('hist')" title="Alle bisherigen Kurse dieses TN">📋 Historie</button>
       </div>
       <div class="tp active" id="tp-info">
+        <div id="seatLeerHinweis" style="display:none;padding:10px 12px;margin-bottom:10px;background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.3);border-radius:10px;font-size:.74rem;color:#92400e;line-height:1.5">
+          ℹ <b>Leerer Sitzplatz.</b> Bitte erst über <b>＋ TN</b> in der rechten Sidebar einen Teilnehmer anlegen, dann per Drag & Drop oder Tap auf diesen Sitz ziehen. So erscheint der TN auch in der VerwaltungPro-Kursliste.
+        </div>
         <div class="fg ac-wrap">
           <label class="fl">Name</label>
           <input class="fi" type="text" id="iName" placeholder="Schülername" autocomplete="off" oninput="acInput('iName','acName');updateSeatModalTitle()" onkeydown="acKey(event,'acName')" onfocus="acInput('iName','acName')" onblur="acBlur('acName')">
@@ -4105,6 +4108,12 @@ function openModal(id){
   curSeat=id;curAttMain=null;
   const d=curSeats()[id]||{};
   tmpAtt=JSON.parse(JSON.stringify(d.attendance||[]));
+  // Leerer-Sitz-Hinweis: nur wenn Kurs mit Cloud verbunden + Sitz wirklich leer
+  const inst_pre=curInst();
+  const istLeer=!(d.name||'').trim() && !d.poolTnId;
+  const istCloud=!!(inst_pre && inst_pre.sharedKursId);
+  const hint=document.getElementById('seatLeerHinweis');
+  if(hint) hint.style.display=(istLeer && istCloud && !_demoMode)?'':'none';
   // Snapshot für Dirty-Check
   _modalSnapshot={name:d.name||'',company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',attLen:(d.attendance||[]).length};
   const inst_=curInst();
@@ -4908,63 +4917,6 @@ function saveSeat(){
         }
       }).catch(()=>{});
     }
-  }
-
-  // ── AUTO-ANLAGE: Sitzplatz manuell befüllt aber noch nicht in Kurs-TN-Liste ──
-  // Wenn am Platz selbst Name eingetippt wurde (ohne Drag aus Pool und ohne +TN-Button),
-  // legen wir den TN automatisch in globalTN + shared/kurse/.../teilnehmer/ an, damit
-  // er auch in VerwaltungPro erscheint und die Anwesenheits-/Noten-Sync greifen kann.
-  const sharedKursId = inst.sharedKursId;
-  if(_db && _seatName && !poolTnId && sharedKursId && !_demoMode){
-    const parts = _seatName.split(/\s+/).filter(Boolean);
-    if(parts.length >= 2){
-      const vn = parts[0];
-      const nn = parts.slice(1).join(' ');
-      const firma = (document.getElementById('iCo').value||'').trim();
-      const beruf = (document.getElementById('iProf').value||'').trim();
-      const ausbjahr = document.getElementById('iAusbjahr').value||'';
-      const tnData = {
-        vorname:vn, nachname:nn, firma, beruf, ausbjahr,
-        typ:'azubi',
-        aktiverKursId: sharedKursId,
-        kursHistory: [{
-          kursId: sharedKursId,
-          kursName: (S.kats[_saveKatId] && S.kats[_saveKatId].label) || 'Kurs',
-          von: inst.sY+'-'+inst.sM+'-'+inst.sD,
-          bis: inst.eY+'-'+inst.eM+'-'+inst.eD,
-          addedAt: Date.now()
-        }],
-        manuellAngelegt: true,
-        angelegtAmSitz: true,
-        angelegtVon: (_auth && _auth.currentUser && _auth.currentUser.email)||''
-      };
-      _db.collection('globalTN').add(tnData).then(ref=>{
-        const newTnId = ref.id;
-        // poolTnId/poolKursId am Sitz setzen
-        const k=S.kats[_saveKatId];
-        const i=k && k.instances && k.instances[_saveInstId];
-        const seat=i && i.seats && i.seats[_saveSeatId];
-        if(seat){
-          seat.poolTnId = newTnId;
-          seat.poolKursId = sharedKursId;
-          persist();
-        }
-        // Kurs-TN eintragen
-        return _db.collection('shared').doc('kurse').collection('list').doc(sharedKursId)
-          .collection('teilnehmer').doc(newTnId).set({
-            vorname:vn, nachname:nn, firma, beruf, ausbjahr,
-            status:'active', addedAt: Date.now()
-          }).then(()=>newTnId);
-      }).then(newTnId=>{
-        toast('TN in Kurs-Liste angelegt ✓');
-        // Sync nochmal triggern jetzt mit poolTnId, damit Noten/Anwesenheit greifen
-        syncAttendanceToFirestore(_saveSeatId);
-      }).catch(err=>{
-        console.error('Auto-Anlage fehlgeschlagen:',err);
-        toast('⚠ Auto-Anlage fehlgeschlagen: '+err.message,'bad');
-      });
-    }
-    // Nur Vorname/Nachname als 1 Wort → keine Auto-Anlage, User soll Vor- und Nachname eingeben
   }
 }
 
