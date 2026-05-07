@@ -1,4 +1,4 @@
-const CACHE = 'verwaltungpro-v208';
+const CACHE = 'verwaltungpro-v209';
 const ASSETS = [
   './HBZVerwaltung.html',
   './manifest-vp.json',
@@ -12,8 +12,11 @@ const ASSETS = [
 ];
 
 // Install: cache shell assets
+// (kein skipWaiting hier — die neue Version wartet bis User in der App
+// auf "Aktualisieren" klickt, sonst kommt es zum Doppel-Load durch
+// automatischen controllerchange→reload-Trigger)
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
 });
 
 // Activate: remove old caches
