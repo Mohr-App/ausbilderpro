@@ -6014,6 +6014,37 @@ function loadKursTNView(){
   }).catch(err=>{if(listEl)listEl.innerHTML='<div class="empty">Fehler: '+err.message+'</div>';});
 }
 
+// Prüft ob beim Hinzufügen eines TN zu einem neuen Kurs die alten Status-Marker
+// (status:'absent' / wiederholer:true) gelöscht werden sollen.
+// Regel: Reset NUR wenn die Lehrgangsart des neuen Kurses identisch ist mit der
+// Lehrgangsart desjenigen kursHistory-Eintrags, in dem der TN abgebrochen wurde
+// (für wiederholer) bzw. nicht erschienen ist (für absent).
+// Beispiel: TN ist Wiederholer für ET1 (13.04.) → wird in ET1 (24.04.) eingeschrieben
+// → Reset. Wird stattdessen in GET1 eingeschrieben → Wiederholer-Flag bleibt.
+function statusClearDecision(tn, neuerKurs){
+  const result={clearStatus:false, clearWiederholer:false};
+  const neuerLgArt=(neuerKurs && neuerKurs.lehrgangsartId)||'';
+  if(!neuerLgArt) return result;
+  const hist=tn.kursHistory||[];
+  if(tn.wiederholer){
+    for(let i=hist.length-1;i>=0;i--){
+      if(hist[i].abgebrochen && hist[i].lehrgangsartId){
+        if(hist[i].lehrgangsartId===neuerLgArt) result.clearWiederholer=true;
+        break;
+      }
+    }
+  }
+  if(tn.status==='absent'){
+    for(let i=hist.length-1;i>=0;i--){
+      if(hist[i].nichtErschienen && hist[i].lehrgangsartId){
+        if(hist[i].lehrgangsartId===neuerLgArt) result.clearStatus=true;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 function dropTNIntoKurs(e){
   e.preventDefault();
   const dz=document.getElementById('kursTNDropZone');if(dz)dz.classList.remove('drop-active');
@@ -6037,14 +6068,15 @@ function dropTNIntoKurs(e){
   const kurs=_kurse.find(k=>k.id===kursId);
   const kursName=kurs?.name||kursId;
   const histEntry={kursId,kursName,von:kurs?.von||'',bis:kurs?.bis||'',ausbilderName:kurs?.ausbilderName||'',lehrgangsartId:kurs?.lehrgangsartId||'',addedAt:Date.now()};
-  // Beim Hinzufügen zu neuem Kurs: alte Status-Marker (Wiederholer, Nicht erschienen) entfernen
-  // — die galten für den vorherigen Kurs, im neuen Kurs starten alle wieder neutral.
+  // Beim Hinzufügen zu neuem Kurs: alte Status-Marker nur entfernen wenn der TN
+  // jetzt den GLEICHEN Lehrgang wiederholt für den der Status gesetzt wurde.
+  const decision=statusClearDecision(tn, kurs);
   const tnUpdate={
     aktiverKursId:kursId,
     kursHistory:firebase.firestore.FieldValue.arrayUnion(histEntry)
   };
-  if(tn.status) tnUpdate.status=firebase.firestore.FieldValue.delete();
-  if(tn.wiederholer) tnUpdate.wiederholer=firebase.firestore.FieldValue.delete();
+  if(decision.clearStatus) tnUpdate.status=firebase.firestore.FieldValue.delete();
+  if(decision.clearWiederholer) tnUpdate.wiederholer=firebase.firestore.FieldValue.delete();
   db.collection('globalTN').doc(_dragTNId).update(tnUpdate).then(()=>db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(_dragTNId).set({
       vorname:tn.vorname||'',nachname:tn.nachname||'',
@@ -6130,9 +6162,14 @@ function reassignTNToKurs(e, newKursId){
     kursHistory: firebase.firestore.FieldValue.arrayUnion(histEntry)
   };
   if(markedHist) tnUpdate.kursHistory=markedHist.concat([histEntry]);
-  // Status-Felder entfernen (clean slate im neuen Kurs)
-  if(tn.status) tnUpdate.status = firebase.firestore.FieldValue.delete();
-  if(tn.wiederholer) tnUpdate.wiederholer = firebase.firestore.FieldValue.delete();
+  // Status-Felder NUR entfernen wenn neuer Kurs gleiche Lehrgangsart hat
+  // wie der Kurs für den der Status ursprünglich gesetzt wurde.
+  // Wichtig: 'tn' hat eventuell den frisch markierten Eintrag aus markedHist noch nicht
+  // — daher prüfen wir gegen die kombinierte Historie.
+  const tnForCheck={...tn, kursHistory: markedHist || tn.kursHistory || []};
+  const decision=statusClearDecision(tnForCheck, newKurs);
+  if(decision.clearStatus) tnUpdate.status = firebase.firestore.FieldValue.delete();
+  if(decision.clearWiederholer) tnUpdate.wiederholer = firebase.firestore.FieldValue.delete();
 
   db.collection('globalTN').doc(tnId).update(tnUpdate)
   .then(()=>{

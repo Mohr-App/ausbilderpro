@@ -4936,6 +4936,28 @@ function saveSeat(){
 //  1) Sitz mit Name, ohne poolTnId → globalTN + Kurs-TN anlegen
 //  2) Sitz mit poolTnId, aber globalTN-Doc fehlt → globalTN nachlegen
 //  3) Sitz mit poolTnId + globalTN, aber aktiverKursId stimmt nicht oder Kurs-TN-Eintrag fehlt → fixen
+function _statusClearDecisionAP(tn, neuerKursLgArt){
+  const result={clearStatus:false, clearWiederholer:false};
+  if(!neuerKursLgArt) return result;
+  const hist=tn.kursHistory||[];
+  if(tn.wiederholer){
+    for(let i=hist.length-1;i>=0;i--){
+      if(hist[i].abgebrochen && hist[i].lehrgangsartId){
+        if(hist[i].lehrgangsartId===neuerKursLgArt) result.clearWiederholer=true;
+        break;
+      }
+    }
+  }
+  if(tn.status==='absent'){
+    for(let i=hist.length-1;i>=0;i--){
+      if(hist[i].nichtErschienen && hist[i].lehrgangsartId){
+        if(hist[i].lehrgangsartId===neuerKursLgArt) result.clearStatus=true;
+        break;
+      }
+    }
+  }
+  return result;
+}
 async function recoverOrphanSeats(){
   if(!_db){alert('Nicht mit Cloud verbunden – bitte erst einloggen.');return;}
   // Alle Cloud-verbundenen Sitze sammeln
@@ -5040,14 +5062,27 @@ async function recoverOrphanSeats(){
         tnId=p.seat.poolTnId;
         angelegt++;
       } else if(p.typ==='verknuepfungKaputt'){
-        // globalTN-Doc fixieren (aktiverKursId + Historie ergänzen)
-        // Auch alte Status-Marker bereinigen — der TN startet im neuen Kurs neutral.
+        // globalTN-Doc fixieren (aktiverKursId)
+        // Status-Marker (status/wiederholer) NUR entfernen wenn die Lehrgangsart
+        // des neuen Kurses identisch ist mit der des abgebrochenen Vorgängers.
         tnId=p.seat.poolTnId;
-        const updates={
-          aktiverKursId:p.kursId,
-          status:firebase.firestore.FieldValue.delete(),
-          wiederholer:firebase.firestore.FieldValue.delete()
-        };
+        const updates={aktiverKursId:p.kursId};
+        // Lehrgangsart des aktuellen Kurses laden
+        let neuerLgArt='';
+        try{
+          const kursDoc=await _db.collection('shared').doc('kurse').collection('list').doc(p.kursId).get();
+          if(kursDoc.exists) neuerLgArt=kursDoc.data().lehrgangsartId||'';
+        }catch(_){}
+        // TN-Daten neu lesen (für aktuelle kursHistory)
+        try{
+          const tnDoc=await _db.collection('globalTN').doc(tnId).get();
+          if(tnDoc.exists){
+            const tnNow=tnDoc.data();
+            const decision=_statusClearDecisionAP(tnNow, neuerLgArt);
+            if(decision.clearStatus) updates.status=firebase.firestore.FieldValue.delete();
+            if(decision.clearWiederholer) updates.wiederholer=firebase.firestore.FieldValue.delete();
+          }
+        }catch(_){}
         await _db.collection('globalTN').doc(tnId).set(updates,{merge:true});
         fixiert++;
       }
