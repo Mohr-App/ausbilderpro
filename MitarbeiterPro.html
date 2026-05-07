@@ -1392,6 +1392,7 @@ function loadBetriebMeldungen(){
 // ZEITERFASSUNG
 // ═══════════════════════════════════
 let _zeitState='aus'; // 'aus'|'ein'|'pause'
+let _zeitBusy=false;  // verhindert Doppel-Klicks während GPS/Firestore-Write
 let _zeitHeute=null;
 let _zeitTimer=null;
 
@@ -1459,6 +1460,10 @@ function updateZeitBtn(){
   const pauseRow=document.getElementById('zeitPauseRow');
   const pauseBtn=document.getElementById('zeitPauseBtn');
   if(!btn) return;
+  // Busy-Lock aufheben + Button wieder aktivieren
+  _zeitBusy=false;
+  btn.style.pointerEvents='';
+  btn.style.opacity='';
   const bar=document.getElementById('zeitBtnBar');if(bar) bar.style.width='0';
   if(!_zeitHeute||!_zeitHeute.eingang||_zeitHeute.ausgang){
     _zeitState='aus';
@@ -1584,6 +1589,7 @@ function checkGleitzeit(jetzt, typ){
   let _holdTimer=null,_holdStart=0,_holdAF=null;
   function startHold(){
     if(_holdTimer) return;
+    if(_zeitBusy) return; // Stempel-Vorgang läuft schon
     _holdStart=Date.now();
     const bar=document.getElementById('zeitBtnBar');
     if(bar) bar.style.width='0';
@@ -1625,14 +1631,24 @@ function checkGleitzeit(jetzt, typ){
 function zeitStempeln(){
   if(!_firmaReadOnlyGuard()) return;
   if(!_tnId||!db) return;
+  if(_zeitBusy) return; // Doppel-Klick-Schutz
   const today=localDate();
   const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
+  // Sofort visuelles Feedback + Button sperren
+  function _setBusy(actionLabel){
+    _zeitBusy=true;
+    const btn=document.getElementById('zeitBtn');
+    const text=document.getElementById('zeitBtnText');
+    if(btn){btn.style.pointerEvents='none';btn.style.opacity='.75';}
+    if(text) text.innerHTML='⏳<br>'+actionLabel;
+  }
   if(_zeitState==='aus'){
     if(_zeitHeute&&_zeitHeute.ausgang){if(!confirm('Bereits ausgestempelt. Neuen Tag starten?'))return;}
+    _setBusy('Wird eingestempelt…');
     getGPS().then(gps=>{
       const geoResult=checkGeofence(gps);
-      if(geoResult===false) return;
+      if(geoResult===false){loadZeitHeute(); return;}
       let gpsGrund='';
       if(geoResult==='no-gps'){
         gpsGrund=(prompt('📍 GPS ist deaktiviert.\n\nBitte Grund angeben warum du ohne Standort stempelst:')||'').trim();
@@ -1642,9 +1658,10 @@ function zeitStempeln(){
       const data={eingang:jetzt,pauseLog:[],datum:today,firmaUid:_tnData?.firmaUid||null};
       if(gps) data.gpsEingang=gps;
       if(geoResult==='no-gps'){data.ohneGPS=true;data.ohneGPSGrund=gpsGrund;}
-      ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);});
+      ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);}).catch(()=>{loadZeitHeute();toast('Fehler beim Stempeln','bad');});
     });
   } else if(_zeitState==='ein'||_zeitState==='pause'){
+    _setBusy('Wird ausgestempelt…');
     checkGleitzeit(jetzt,'aus');
     const pLog=(_zeitHeute?.pauseLog||[]).map(p=>p.start&&!p.ende?{...p,ende:jetzt}:p);
     const pauseMin=calcPauseMinuten(pLog);
@@ -1652,14 +1669,14 @@ function zeitStempeln(){
     const update={ausgang:jetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin};
     getGPS().then(gps=>{
       const geoResult=checkGeofence(gps);
-      if(geoResult===false) return;
+      if(geoResult===false){loadZeitHeute(); return;}
       if(geoResult==='no-gps'){
         const grund=(prompt('📍 GPS ist deaktiviert.\n\nBitte Grund angeben:')||'').trim();
         
         update.ohneGPS=true;update.ohneGPSGrund=grund;
       }
       if(gps) update.gpsAusgang=gps;
-      ref.update(update).then(()=>{loadZeitHeute();toast('⏹ Ausgestempelt um '+jetzt);});
+      ref.update(update).then(()=>{loadZeitHeute();toast('⏹ Ausgestempelt um '+jetzt);}).catch(()=>{loadZeitHeute();toast('Fehler beim Stempeln','bad');});
     });
   }
 }
