@@ -1688,13 +1688,22 @@ auth.onAuthStateChanged(u => {
     });
   } else {
     _uid = null;
+    _grantedUid = null;
     document.getElementById('loginWrap').style.display = 'flex';
     document.getElementById('appWrap').style.display = 'none';
     showHBZLogin();
   }
 });
 
+let _grantedUid = null;
 function grantAccess(u, role){
+  // Token-Refresh / wiederholte onAuthStateChanged-Events:
+  // wenn schon fuer diesen User initialisiert, nur Aktivitaet aktualisieren.
+  if(_grantedUid === u.uid){
+    if(_uid) db.collection('users').doc(_uid).set({lastActive:Date.now()},{merge:true}).catch(()=>{});
+    return;
+  }
+  _grantedUid = u.uid;
   _userRole = role;
   document.getElementById('loginWrap').style.display = 'none';
   document.getElementById('appWrap').style.display = 'flex';
@@ -2372,13 +2381,16 @@ function renderSbTnTree(){
 
 // ── Load All ──
 let _renderTimer = null;
+let _kurseListUnsub = null;
 function loadAll(){
   loadKursSettings();
   loadBerufe();
   loadCurricula();
   // globalTN sofort laden (nicht erst beim Tab-Wechsel)
   initGlobalTN();
-  db.collection('shared').doc('kurse').collection('list')
+  // Listener nur einmal anlegen — bei wiederholten Aufrufen alten erst stoppen
+  if(_kurseListUnsub){ try{_kurseListUnsub();}catch(_){} _kurseListUnsub=null; }
+  _kurseListUnsub = db.collection('shared').doc('kurse').collection('list')
     .orderBy('createdAt','desc').onSnapshot(snap=>{
       _kurse = [];
       snap.forEach(doc=>_kurse.push({id:doc.id,...doc.data()}));
@@ -9228,11 +9240,17 @@ function submitDsgvoConsent(){
 }
 function checkBackupReminder(){
   const last=parseInt(localStorage.getItem('vp_lastBackup')||'0');
+  // Kein gespeichertes Backup-Datum oder unrealistisch alt (>2 Jahre) → ignorieren.
+  // Sonst zeigt der Reminder absurde Zahlen wie "vor 20000 Tagen" wenn last=0 (Epoch).
+  if(!last || (Date.now()-last) > 730*86400000) return;
   const daysSince=Math.floor((Date.now()-last)/(1000*60*60*24));
   if(daysSince>=30){
     setTimeout(()=>{
       if(confirm('📦 Letztes Backup vor '+daysSince+' Tagen.\n\nJetzt ein Backup erstellen?')){
         doFullBackup();
+      } else {
+        // Snooze: 30 Tage nicht mehr nerven
+        localStorage.setItem('vp_lastBackup', Date.now().toString());
       }
     },3000);
   }
