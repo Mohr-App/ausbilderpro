@@ -1989,9 +1989,6 @@ function calcPauseMinuten(pLog){
   });
   return Math.max(0,total);
 }
-function calcIstMinuten(ein,aus,pause){
-  return Math.max(0,timeToMin(aus)-timeToMin(ein)-(pause||0));
-}
 function timeToMin(t){
   const p=(t||'0:0').split(':');
   return parseInt(p[0])*60+parseInt(p[1]||0);
@@ -2281,15 +2278,24 @@ function zeitNachtragen(){
   err.textContent='';
   if(!datum||!ein||!aus){err.textContent='Bitte Datum, Eingang und Ausgang eingeben';return;}
   if(aus<=ein){err.textContent='Ausgang muss nach Eingang liegen';return;}
-  const istMin=timeToMin(aus)-timeToMin(ein);
-  if(!confirm('Zeit nachtragen?\n\n'+datum+': '+ein+' – '+aus+' ('+minToStr(istMin)+')\n\nDein Betrieb muss diesen Eintrag bestätigen.')) return;
+  const brutto=timeToMin(aus)-timeToMin(ein);
+  const pflicht=calcPflichtPauseMin(brutto);
+  const istMin=Math.max(0,brutto-pflicht);
+  if(!confirm('Zeit nachtragen?\n\n'+datum+': '+ein+' – '+aus+'\nBrutto: '+minToStr(brutto)+(pflicht?'\nPflicht-Pause: '+pflicht+' min':'')+'\nArbeitszeit: '+minToStr(istMin)+'\n\nDein Betrieb muss diesen Eintrag bestätigen.')) return;
   db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(datum).set({
-    datum, eingang:ein, ausgang:aus, pauseLog:[], pauseMinuten:0, istMinuten:istMin,
+    datum,
+    stempel:[{ein, aus, manuell:true}],
+    pauseLog:[],
+    bruttoMinuten:brutto,
+    pauseMinuten:pflicht,
+    istMinuten:istMin,
     manuell:true, agBestaetigt:false,
     firmaUid: _tnData?.firmaUid||null,
     bemerkung:bem,
     nachgetragenAm:Date.now(),
-    historie:firebase.firestore.FieldValue.arrayUnion({aktion:'nachgetragen',von:_email||'Mitarbeiter',am:Date.now(),eingang:ein,ausgang:aus})
+    historie:firebase.firestore.FieldValue.arrayUnion({aktion:'nachgetragen',von:_email||'Mitarbeiter',am:Date.now(),eingang:ein,ausgang:aus}),
+    eingang: firebase.firestore.FieldValue.delete(),
+    ausgang: firebase.firestore.FieldValue.delete()
   },{merge:true}).then(()=>{
     document.getElementById('zeitNachDatum').value='';
     document.getElementById('zeitNachEin').value='';

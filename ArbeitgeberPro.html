@@ -4660,13 +4660,22 @@ function agZeitNachtragen(){
   if(!tnId){err.textContent='Bitte Azubi wählen';return;}
   if(!datum||!ein||!aus){err.textContent='Bitte alle Felder ausfüllen';return;}
   if(aus<=ein){err.textContent='Ausgang muss nach Eingang liegen';return;}
-  const istMin=timeToMin(aus)-timeToMin(ein);
+  const brutto=timeToMin(aus)-timeToMin(ein);
+  const pflicht=calcPflichtPauseMin(brutto);
+  const istMin=Math.max(0,brutto-pflicht);
   const azName=document.getElementById('agNachAzubi').selectedOptions[0]?.text||'Azubi';
-  if(!confirm('Zeit nachtragen für '+azName+'?\n\n'+datum+': '+ein+' – '+aus+' ('+minToStr(istMin)+')')) return;
+  if(!confirm('Zeit nachtragen für '+azName+'?\n\n'+datum+': '+ein+' – '+aus+'\nBrutto: '+minToStr(brutto)+(pflicht?'\nPflicht-Pause: '+pflicht+' min':'')+'\nArbeitszeit: '+minToStr(istMin))) return;
   db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum).set({
-    datum, eingang:ein, ausgang:aus, pauseLog:[], pauseMinuten:0, istMinuten:istMin,
+    datum,
+    stempel:[{ein, aus, manuell:true}],
+    pauseLog:[],
+    bruttoMinuten:brutto,
+    pauseMinuten:pflicht,
+    istMinuten:istMin,
     agBestaetigt:true, agNachgetragen:true, agNachgetragenAm:Date.now(), agNachgetragenVon:_firma||_email,
-    firmaUid: _uid
+    firmaUid: _uid,
+    eingang: firebase.firestore.FieldValue.delete(),
+    ausgang: firebase.firestore.FieldValue.delete()
   },{merge:true}).then(()=>{
     document.getElementById('agNachDatum').value='';
     document.getElementById('agNachEin').value='';

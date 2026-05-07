@@ -774,7 +774,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="openTrash();closeHdrMenu()" style="width:100%;text-align:left" title="Gelöschte Lehrgänge wiederherstellen (30 Tage)">🗑 Papierkorb</button>
         <button class="tbtn" onclick="appReset();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#991b1b" title="App-Cache und alte lokale Dateien zurücksetzen (bei Problemen)">🔄 App zurücksetzen</button>
         <button class="tbtn" onclick="recoverOrphanSeats();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.2);color:#4338ca" title="TN, die direkt am Sitzplatz eingegeben wurden (statt über +TN), nachträglich in globalTN + Kurs-Liste anlegen">🔗 Verwaiste Sitze nachtragen</button>
-        <button class="tbtn" id="pilotCleanupBtn" onclick="pilotCleanupLocalState();closeHdrMenu()" style="width:100%;text-align:left;display:none;background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.2);color:#92400e" title="Pilot-Cleanup: Geister-Sitzplaetze und Vollnamen lokal+Cloud bereinigen">⚠ Pilot-Cleanup</button>
         <button class="tbtn" onclick="showHilfeModal();closeHdrMenu()" style="width:100%;text-align:left" title="Anleitungen und Tipps">❓ Brauchst du Hilfe?</button>
       </div>
     </div>
@@ -1112,27 +1111,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
-<!-- PILOT-BANNER OVERLAY (einmalig nach Login, Stand 28.04.2026) -->
-<div id="pilotBannerOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,18,25,.92);z-index:9998;align-items:center;justify-content:center;padding:20px">
-  <div style="max-width:440px;width:100%;background:var(--sur);border:2px solid #f59e0b;border-radius:16px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.4)">
-    <div style="font-size:1.1rem;font-weight:800;color:#92400e;margin-bottom:6px">⚠ Pilot-Hinweis</div>
-    <div style="font-size:.78rem;color:var(--tx);line-height:1.6;margin-bottom:14px">
-      AusbilderPro befindet sich aktuell in der <b>Pilotphase</b>. Aus Datensparsamkeitsgründen wurde Folgendes angepasst:
-    </div>
-    <ul style="font-size:.74rem;color:var(--tx);line-height:1.7;margin-bottom:14px;padding-left:20px">
-      <li>Vor- und Nachnamen werden nur als <b>2-Buchstaben-Kürzel</b> gespeichert (z.B. „Ma. Mu." statt „Max Mustermann")</li>
-      <li>Telefonnummern und Geburtsdaten werden <b>nicht erfasst</b></li>
-      <li>Bestehende Daten wurden entsprechend angepasst</li>
-      <li>Anwesenheits- und Notendaten bleiben unverändert</li>
-    </ul>
-    <div style="font-size:.7rem;color:var(--mu);line-height:1.6;margin-bottom:14px">
-      Sobald die Nutzung mit der HBZ-Geschäftsführung formal geregelt ist, informieren wir erneut.
-      Bei Fragen: <a href="mailto:info@ausbilderpro.de" style="color:var(--acc)">info@ausbilderpro.de</a>
-    </div>
-    <button title="Verstanden" onclick="dismissPilotBanner()" style="width:100%;padding:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✓ Verstanden</button>
-  </div>
-</div>
-
 <!-- TN DETAIL MODAL -->
 <div class="ov" id="tnDetailModal" title="Schließen" onclick="if(event.target===this)this.classList.remove('open')">
 <div class="modal" style="max-width:420px">
@@ -1152,18 +1130,15 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="modal" style="max-width:400px">
 <div class="mhd"><div class="mtit">👤 Teilnehmer manuell hinzufügen</div><button class="xcls" onclick="document.getElementById('manualTNModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
 <div class="mbdy">
-<div style="background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.25);border-radius:8px;padding:9px 11px;margin-bottom:12px;font-size:.7rem;color:#92400e;line-height:1.5">
-⚠ <b>Pilotphase:</b> Bitte nur 2-Buchstaben-Kürzel eingeben (z.B. „Ma." statt „Maximilian"). Telefon und Geburtsdatum werden in der Pilotphase nicht erfasst.
-</div>
-<div class="fg"><label class="fl">Vorname (Kürzel) <span style="color:#ef4444">*</span></label><input class="fi" id="mtVorname" placeholder="Ma." maxlength="3"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">Nachname (Kürzel) <span style="color:#ef4444">*</span></label><input class="fi" id="mtNachname" placeholder="Mu." maxlength="3"></div>
+<div class="fg"><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="mtVorname" placeholder="Max"></div>
+<div class="fg" style="margin-top:6px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="mtNachname" placeholder="Mustermann"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Betrieb</label><input class="fi" id="mtBetrieb" placeholder="Firma GmbH"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Berufsgruppe <span style="color:#ef4444">*</span></label><select class="fi" id="mtBerufGruppe" onchange="mtUpdateFachrichtungen()" style="cursor:pointer"><option value="">– Berufsgruppe wählen –</option></select></div>
 <div class="fg" style="margin-top:6px;display:none" id="mtFachWrap"><label class="fl">Fachrichtung</label><select class="fi" id="mtFachrichtung" style="cursor:pointer"><option value="">– Fachrichtung wählen –</option></select></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Lehrjahr <span style="color:#ef4444">*</span></label><select class="fi" id="mtLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
 <div style="display:flex;gap:8px;margin-top:6px">
 <div class="fg" style="flex:1"><label class="fl">E-Mail</label><input class="fi" id="mtEmail" type="email" placeholder="max@firma.de"></div>
-<div class="fg" style="flex:1"><label class="fl" style="color:var(--mu)">Telefon <span style="font-size:.6rem;font-weight:400">(Pilotphase: gesperrt)</span></label><input class="fi" id="mtTelefon" type="tel" placeholder="—" disabled style="opacity:.45;cursor:not-allowed;background:var(--sur2)"></div>
+<div class="fg" style="flex:1"><label class="fl">Telefon</label><input class="fi" id="mtTelefon" type="tel" placeholder="+49 …"></div>
 </div>
 <div class="fg" style="margin-top:6px"><label class="fl">Sitzplatznummer</label><input class="fi" id="mtSitzplatz" type="number" min="1" placeholder="z.B. 5" style="max-width:120px"></div>
 <button class="bsave" title="✓ Hinzufügen" onclick="saveManualTN()" style="margin-top:12px">✓ Hinzufügen</button>
@@ -1242,9 +1217,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="display:flex;gap:8px;margin-bottom:6px">
         <button class="tbtn" title="📁 Datei hochladen" onclick="docsUpload('file','course')" style="flex:1">📁 Datei hochladen</button>
         <button class="tbtn" title="📷 Kamera" onclick="docsUpload('cam','course')" style="flex:1">📷 Kamera</button>
-      </div>
-      <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:6px;padding:6px 10px;margin-bottom:14px;font-size:.65rem;color:#92400e;line-height:1.45">
-        ⚠ Pilotphase: Nur <b>PDF</b>- und <b>Word</b>-Dokumente (.pdf, .doc, .docx) hochladbar. Kamera-Upload deaktiviert.
       </div>
       <input type="file" id="docsFileInCourse" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="docsHandleUpload(event,'course')">
       <input type="file" id="docsCamInCourse" accept="image/*" capture="environment" style="display:none" onchange="docsHandleUpload(event,'course')">
@@ -1521,7 +1493,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <button class="tbtn" title="📁 Datei hochladen" onclick="docsUpload('file','seat')" style="flex:1;font-size:.75rem">📁 Datei hochladen</button>
           <button class="tbtn" title="📷 Kamera" onclick="docsUpload('cam','seat')" style="flex:1;font-size:.75rem">📷 Kamera</button>
         </div>
-        <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:6px;padding:6px 10px;margin-bottom:12px;font-size:.65rem;color:#92400e;line-height:1.45">
+        <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:6px;padding:6px 10px;margin-bottom:12px;font-size:.65rem;color:#92400e;line-height:1.45;display:none">
           ⚠ Pilotphase: Nur <b>PDF</b>- und <b>Word</b>-Dokumente (.pdf, .doc, .docx) hochladbar. Kamera-Upload deaktiviert.
         </div>
         <input type="file" id="docsFileInSeat" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="docsHandleUpload(event,'seat')">
@@ -1549,17 +1521,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Lehrgangsarten an
 const APP_VERSION = 'v2.6.0';
-// ─── PILOT-MODUS: Datensparsamkeit waehrend Pilotphase ───
-// Solange aktiviert: Vor-/Nachname werden auf 2-Buchstaben-Kuerzel reduziert,
-// Telefon und Geburtsdatum werden nicht erfasst, Eingabefelder sind eingeschraenkt.
-const PILOT_MODE = false;
-const PILOT_BANNER_KEY = 'pilotBannerSeen_2026_04_28';
-function pilotShortName(s){
-  if(!PILOT_MODE) return s;
-  const v = (s||'').trim();
-  if(!v) return '';
-  // Schon ein Kuerzel ("Ma." oder "Ma" mit max 2 Buchstaben)?
-  if(/^[A-Za-zÄÖÜäöüß]{1,2}\.?$/.test(v)) {
+\.?$/.test(v)) {
     return v.replace(/\.$/,'') + '.';
   }
   // Erste 2 Buchstaben + Punkt
@@ -1772,12 +1734,6 @@ function persist(){
 
 function autoExport(reason){
   if(_demoMode) return;
-  // ── PILOT-MODUS: Kein lokaler Auto-Export. Daten liegen sicher in Firestore.
-  // Lokale .hbz-Dateien wuerden Schuelerdaten ausserhalb der DSGVO-Schutzzone ablegen.
-  if(PILOT_MODE){
-    _lastExportCount = _changeCount; // Counter trotzdem zuruecksetzen damit nicht alle 20 Aenderungen geprueft wird
-    return;
-  }
   _lastExportCount = _changeCount;
   if(_driveToken){ driveSave(); return; }
   const plain=JSON.stringify(S,null,2);
@@ -5563,45 +5519,6 @@ function submitDsgvoConsent(){
     toast('✓ Zustimmung gespeichert');
   }).catch(err=>{if(errEl)errEl.textContent='Fehler: '+err.message;});
 }
-// ─── PILOT-BANNER: einmalige Hinweis-Anzeige bei Login ───
-function checkPilotBanner(){
-  if(!PILOT_MODE) return;
-  if(localStorage.getItem(_lsKey(PILOT_BANNER_KEY))==='1') return;
-  const ov=document.getElementById('pilotBannerOverlay');
-  if(ov) ov.style.display='flex';
-}
-function dismissPilotBanner(){
-  localStorage.setItem(_lsKey(PILOT_BANNER_KEY),'1');
-  const ov=document.getElementById('pilotBannerOverlay');
-  if(ov) ov.style.display='none';
-  // Optional: Quittierung in Firestore loggen (Beleg-Wert)
-  if(_db && _fbUid){
-    _db.collection('users').doc(_fbUid).set({
-      pilotBannerSeen: { zeitpunkt: new Date().toISOString(), version: '2026-04-28' }
-    },{merge:true}).catch(()=>{});
-  }
-}
-// ─── PILOT-MODUS: UI-Restriktionen anwenden ───
-// Versteckt Export-/Import-/Drive-Buttons damit lokale Klartext-Dateien
-// nicht versehentlich erzeugt werden. Daten liegen ohnehin in Firestore.
-function applyPilotUiRestrictions(){
-  if(!PILOT_MODE) return;
-  const hide=id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; };
-  // Desktop Header-Menue
-  hide('hdrExportBtn');
-  hide('hdrExportPwBtn');
-  hide('hdrImportBtn');
-  hide('gdriveBtn');
-  hide('hdrIoSep');
-  // Mobile Mehr-Menue
-  hide('mobExportPwBtn');
-  hide('mobIoSepTop');
-  hide('mobIoSepBot');
-  // Mobile Bottom-Nav
-  hide('mobBottomExportBtn');
-  hide('mobBottomImportBtn');
-  hide('mobBottomDriveBtn');
-}
 function getAusbilderKursData(){
   const p=getAusbilderProfil();
   const loginEmail=_auth?.currentUser?.email?.toLowerCase()||'';
@@ -5649,14 +5566,7 @@ function backfillCourseAusbilderData(profil){
 // Erneuert Service-Worker, gibt Diagnose aus und reloadet.
 async function appReset(){
   let report=[];
-  report.push('🔍 Diagnose vor Reset:\n');
-  // Code-Stand (PILOT_MODE existiert seit v309)
-  if(typeof PILOT_MODE!=='undefined'){
-    report.push('· Code-Stand: NEU (PILOT_MODE='+PILOT_MODE+')');
-  } else {
-    report.push('· Code-Stand: ALT (Reset noetig!)');
-  }
-  // Service-Worker?
+  report.push('🔍 Diagnose vor Reset:\n');  // Service-Worker?
   let swCount=0;
   if('serviceWorker' in navigator){
     try{
@@ -5708,126 +5618,6 @@ async function appReset(){
 // Wird vom Header-Menue manuell ausgeloest.
 // Schritt 1: Diagnose - zeigt was gefunden wurde
 // Schritt 2: Cleanup - entfernt Geister + kuerzt Vollnamen
-async function pilotCleanupLocalState(){
-  if(!PILOT_MODE){alert('Funktion nur im Pilot-Modus aktiv');return;}
-  if(!_db){alert('Firestore nicht verbunden');return;}
-  // PHASE 1: Diagnose - Welche Sitze haben poolTnId? Welche existieren in globalTN?
-  const tnIdsInUse=new Set();
-  const allSeatRefs=[]; // {katId, instId, seatId, seat}
-  Object.keys(S.kats||{}).forEach(katId=>{
-    const kat=S.kats[katId];
-    Object.keys(kat.instances||{}).forEach(instId=>{
-      const inst=kat.instances[instId];
-      Object.keys(inst.seats||{}).forEach(seatId=>{
-        const seat=inst.seats[seatId];
-        if(seat&&(seat.name||seat.poolTnId)){
-          allSeatRefs.push({katId,instId,seatId,seat});
-          if(seat.poolTnId) tnIdsInUse.add(seat.poolTnId);
-        }
-      });
-    });
-  });
-  if(!allSeatRefs.length){alert('Keine Sitzplaetze mit Daten gefunden.');return;}
-  // Firestore-Existenz pro poolTnId pruefen
-  const existsMap={};
-  const promises=[...tnIdsInUse].map(tnId=>
-    _db.collection('globalTN').doc(tnId).get()
-      .then(doc=>{ existsMap[tnId]=doc.exists; })
-      .catch(()=>{ existsMap[tnId]=null; }) // unbekannt bei Fehler -> nicht loeschen
-  );
-  await Promise.all(promises);
-  // Klassifizieren
-  const ghosts=[]; // poolTnId vorhanden, aber Firestore-Doc weg
-  const fullNames=[]; // Name nicht in Kuerzel-Form
-  const isShort=name=>{
-    if(!name) return true;
-    const parts=(name||'').trim().split(/\s+/);
-    return parts.every(p=>/^[A-Za-zÄÖÜäöüß]{1,2}\.?$/.test(p));
-  };
-  allSeatRefs.forEach(ref=>{
-    const {seat}=ref;
-    if(seat.poolTnId && existsMap[seat.poolTnId]===false){
-      ghosts.push(ref);
-    } else if(seat.name && !isShort(seat.name)){
-      fullNames.push(ref);
-    }
-  });
-  // PHASE 2: Confirm + Cleanup
-  // Detail-Liste der Geister fuer Anzeige (max 20 Zeichen pro Eintrag)
-  const ghostList=ghosts.slice(0,10).map(ref=>{
-    const seat=ref.seat;
-    const kat=S.kats[ref.katId];
-    const inst=kat&&kat.instances&&kat.instances[ref.instId];
-    const kursLabel=kat?kat.label:'?';
-    const instDate=inst?(inst.von||'').substring(5)+'-'+(inst.bis||'').substring(5):'';
-    return '  · '+(seat.name||'(leer)')+' ['+kursLabel+' '+instDate+', Sitz '+ref.seatId+']';
-  }).join('\n');
-  const ghostMore=ghosts.length>10?'\n  ... und '+(ghosts.length-10)+' weitere':'';
-  const fullNamesList=fullNames.slice(0,5).map(ref=>{
-    const seat=ref.seat;
-    const kat=S.kats[ref.katId];
-    return '  · '+(seat.name||'')+' ['+(kat?kat.label:'?')+']';
-  }).join('\n');
-  const fullNamesMore=fullNames.length>5?'\n  ... und '+(fullNames.length-5)+' weitere':'';
-
-  const summary=
-    'DIAGNOSE:\n\n'+
-    '═══ GEISTER-SITZPLÄTZE ('+ghosts.length+') ═══\n'+
-    '(poolTnId verweist auf geloeschte TNs)\n\n'+
-    (ghostList||'  (keine)')+ghostMore+'\n\n'+
-    '═══ VOLLNAMEN ('+fullNames.length+') ═══\n'+
-    '(sollten Kuerzel sein)\n\n'+
-    (fullNamesList||'  (keine)')+fullNamesMore+'\n\n'+
-    '════════════════════\n\n'+
-    'Cleanup wuerde:\n'+
-    '· Geister-Sitzplaetze KOMPLETT LEEREN\n'+
-    '· Vollnamen auf 2-Buchstaben-Kuerzel reduzieren\n\n'+
-    'Cleanup jetzt durchfuehren?';
-  if(!confirm(summary)) return;
-  // Helper: Kuerzeln (analog pilotShortName)
-  const shorten=s=>{
-    const v=(s||'').trim();
-    if(!v) return '';
-    const parts=v.split(/\s+/);
-    return parts.map(p=>{
-      if(/^[A-Za-zÄÖÜäöüß]{1,2}\.?$/.test(p)) return p.replace(/\.$/,'')+'.';
-      return p.replace(/[^A-Za-zÄÖÜäöüß]/g,'').slice(0,2)+'.';
-    }).join(' ');
-  };
-  let ghostsCleared=0, namesShortened=0;
-  ghosts.forEach(ref=>{
-    const seat=ref.seat;
-    // Sitzplatz komplett leeren - geloeschter TN soll keine Spuren hinterlassen
-    delete seat.name;
-    delete seat.company;
-    delete seat.profession;
-    delete seat.ausbjahr;
-    delete seat.note;
-    delete seat.bemerkung;
-    delete seat.photo;
-    delete seat.mitarbeit;
-    delete seat.fuehrung;
-    delete seat.praxis;
-    delete seat.poolTnId;
-    delete seat.note1;
-    delete seat.note2;
-    delete seat.note3;
-    delete seat.gesamtnote;
-    ghostsCleared++;
-  });
-  fullNames.forEach(ref=>{
-    const seat=ref.seat;
-    seat.name=shorten(seat.name);
-    namesShortened++;
-  });
-  if(typeof persist==='function') persist();
-  if(typeof renderSeats==='function') renderSeats();
-  if(typeof renderSidebar==='function') renderSidebar();
-  alert('Cleanup abgeschlossen:\n\n'+
-    '✓ '+ghostsCleared+' Geister-Sitzplaetze geleert\n'+
-    '✓ '+namesShortened+' Namen auf Kuerzel reduziert\n\n'+
-    'Aenderungen wurden lokal und in Firestore gespeichert.');
-}
 
 // ─── TN DETAIL ───
 function openTnDetail(tnId){
@@ -7269,11 +7059,6 @@ function showDemoUpgrade(){
 
 function doExport(){
   if(_demoMode){ showDemoUpgrade(); return; }
-  // ── PILOT-MODUS: Export komplett gesperrt ──
-  if(PILOT_MODE){
-    alert('Datei-Export in der Pilotphase deaktiviert.\n\nAlle Daten liegen sicher in der Cloud (Firestore, EU-Region Frankfurt).');
-    return;
-  }
   _lastExportCount=_changeCount;
   let pw=localStorage.getItem(_lsKey('ap_exppw'))||'';
   if(!pw){
@@ -7294,7 +7079,6 @@ function doExport(){
 }
 function doExportChangePw(){
   if(_demoMode){ showDemoUpgrade(); return; }
-  if(PILOT_MODE){ alert('In der Pilotphase deaktiviert.'); return; }
   const pw=prompt('Neues Export-Passwort eingeben:');
   if(pw===null) return;
   if(pw.trim()===''){alert('Bitte ein Passwort eingeben.');return;}
@@ -7305,7 +7089,6 @@ function doExportChangePw(){
 
 function doImport(e){
   if(_demoMode){ showDemoUpgrade(); e.target.value=''; return; }
-  if(PILOT_MODE){ alert('Datei-Import in der Pilotphase deaktiviert.'); e.target.value=''; return; }
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=ev=>{
@@ -7358,7 +7141,6 @@ function doImport(e){
 // ═══════════════════════════════════════════════════
 function gdriveAction(){
   if(_demoMode){ showDemoUpgrade(); return; }
-  if(PILOT_MODE){ alert('Google Drive-Backup in der Pilotphase deaktiviert.\n\nDaten werden bereits in der EU-Cloud (Firestore Frankfurt) gesichert.'); return; }
   openDriveModal('menu');
 }
 
@@ -8926,10 +8708,6 @@ function closePoolLink(){ document.getElementById('poolLinkModal').classList.rem
 // ═══════════════════════════════════════════════
 function docsUpload(type, scope){
   // ── PILOT-MODUS: Kamera deaktiviert (nur PDF/Word über Datei-Auswahl) ──
-  if(PILOT_MODE && type==='cam'){
-    alert('Kamera-Upload in der Pilotphase deaktiviert.\nBitte Datei-Auswahl verwenden (PDF/Word).');
-    return;
-  }
   const id = scope==='seat' ? (type==='cam' ? 'docsCamInSeat' : 'docsFileInSeat')
                              : (type==='cam' ? 'docsCamInCourse' : 'docsFileInCourse');
   document.getElementById(id).click();
@@ -8939,18 +8717,6 @@ function docsHandleUpload(e, scope){
   const file = e.target.files[0];
   if(!file || !_fbUid) return;
   e.target.value = '';
-  // ── PILOT-MODUS: Nur PDF + Word zulassen ──
-  if(PILOT_MODE){
-    const name=(file.name||'').toLowerCase();
-    const okExt=name.endsWith('.pdf')||name.endsWith('.doc')||name.endsWith('.docx');
-    const okType=file.type==='application/pdf'
-      ||file.type==='application/msword'
-      ||file.type==='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    if(!okExt && !okType){
-      alert('In der Pilotphase sind nur PDF- und Word-Dokumente erlaubt.\n\nBilder, Videos und andere Datei-Typen werden nicht unterstützt.');
-      return;
-    }
-  }
   const maxMB = 20;
   if(file.size > maxMB * 1024 * 1024){ alert('Datei zu groß (max '+maxMB+' MB)'); return; }
 
@@ -9290,8 +9056,6 @@ function _checkAdminShowLauncher(uid){
     const el=document.getElementById('appLauncher');
     if(el) el.style.display='inline-block';
     // Pilot-Cleanup-Button nur fuer Stefan sichtbar
-    const cb=document.getElementById('pilotCleanupBtn');
-    if(cb && PILOT_MODE) cb.style.display='';
     return;
   }
   _db.collection('users').doc(uid).get().then(doc=>{
@@ -9399,8 +9163,6 @@ function fbLoadData(){
       checkAusbNotifications();
       checkFirstLoginPwHint();
       checkDsgvoConsent();
-      checkPilotBanner();
-      applyPilotUiRestrictions();
       // Profil aus Firestore nachladen (persistent, nicht nur localStorage)
       _db.collection('users').doc(_fbUid).collection('data').doc('profil').get().then(pDoc=>{
         if(pDoc.exists){
