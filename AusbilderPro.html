@@ -1493,9 +1493,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <button class="tbtn" title="📁 Datei hochladen" onclick="docsUpload('file','seat')" style="flex:1;font-size:.75rem">📁 Datei hochladen</button>
           <button class="tbtn" title="📷 Kamera" onclick="docsUpload('cam','seat')" style="flex:1;font-size:.75rem">📷 Kamera</button>
         </div>
-        <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:6px;padding:6px 10px;margin-bottom:12px;font-size:.65rem;color:#92400e;line-height:1.45;display:none">
-          ⚠ Pilotphase: Nur <b>PDF</b>- und <b>Word</b>-Dokumente (.pdf, .doc, .docx) hochladbar. Kamera-Upload deaktiviert.
-        </div>
         <input type="file" id="docsFileInSeat" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="docsHandleUpload(event,'seat')">
         <input type="file" id="docsCamInSeat" accept="image/*" capture="environment" style="display:none" onchange="docsHandleUpload(event,'seat')">
         <div id="docsListSeat" style="display:flex;flex-direction:column;gap:6px">
@@ -3350,13 +3347,13 @@ function updateKurstage(val){
 }
 
 // Repariert pseudonymisierte Sitzplatz-Namen ('Ma. Mu.') aus den
-// echten globalTN-Daten. Wird einmal nach Pilot-Modus-Ende benoetigt.
+// echten globalTN-Daten. Standalone-Funktion zum Re-Sync nach manueller DB-Korrektur.
 async function refreshAllSeatNamesFromGlobalTN(){
   if(!_db) { toast('Keine Datenbankverbindung','bad'); return; }
   if(!confirm('🔄 Sitzplatz-Namen aus echten Daten neu laden?\n\nFuer alle Sitze wird die Datenbank durchsucht. Wenn der echte Name gefunden wird (entweder ueber poolTnId-Verknuepfung oder ueber Kurzform-Matching), wird die App-Anzeige aktualisiert.\n\nFortfahren?')) return;
   let updated=0, missing=0, alreadyOk=0;
   toast('Suche Datenbank-Eintraege...','warn');
-  // Helper: kuerzelt einen Namen wie pilotShortName es taete
+  // Helper: kuerzelt einen Namen auf 2-Buchstaben-Abkuerzung (z.B. "Max Mustermann" -> "Ma. Mu.")
   const kuerzeln = (s)=> {
     const v=(s||'').trim();
     if(!v) return '';
@@ -4321,10 +4318,9 @@ function resolveAllPoolTnIds(){
   });
 }
 
-// ─── PILOT-SYNC: Sitzplatz-Namen aus globalTN aktualisieren ───
-// Nach Anonymisierung haben Sitzpläne lokal evtl. noch Vollnamen. Diese Funktion
-// gleicht lokalen seat.name/seat.company mit aktuellem Firestore-Stand ab.
-// Lookup über seat.poolTnId → globalTN/{tnId}. Wenn Firestore neuer ist, wird lokal überschrieben.
+// ─── SEAT-NAMES SYNC: Sitzplatz-Namen aus globalTN aktualisieren ───
+// Gleicht lokalen seat.name/seat.company mit aktuellem Firestore-Stand ab.
+// Lookup über seat.poolTnId → globalTN/{tnId}. Firestore = Wahrheit.
 function syncSeatNamesFromFirestore(){
   if(_demoMode) return;
   if(!_db) return;
@@ -4820,12 +4816,7 @@ function saveSeat(){
   const extraGrades={};
   (inst.customGrades||[]).forEach(g=>{ const el=document.getElementById('ig_'+g.id); extraGrades[g.id]=el?el.value:''; });
   const oldSeat=S.kats[S.curKat].instances[S.curInst].seats[curSeat]||{};
-  // Im Pilot-Modus: Manuell eingetippte Namen automatisch pseudonymisieren
-  // (z.B. 'Maximilian Mustermann' -> 'Ma. Mu.')
-  // Bereits gekuerzte Namen bleiben unveraendert.
   let _seatName=document.getElementById('iName').value.trim();
-  // (Frueher wurde hier pilotShortName() angewendet - ENTFERNT, da das die
-  // echten Namen dauerhaft im Sitz-Objekt gespeichert hat.)
   S.kats[S.curKat].instances[S.curInst].seats[curSeat]={
     name:_seatName,
     company:document.getElementById('iCo').value.trim(),
@@ -5608,13 +5599,12 @@ async function appReset(){
       for(const k of keys){ await caches.delete(k); }
     }catch(e){ console.warn('Cache delete failed',e); }
   }
-  // 3. Hinweis auf alte ap_auto_*.hbz Dateien (bei Kollegen mit aktivem Pilot)
+  // 3. Hinweis auf alte ap_auto_*.hbz Dateien
   alert('✓ App zurueckgesetzt!\n\nDie Seite wird jetzt neu geladen. Beim naechsten Login werden deine Daten frisch aus der Cloud geholt.\n\nFalls auf deinem Desktop oder Download-Ordner alte ap_auto_*.hbz Dateien liegen: bitte manuell loeschen (Suche nach "ap_auto" → alle markieren → Papierkorb).');
   // Force-Reload (true = von Server, nicht aus Cache)
   setTimeout(()=>{ location.reload(true); }, 100);
 }
 
-// ─── PILOT-CLEANUP: lokalen State von Vollnamen + Geister-Eintraegen bereinigen ───
 // Wird vom Header-Menue manuell ausgeloest.
 // Schritt 1: Diagnose - zeigt was gefunden wurde
 // Schritt 2: Cleanup - entfernt Geister + kuerzt Vollnamen
@@ -6039,9 +6029,6 @@ function saveManualTN(){
   let vorname=(document.getElementById('mtVorname').value||'').trim();
   let nachname=(document.getElementById('mtNachname').value||'').trim();
   if(!vorname||!nachname){toast('Bitte Vor- und Nachname eingeben','bad');return;}
-  // (Frueher wurde hier pilotShortName() angewendet - ENTFERNT, da das die
-  // echten Namen dauerhaft in Firestore zerstoert hat. Pseudonymisierung
-  // erfolgt nur noch in der UI-Render-Schicht ueber pilotShortName().)
   const firma=(document.getElementById('mtBetrieb').value||'').trim();
   // Neue Dropdown-Logik: Berufsgruppe + optional Fachrichtung
   const berufGruppeSel=document.getElementById('mtBerufGruppe');
@@ -6055,8 +6042,7 @@ function saveManualTN(){
   const ausbjahr=document.getElementById('mtLehrjahr').value||'';
   if(!ausbjahr){toast('Bitte Lehrjahr wählen','bad');return;}
   const kontaktEmail=(document.getElementById('mtEmail').value||'').trim();
-  // ── PILOT-MODUS: Telefon nicht gespeichert (Datensparsamkeit) ──
-  const kontaktTelefon='';
+  const kontaktTelefon=(document.getElementById('mtTelefon').value||'').trim();
   const wunschSitzplatz=(document.getElementById('mtSitzplatz').value||'').trim();
 
   if(!_db){toast('Nicht verbunden','bad');return;}
@@ -8707,7 +8693,6 @@ function closePoolLink(){ document.getElementById('poolLinkModal').classList.rem
 // DOKUMENTE (Firebase Storage)
 // ═══════════════════════════════════════════════
 function docsUpload(type, scope){
-  // ── PILOT-MODUS: Kamera deaktiviert (nur PDF/Word über Datei-Auswahl) ──
   const id = scope==='seat' ? (type==='cam' ? 'docsCamInSeat' : 'docsFileInSeat')
                              : (type==='cam' ? 'docsCamInCourse' : 'docsFileInCourse');
   document.getElementById(id).click();
@@ -9055,7 +9040,6 @@ function _checkAdminShowLauncher(uid){
   if(stefanWhitelist.includes(curEmail)){
     const el=document.getElementById('appLauncher');
     if(el) el.style.display='inline-block';
-    // Pilot-Cleanup-Button nur fuer Stefan sichtbar
     return;
   }
   _db.collection('users').doc(uid).get().then(doc=>{
