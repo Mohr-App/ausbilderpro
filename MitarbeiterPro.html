@@ -1465,20 +1465,32 @@ function updateZeitBtn(){
   btn.style.pointerEvents='';
   btn.style.opacity='';
   const bar=document.getElementById('zeitBtnBar');if(bar) bar.style.width='0';
-  if(!_zeitHeute||!_zeitHeute.eingang||_zeitHeute.ausgang){
+
+  const arr=getStempelArr(_zeitHeute);
+  const offen=getOffenerStempel(_zeitHeute);
+  const ersterEin=getErsterEingang(_zeitHeute);
+  const letzterAus=getLetzterAusgang(_zeitHeute);
+
+  if(!offen){
     _zeitState='aus';
     document.getElementById('zeitBtnText').innerHTML='▶<br>Einstempeln';
     btn.style.background='linear-gradient(135deg,#059669,#10b981)';
-    status.textContent=_zeitHeute?.ausgang?'✓ Feierabend – '+_zeitHeute.eingang+' bis '+_zeitHeute.ausgang:'Nicht eingestempelt';
+    if(arr.length===0){
+      status.textContent='Nicht eingestempelt';
+    } else if(letzterAus){
+      status.textContent='Ausgestempelt um '+letzterAus+' · Wieder einstempeln möglich';
+    } else {
+      status.textContent='Nicht eingestempelt';
+    }
     pauseRow.style.display='none';
-  } else if(_zeitHeute.eingang&&!_zeitHeute.ausgang){
-    const pLog=_zeitHeute.pauseLog||[];
+  } else {
+    const pLog=_zeitHeute?.pauseLog||[];
     const offenePause=pLog.find(p=>p.start&&!p.ende);
     if(offenePause){
       _zeitState='pause';
       document.getElementById('zeitBtnText').innerHTML='⏸<br>In Pause<br><span style="font-size:.7rem;font-weight:600;opacity:.9">seit '+offenePause.start+'</span>';
       btn.style.background='linear-gradient(135deg,#d97706,#f59e0b)';
-      status.textContent='Eingestempelt seit '+_zeitHeute.eingang+' – Pause läuft';
+      status.textContent='Eingestempelt seit '+offen.ein+' – Pause läuft';
       pauseRow.style.display='';
       pauseBtn.textContent='▶ Pause beenden';
       pauseBtn.style.background='rgba(16,185,129,.15)';pauseBtn.style.color='#059669';pauseBtn.style.borderColor='rgba(16,185,129,.3)';
@@ -1486,7 +1498,9 @@ function updateZeitBtn(){
       _zeitState='ein';
       document.getElementById('zeitBtnText').innerHTML='⏹<br>Ausstempeln';
       btn.style.background='linear-gradient(135deg,#dc2626,#ef4444)';
-      status.textContent='Eingestempelt seit '+_zeitHeute.eingang;
+      status.textContent= arr.length>1
+        ? 'Eingestempelt seit '+offen.ein+' (Tagesbeginn: '+ersterEin+')'
+        : 'Eingestempelt seit '+offen.ein;
       pauseRow.style.display='';
       pauseBtn.textContent='⏸ Pause starten';
       pauseBtn.style.background='rgba(245,158,11,.15)';pauseBtn.style.color='#d97706';pauseBtn.style.borderColor='rgba(245,158,11,.3)';
@@ -1498,22 +1512,21 @@ function updateZeitBtn(){
 function checkPauseErinnerung(){
   const banner=document.getElementById('pauseWarning');
   const banner10=document.getElementById('ueberstundenWarning');
-  if(!_zeitHeute||!_zeitHeute.eingang||_zeitHeute.ausgang){
+  const offen=getOffenerStempel(_zeitHeute);
+  if(!offen){
     if(banner)banner.style.display='none';
     if(banner10)banner10.style.display='none';
     return;
   }
-  const pLog=_zeitHeute.pauseLog||[];
+  const pLog=_zeitHeute?.pauseLog||[];
   const hatPause=pLog.some(p=>p.start&&p.ende);
-  const [h,m]=_zeitHeute.eingang.split(':').map(Number);
-  const eingangMin=h*60+m;
   const jetztMin=new Date().getHours()*60+new Date().getMinutes();
-  const arbeitsMin=jetztMin-eingangMin;
+  const arbeitsMin=calcBruttoMin(_zeitHeute, jetztMin);
   if(arbeitsMin>=360&&!hatPause){
     if(!banner){
       const el=document.createElement('div');el.id='pauseWarning';
       el.style.cssText='padding:10px 14px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.25);border-radius:10px;margin-top:8px;font-size:.72rem;color:#dc2626;font-weight:600';
-      el.textContent='⚠ Gesetzliche Pause: Nach 6 Stunden Arbeitszeit ist eine Pause von mind. 30 Minuten vorgeschrieben (§4 ArbZG).';
+      el.textContent='⚠ Gesetzliche Pause: Nach 6h Arbeitszeit sind 30 Min Pause Pflicht (§4 ArbZG). Wird automatisch abgezogen.';
       document.getElementById('zeitBtn')?.parentElement?.appendChild(el);
     } else banner.style.display='';
   } else {if(banner)banner.style.display='none';}
@@ -1631,11 +1644,10 @@ function checkGleitzeit(jetzt, typ){
 function zeitStempeln(){
   if(!_firmaReadOnlyGuard()) return;
   if(!_tnId||!db) return;
-  if(_zeitBusy) return; // Doppel-Klick-Schutz
+  if(_zeitBusy) return;
   const today=localDate();
   const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
   const ref=db.collection('globalTN').doc(_tnId).collection('zeiterfassung').doc(today);
-  // Sofort visuelles Feedback + Button sperren
   function _setBusy(actionLabel){
     _zeitBusy=true;
     const btn=document.getElementById('zeitBtn');
@@ -1643,40 +1655,83 @@ function zeitStempeln(){
     if(btn){btn.style.pointerEvents='none';btn.style.opacity='.75';}
     if(text) text.innerHTML='⏳<br>'+actionLabel;
   }
-  if(_zeitState==='aus'){
-    if(_zeitHeute&&_zeitHeute.ausgang){if(!confirm('Bereits ausgestempelt. Neuen Tag starten?'))return;}
-    _setBusy('Wird eingestempelt…');
+  const currentArr=getStempelArr(_zeitHeute);
+  const offen=getOffenerStempel(_zeitHeute);
+
+  if(!offen){
+    _setBusy(currentArr.length?'Wird wieder eingestempelt…':'Wird eingestempelt…');
     getGPS().then(gps=>{
       const geoResult=checkGeofence(gps);
       if(geoResult===false){loadZeitHeute(); return;}
       let gpsGrund='';
       if(geoResult==='no-gps'){
         gpsGrund=(prompt('📍 GPS ist deaktiviert.\n\nBitte Grund angeben warum du ohne Standort stempelst:')||'').trim();
-        
       }
       checkGleitzeit(jetzt,'ein');
-      const data={eingang:jetzt,pauseLog:[],datum:today,firmaUid:_tnData?.firmaUid||null};
-      if(gps) data.gpsEingang=gps;
-      if(geoResult==='no-gps'){data.ohneGPS=true;data.ohneGPSGrund=gpsGrund;}
-      ref.set(data,{merge:true}).then(()=>{loadZeitHeute();toast('▶ Eingestempelt um '+jetzt);}).catch(()=>{loadZeitHeute();toast('Fehler beim Stempeln','bad');});
+      const neuerStempel={ein:jetzt};
+      if(gps) neuerStempel.gpsEin=gps;
+      if(geoResult==='no-gps'){neuerStempel.ohneGPS=true; neuerStempel.ohneGPSGrund=gpsGrund;}
+      const neueArr=[...currentArr, neuerStempel];
+      const data={
+        stempel: neueArr,
+        pauseLog: _zeitHeute?.pauseLog||[],
+        datum: today,
+        firmaUid: _tnData?.firmaUid||null,
+        eingang: firebase.firestore.FieldValue.delete(),
+        ausgang: firebase.firestore.FieldValue.delete(),
+        gpsEingang: firebase.firestore.FieldValue.delete(),
+        gpsAusgang: firebase.firestore.FieldValue.delete(),
+        ohneGPS: firebase.firestore.FieldValue.delete(),
+        ohneGPSGrund: firebase.firestore.FieldValue.delete(),
+        istMinuten: firebase.firestore.FieldValue.delete(),
+        pauseMinuten: firebase.firestore.FieldValue.delete(),
+        bruttoMinuten: firebase.firestore.FieldValue.delete()
+      };
+      ref.set(data,{merge:true})
+        .then(()=>{loadZeitHeute(); toast(currentArr.length?'▶ Wieder eingestempelt um '+jetzt:'▶ Eingestempelt um '+jetzt);})
+        .catch(()=>{loadZeitHeute(); toast('Fehler beim Stempeln','bad');});
     });
-  } else if(_zeitState==='ein'||_zeitState==='pause'){
+  } else {
     _setBusy('Wird ausgestempelt…');
     checkGleitzeit(jetzt,'aus');
     const pLog=(_zeitHeute?.pauseLog||[]).map(p=>p.start&&!p.ende?{...p,ende:jetzt}:p);
-    const pauseMin=calcPauseMinuten(pLog);
-    const istMin=calcIstMinuten(_zeitHeute.eingang,jetzt,pauseMin);
-    const update={ausgang:jetzt,pauseLog:pLog,pauseMinuten:pauseMin,istMinuten:istMin};
     getGPS().then(gps=>{
       const geoResult=checkGeofence(gps);
       if(geoResult===false){loadZeitHeute(); return;}
+      let gpsGrund='';
       if(geoResult==='no-gps'){
-        const grund=(prompt('📍 GPS ist deaktiviert.\n\nBitte Grund angeben:')||'').trim();
-        
-        update.ohneGPS=true;update.ohneGPSGrund=grund;
+        gpsGrund=(prompt('📍 GPS ist deaktiviert.\n\nBitte Grund angeben:')||'').trim();
       }
-      if(gps) update.gpsAusgang=gps;
-      ref.update(update).then(()=>{loadZeitHeute();toast('⏹ Ausgestempelt um '+jetzt);}).catch(()=>{loadZeitHeute();toast('Fehler beim Stempeln','bad');});
+      const neueArr=currentArr.map(s=>{
+        if(s===offen || (s.ein && !s.aus)){
+          const closed={...s, aus:jetzt};
+          if(gps) closed.gpsAus=gps;
+          if(geoResult==='no-gps'){closed.ohneGPS=true; closed.ohneGPSGrund=gpsGrund;}
+          return closed;
+        }
+        return s;
+      });
+      const brutto=calcBruttoMin({stempel:neueArr});
+      const effPause=calcEffPauseMin({pauseLog:pLog}, brutto);
+      const istMin=Math.max(0, brutto-effPause);
+      const data={
+        stempel: neueArr,
+        pauseLog: pLog,
+        bruttoMinuten: brutto,
+        pauseMinuten: effPause,
+        istMinuten: istMin,
+        datum: today,
+        firmaUid: _tnData?.firmaUid||null,
+        eingang: firebase.firestore.FieldValue.delete(),
+        ausgang: firebase.firestore.FieldValue.delete(),
+        gpsEingang: firebase.firestore.FieldValue.delete(),
+        gpsAusgang: firebase.firestore.FieldValue.delete(),
+        ohneGPS: firebase.firestore.FieldValue.delete(),
+        ohneGPSGrund: firebase.firestore.FieldValue.delete()
+      };
+      ref.set(data,{merge:true})
+        .then(()=>{loadZeitHeute(); toast('⏹ Ausgestempelt um '+jetzt);})
+        .catch(()=>{loadZeitHeute(); toast('Fehler beim Stempeln','bad');});
     });
   }
 }
@@ -1876,6 +1931,57 @@ function zeitPause(){
   }
 }
 
+// ── Stempel-Schema-Helpers (mehrere Stempel-Paare pro Tag, abwärtskompatibel) ──
+function getStempelArr(z){
+  if(!z) return [];
+  if(Array.isArray(z.stempel)) return z.stempel;
+  if(z.eingang){
+    const s={ein:z.eingang};
+    if(z.ausgang) s.aus=z.ausgang;
+    if(z.gpsEingang) s.gpsEin=z.gpsEingang;
+    if(z.gpsAusgang) s.gpsAus=z.gpsAusgang;
+    if(z.ohneGPS) s.ohneGPS=true;
+    if(z.ohneGPSGrund) s.ohneGPSGrund=z.ohneGPSGrund;
+    if(z.manuell) s.manuell=true;
+    return [s];
+  }
+  return [];
+}
+function getOffenerStempel(z){
+  const arr=getStempelArr(z);
+  for(let i=arr.length-1;i>=0;i--) if(arr[i].ein && !arr[i].aus) return arr[i];
+  return null;
+}
+function calcBruttoMin(z, jetztMin){
+  const arr=getStempelArr(z);
+  let total=0;
+  arr.forEach(s=>{
+    if(!s.ein) return;
+    const ein=timeToMin(s.ein);
+    const aus=s.aus?timeToMin(s.aus):(typeof jetztMin==='number'?jetztMin:ein);
+    total+=Math.max(0,aus-ein);
+  });
+  return total;
+}
+function calcPflichtPauseMin(bruttoMin){
+  if(bruttoMin>9*60) return 45;
+  if(bruttoMin>6*60) return 30;
+  return 0;
+}
+function calcEffPauseMin(z, bruttoMin){
+  const manuell=calcPauseMinuten(z?.pauseLog||[]);
+  const pflicht=calcPflichtPauseMin(bruttoMin);
+  return Math.max(manuell,pflicht);
+}
+function calcGesamtIstMin(z, jetztMin){
+  const brutto=calcBruttoMin(z, jetztMin);
+  const pause=calcEffPauseMin(z, brutto);
+  return Math.max(0, brutto-pause);
+}
+function getErsterEingang(z){const arr=getStempelArr(z); return arr.length?arr[0].ein||'':'';}
+function getLetzterAusgang(z){const arr=getStempelArr(z); for(let i=arr.length-1;i>=0;i--) if(arr[i].aus) return arr[i].aus; return '';}
+function isTagAbgeschlossen(z){const arr=getStempelArr(z); return arr.length>0 && arr.every(s=>s.aus);}
+
 function calcPauseMinuten(pLog){
   let total=0;
   (pLog||[]).forEach(p=>{
@@ -1899,21 +2005,34 @@ function minToStr(m){
 function renderZeitHeute(){
   const el=document.getElementById('zeitHeute');
   if(!el) return;
-  if(!_zeitHeute||!_zeitHeute.eingang){el.innerHTML='<div class="empty">Noch nicht eingestempelt</div>';return;}
-  let html='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--brd)">'
-    +'<span style="font-size:.78rem;font-weight:700;color:var(--acc)">▶ '+_zeitHeute.eingang+'</span>';
-  if(_zeitHeute.ausgang) html+='<span style="font-size:.78rem;font-weight:700;color:#ef4444">⏹ '+_zeitHeute.ausgang+'</span>';
-  else html+='<span style="font-size:.7rem;color:var(--mu)">läuft…</span>';
-  html+='</div>';
-  const pLog=_zeitHeute.pauseLog||[];
+  const arr=getStempelArr(_zeitHeute);
+  if(arr.length===0){el.innerHTML='<div class="empty">Noch nicht eingestempelt</div>';return;}
+  let html='';
+  arr.forEach((s,i)=>{
+    html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--brd)">'
+      +'<span style="font-size:.78rem;font-weight:700;color:var(--acc)">▶ '+esc(s.ein||'')+'</span>';
+    if(s.aus) html+='<span style="font-size:.78rem;font-weight:700;color:#ef4444">⏹ '+esc(s.aus)+'</span>';
+    else html+='<span style="font-size:.7rem;color:var(--mu)">läuft…</span>';
+    html+='</div>';
+  });
+  const pLog=_zeitHeute?.pauseLog||[];
   if(pLog.length){
-    html+='<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Pausen: ';
-    html+=pLog.map(p=>p.start+(p.ende?' – '+p.ende:' – …')).join(', ');
+    html+='<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Manuelle Pausen: ';
+    html+=pLog.map(p=>esc(p.start)+(p.ende?' – '+esc(p.ende):' – …')).join(', ');
     html+=' ('+calcPauseMinuten(pLog)+' min)</div>';
   }
-  if(_zeitHeute.ausgang){
-    const ist=_zeitHeute.istMinuten||calcIstMinuten(_zeitHeute.eingang,_zeitHeute.ausgang,calcPauseMinuten(pLog));
-    html+='<div style="font-size:.82rem;font-weight:700;color:var(--tx);margin-top:8px">Arbeitszeit: '+minToStr(ist)+'</div>';
+  if(isTagAbgeschlossen(_zeitHeute) && arr.length>0){
+    const brutto=calcBruttoMin(_zeitHeute);
+    const manuell=calcPauseMinuten(pLog);
+    const pflicht=calcPflichtPauseMin(brutto);
+    const effPause=Math.max(manuell,pflicht);
+    const ist=Math.max(0, brutto-effPause);
+    html+='<div style="margin-top:10px;padding:8px;background:rgba(16,185,129,.06);border-radius:8px;font-size:.7rem;line-height:1.5">';
+    html+='<div style="display:flex;justify-content:space-between"><span style="color:var(--mu)">Brutto:</span><span style="font-weight:700">'+minToStr(brutto)+'</span></div>';
+    if(manuell>0) html+='<div style="display:flex;justify-content:space-between"><span style="color:var(--mu)">Pause manuell:</span><span>'+minToStr(manuell)+'</span></div>';
+    if(pflicht>manuell) html+='<div style="display:flex;justify-content:space-between"><span style="color:var(--mu)">Pflicht-Pause (§4 ArbZG):</span><span>'+minToStr(pflicht)+'</span></div>';
+    html+='<div style="display:flex;justify-content:space-between;margin-top:4px;padding-top:4px;border-top:1px solid rgba(16,185,129,.2)"><span style="font-weight:700;color:#065f46">Arbeitszeit:</span><span style="font-weight:800;color:#065f46">'+minToStr(ist)+'</span></div>';
+    html+='</div>';
   }
   el.innerHTML=html;
 }
@@ -1978,16 +2097,21 @@ function loadZeitkonto(){
       const isKrank=krankDates.has(ds);
       const isUrlaub=urlaubDates.has(ds);
       const isFeiertag=!!feiertage[ds];
-      const ist=zeit?.istMinuten||0;
+      const ist=zeit?.istMinuten||(zeit?calcGesamtIstMin(zeit):0);
       const sollRaw=getSollMin(ds);
       const soll=(isKrank||isUrlaub||isFeiertag)?0:sollRaw;
       if(!sollRaw&&!zeit&&!isKrank&&!isUrlaub&&!isFeiertag) return;
       if(isFeiertag) feiertagCount++;
       const diff=ist-soll;
       totalIst+=ist;totalSoll+=soll;
-      if(zeit?.ausgang) tage++;
+      const tagAb=zeit?isTagAbgeschlossen(zeit):false;
+      if(tagAb) tage++;
       const datDE=new Date(ds+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
       const manuell=zeit?.manuell?'<span style="font-size:.45rem;color:#d97706;font-weight:700">✎</span>':'';
+      const stArr=zeit?getStempelArr(zeit):[];
+      const mehrfach=stArr.length>1?'<span title="'+stArr.length+' Stempel-Paare" style="font-size:.5rem;color:#6366f1;font-weight:700;margin-left:2px">×'+stArr.length+'</span>':'';
+      const ersterEin=zeit?getErsterEingang(zeit):'';
+      const letzterAus=zeit?getLetzterAusgang(zeit):'';
       const isFrei=isKrank||isUrlaub||isFeiertag;
       let statusTag='';
       if(isFeiertag) statusTag='<span style="font-size:.55rem;padding:1px 6px;background:rgba(139,92,246,.12);color:#7c3aed;border-radius:4px;font-weight:700;margin-left:4px">🎌 '+feiertage[ds]+'</span>';
@@ -1995,19 +2119,19 @@ function loadZeitkonto(){
       else if(isUrlaub) statusTag='<span style="font-size:.55rem;padding:1px 6px;background:rgba(16,185,129,.15);color:#059669;border-radius:4px;font-weight:700;margin-left:4px">🏖 Urlaub</span>';
       if(_azPlan){
         const diffCol=isFrei?'var(--mu)':diff>=0?'#059669':'#ef4444';
-        const zeitText=zeit?(zeit.eingang+(zeit.ausgang?' – '+zeit.ausgang:'…')):(isFrei?'—':'<span style="color:#ef4444;font-size:.55rem">nicht erfasst</span>');
+        const zeitText=zeit?(ersterEin+(letzterAus?' – '+letzterAus:'…')+mehrfach):(isFrei?'—':'<span style="color:#ef4444;font-size:.55rem">nicht erfasst</span>');
         html+='<div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.05);font-size:.68rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
           +'<span style="flex:2;color:var(--mu)">'+datDE+manuell+statusTag+'</span>'
           +'<span style="flex:2;text-align:center">'+zeitText+'</span>'
-          +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(zeit?.ausgang?minToStr(ist):(isFrei?'—':''))+'</span>'
+          +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(tagAb?minToStr(ist):(isFrei?'—':''))+'</span>'
           +'<span style="flex:1;text-align:right;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':minToStr(sollRaw))+'</span>'
-          +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':(zeit?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span>'
+          +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':(tagAb?(diff>=0?'+':'')+minToStr(diff):''))+'</span>'
           +'</div>';
       } else if(zeit) {
         html+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.72rem">'
           +'<span style="color:var(--mu)">'+datDE+manuell+statusTag+'</span>'
-          +'<span>'+zeit.eingang+(zeit.ausgang?' – '+zeit.ausgang:'')+'</span>'
-          +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(zeit.ausgang?minToStr(ist):'…')+'</span></div>';
+          +'<span>'+ersterEin+(letzterAus?' – '+letzterAus:'')+mehrfach+'</span>'
+          +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(tagAb?minToStr(ist):'…')+'</span></div>';
       } else if(isFrei){
         html+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:.72rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
           +'<span style="color:var(--mu)">'+datDE+statusTag+'</span>'

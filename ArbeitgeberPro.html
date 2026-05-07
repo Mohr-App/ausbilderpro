@@ -1648,7 +1648,7 @@ function _renderEhemaligeModal(e, data){
   const vonStr=e.von?new Date(e.von).toLocaleDateString('de-DE'):'?';
   const bisStr=e.bis?new Date(e.bis).toLocaleDateString('de-DE'):'?';
   // Stunden-Summe + Ist-Minuten
-  const totalMin=data.zeiten.reduce((s,z)=>s+(z.istMinuten||0),0);
+  const totalMin=data.zeiten.reduce((s,z)=>s+(z.istMinuten||calcGesamtIstMin(z)),0);
   const totalH=(totalMin/60).toFixed(2);
   // Aufträge-Status
   const aOffen=data.auftraege.filter(a=>a.status!=='erledigt').length;
@@ -1680,14 +1680,19 @@ function _renderEhemaligeModal(e, data){
 
 function _renderEhemaligeZeiten(zeiten){
   if(!zeiten.length) return '';
-  const sorted=zeiten.filter(z=>z.eingang).sort((a,b)=>(b.datum||'').localeCompare(a.datum||''));
+  const sorted=zeiten.filter(z=>getStempelArr(z).length>0).sort((a,b)=>(b.datum||'').localeCompare(a.datum||''));
   let h='<details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:.78rem;font-weight:700;padding:8px 10px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:7px">⏱ Stempelzeiten ('+sorted.length+')</summary>';
   h+='<div style="margin-top:6px;max-height:240px;overflow-y:auto">';
   sorted.forEach(z=>{
-    const minStr=z.istMinuten?Math.floor(z.istMinuten/60)+'h '+(z.istMinuten%60)+'min':'-';
+    const istMin=z.istMinuten||calcGesamtIstMin(z);
+    const minStr=istMin?Math.floor(istMin/60)+'h '+(istMin%60)+'min':'-';
+    const ersterEin=getErsterEingang(z);
+    const letzterAus=getLetzterAusgang(z);
+    const arr=getStempelArr(z);
+    const mehrfach=arr.length>1?' ×'+arr.length:'';
     h+='<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;font-size:.7rem;border-bottom:1px solid var(--brd);font-family:\'JetBrains Mono\',monospace">';
     h+='<span style="flex:0 0 90px;color:var(--mu)">'+esc(z.datum||'')+'</span>';
-    h+='<span style="flex:1;color:var(--tx)">'+esc(z.eingang||'')+' – '+esc(z.ausgang||'läuft')+'</span>';
+    h+='<span style="flex:1;color:var(--tx)">'+esc(ersterEin)+' – '+esc(letzterAus||'läuft')+esc(mehrfach)+'</span>';
     h+='<span style="font-weight:700">'+minStr+'</span>';
     h+='</div>';
   });
@@ -2781,9 +2786,10 @@ function _loadMaDetailStats(tnId){
       snap.forEach(d=>{
         const dd=d.data();
         if(dd.firmaUid && dd.firmaUid !== _uid) return;
-        if(dd.istMinuten){totalMin+=dd.istMinuten; istProTag[dd.datum]=dd.istMinuten;}
+        const istMin=dd.istMinuten||calcGesamtIstMin(dd);
+        if(istMin){totalMin+=istMin; istProTag[dd.datum]=istMin;}
         // Heute eingestempelt?
-        if(dd.datum===heute && dd.eingang && !dd.ausgang) isStempelt=true;
+        if(dd.datum===heute && getOffenerStempel(dd)) isStempelt=true;
       });
       const elS=document.getElementById('maDetStatStunden');
       if(elS) elS.textContent=Math.round(totalMin/60)+'h';
@@ -4691,7 +4697,8 @@ function startAgZeitLive(){
     _azubis.forEach(az=>{
       const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Azubi';
       const d=liveData[az.id];
-      if(!d || (!d.eingang && !d.ausgang)){
+      const stArr=getStempelArr(d);
+      if(!d || stArr.length===0){
         // Nicht eingestempelt: prüfen ob Arbeitsbeginn schon überschritten
         const ab=getArbeitsbeginn(az.arbeitszeitPlan);
         const [abH,abM]=ab.split(':').map(Number);
@@ -4708,15 +4715,20 @@ function startAgZeitLive(){
       }
       const pLog=d.pauseLog||[];
       const offenePause=pLog.find(p=>p.start&&!p.ende);
+      const offen=getOffenerStempel(d);
+      const ersterEin=getErsterEingang(d);
+      const letzterAus=getLetzterAusgang(d);
+      const mehrfachHint=stArr.length>1?' ×'+stArr.length:'';
       let status='',statusCol='',icon='';
-      if(d.ausgang){
-        icon='🔴';status='Feierabend · '+d.eingang+' – '+d.ausgang;statusCol='var(--mu)';
-      } else if(offenePause){
-        icon='⏸';status='Pause seit '+offenePause.start+' · Eingang '+d.eingang;statusCol='#d97706';
-      } else {
-        icon='🟢';status='Arbeitet seit '+d.eingang;statusCol='#059669';
+      if(!offen && letzterAus){
+        icon='🔴';status='Feierabend · '+ersterEin+' – '+letzterAus+mehrfachHint;statusCol='var(--mu)';
+      } else if(offen && offenePause){
+        icon='⏸';status='Pause seit '+offenePause.start+' · Eingang '+offen.ein;statusCol='#d97706';
+      } else if(offen) {
+        icon='🟢';status='Arbeitet seit '+offen.ein+(stArr.length>1?' (Tagesbeginn '+ersterEin+')':'');statusCol='#059669';
       }
-      const gpsWarn=d.ohneGPS?'<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.12);color:#ef4444;border-radius:3px;font-weight:700;margin-left:6px" title="'+(d.ohneGPSGrund?'Grund: '+esc(d.ohneGPSGrund):'Kein Grund angegeben')+'">⚠ ohne GPS</span>':'';
+      // Nimmt erstes Stempel-Paar als Quelle für GPS-Warnung
+      const gpsWarn=(d.ohneGPS||(stArr[0]&&stArr[0].ohneGPS))?'<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.12);color:#ef4444;border-radius:3px;font-weight:700;margin-left:6px" title="'+esc(d.ohneGPSGrund||(stArr[0]&&stArr[0].ohneGPSGrund)||'Kein Grund angegeben')+'">⚠ ohne GPS</span>':'';
       html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.05)">'
         +'<span style="font-size:1rem">'+icon+'</span>'
         +'<span style="font-size:.78rem;font-weight:700">'+esc(name)+'</span>'
@@ -4859,7 +4871,7 @@ function loadAgZeiten(){
           const isUrlaub=urlaubDatesAll.has(ds);
           const isFeiertag=!!feiertageAll[ds];
           const isFrei=isKrank||isUrlaub||isFeiertag;
-          const ist=e?.istMinuten||0;
+          const ist=e?.istMinuten||(e?calcGesamtIstMin(e):0);
           const sollRaw=getAgSollMin(ds,plan);
           const soll=isFrei?0:sollRaw;
           uebertragDiff+=(ist-soll);
@@ -4873,12 +4885,17 @@ function loadAgZeiten(){
         const isUrlaub=urlaubDates.has(ds);
         const isFeiertag=!!feiertage[ds];
         const isFrei=isKrank||isUrlaub||isFeiertag;
-        const ist=e?.istMinuten||0;
+        const ist=e?.istMinuten||(e?calcGesamtIstMin(e):0);
         const sollRaw=plan?getAgSollMin(ds,plan):0;
         const soll=isFrei?0:sollRaw;
         if(!sollRaw&&!e&&!isFrei) return;
         totalIst+=ist;totalSoll+=soll;
-        if(e?.ausgang) tage++;
+        const tagAb=e?isTagAbgeschlossen(e):false;
+        if(tagAb) tage++;
+        const stArr=e?getStempelArr(e):[];
+        const ersterEin=e?getErsterEingang(e):'';
+        const letzterAus=e?getLetzterAusgang(e):'';
+        const mehrfach=stArr.length>1?'<span title="'+stArr.length+' Stempel-Paare" style="font-size:.5rem;color:#6366f1;font-weight:700;margin-left:2px">×'+stArr.length+'</span>':'';
         const datDE=new Date(ds+'T12:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
         const manuell=e?.manuell?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(245,158,11,.15);color:#d97706;border-radius:4px;font-weight:700;margin-left:3px">✎'+(e.agBestaetigt?' ✓':' offen')+'</span>':(e?.agKorrigiert?'<span style="font-size:.5rem;padding:2px 6px;background:rgba(99,102,241,.12);color:#6366f1;border-radius:4px;font-weight:700;margin-left:3px">✏ korrigiert</span>':'');
         const ohneGpsBadge=e?.ohneGPS?'<span style="font-size:.5rem;padding:1px 5px;background:rgba(239,68,68,.12);color:#ef4444;border-radius:3px;font-weight:700;margin-left:3px;cursor:help" title="Ohne GPS'+(e.ohneGPSGrund?' – Grund: '+esc(e.ohneGPSGrund):'')+'">⚠ ohne GPS</span>':'';
@@ -4890,19 +4907,19 @@ function loadAgZeiten(){
         else if(isUrlaub) statusTag='<span style="font-size:.5rem;padding:1px 5px;background:rgba(16,185,129,.15);color:#059669;border-radius:3px;font-weight:700;margin-left:3px">🏖</span>';
         if(plan){
           const diff=ist-soll;const diffCol=isFrei?'var(--mu)':diff>=0?'#059669':'#ef4444';
-          const zeitText=e?(e.eingang+(e.ausgang?' – '+e.ausgang:'…')):(isFrei?'—':'');
-          const dokuIcons=e&&(e.fotos||e.unterschrift||e.gpsEingang)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku anzeigen">'+(e.gpsEingang?'📍':'')+(e.fotos?'📸':'')+(e.unterschrift?'✍':'')+'</span>':'';
-          const nachtarbeit=e&&e.ausgang&&parseInt(e.ausgang)>=22?'<span style="font-size:.5rem;margin-left:2px" title="Nachtarbeit">🌙</span>':'';
+          const zeitText=e?(ersterEin+(letzterAus?' – '+letzterAus:'…')+mehrfach):(isFrei?'—':'');
+          const dokuIcons=e&&(e.fotos||e.unterschrift||e.gpsEingang||(stArr[0]&&stArr[0].gpsEin))?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku anzeigen">'+((e.gpsEingang||(stArr[0]&&stArr[0].gpsEin))?'📍':'')+(e.fotos?'📸':'')+(e.unterschrift?'✍':'')+'</span>':'';
+          const nachtarbeit=letzterAus&&parseInt(letzterAus)>=22?'<span style="font-size:.5rem;margin-left:2px" title="Nachtarbeit">🌙</span>':'';
           dayHtml+='<div style="display:flex;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.65rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
             +'<span style="flex:1.5;color:var(--mu)">'+datDE+statusTag+'</span>'
             +'<span style="flex:2">'+zeitText+nachtarbeit+dokuIcons+manuell+ohneGpsBadge+bestBtn+korrekturBtn+'</span>'
-            +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e?.ausgang?minToStr(ist):(isFrei?'—':''))+'</span>'
-            +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
+            +'<span style="flex:1;text-align:right;font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(tagAb?minToStr(ist):(isFrei?'—':''))+'</span>'
+            +'<span style="flex:1;text-align:right;font-weight:700;color:'+diffCol+';font-family:\'JetBrains Mono\',monospace">'+(isFrei?'—':(tagAb?(diff>=0?'+':'')+minToStr(diff):''))+'</span></div>';
         } else if(e){
           dayHtml+='<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem">'
             +'<span style="color:var(--mu)">'+datDE+statusTag+'</span>'
-            +'<span>'+e.eingang+(e.ausgang?' – '+e.ausgang:'…')+(e&&(e.fotos||e.unterschrift)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku">📋</span>':'')+manuell+ohneGpsBadge+bestBtn+'</span>'
-            +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(e.ausgang?minToStr(ist):'…')+'</span></div>';
+            +'<span>'+ersterEin+(letzterAus?' – '+letzterAus:'…')+mehrfach+(e&&(e.fotos||e.unterschrift)?'<span onclick="showDoku(\''+az.id+'\',\''+ds+'\')" style="cursor:pointer;margin-left:4px;font-size:.6rem" title="Doku">📋</span>':'')+manuell+ohneGpsBadge+bestBtn+'</span>'
+            +'<span style="font-weight:700;font-family:\'JetBrains Mono\',monospace">'+(tagAb?minToStr(ist):'…')+'</span></div>';
         } else if(isFrei){
           dayHtml+='<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:.68rem'+(isFeiertag?';background:rgba(139,92,246,.04)':'')+'">'
             +'<span style="color:var(--mu)">'+datDE+statusTag+'</span><span>—</span><span>—</span></div>';
@@ -4915,12 +4932,19 @@ function loadAgZeiten(){
       let todayStatus='',todayCol='var(--mu)';
       if(todayKrank){todayStatus='🤒 Krank';todayCol='#ef4444';}
       else if(todayUrlaub){todayStatus='🏖 Urlaub';todayCol='#059669';}
-      else if(todayE&&!todayE.ausgang){
+      else if(todayE && getOffenerStempel(todayE)){
         const pLog=todayE.pauseLog||[];
         const inPause=pLog.find(p=>p.start&&!p.ende);
-        todayStatus=inPause?'⏸ Pause seit '+inPause.start:'🟢 Arbeitet seit '+todayE.eingang;
+        const offen=getOffenerStempel(todayE);
+        const todayArr=getStempelArr(todayE);
+        const todayErsterEin=getErsterEingang(todayE);
+        todayStatus=inPause?'⏸ Pause seit '+inPause.start:'🟢 Arbeitet seit '+offen.ein+(todayArr.length>1?' (Tagesbeginn '+todayErsterEin+')':'');
         todayCol=inPause?'#d97706':'#059669';
-      } else if(todayE?.ausgang){todayStatus='✅ '+todayE.eingang+' – '+todayE.ausgang;todayCol='var(--mu)';}
+      } else if(todayE && isTagAbgeschlossen(todayE)){
+        const todayArr=getStempelArr(todayE);
+        const tStr=getErsterEingang(todayE)+' – '+getLetzterAusgang(todayE)+(todayArr.length>1?' ×'+todayArr.length:'');
+        todayStatus='✅ '+tStr;todayCol='var(--mu)';
+      }
       else {todayStatus='❌ Nicht eingestempelt';}
       // Überstunden
       const totalDiff=totalIst-totalSoll;
@@ -5009,17 +5033,91 @@ function agKorrekturZeit(tnId, datum){
   const ref=db.collection('globalTN').doc(tnId).collection('zeiterfassung').doc(datum);
   ref.get().then(doc=>{
     const old=doc.exists?doc.data():{};
+    const oldArr=getStempelArr(old);
     const histEintrag={aktion:'korrigiert',von:_email||_firma,am:Date.now(),
-      vorher:{eingang:old.eingang||'',ausgang:old.ausgang||'',istMinuten:old.istMinuten||0}};
+      vorher:{stempel:oldArr,istMinuten:old.istMinuten||0}};
+    const brutto=timeToMin(neuAus)-timeToMin(neuEin);
+    const pflicht=calcPflichtPauseMin(brutto);
+    const manuell=calcPauseMinFromLog(old.pauseLog||[]);
+    const effPause=Math.max(manuell,pflicht);
+    const istNetto=Math.max(0, brutto-effPause);
     ref.set({
-      datum,eingang:neuEin,ausgang:neuAus,pauseLog:old.pauseLog||[],pauseMinuten:old.pauseMinuten||0,
-      istMinuten:istMin,agKorrigiert:true,agKorrigiertAm:Date.now(),agKorrigiertVon:_email||_firma,
-      historie:firebase.firestore.FieldValue.arrayUnion(histEintrag)
+      datum,
+      stempel:[{ein:neuEin, aus:neuAus, manuell:true}],
+      pauseLog:old.pauseLog||[],
+      bruttoMinuten:brutto,
+      pauseMinuten:effPause,
+      istMinuten:istNetto,
+      agKorrigiert:true,agKorrigiertAm:Date.now(),agKorrigiertVon:_email||_firma,
+      historie:firebase.firestore.FieldValue.arrayUnion(histEintrag),
+      // Legacy-Felder löschen
+      eingang: firebase.firestore.FieldValue.delete(),
+      ausgang: firebase.firestore.FieldValue.delete(),
+      gpsEingang: firebase.firestore.FieldValue.delete(),
+      gpsAusgang: firebase.firestore.FieldValue.delete(),
+      ohneGPS: firebase.firestore.FieldValue.delete(),
+      ohneGPSGrund: firebase.firestore.FieldValue.delete()
     },{merge:true}).then(()=>{toast('✅ Zeit korrigiert');loadAgZeiten();});
   });
 }
 
 function timeToMin(t){const [h,m]=(t||'0:0').split(':').map(Number);return h*60+(m||0);}
+
+// ── Stempel-Schema-Helpers (mehrere Stempel-Paare pro Tag, abwärtskompatibel) ──
+function getStempelArr(z){
+  if(!z) return [];
+  if(Array.isArray(z.stempel)) return z.stempel;
+  if(z.eingang){
+    const s={ein:z.eingang};
+    if(z.ausgang) s.aus=z.ausgang;
+    if(z.gpsEingang) s.gpsEin=z.gpsEingang;
+    if(z.gpsAusgang) s.gpsAus=z.gpsAusgang;
+    if(z.ohneGPS) s.ohneGPS=true;
+    if(z.ohneGPSGrund) s.ohneGPSGrund=z.ohneGPSGrund;
+    if(z.manuell) s.manuell=true;
+    return [s];
+  }
+  return [];
+}
+function getOffenerStempel(z){
+  const arr=getStempelArr(z);
+  for(let i=arr.length-1;i>=0;i--) if(arr[i].ein && !arr[i].aus) return arr[i];
+  return null;
+}
+function calcPauseMinFromLog(pLog){
+  let total=0;
+  (pLog||[]).forEach(p=>{ if(p.start&&p.ende) total+=timeToMin(p.ende)-timeToMin(p.start); });
+  return Math.max(0,total);
+}
+function calcBruttoMin(z, jetztMin){
+  const arr=getStempelArr(z);
+  let total=0;
+  arr.forEach(s=>{
+    if(!s.ein) return;
+    const ein=timeToMin(s.ein);
+    const aus=s.aus?timeToMin(s.aus):(typeof jetztMin==='number'?jetztMin:ein);
+    total+=Math.max(0,aus-ein);
+  });
+  return total;
+}
+function calcPflichtPauseMin(bruttoMin){
+  if(bruttoMin>9*60) return 45;
+  if(bruttoMin>6*60) return 30;
+  return 0;
+}
+function calcEffPauseMin(z, bruttoMin){
+  const manuell=calcPauseMinFromLog(z?.pauseLog||[]);
+  const pflicht=calcPflichtPauseMin(bruttoMin);
+  return Math.max(manuell,pflicht);
+}
+function calcGesamtIstMin(z, jetztMin){
+  const brutto=calcBruttoMin(z, jetztMin);
+  const pause=calcEffPauseMin(z, brutto);
+  return Math.max(0, brutto-pause);
+}
+function getErsterEingang(z){const arr=getStempelArr(z); return arr.length?arr[0].ein||'':'';}
+function getLetzterAusgang(z){const arr=getStempelArr(z); for(let i=arr.length-1;i>=0;i--) if(arr[i].aus) return arr[i].aus; return '';}
+function isTagAbgeschlossen(z){const arr=getStempelArr(z); return arr.length>0 && arr.every(s=>s.aus);}
 
 // AG: BAUSTELLEN
 // AG: AUFTRÄGE
@@ -5992,7 +6090,7 @@ function exportStundenzettel(tnId,name,ym,format){
         const isU=urlaubDatesAll.has(ds);
         const isFT=!!feiertageAll[ds];
         const isFrei=isK||isU||isFT;
-        const ist=e?.istMinuten||0;
+        const ist=e?.istMinuten||(e?calcGesamtIstMin(e):0);
         const sollRaw=getAgSollMin(ds,plan);
         const soll=isFrei?0:sollRaw;
         uebertragDiff+=(ist-soll);
@@ -6000,7 +6098,7 @@ function exportStundenzettel(tnId,name,ym,format){
     }
     const tage=new Date(y,mo,0).getDate();
     let rows='',csvRows=[],totalIst=0,totalSoll=0,krankCount=0,urlaubCount=0,feiertagCount=0;
-    csvRows.push(['Tag','Datum','Eingang','Ausgang','Pause(min)','Ist(min)','Soll(min)','Diff(min)','Status'].join(';'));
+    csvRows.push(['Tag','Datum','Eingang','Ausgang','Stempel','Pause(min)','Ist(min)','Soll(min)','Diff(min)','Status'].join(';'));
     for(let d=1;d<=tage;d++){
       const ds=ym+'-'+String(d).padStart(2,'0');
       const dat=new Date(ds+'T12:00');
@@ -6012,7 +6110,7 @@ function exportStundenzettel(tnId,name,ym,format){
       const isUrlaub=urlaubDates.has(ds);
       const isFrei=isFT||isKrank||isUrlaub;
       const sollMin=(isFrei||isWE)?0:(plan?getAgSollMin(ds,plan):0);
-      const istMin=e?.istMinuten||0;
+      const istMin=e?.istMinuten||(e?calcGesamtIstMin(e):0);
       const diff=istMin-sollMin;
       if(!isWE||e) {totalIst+=istMin;totalSoll+=sollMin;}
       if(isFT&&!isWE) feiertagCount++;
@@ -6023,14 +6121,19 @@ function exportStundenzettel(tnId,name,ym,format){
       else if(isKrank) status='Krank';
       else if(isUrlaub) status='Urlaub';
       const rowBg=isFT?'background:#f5f3ff':isKrank?'background:#fef2f2':isUrlaub?'background:#ecfdf5':isWE?'background:#f8fafc;color:#94a3b8':'';
+      const eEin=e?getErsterEingang(e):'';
+      const eAus=e?getLetzterAusgang(e):'';
+      const eStArr=e?getStempelArr(e):[];
+      const tagAb=e?isTagAbgeschlossen(e):false;
+      const stempelDetail=eStArr.length>1?eStArr.map(s=>(s.ein||'')+(s.aus?'-'+s.aus:'-läuft')).join(', '):'';
       rows+='<tr style="'+rowBg+'">'
         +'<td>'+tag+', '+String(d).padStart(2,'0')+'.'+String(mo).padStart(2,'0')+'.</td>'
-        +'<td>'+(e?.eingang||'–')+'</td><td>'+(e?.ausgang||'–')+'</td>'
+        +'<td>'+(eEin||'–')+'</td><td>'+(eAus||'–')+(eStArr.length>1?' <span style="font-size:.65rem;color:#6366f1" title="'+esc(stempelDetail)+'">×'+eStArr.length+'</span>':'')+'</td>'
         +'<td>'+(e?.pauseMinuten?e.pauseMinuten+'min':'–')+'</td>'
-        +'<td style="font-weight:700">'+(e?.ausgang?minToStr(istMin):'–')+'</td>'
-        +(plan?'<td>'+(isFrei?'–':minToStr(sollMin))+'</td><td style="font-weight:700;color:'+(isFrei?'#7c3aed':diff>=0?'#059669':'#ef4444')+'">'+(isFrei?status:(e?.ausgang?(diff>=0?'+':'')+minToStr(diff):'–'))+'</td>':'')
+        +'<td style="font-weight:700">'+(tagAb?minToStr(istMin):'–')+'</td>'
+        +(plan?'<td>'+(isFrei?'–':minToStr(sollMin))+'</td><td style="font-weight:700;color:'+(isFrei?'#7c3aed':diff>=0?'#059669':'#ef4444')+'">'+(isFrei?status:(tagAb?(diff>=0?'+':'')+minToStr(diff):'–'))+'</td>':'')
         +'</tr>';
-      csvRows.push([tag,String(d).padStart(2,'0')+'.'+String(mo).padStart(2,'0')+'.'+y,e?.eingang||'',e?.ausgang||'',e?.pauseMinuten||'',istMin,sollMin,diff,status].join(';'));
+      csvRows.push([tag,String(d).padStart(2,'0')+'.'+String(mo).padStart(2,'0')+'.'+y,eEin||'',eAus||'',stempelDetail,e?.pauseMinuten||'',istMin,sollMin,diff,status].join(';'));
     }
     const totalDiff=totalIst-totalSoll;
     const gesamtSaldo=uebertragDiff+totalDiff;
@@ -6125,7 +6228,7 @@ function exportDATEV(){
       alleDaten.forEach(ds=>{
         if(ds>=monatsStart) return;
         const e=zeitMap[ds];
-        const ist=e.istMinuten||0;
+        const ist=e.istMinuten||calcGesamtIstMin(e);
         const dow=new Date(ds+'T12:00').getDay();
         const isWE=dow===0||dow===6;
         const isFT=!!feiertageKombiniert[ds];
@@ -6141,7 +6244,6 @@ function exportDATEV(){
 
       // ── AKTUELLER MONAT: Ist/Soll + Zuschlag-Kategorien ──
       let istMin=0, sollMin=0, pauseMin=0, arbeitstage=0;
-      // Zuschlag-Minuten separat
       let samstagMin=0, sonntagMin=0, feiertagMin=0, nachtMin=0;
       for(let d=1;d<=tage;d++){
         const ds=ym+'-'+String(d).padStart(2,'0');
@@ -6151,22 +6253,24 @@ function exportDATEV(){
         const isFT=!!feiertage[ds];
         const isK=krankDates.has(ds);
         const isU=urlaubDates.has(ds);
-        if(e?.istMinuten) istMin+=e.istMinuten;
+        const eIst=e?(e.istMinuten||calcGesamtIstMin(e)):0;
+        if(eIst) istMin+=eIst;
         if(e?.pauseMinuten) pauseMin+=e.pauseMinuten;
-        if(e?.ausgang) arbeitstage++;
+        if(e && isTagAbgeschlossen(e)) arbeitstage++;
         if(!isSa&&!isSo&&!isFT&&!isK&&!isU&&plan){
           const map={0:'so',1:'mo',2:'di',3:'mi',4:'do',5:'fr',6:'sa'};
           sollMin+=(plan[map[dow]]||0)*60;
         }
         // Zuschlag-Kategorisierung: gearbeitete Minuten pro Tag
-        if(e?.istMinuten){
-          if(isFT) feiertagMin+=e.istMinuten;
-          else if(isSo) sonntagMin+=e.istMinuten;
-          else if(isSa) samstagMin+=e.istMinuten;
-          // Nacht-Minuten: Intervall 22:00-06:00 aus eingang/ausgang rechnen
-          if(e.eingang && e.ausgang){
-            nachtMin+=_computeNachtMin(ds, e.eingang, e.ausgang, e.pauseMinuten||0);
-          }
+        if(eIst){
+          if(isFT) feiertagMin+=eIst;
+          else if(isSo) sonntagMin+=eIst;
+          else if(isSa) samstagMin+=eIst;
+          // Nacht-Minuten: über alle Stempel-Paare summieren
+          const stArr=getStempelArr(e);
+          stArr.forEach(s=>{
+            if(s.ein && s.aus) nachtMin+=_computeNachtMin(ds, s.ein, s.aus, 0);
+          });
         }
       }
 
