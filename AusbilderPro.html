@@ -4112,8 +4112,18 @@ function openModal(id){
   const inst_pre=curInst();
   const istLeer=!(d.name||'').trim() && !d.poolTnId;
   const istCloud=!!(inst_pre && inst_pre.sharedKursId);
+  const sperrePerson=istLeer && istCloud && !_demoMode;
   const hint=document.getElementById('seatLeerHinweis');
-  if(hint) hint.style.display=(istLeer && istCloud && !_demoMode)?'':'none';
+  if(hint) hint.style.display=sperrePerson?'':'none';
+  // Person-Tab-Eingaben sperren wenn leerer Sitz auf Cloud-Kurs:
+  // User soll erst über +TN in der Sidebar einen TN anlegen, dann auf den Sitz ziehen.
+  ['iName','iCo','iProfOber','iProfFach','iAusbjahr','iNote','iBemerkung','wzOk','wzFehlt','wzFehltText'].forEach(fid=>{
+    const el=document.getElementById(fid);
+    if(!el) return;
+    el.disabled=sperrePerson;
+    el.style.opacity=sperrePerson?'.5':'';
+    el.style.cursor=sperrePerson?'not-allowed':'';
+  });
   // Snapshot für Dirty-Check
   _modalSnapshot={name:d.name||'',company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',attLen:(d.attendance||[]).length};
   const inst_=curInst();
