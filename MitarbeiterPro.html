@@ -136,6 +136,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .confirm-btn{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;font-family:'Sora',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;margin-top:10px;transition:all .15s;}
 .confirm-btn:active{transform:scale(.97);}
+@keyframes newPulse{0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.7)}50%{box-shadow:0 0 0 5px rgba(37,99,235,0)}}
 /* === EINHEITLICHE AUFKLAPP-OPTIK (über alle Apps konsistent) === */
 .coll-card[open],details.card[open],.help-section.open{background:linear-gradient(135deg,rgba(37,99,235,.28),rgba(5,150,105,.28))!important;border-color:rgba(37,99,235,.7)!important;border-width:2px!important;box-shadow:0 6px 20px rgba(37,99,235,.25)!important;transition:background .2s,border-color .2s,box-shadow .2s}
 .coll-card[open] .coll-card,.coll-card[open] details.card,.coll-card[open] .help-section,details.card[open] .coll-card,details.card[open] details.card,details.card[open] .help-section,.help-section.open .coll-card,.help-section.open details.card,.help-section.open .help-section{background:#fff!important;border-color:var(--brd)!important;border-width:1px!important;box-shadow:0 1px 2px rgba(0,0,0,.02)!important}
@@ -2544,6 +2545,12 @@ function openAufDetails(aufId){
   _aufdAufId=aufId;
   const a=_auftraege.find(x=>x.id===aufId);
   if(!a){toast('Auftrag nicht gefunden','bad');return;}
+  // Als gesehen markieren (NEU-Indikator entfernen)
+  if(a.seenByMa===false){
+    db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId)
+      .update({seenByMa:true, seenByMaAm:Date.now()}).catch(()=>{});
+    a.seenByMa=true;
+  }
   // Title: Kunde + Auftragsnr-Suffix
   const titleHtml=esc(a.kunde||'Auftrag')+(a.auftragsNr?' <span style="font-size:.6rem;color:var(--mu);font-weight:500;font-family:\'JetBrains Mono\',monospace">#'+esc(a.auftragsNr)+'</span>':'');
   document.getElementById('aufdTitle').innerHTML=titleHtml;
@@ -3142,15 +3149,22 @@ function renderAuftraege(){
       const dat=a.erstelltAm?new Date(a.erstelltAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
       const mapsUrl=a.adresse?'https://maps.google.com/?q='+encodeURIComponent(a.adresse):'';
       const isRunning=a.status==='inArbeit';
-      let borderCol=isRunning?'rgba(16,185,129,.4)':'rgba(37,99,235,.2)';
-      let bgCol='#fff';
-      if(a.prioritaet==='eilig'){borderCol='rgba(245,158,11,.5)';bgCol='rgba(245,158,11,.05)';}
-      else if(a.prioritaet==='notfall'){borderCol='rgba(239,68,68,.5)';bgCol='rgba(239,68,68,.05)';}
+      const isNew=(a.seenByMa===false);
+      // Status durch Border-Farbe (Hintergrund bleibt weiss)
+      let borderCol=isRunning?'rgba(16,185,129,.55)':'rgba(37,99,235,.3)';
+      let borderWidth='1.5px';
+      if(a.prioritaet==='eilig') borderCol='rgba(245,158,11,.7)';
+      else if(a.prioritaet==='notfall') borderCol='rgba(239,68,68,.7)';
+      // Neuer Auftrag: dicker blauer Akzent-Border + Schatten
+      if(isNew){borderCol='#2563eb';borderWidth='2.5px';}
+      const bgCol='#fff';
+      const newShadow=isNew?'box-shadow:0 4px 14px rgba(37,99,235,.25);':'';
       let seit='';
       if(isRunning&&a.gestartetAm){const min=Math.round((Date.now()-a.gestartetAm)/60000);seit=min<60?min+'min':Math.floor(min/60)+'h '+min%60+'min';}
       let prioBadge='';
-      if(a.prioritaet==='eilig') prioBadge='<span style="display:inline-block;font-size:.55rem;font-weight:800;background:rgba(245,158,11,.18);color:#92400e;padding:2px 7px;border-radius:5px;margin-right:6px">⚡ EILIG</span>';
-      else if(a.prioritaet==='notfall') prioBadge='<span style="display:inline-block;font-size:.55rem;font-weight:800;background:rgba(239,68,68,.18);color:#991b1b;padding:2px 7px;border-radius:5px;margin-right:6px">🚨 NOTFALL</span>';
+      if(isNew) prioBadge+='<span style="display:inline-block;font-size:.55rem;font-weight:800;background:#2563eb;color:#fff;padding:2px 7px;border-radius:5px;margin-right:6px;animation:newPulse 1.5s ease-in-out infinite">🆕 NEU</span>';
+      if(a.prioritaet==='eilig') prioBadge+='<span style="display:inline-block;font-size:.55rem;font-weight:800;background:rgba(245,158,11,.18);color:#92400e;padding:2px 7px;border-radius:5px;margin-right:6px">⚡ EILIG</span>';
+      else if(a.prioritaet==='notfall') prioBadge+='<span style="display:inline-block;font-size:.55rem;font-weight:800;background:rgba(239,68,68,.18);color:#991b1b;padding:2px 7px;border-radius:5px;margin-right:6px">🚨 NOTFALL</span>';
       const nrLine=(a.auftragsNr||a.kategorie)?'<div style="font-size:.55rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace;margin-bottom:3px">'+(a.auftragsNr?'#'+esc(a.auftragsNr):'')+(a.auftragsNr&&a.kategorie?' · ':'')+(a.kategorie?esc(a.kategorie):'')+'</div>':'';
       const refBilder=(a.fotosAG&&a.fotosAG.length)
         ? '<div class="aufimg-ag"><div class="aufimg-ag-title">📎 Referenzbilder vom Arbeitgeber ('+a.fotosAG.length+')</div>'
@@ -3186,7 +3200,7 @@ function renderAuftraege(){
       if(a.material&&a.material.length) quickInfo.push('🔧 '+a.material.length+' Mat.');
       const quickLine=quickInfo.length?'<div style="font-size:.62rem;color:var(--mu);margin-top:6px;font-family:\'JetBrains Mono\',monospace">'+quickInfo.join(' · ')+'</div>':'';
       const telBtn=a.kundeTel?'<a href="tel:'+esc(a.kundeTel.replace(/\s/g,''))+'" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:4px;padding:6px 10px;background:rgba(16,185,129,.1);color:#059669;border:1px solid rgba(16,185,129,.3);border-radius:8px;font-size:.68rem;font-weight:700;text-decoration:none;margin-right:6px">📞 Anrufen</a>':'';
-      h+='<div onclick="openAufDetails(\''+a.id+'\')" style="padding:12px;border:1.5px solid '+borderCol+';border-radius:10px;margin-bottom:8px;background:'+bgCol+';cursor:pointer">'
+      h+='<div onclick="openAufDetails(\''+a.id+'\')" style="padding:12px;border:'+borderWidth+' solid '+borderCol+';border-radius:10px;margin-bottom:8px;background:'+bgCol+';'+newShadow+'cursor:pointer">'
         +nrLine
         +(isRunning?'<div style="font-size:.6rem;font-weight:700;color:#059669;margin-bottom:4px">▶ In Arbeit'+(seit?' seit '+seit:'')+'</div>':'')
         +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">'
