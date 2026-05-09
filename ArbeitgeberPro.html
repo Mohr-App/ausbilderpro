@@ -342,17 +342,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                 <span class="bb-arr">›</span>
               </button>
               <div id="agNotifBanner"></div>
-              <!-- Collapsible ÜBL-Kursansicht -->
-              <div style="margin-bottom:12px">
-                <button onclick="toggleUeblView()" id="ueblToggleBtn" style="width:100%;padding:12px 14px;background:rgba(245,158,11,.06);border:1.5px solid rgba(245,158,11,.25);border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:'Sora',sans-serif;color:var(--tx)">
-                  <span style="font-size:1rem">🎓</span>
-                  <div style="flex:1;text-align:left"><div style="font-size:.78rem;font-weight:700">ÜBL-Kursansicht</div><div style="font-size:.6rem;color:var(--mu)">Lehrgänge, Anwesenheit, Noten</div></div>
-                  <span id="ueblArrow" style="font-size:.9rem;color:var(--mu)">▾</span>
-                </button>
-                <div id="ueblCollapse" style="display:none;padding:12px 2px 0">
-                  <div id="azubiList"><div class="empty">Lädt…</div></div>
-                </div>
-              </div>
               <div class="card">
                 <div class="card-title">👥 Azubi-Kontakte</div>
                 <div id="agAzubiListe"><div class="empty">Lädt…</div></div>
@@ -363,6 +352,17 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                   <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
                 </div>
               </details>
+              <!-- ÜBL-Kursansicht: ganz unten, da externe HBZ-Daten -->
+              <div id="ueblWrap" style="margin-top:14px;border-radius:12px;transition:background .2s,box-shadow .2s">
+                <button onclick="toggleUeblView()" id="ueblToggleBtn" style="width:100%;padding:12px 14px;background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.3);border-radius:12px;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:'Sora',sans-serif;color:var(--tx)">
+                  <span style="font-size:1rem">🎓</span>
+                  <div style="flex:1;text-align:left"><div style="font-size:.78rem;font-weight:700">ÜBL-Kursansicht</div><div style="font-size:.6rem;color:var(--mu)">Lehrgänge, Anwesenheit, Noten</div></div>
+                  <span id="ueblArrow" style="font-size:.9rem;color:var(--mu)">▾</span>
+                </button>
+                <div id="ueblCollapse" style="display:none;padding:14px;background:rgba(245,158,11,.04);border:1.5px solid rgba(245,158,11,.3);border-top:none;border-radius:0 0 12px 12px;margin-top:-1.5px">
+                  <div id="azubiList"><div class="empty">Lädt…</div></div>
+                </div>
+              </div>
             </div>
           </div>
         </details>
@@ -3100,9 +3100,17 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
 function toggleUeblView(){
   const el=document.getElementById('ueblCollapse');
   const arr=document.getElementById('ueblArrow');
+  const btn=document.getElementById('ueblToggleBtn');
   if(!el) return;
-  if(el.style.display==='none'){el.style.display='';if(arr) arr.textContent='▴';}
-  else{el.style.display='none';if(arr) arr.textContent='▾';}
+  if(el.style.display==='none'){
+    el.style.display='';
+    if(arr) arr.textContent='▴';
+    if(btn){btn.style.borderBottomLeftRadius='0';btn.style.borderBottomRightRadius='0';btn.style.borderBottomColor='transparent';}
+  } else {
+    el.style.display='none';
+    if(arr) arr.textContent='▾';
+    if(btn){btn.style.borderBottomLeftRadius='';btn.style.borderBottomRightRadius='';btn.style.borderBottomColor='';}
+  }
 }
 
 // ─── Foto-Resize zu 200×200 JPEG base64 ───────────────────────
