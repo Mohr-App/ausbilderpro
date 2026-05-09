@@ -2002,8 +2002,8 @@ function renderAzubiList(){
   const el=document.getElementById('azubiList');
   if(!el) return; // ÜBL-Modal ist nicht mehr Teil von AG
   // ÜBL-Kursansicht: nur Azubis zeigen, keine regulaeren Mitarbeiter
-  // (typ fehlt bei alten Docs -> als Azubi behandeln, MA werden explizit ausgefiltert)
-  const azubisOnly=_azubis.filter(a=>a.typ!=='mitarbeiter');
+  // Legacy: alte Docs koennen 'mitarbeiter' statt 'arbeitnehmer' haben
+  const azubisOnly=_azubis.filter(a=>a.typ!=='mitarbeiter'&&a.typ!=='arbeitnehmer');
   if(!azubisOnly.length){el.innerHTML='<div class="empty">Noch keine Azubis angelegt.<br>Lege Azubis im Bereich „Azubis → Azubi anlegen" an.</div>';return;}
   const openIds=new Set();
   document.querySelectorAll('.azubi-card.expanded').forEach(c=>{if(c.dataset.tnId)openIds.add(c.dataset.tnId);});
@@ -2595,8 +2595,10 @@ function showDoku(tnId,datum){
 function renderAgAzubiKontakte(){
   const elAn=document.getElementById('agArbeitnehmerListe');
   const elAz=document.getElementById('agAzubiListe');
-  const arbeitnehmer=_azubis.filter(a=>a.typ==='arbeitnehmer');
-  const azubis=_azubis.filter(a=>a.typ!=='arbeitnehmer');
+  // Legacy: alte Docs koennen 'mitarbeiter' statt 'arbeitnehmer' haben
+  const isMa=(t)=>t==='arbeitnehmer'||t==='mitarbeiter';
+  const arbeitnehmer=_azubis.filter(a=>isMa(a.typ));
+  const azubis=_azubis.filter(a=>!isMa(a.typ));
   if(elAn) elAn.innerHTML=arbeitnehmer.length
     ? arbeitnehmer.map(_renderMaCard).join('')
     : '<div class="empty">Noch keine Arbeitnehmer angelegt</div>';
