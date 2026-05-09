@@ -165,7 +165,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .tab-order-btn:disabled{opacity:.3;cursor:not-allowed}
 .coll-card{background:var(--sur);border:1px solid var(--brd);border-radius:12px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.02);transition:background .2s,border-color .2s,box-shadow .2s}
 .coll-card[open]{background:linear-gradient(135deg,rgba(37,99,235,.28),rgba(5,150,105,.28));border-color:rgba(37,99,235,.7);border-width:2px;box-shadow:0 6px 20px rgba(37,99,235,.25)}
-.coll-card[open]>summary{border-bottom:2px solid rgba(37,99,235,.55)}
 /* Auftrag-Modal-Sections */
 .auf-section{padding:12px;background:rgba(248,250,252,.6);border:1px solid var(--brd);border-radius:10px;margin-bottom:8px;}
 .auf-sect-title{font-size:.7rem;font-weight:800;color:var(--tx);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;}
@@ -1998,7 +1997,10 @@ function renderStats(){
 function renderAzubiList(){
   const el=document.getElementById('azubiList');
   if(!el) return; // ÜBL-Modal ist nicht mehr Teil von AG
-  if(!_azubis.length){el.innerHTML='<div class="empty">Noch keine Mitarbeiter angelegt.<br>Legen Sie im Betrieb-Tab unter Zeiten Ihre Mitarbeiter an.</div>';return;}
+  // ÜBL-Kursansicht: nur Azubis zeigen, keine regulaeren Mitarbeiter
+  // (typ fehlt bei alten Docs -> als Azubi behandeln, MA werden explizit ausgefiltert)
+  const azubisOnly=_azubis.filter(a=>a.typ!=='mitarbeiter');
+  if(!azubisOnly.length){el.innerHTML='<div class="empty">Noch keine Azubis angelegt.<br>Lege Azubis im Bereich „Azubis → Azubi anlegen" an.</div>';return;}
   const openIds=new Set();
   document.querySelectorAll('.azubi-card.expanded').forEach(c=>{if(c.dataset.tnId)openIds.add(c.dataset.tnId);});
   el.innerHTML='';
@@ -2009,7 +2011,7 @@ function renderAzubiList(){
   hint.style.cssText='font-size:.58rem;color:var(--mu);margin-bottom:10px;padding:0 4px';
   el.appendChild(hint);
   renderAGSyncStatus();
-  _azubis.forEach(a=>{
+  azubisOnly.forEach(a=>{
     const isArchived=false;
     const name=((a.vorname||'')+' '+(a.nachname||'')).trim();
     const init=((a.vorname||'?')[0]+(a.nachname||'?')[0]).toUpperCase();
