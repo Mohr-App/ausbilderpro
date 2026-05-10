@@ -2862,7 +2862,8 @@ function renderMain(){
     +'<div style="display:flex;justify-content:space-between;align-items:start;gap:10px">'
     +'<div style="flex:1">'
     +'<div style="font-weight:800;color:#2563eb;margin-bottom:6px">💡 So belegst du Sitzplätze</div>'
-    +'<div style="margin-bottom:4px">• <b>Azubi aus dem Pool (rechts)</b> auf einen Tisch ziehen</div>'
+    +'<div style="margin-bottom:4px">• <b>Tisch anklicken</b> → Azubi aus Pool auswählen</div>'
+    +'<div style="margin-bottom:4px">• Oder: <b>Azubi aus dem Pool (rechts)</b> auf Tisch ziehen</div>'
     +'<div>• Oder: <b>Azubi gibt in seiner App</b> seine Wunsch-Platznummer ein → wird automatisch platziert</div>'
     +'</div>'
     +'<button onclick="dismissPoolHint()" title="Hinweis ausblenden" style="background:transparent;border:none;color:var(--mu);cursor:pointer;font-size:1rem;padding:4px 8px;flex-shrink:0">✕</button>'
@@ -3635,7 +3636,14 @@ function mkSeat(id,seats){
   const el=document.createElement('div');
   const isFirstEmpty = window._firstEmptySeatId === id;
   el.className='seat'+(isFirstEmpty?' seat-first-empty':'');
-  el.id='seat-'+id;el.onclick=()=>openModal(id);
+  el.id='seat-'+id;
+  el.onclick=()=>{
+    const inst=curInst();
+    const d=inst&&inst.seats[id];
+    // Belegter Sitz: Detail-Modal (existing). Leerer Sitz: Pool-Picker.
+    if(d&&d.name){ openModal(id); }
+    else { openEmptySeatChooser(id); }
+  };
   const d=seats[id];
   el.innerHTML='<div class="snum" title="Tischnummer ändern" onclick="renameSeat(event,\''+id+'\')">'+esc(label)+'</div>';
   // drag & drop
@@ -8148,6 +8156,93 @@ function poolPlaceAll(allTN, kursId){
   persist(); renderSeats(); loadPool();
 }
 
+// Platzierung Pool-TN auf Sitzplatz (gemeinsam fuer Drag-Drop UND Klick-Picker)
+function _applyPoolToSeat(seatId){
+  const inst=curInst(); if(!inst) return;
+  const existing=inst.seats[seatId]||{};
+  // Wiederholer-Karte: Originalsitz-Flag entfernen
+  if(_wiederholerSeatId){
+    if(inst.seats[_wiederholerSeatId]) delete inst.seats[_wiederholerSeatId].wiederholer;
+    _wiederholerSeatId=null;
+  }
+  if(inst.fehltStudents){
+    inst.fehltStudents = inst.fehltStudents.filter(f=>f.name!==_poolDragId);
+  }
+  _fehltLocal=false;
+  const card=document.querySelector('.pool-card[data-name="'+CSS.escape(_poolDragId)+'"]')
+             || document.querySelector('.wiederholer-card[data-name="'+CSS.escape(_poolDragId)+'"]')
+             || document.querySelector('.fehlt-card[data-name="'+CSS.escape(_poolDragId)+'"]');
+  const fehltEntry = inst.fehltStudents ? inst.fehltStudents.find(f=>f.name===_poolDragId) : null;
+  const newSeatData = { ...existing,
+    name:      _poolDragId,
+    company:   card?.dataset.company    || fehltEntry?.company    || existing.company    || '',
+    profession:card?.dataset.profession || fehltEntry?.profession || existing.profession || '',
+    ausbjahr:  card?.dataset.ausbjahr   || fehltEntry?.ausbjahr   || existing.ausbjahr   || '',
+    poolTnId:  _poolDragTnId  || fehltEntry?.poolTnId  || existing.poolTnId  || null,
+    poolKursId:_poolDragKursId|| fehltEntry?.poolKursId|| existing.poolKursId|| null
+  };
+  delete newSeatData.wiederholer;
+  inst.seats[seatId] = newSeatData;
+  if(_db && _poolDragKursId && _poolDragTnId){
+    _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
+      .collection('teilnehmer').doc(_poolDragTnId)
+      .update({status:'attending'}).then(()=>loadPool()).catch(()=>loadPool());
+    syncGlobalTNStatus(_poolDragTnId, 'clear');
+  } else {
+    loadPool();
+  }
+  persist(); renderSeats();
+}
+
+// Klick auf leeren Sitz: Picker-Dialog mit Pool-TN
+function openEmptySeatChooser(seatId){
+  const cards = document.querySelectorAll('#poolSbBody .pool-card, #poolSbBody .wiederholer-card, #poolSbBody .fehlt-card');
+  // Wenn Pool leer -> direkt das normale Sitz-Modal (manuell eingeben)
+  if(!cards.length){ openModal(seatId); return; }
+  // Modal aufbauen
+  let modal = document.getElementById('seatPickerModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'seatPickerModal';
+    modal.className = 'mdl';
+    modal.innerHTML = '<div class="mdl-box" style="max-width:420px"><div class="mdl-head"><div class="mdl-title">👤 Azubi auf Sitzplatz setzen</div><button class="mdl-x" onclick="closeSeatPicker()" title="Schließen">✕</button></div><div id="seatPickerBody"></div></div>';
+    document.body.appendChild(modal);
+  }
+  const body = document.getElementById('seatPickerBody');
+  let html = '<div style="font-size:.7rem;color:var(--mu);margin-bottom:10px">Aus dem Pool waehlen oder manuell eingeben:</div>';
+  cards.forEach(card=>{
+    const name = card.dataset.name || '';
+    const company = card.dataset.company || '';
+    const profession = card.dataset.profession || '';
+    const tnId = card.dataset.tnId || '';
+    const kursId = card.dataset.kursId || '';
+    const isWdh = card.classList.contains('wiederholer-card');
+    const isFehlt = card.classList.contains('fehlt-card');
+    const badge = isWdh ? '<span style="font-size:.55rem;background:rgba(168,85,247,.15);color:#7c3aed;padding:2px 6px;border-radius:5px;margin-left:6px">↻ Wdh.</span>' :
+                  isFehlt ? '<span style="font-size:.55rem;background:rgba(239,68,68,.15);color:#dc2626;padding:2px 6px;border-radius:5px;margin-left:6px">✗ Fehlt</span>' : '';
+    const sub = [profession, company].filter(Boolean).join(' · ');
+    html += '<button onclick="_pickPoolTN(\''+seatId+'\',\''+name.replace(/\'/g,"\\'")+'\',\''+tnId+'\',\''+kursId+'\')" style="width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;background:#fff;border:1px solid var(--brd);border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;display:flex;flex-direction:column;gap:2px;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor=\'#2563eb\';this.style.background=\'rgba(37,99,235,.04)\'" onmouseout="this.style.borderColor=\'\';this.style.background=\'\'">';
+    html += '<div style="font-weight:700;font-size:.78rem;color:var(--tx)">'+name+badge+'</div>';
+    if(sub) html += '<div style="font-size:.62rem;color:var(--mu)">'+sub+'</div>';
+    html += '</button>';
+  });
+  html += '<button onclick="closeSeatPicker();openModal(\''+seatId+'\')" style="width:100%;padding:10px 12px;margin-top:8px;background:rgba(100,116,139,.06);border:1px dashed var(--brd);border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-size:.74rem;color:var(--tx)"> ✏ Manuell eingeben…</button>';
+  body.innerHTML = html;
+  modal.classList.add('open');
+}
+function closeSeatPicker(){
+  const m = document.getElementById('seatPickerModal');
+  if(m) m.classList.remove('open');
+}
+function _pickPoolTN(seatId, name, tnId, kursId){
+  closeSeatPicker();
+  _poolDragId = name;
+  _poolDragTnId = tnId || null;
+  _poolDragKursId = kursId || null;
+  _applyPoolToSeat(seatId);
+  _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
+}
+
 function setupSeatDropTargets(){
   document.querySelectorAll('.seat').forEach(el=>{
     el.addEventListener('dragover',e=>{ e.preventDefault(); if(_poolDragId) el.classList.add('pool-target'); });
@@ -8156,43 +8251,7 @@ function setupSeatDropTargets(){
       e.preventDefault(); el.classList.remove('pool-target');
       if(!_poolDragId) return;
       const id=el.id.replace('seat-','');
-      const inst=curInst(); if(!inst) return;
-      const existing=inst.seats[id]||{};
-      // Wiederholer-Karte: Originalsitz-Flag entfernen
-      if(_wiederholerSeatId){
-        if(inst.seats[_wiederholerSeatId]) delete inst.seats[_wiederholerSeatId].wiederholer;
-        _wiederholerSeatId=null;
-      }
-      // Lokalen Fehlt-Eintrag immer entfernen (egal ob Firestore oder lokal)
-      if(inst.fehltStudents){
-        inst.fehltStudents = inst.fehltStudents.filter(f=>f.name!==_poolDragId);
-      }
-      _fehltLocal=false;
-      const card=document.querySelector('.pool-card[data-name="'+CSS.escape(_poolDragId)+'"]')
-                 || document.querySelector('.wiederholer-card[data-name="'+CSS.escape(_poolDragId)+'"]')
-                 || document.querySelector('.fehlt-card[data-name="'+CSS.escape(_poolDragId)+'"]');
-      // Fallback: Daten aus fehltStudents holen falls Karte kein dataset hat
-      const fehltEntry = inst.fehltStudents ? inst.fehltStudents.find(f=>f.name===_poolDragId) : null;
-      const newSeatData = { ...existing,
-        name:      _poolDragId,
-        company:   card?.dataset.company    || fehltEntry?.company    || existing.company    || '',
-        profession:card?.dataset.profession || fehltEntry?.profession || existing.profession || '',
-        ausbjahr:  card?.dataset.ausbjahr   || fehltEntry?.ausbjahr   || existing.ausbjahr   || '',
-        poolTnId:  _poolDragTnId  || fehltEntry?.poolTnId  || existing.poolTnId  || null,
-        poolKursId:_poolDragKursId|| fehltEntry?.poolKursId|| existing.poolKursId|| null
-      };
-      delete newSeatData.wiederholer; // immer entfernen, egal ob Wiederholer-Karte oder Pool-Karte
-      inst.seats[id] = newSeatData;
-      // Status zurücksetzen: attending wenn Firestore-ID, sonst status-Feld löschen
-      if(_db && _poolDragKursId && _poolDragTnId){
-        _db.collection('shared').doc('kurse').collection('list').doc(_poolDragKursId)
-          .collection('teilnehmer').doc(_poolDragTnId)
-          .update({status:'attending'}).then(()=>loadPool()).catch(()=>loadPool());
-        syncGlobalTNStatus(_poolDragTnId, 'clear');
-      } else {
-        loadPool();
-      }
-      persist(); renderSeats();
+      _applyPoolToSeat(id);
       _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null;
     });
     el.setAttribute('draggable','true');
