@@ -8197,17 +8197,28 @@ function _applyPoolToSeat(seatId){
 // Klick auf leeren Sitz: Picker-Dialog mit Pool-TN
 function openEmptySeatChooser(seatId){
   const cards = document.querySelectorAll('#poolSbBody .pool-card, #poolSbBody .wiederholer-card, #poolSbBody .fehlt-card');
-  // Wenn Pool leer -> direkt das normale Sitz-Modal (manuell eingeben)
-  if(!cards.length){ openModal(seatId); return; }
+  // Pool leer -> Hinweis + Button zum TN-Anlegen-Modal
+  if(!cards.length){
+    let m = document.getElementById('seatPickerModal');
+    if(!m){
+      m = document.createElement('div');
+      m.id = 'seatPickerModal';
+      m.className = 'mdl';
+      document.body.appendChild(m);
+    }
+    m.innerHTML = '<div class="mdl-box" style="max-width:420px"><div class="mdl-head"><div class="mdl-title">👤 Sitzplatz belegen</div><button class="mdl-x" onclick="closeSeatPicker()" title="Schließen">✕</button></div><div style="text-align:center;padding:8px 4px"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-weight:700;font-size:.85rem;margin-bottom:6px">Pool ist leer</div><div style="font-size:.7rem;color:var(--mu);margin-bottom:14px;line-height:1.55">Es sind noch keine Teilnehmer im Pool. Lege zuerst einen Teilnehmer an, dann kannst du ihn auf einen Sitzplatz setzen.</div><button onclick="closeSeatPicker();openManualTNModal()" style="width:100%;padding:11px 14px;background:var(--acc);color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.78rem">+ Teilnehmer anlegen</button></div></div>';
+    m.classList.add('open');
+    return;
+  }
   // Modal aufbauen
   let modal = document.getElementById('seatPickerModal');
   if(!modal){
     modal = document.createElement('div');
     modal.id = 'seatPickerModal';
     modal.className = 'mdl';
-    modal.innerHTML = '<div class="mdl-box" style="max-width:420px"><div class="mdl-head"><div class="mdl-title">👤 Azubi auf Sitzplatz setzen</div><button class="mdl-x" onclick="closeSeatPicker()" title="Schließen">✕</button></div><div id="seatPickerBody"></div></div>';
     document.body.appendChild(modal);
   }
+  modal.innerHTML = '<div class="mdl-box" style="max-width:420px"><div class="mdl-head"><div class="mdl-title">👤 Azubi auf Sitzplatz setzen</div><button class="mdl-x" onclick="closeSeatPicker()" title="Schließen">✕</button></div><div id="seatPickerBody"></div></div>';
   const body = document.getElementById('seatPickerBody');
   let html = '<div style="font-size:.7rem;color:var(--mu);margin-bottom:10px">Aus dem Pool waehlen oder manuell eingeben:</div>';
   cards.forEach(card=>{
@@ -8226,7 +8237,7 @@ function openEmptySeatChooser(seatId){
     if(sub) html += '<div style="font-size:.62rem;color:var(--mu)">'+sub+'</div>';
     html += '</button>';
   });
-  html += '<button onclick="closeSeatPicker();openModal(\''+seatId+'\')" style="width:100%;padding:10px 12px;margin-top:8px;background:rgba(100,116,139,.06);border:1px dashed var(--brd);border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-size:.74rem;color:var(--tx)"> ✏ Manuell eingeben…</button>';
+  html += '<button onclick="closeSeatPicker();openManualTNModal()" style="width:100%;padding:10px 12px;margin-top:8px;background:rgba(37,99,235,.08);border:1px dashed rgba(37,99,235,.4);border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-size:.74rem;color:var(--acc);font-weight:700">+ Neuen Teilnehmer anlegen</button>';
   body.innerHTML = html;
   modal.classList.add('open');
 }
