@@ -6025,21 +6025,30 @@ function mtSearchSuggestions(){
   if(v.length < 2 && n.length < 2){
     container.style.display='none'; container.innerHTML=''; return;
   }
+  // DIAG: Status-Header
+  const total = _mtSuggestionList.length;
+  // Wenn noch nichts geladen wurde -> Hinweis
+  if(!total){
+    container.innerHTML = '<div style="padding:8px 10px;font-size:.7rem;color:var(--mu)">⏳ Lade TN-Daten... (oder keine vorhanden)</div>';
+    container.style.display = 'block';
+    return;
+  }
   const queryNorm = _normNameFuzzy(v, n);
   const hits = _mtSuggestionList.filter(t=>{
     const tNorm = _normNameFuzzy(t.vorname, t.nachname);
     const vn = (t.vorname||'').toLowerCase();
     const nn = (t.nachname||'').toLowerCase();
-    // Substring-Match (Anfang) ODER Fuzzy
     if(v && vn.startsWith(v) && (!n || nn.startsWith(n))) return true;
     if(n && nn.startsWith(n) && (!v || vn.startsWith(v))) return true;
     if(v && n && _levenshtein(queryNorm, tNorm) <= 2) return true;
     return false;
   }).slice(0, 6);
   if(!hits.length){
-    container.style.display='none'; container.innerHTML=''; return;
+    container.innerHTML = '<div style="padding:8px 10px;font-size:.7rem;color:var(--mu)">Kein Treffer in '+total+' vorhandenen TN. Wird neu angelegt.</div>';
+    container.style.display = 'block';
+    return;
   }
-  let html = '<div style="font-size:.62rem;color:var(--mu);padding:6px 10px;background:rgba(37,99,235,.06);border-bottom:1px solid var(--brd);font-weight:600">💡 Vorhandene TN — anklicken um zu übernehmen</div>';
+  let html = '<div style="font-size:.62rem;color:var(--mu);padding:6px 10px;background:rgba(37,99,235,.06);border-bottom:1px solid var(--brd);font-weight:600">💡 Vorhandene TN ('+hits.length+' von '+total+') — anklicken um zu übernehmen</div>';
   hits.forEach(t=>{
     const sub = [t.beruf, t.firma, t.ausbjahr?(t.ausbjahr+'. LJ'):''].filter(Boolean).join(' · ');
     html += '<button type="button" onclick="mtPickExisting(\''+t.id+'\')" style="width:100%;text-align:left;padding:8px 10px;background:#fff;border:none;border-bottom:1px solid var(--brd);cursor:pointer;font-family:Sora,sans-serif;display:block">'
