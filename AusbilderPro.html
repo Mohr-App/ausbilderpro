@@ -1109,8 +1109,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="modal" style="max-width:400px">
 <div class="mhd"><div class="mtit">👤 Teilnehmer manuell hinzufügen</div><button class="xcls" onclick="document.getElementById('manualTNModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
 <div class="mbdy">
-<div class="fg"><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="mtVorname" placeholder="Max"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="mtNachname" placeholder="Mustermann"></div>
+<div class="fg"><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="mtVorname" placeholder="Max" oninput="mtSearchSuggestions()" autocomplete="off"></div>
+<div class="fg" style="margin-top:6px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="mtNachname" placeholder="Mustermann" oninput="mtSearchSuggestions()" autocomplete="off"></div>
+<div id="mtSuggBox" style="display:none;margin-top:6px;border:1.5px solid rgba(37,99,235,.3);border-radius:8px;background:#fff;max-height:240px;overflow-y:auto"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Betrieb</label><input class="fi" id="mtBetrieb" placeholder="Firma GmbH"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Berufsgruppe <span style="color:#ef4444">*</span></label><select class="fi" id="mtBerufGruppe" onchange="mtUpdateFachrichtungen()" style="cursor:pointer"><option value="">– Berufsgruppe wählen –</option></select></div>
 <div class="fg" style="margin-top:6px;display:none" id="mtFachWrap"><label class="fl">Fachrichtung</label><select class="fi" id="mtFachrichtung" style="cursor:pointer"><option value="">– Fachrichtung wählen –</option></select></div>
@@ -5981,9 +5982,109 @@ function openManualTNModal(){
   document.getElementById('mtEmail').value='';
   document.getElementById('mtTelefon').value='';
   document.getElementById('mtSitzplatz').value='';
+  // Suggestion-State reset
+  _mtSelectedExistingId = null;
+  _mtSuggestionList = [];
+  const sg = document.getElementById('mtSuggBox');
+  if(sg){sg.style.display='none'; sg.innerHTML='';}
+  // Existierende Azubi-TN aus globalTN laden (fuer Autocomplete)
+  if(_db){
+    _db.collection('globalTN').where('typ','==','azubi').limit(500).get().then(snap=>{
+      _mtSuggestionList=[];
+      snap.forEach(doc=>{
+        const d=doc.data();
+        _mtSuggestionList.push({
+          id:doc.id,
+          vorname:d.vorname||'', nachname:d.nachname||'',
+          firma:d.firma||'', beruf:d.beruf||'',
+          berufGruppeId:d.berufGruppeId||'',
+          ausbjahr:d.ausbjahr||'',
+          kontaktEmail:d.kontaktEmail||d.email||'',
+          kontaktTelefon:d.kontaktTelefon||'',
+          aktiverKursId:d.aktiverKursId||''
+        });
+      });
+    }).catch(()=>{});
+  }
   // Berufsgruppen-Dropdown befuellen (aus Firestore shared/kursSettings/berufe)
   mtPopulateBerufe();
   document.getElementById('manualTNModal').classList.add('open');
+}
+
+// Autocomplete-State
+let _mtSuggestionList = [];
+let _mtSelectedExistingId = null;
+
+function mtSearchSuggestions(){
+  // Wenn Auswahl bereits getroffen + User aendert Namen -> Auswahl loesen
+  if(_mtSelectedExistingId) _mtSelectedExistingId = null;
+  const v=(document.getElementById('mtVorname').value||'').trim().toLowerCase();
+  const n=(document.getElementById('mtNachname').value||'').trim().toLowerCase();
+  const container=document.getElementById('mtSuggBox');
+  if(!container) return;
+  if(v.length < 2 && n.length < 2){
+    container.style.display='none'; container.innerHTML=''; return;
+  }
+  const queryNorm = _normNameFuzzy(v, n);
+  const hits = _mtSuggestionList.filter(t=>{
+    const tNorm = _normNameFuzzy(t.vorname, t.nachname);
+    const vn = (t.vorname||'').toLowerCase();
+    const nn = (t.nachname||'').toLowerCase();
+    // Substring-Match (Anfang) ODER Fuzzy
+    if(v && vn.startsWith(v) && (!n || nn.startsWith(n))) return true;
+    if(n && nn.startsWith(n) && (!v || vn.startsWith(v))) return true;
+    if(v && n && _levenshtein(queryNorm, tNorm) <= 2) return true;
+    return false;
+  }).slice(0, 6);
+  if(!hits.length){
+    container.style.display='none'; container.innerHTML=''; return;
+  }
+  let html = '<div style="font-size:.62rem;color:var(--mu);padding:6px 10px;background:rgba(37,99,235,.06);border-bottom:1px solid var(--brd);font-weight:600">💡 Vorhandene TN — anklicken um zu übernehmen</div>';
+  hits.forEach(t=>{
+    const sub = [t.beruf, t.firma, t.ausbjahr?(t.ausbjahr+'. LJ'):''].filter(Boolean).join(' · ');
+    html += '<button type="button" onclick="mtPickExisting(\''+t.id+'\')" style="width:100%;text-align:left;padding:8px 10px;background:#fff;border:none;border-bottom:1px solid var(--brd);cursor:pointer;font-family:Sora,sans-serif;display:block">'
+      + '<div style="font-weight:700;font-size:.74rem;color:var(--tx)">'+esc(((t.vorname||'')+' '+(t.nachname||'')).trim())+'</div>'
+      + (sub ? '<div style="font-size:.62rem;color:var(--mu);margin-top:1px">'+esc(sub)+'</div>' : '')
+      + '</button>';
+  });
+  container.innerHTML = html;
+  container.style.display = 'block';
+}
+
+function mtPickExisting(tnId){
+  const t = _mtSuggestionList.find(x=>x.id===tnId);
+  if(!t) return;
+  _mtSelectedExistingId = tnId;
+  document.getElementById('mtVorname').value = t.vorname;
+  document.getElementById('mtNachname').value = t.nachname;
+  document.getElementById('mtBetrieb').value = t.firma;
+  document.getElementById('mtEmail').value = t.kontaktEmail;
+  document.getElementById('mtTelefon').value = t.kontaktTelefon;
+  // BerufGruppe via data-id
+  if(t.berufGruppeId){
+    const sel = document.getElementById('mtBerufGruppe');
+    if(sel){
+      Array.from(sel.options).forEach(o=>{
+        if(o.dataset.id === t.berufGruppeId) sel.value = o.value;
+      });
+      try{ mtUpdateFachrichtungen(); }catch(e){}
+      // Fachrichtung aus "Hauptberuf – Fachrichtung" extrahieren
+      if(t.beruf && t.beruf.includes('–')){
+        const fach = t.beruf.split('–').pop().trim();
+        const fSel = document.getElementById('mtFachrichtung');
+        if(fSel){
+          Array.from(fSel.options).forEach(o=>{
+            if(o.value===fach) fSel.value = fach;
+          });
+        }
+      }
+    }
+  }
+  if(t.ausbjahr) document.getElementById('mtLehrjahr').value = t.ausbjahr;
+  // Suggestions ausblenden
+  const c=document.getElementById('mtSuggBox');
+  if(c){c.style.display='none'; c.innerHTML='';}
+  toast('TN übernommen: '+t.vorname+' '+t.nachname);
 }
 
 function saveManualTN(){
@@ -6027,6 +6128,49 @@ function saveManualTN(){
     manuellAngelegt: true,
     angelegtVon: _auth?.currentUser?.email||''
   };
+
+  // Wenn der Ausbilder einen existierenden TN aus dem Vorschlag-Dropdown
+  // ausgewaehlt hat: kein neues globalTN-Doc anlegen, sondern bestehendes
+  // dem aktuellen Kurs zuweisen (verhindert Duplikate von vornherein).
+  if(_mtSelectedExistingId){
+    const existingTnId = _mtSelectedExistingId;
+    _mtSelectedExistingId = null;
+    const histEntry = {
+      kursId: kursId,
+      kursName: S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs',
+      von: inst.sY+'-'+inst.sM+'-'+inst.sD,
+      bis: inst.eY+'-'+inst.eM+'-'+inst.eD,
+      addedAt: Date.now()
+    };
+    // 1. globalTN-Update: aktiverKursId, kursHistory ergaenzt; manuell aktualisierte
+    //    Felder (Beruf, Firma, Lehrjahr usw.) ueberschreiben nur wenn vom Ausbilder
+    //    bewusst angepasst (alle Felder werden uebernommen, falls Ausbilder geaendert hat)
+    _db.collection('globalTN').doc(existingTnId).get().then(doc=>{
+      const cur = doc.exists?doc.data():{};
+      const hist = Array.isArray(cur.kursHistory)?cur.kursHistory:[];
+      if(!hist.some(h=>h.kursId===kursId)) hist.push(histEntry);
+      return _db.collection('globalTN').doc(existingTnId).set({
+        vorname, nachname, firma, beruf, berufGruppeId, ausbjahr,
+        kontaktEmail, kontaktTelefon, wunschSitzplatz,
+        aktiverKursId: kursId,
+        kursHistory: hist
+      },{merge:true});
+    }).then(()=>{
+      // 2. In Kurs-TN-Subcollection eintragen (manuellAngelegt false, weil TN existierte)
+      return _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('teilnehmer').doc(existingTnId).set({
+          vorname, nachname, firma, beruf, berufGruppeId, ausbjahr,
+          kontaktEmail, kontaktTelefon, wunschSitzplatz,
+          status: 'active',
+          addedAt: Date.now()
+        },{merge:true});
+    }).then(()=>{
+      document.getElementById('manualTNModal').classList.remove('open');
+      toast(vorname+' '+nachname+' zum Kurs hinzugefügt ✓');
+      loadPool();
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
+    return;
+  }
 
   _db.collection('globalTN').add(tnData).then(ref=>{
     // In Kurs-TN-Subcollection eintragen
