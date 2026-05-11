@@ -1721,25 +1721,13 @@ function persist(){
   showSaveInd();
   // Cloud-Sync (hook wird von Firebase-Block gesetzt)
   if(typeof window._fbSaveHook === 'function') window._fbSaveHook();
-  // auto file-export after 20 changes
-  if(_changeCount - _lastExportCount >= 20){
-    clearTimeout(_autoExportTimer);
-    _autoExportTimer = setTimeout(()=>autoExport('20 Änderungen'), 3000);
-  }
+  // Auto-Export deaktiviert (Stefan: nervig, nicht benoetigt - Daten liegen in Firestore)
 }
 
 function autoExport(reason){
-  if(_demoMode) return;
+  // Bewusst leer: User wollte keine Auto-Exports mehr.
+  // Manueller Export bleibt ueber doExport() im Header verfuegbar.
   _lastExportCount = _changeCount;
-  if(_driveToken){ driveSave(); return; }
-  const plain=JSON.stringify(S,null,2);
-  const enc=_EXP_MAGIC+_toB64(_rc4(_EXP_MASTER,plain))+'||'+_toB64(_rc4(_EXP_MASTER,plain));
-  const b=new Blob([enc],{type:'text/plain'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(b);
-  a.download='ap_auto_'+new Date().toISOString().replace('T','_').slice(0,16).replace(':','-')+'.hbz';
-  a.click();
-  showInfoToast('💾 Auto-Export','Datei automatisch gespeichert ('+reason+').\nLiegt in deinem Download-Ordner.');
 }
 
 function showSaveInd(){
