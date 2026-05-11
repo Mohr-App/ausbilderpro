@@ -760,9 +760,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div style="position:relative">
       <button class="tbtn" title="Menü öffnen" onclick="toggleHdrMenu()" id="hdrMenuBtn">⚙ Mehr</button>
       <div id="hdrMenu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--sur);border:2px solid #e2e8f0;border-radius:10px;padding:6px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.1);min-width:170px;display:none;flex-direction:column;gap:4px;">
-        <button class="tbtn" id="hdrExportBtn" onclick="doExport();closeHdrMenu()" style="width:100%;text-align:left" title="Daten als verschlüsselte .hbz Datei sichern">⬇ Export (.hbz)</button>
-        <button class="tbtn" id="hdrExportPwBtn" onclick="doExportChangePw();closeHdrMenu()" style="width:100%;text-align:left" title="Passwort für Export-Dateien ändern">🔑 Export-Passwort</button>
-        <button class="tbtn" id="hdrImportBtn" onclick="document.getElementById('impFile').click();closeHdrMenu()" style="width:100%;text-align:left" title="Gespeicherte .hbz Datei einlesen">⬆ Import</button>
         <div id="hdrIoSep" style="border-top:1px solid var(--brd);margin:2px 0"></div>
         <button class="tbtn" onclick="openMeinUrlaub();closeHdrMenu()" style="width:100%;text-align:left" title="Eigene Urlaubstage eintragen">🏖 Mein Urlaub</button>
         <button class="tbtn" onclick="openAusbilderProfil();closeHdrMenu()" style="width:100%;text-align:left" title="Name, Telefon, E-Mail für Azubis hinterlegen">👤 Mein Profil</button>
@@ -773,16 +770,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="showHilfeModal();closeHdrMenu()" style="width:100%;text-align:left" title="Anleitungen und Tipps">❓ Brauchst du Hilfe?</button>
       </div>
     </div>
-    <input type="file" id="impFile" accept=".json,.hbz" style="display:none" onchange="doImport(event)">
   </div>
 </div>
 <!-- TOAST -->
-<div class="toast" id="toast">
-  <div class="toast-title"><span id="toastIcon">💾</span><span id="toastTitle">Export empfohlen</span></div>
-  <div class="toast-body" id="toastBody">Du hast viele Änderungen gemacht. Exportiere jetzt deine Daten als Sicherheitskopie.</div>
+<div class="toast" id="toast" style="display:none">
+  <div class="toast-title"><span id="toastIcon">ℹ</span><span id="toastTitle">Hinweis</span></div>
+  <div class="toast-body" id="toastBody"></div>
   <div class="toast-btns" id="toastActionRow">
-    <button class="toast-btn prim" onclick="toastExport()" title="Jetzt exportieren">⬇ Jetzt exportieren</button>
-    <button class="toast-btn sec" onclick="closeToast()" title="Schließen">Später</button>
+    <button class="toast-btn sec" onclick="closeToast()" title="Schließen">OK</button>
   </div>
 </div>
 
@@ -820,7 +815,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="mbdy" style="padding:14px 14px 24px;display:flex;flex-direction:column;gap:6px">
       <button class="tbtn" onclick="drawerOpen();closeMobMoreMenu()" style="width:100%;text-align:left" title="Lehrgangsliste öffnen">📋 Lehrgänge</button>
       <div id="mobIoSepTop" style="border-top:1px solid var(--brd);margin:4px 0"></div>
-      <button class="tbtn" id="mobExportPwBtn" onclick="doExportChangePw();closeMobMoreMenu()" style="width:100%;text-align:left" title="Passwort für Export-Dateien ändern">🔑 Export-Passwort</button>
       <div id="mobIoSepBot" style="border-top:1px solid var(--brd);margin:4px 0"></div>
       <button class="tbtn" onclick="openMeinUrlaub();closeMobMoreMenu()" style="width:100%;text-align:left" title="Eigene Urlaubstage eintragen">🏖 Mein Urlaub</button>
       <button class="tbtn" onclick="openAusbilderProfil();closeMobMoreMenu()" style="width:100%;text-align:left" title="Name, Telefon, E-Mail für Azubis hinterlegen">👤 Mein Profil</button>
@@ -835,7 +829,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="mob-bottom-nav">
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<input type="file" id="impFileMob" accept=".json,.hbz" style="display:none" onchange="doImport(event)">
 <div class="copyright">© AusbilderPro v2.7.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
@@ -1753,7 +1746,7 @@ function showToast(type){
   _toastTimer = setTimeout(closeToast, 12000);
 }
 function closeToast(){ document.getElementById('toast')?.classList.remove('show'); }
-function toastExport(){ closeToast(); _lastExportCount=_changeCount; doExport(); }
+function toastExport(){ closeToast(); }
 function toast(msg){
   const existing=document.getElementById('simpleToast');
   if(existing) existing.remove();
@@ -7013,84 +7006,10 @@ function showDemoUpgrade(){
   el.style.display='flex';
 }
 
-function doExport(){
-  if(_demoMode){ showDemoUpgrade(); return; }
-  _lastExportCount=_changeCount;
-  let pw=localStorage.getItem(_lsKey('ap_exppw'))||'';
-  if(!pw){
-    pw=prompt('Export-Passwort festlegen (einmalig):');
-    if(pw===null) return;
-    if(pw.trim()===''){alert('Bitte ein Passwort eingeben.');return;}
-    if(pw===_EXP_MASTER){alert('Dieses Passwort ist reserviert. Bitte ein anderes wählen.');return;}
-    localStorage.setItem(_lsKey('ap_exppw'), pw);
-    showInfoToast('🔐 Export-Passwort gespeichert','Wird ab jetzt automatisch verwendet.');
-  }
-  const plain=JSON.stringify(S,null,2);
-  const slotA=_toB64(_rc4(pw, plain));
-  const slotB=_toB64(_rc4(_EXP_MASTER, plain));
-  const enc=_EXP_MAGIC+slotA+'||'+slotB;
-  const b=new Blob([enc],{type:'text/plain'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);
-  a.download='ap_sitzplan_'+new Date().toISOString().split('T')[0]+'.hbz';a.click();
-}
-function doExportChangePw(){
-  if(_demoMode){ showDemoUpgrade(); return; }
-  const pw=prompt('Neues Export-Passwort eingeben:');
-  if(pw===null) return;
-  if(pw.trim()===''){alert('Bitte ein Passwort eingeben.');return;}
-  if(pw===_EXP_MASTER){alert('Dieses Passwort ist reserviert. Bitte ein anderes wählen.');return;}
-  localStorage.setItem(_lsKey('ap_exppw'), pw);
-  showInfoToast('🔐 Export-Passwort geändert','Neues Passwort wird ab jetzt verwendet.');
-}
+function doExport(){ /* entfernt */ }
+function doExportChangePw(){ /* entfernt */ }
 
-function doImport(e){
-  if(_demoMode){ showDemoUpgrade(); e.target.value=''; return; }
-  const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=ev=>{
-    const raw=ev.target.result.trim();
-    const _OLD_MAGIC='HBZ::ENC::2::';
-    const _V1_MAGIC='HBZ::ENC::1::';
-    const matchedMagic=raw.startsWith(_EXP_MAGIC)?_EXP_MAGIC:raw.startsWith(_OLD_MAGIC)?_OLD_MAGIC:raw.startsWith(_V1_MAGIC)?_V1_MAGIC:null;
-    if(matchedMagic){
-      const body=raw.slice(matchedMagic.length);
-      // v1 had single slot, v2 has dual slot separated by ||
-      const isV1=matchedMagic===_V1_MAGIC;
-      const parts=isV1?[body]:body.split('||');
-      const pw=prompt('Passwort zum Entschlüsseln eingeben:');
-      if(pw===null){e.target.value='';return;}
-      let parsed=null;
-      if(parts[0]){
-        try{
-          const dec=_rc4(pw, _fromB64(parts[0]));
-          const d=JSON.parse(dec);
-          if(d.kats) parsed=d;
-        } catch{}
-      }
-      if(!parsed && pw===_EXP_MASTER && parts[1]){
-        try{
-          const dec=_rc4(_EXP_MASTER, _fromB64(parts[1]));
-          const d=JSON.parse(dec);
-          if(d.kats) parsed=d;
-        } catch{}
-      }
-      if(parsed){
-        S=parsed; persist(); hydrate(); renderAll();
-        showInfoToast('✅ Import erfolgreich','Daten wurden entschlüsselt und geladen.');
-      } else {
-        alert('Falsches Passwort oder beschädigte Datei.');
-      }
-    } else {
-      // legacy unencrypted json
-      try{
-        const d=JSON.parse(raw);
-        if(d.kats){S=d;persist();hydrate();renderAll();}
-        else throw new Error();
-      } catch{ alert('Ungültige Datei.'); }
-    }
-  };
-  r.readAsText(f);e.target.value='';
-}
+function doImport(e){ /* entfernt */ }
 
 
 // Clock + init
