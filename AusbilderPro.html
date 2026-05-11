@@ -7974,6 +7974,7 @@ function checkDuplicateTNs(snapDocs, kursId){
       const ignoreKey = m.id+'__'+a.id;
       if(ignored[ignoreKey]) return;
       matches.push({
+        type: 'pool',
         manuell:m, selbst:a, ignoreKey,
         exact: dist===0,
         distance: dist,
@@ -7982,6 +7983,36 @@ function checkDuplicateTNs(snapDocs, kursId){
       });
     });
   });
+  // Lokale Sitz-Eintraege (Pre-v392-Workflow: TN nur im seat-Doc gespeichert)
+  // vs. selbst-registrierte Pool-TN abgleichen
+  const inst = curInst();
+  if(inst && inst.seats){
+    Object.keys(inst.seats).forEach(seatId=>{
+      const seat = inst.seats[seatId];
+      // Nur lokale Eintraege ohne Pool-Verknuepfung
+      if(!seat || !seat.name || seat.poolTnId) return;
+      const parts = String(seat.name).trim().split(/\s+/);
+      const vorname = parts.shift() || '';
+      const nachname = parts.join(' ');
+      const seatNorm = _normNameFuzzy(vorname, nachname);
+      if(!seatNorm) return;
+      active.forEach(a=>{
+        const dist = _levenshtein(seatNorm, a.normName);
+        if(dist > 2) return;
+        const ignoreKey = 'seat:'+seatId+'__'+a.id;
+        if(ignored[ignoreKey]) return;
+        const label = (inst.seatLabels && inst.seatLabels[seatId]!=null && inst.seatLabels[seatId]!=='') ? inst.seatLabels[seatId] : seatId;
+        matches.push({
+          type: 'localSeat',
+          seatId, seatLabel:label, seatData:seat, selbst:a, ignoreKey,
+          exact: dist===0,
+          distance: dist,
+          displayName:((a.vorname||'')+' '+(a.nachname||'')).trim(),
+          manualDisplay: seat.name
+        });
+      });
+    });
+  }
   if(!matches.length){
     banner.style.display='none';
     banner.innerHTML='';
@@ -7991,23 +8022,76 @@ function checkDuplicateTNs(snapDocs, kursId){
   matches.sort((a,b)=>a.distance-b.distance);
   let html = '<div style="display:flex;align-items:center;gap:8px;font-weight:800;color:#b45309;margin-bottom:8px"><span style="font-size:1rem">🔔</span><span>Möglicher Duplikat-Eintrag erkannt</span></div>';
   matches.forEach(m=>{
-    const sub = [m.manuell.beruf, m.manuell.firma].filter(Boolean).join(' · ');
     const isFuzzy = !m.exact;
-    const headline = isFuzzy
-      ? '<b>'+esc(m.displayName)+'</b> (registriert) ähnelt <b>'+esc(m.manualDisplay)+'</b> (manuell). <span style="color:#b45309">Eventuell ein Tippfehler?</span>'
-      : '<b>'+esc(m.displayName)+'</b> hat sich gerade registriert.';
     const bg = isFuzzy ? 'rgba(245,158,11,.05)' : '#fff';
     const border = isFuzzy ? 'rgba(245,158,11,.5)' : 'rgba(245,158,11,.3)';
+    let headline, subInfo, mergeBtn;
+    if(m.type === 'localSeat'){
+      // Lokaler Sitzplatz-Eintrag (vor v392 angelegt)
+      headline = isFuzzy
+        ? '<b>'+esc(m.displayName)+'</b> (registriert) ähnelt <b>'+esc(m.manualDisplay)+'</b> auf Sitz '+esc(m.seatLabel)+'. <span style="color:#b45309">Eventuell ein Tippfehler?</span>'
+        : '<b>'+esc(m.displayName)+'</b> hat sich registriert — gleicher Name wie der manuelle Eintrag auf Sitz '+esc(m.seatLabel)+'.';
+      const sub2 = [m.seatData.profession, m.seatData.company].filter(Boolean).join(' · ');
+      subInfo = sub2 ? '<div style="font-size:.62rem;color:var(--mu);margin-bottom:8px">Lokaler Sitz: '+esc(sub2)+'</div>' : '';
+      mergeBtn = '<button onclick="mergeDupLocalSeat(\''+m.seatId+'\',\''+m.selbst.id+'\',\''+kursId+'\')" style="flex:1;min-width:120px;padding:8px 12px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.7rem">✓ Auf Sitz '+esc(m.seatLabel)+' übernehmen</button>';
+    } else {
+      // Pool-vs-Pool (manuell + selbst registriert)
+      const sub = [m.manuell.beruf, m.manuell.firma].filter(Boolean).join(' · ');
+      headline = isFuzzy
+        ? '<b>'+esc(m.displayName)+'</b> (registriert) ähnelt <b>'+esc(m.manualDisplay)+'</b> (manuell). <span style="color:#b45309">Eventuell ein Tippfehler?</span>'
+        : '<b>'+esc(m.displayName)+'</b> hat sich gerade registriert.';
+      subInfo = sub ? '<div style="font-size:.62rem;color:var(--mu);margin-bottom:8px">Manuell angelegt: '+esc(sub)+'</div>' : '';
+      mergeBtn = '<button onclick="mergeDupTN(\''+m.manuell.id+'\',\''+m.selbst.id+'\',\''+kursId+'\')" style="flex:1;min-width:120px;padding:8px 12px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.7rem">✓ Zusammenführen</button>';
+    }
     html += '<div style="background:'+bg+';border:1px solid '+border+';border-radius:8px;padding:10px 12px;margin-bottom:8px">'
       + '<div style="font-size:.72rem;margin-bottom:6px">'+headline+'</div>'
-      + (sub ? '<div style="font-size:.62rem;color:var(--mu);margin-bottom:8px">Manuell angelegt: '+esc(sub)+'</div>' : '')
+      + subInfo
       + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
-        + '<button onclick="mergeDupTN(\''+m.manuell.id+'\',\''+m.selbst.id+'\',\''+kursId+'\')" style="flex:1;min-width:120px;padding:8px 12px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.7rem">✓ Zusammenführen</button>'
+        + mergeBtn
         + '<button onclick="ignoreDupTN(\''+m.ignoreKey+'\')" style="padding:8px 12px;background:rgba(100,116,139,.1);color:var(--tx);border:1px solid var(--brd);border-radius:7px;cursor:pointer;font-family:Sora,sans-serif;font-size:.7rem">Sind verschieden</button>'
       + '</div></div>';
   });
   banner.innerHTML = html;
   banner.style.display = 'block';
+}
+
+// Lokaler Sitz-Eintrag (Pre-v392) zu Pool-TN mergen: Sitz behalten, Daten ueberschreiben
+function mergeDupLocalSeat(seatId, selfId, kursId){
+  if(!_db){toast('Nicht verbunden','bad');return;}
+  if(!confirm('Den lokalen Sitzplatz-Eintrag mit dem registrierten TN ersetzen?\n\nDer registrierte TN landet auf diesem Sitzplatz, die alten lokalen Daten werden durch die Firestore-Daten ueberschrieben.')){
+    return;
+  }
+  const inst = curInst();
+  if(!inst || !inst.seats || !inst.seats[seatId]){
+    toast('Sitz nicht gefunden','bad'); return;
+  }
+  toast('Übernehme auf Sitz...');
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(selfId).get()
+    .then(doc=>{
+      const d = doc.exists ? doc.data() : {};
+      const name = ((d.vorname||'')+' '+(d.nachname||'')).trim();
+      inst.seats[seatId] = {
+        name,
+        company: d.firma || '',
+        profession: d.beruf || '',
+        ausbjahr: d.ausbjahr || '',
+        poolTnId: selfId,
+        poolKursId: kursId
+      };
+      persist();
+      renderSeats();
+      // Status auf 'attending' setzen (TN ist platziert)
+      return _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('teilnehmer').doc(selfId).update({status:'attending'});
+    }).then(()=>{
+      try{ syncGlobalTNStatus(selfId, 'clear'); }catch(e){}
+      toast('✓ Auf Sitz übernommen');
+      loadPool();
+    }).catch(err=>{
+      console.error('LocalSeat-Merge-Fehler:', err);
+      alert('Übernahme fehlgeschlagen:\n\n' + (err.message||err));
+    });
 }
 
 function ignoreDupTN(ignoreKey){
