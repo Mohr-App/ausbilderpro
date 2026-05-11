@@ -628,9 +628,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     </div>
     <div class="hdr-sep"></div>
     <div class="hdr-user" id="hdrUser"></div>
-    <button class="hdr-btn" id="backupBtn" onclick="doFullBackup()" title="Alle Daten als JSON-Datei sichern" style="display:none">📦 <span class="hdr-btn-text">Backup</span></button>
-    <button class="hdr-btn" id="restoreBtn" onclick="document.getElementById('restoreFileIn').click()" title="JSON-Backup wiederherstellen" style="opacity:.7;display:none"><span class="hdr-btn-text">Restore</span></button>
-    <input type="file" id="restoreFileIn" accept=".json" style="display:none" onchange="doRestore(event)">
     <!-- Glocke fuer Verwaltung-Events (vom Ausbilder gemeldete Status-Aenderungen) -->
     <div style="position:relative;margin:0 4px">
       <button class="hdr-btn" id="vwBellBtn" onclick="toggleVwBell(event)" title="Status-Meldungen vom Ausbilder" style="position:relative">
@@ -1742,13 +1739,6 @@ function grantAccess(u, role){
         }
       }).catch(()=>{if(settingsBtn) settingsBtn.style.display='none';});
   }
-  // Backup/Restore-Buttons nur für Admin sichtbar (Daten-Export sensibel!)
-  if(role==='admin'){
-    const bb=document.getElementById('backupBtn');
-    const rb=document.getElementById('restoreBtn');
-    if(bb) bb.style.display='';
-    if(rb) rb.style.display='';
-  }
   loadAll();
   loadAusbilderEmails();
   // Stefan-Accounts haben ggf. andere primaere Rolle (z.B. arbeitgeber fuer AG).
@@ -1758,10 +1748,6 @@ function grantAccess(u, role){
     db.collection('users').doc(_uid).set({email:u.email},{merge:true}).catch(()=>{});
   } else {
     db.collection('users').doc(_uid).set({email:u.email, role:role},{merge:true}).catch(()=>{});
-  }
-  // Backup-Reminder: NUR fuer Admin
-  if(role==='admin'){
-    checkBackupReminder();
   }
   loadUrlaubBadge();
   checkDsgvoConsent();
@@ -9182,44 +9168,7 @@ function _showVwBrowserNotification(ev){
 function closeKursModal(){ document.getElementById('kursModal').classList.remove('open'); }
 
 // ── KOMPLETT-BACKUP ──
-function doFullBackup(){
-  // Nur Admin darf Klartext-Backup ziehen
-  if(_userRole!=='admin'){
-    toast('Nur Admin darf Backups erstellen','bad');
-    return;
-  }
-  toast('📦 Backup wird erstellt…');
-  const backup={meta:{app:'VerwaltungPro',version:'1.5.0',date:new Date().toISOString(),email:_email},globalTN:[],kurse:[],kursSettings:{ausbilder:[],lehrgangsarten:[],berufe:[],verwaltung:[],standorte:[]}};
-  Promise.all([
-    db.collection('globalTN').get().then(s=>s.forEach(d=>backup.globalTN.push({id:d.id,...d.data()}))),
-    db.collection('shared').doc('kurse').collection('list').get().then(s=>s.forEach(d=>backup.kurse.push({id:d.id,...d.data()}))),
-    db.collection('shared').doc('kursSettings').collection('ausbilder').get().then(s=>s.forEach(d=>backup.kursSettings.ausbilder.push({id:d.id,...d.data()}))),
-    db.collection('shared').doc('kursSettings').collection('lehrgangsarten').get().then(s=>s.forEach(d=>backup.kursSettings.lehrgangsarten.push({id:d.id,...d.data()}))),
-    db.collection('shared').doc('kursSettings').collection('berufe').get().then(s=>s.forEach(d=>backup.kursSettings.berufe.push({id:d.id,...d.data()}))),
-    db.collection('shared').doc('kursSettings').collection('verwaltung').get().then(s=>s.forEach(d=>backup.kursSettings.verwaltung.push({id:d.id,...d.data()}))),
-    db.collection('shared').doc('kursSettings').collection('standorte').get().then(s=>s.forEach(d=>backup.kursSettings.standorte.push({id:d.id,...d.data()}))),
-  ]).then(()=>{
-    // Kurs-TN Subcollections laden
-    const tnPromises=backup.kurse.map(k=>
-      db.collection('shared').doc('kurse').collection('list').doc(k.id).collection('teilnehmer').get()
-        .then(s=>{k.teilnehmer=[];s.forEach(d=>k.teilnehmer.push({id:d.id,...d.data()}));})
-        .catch(()=>{})
-    );
-    return Promise.all(tnPromises);
-  }).then(()=>{
-    backup.meta.tnCount=backup.globalTN.length;
-    backup.meta.kursCount=backup.kurse.length;
-    const json=JSON.stringify(backup,null,2);
-    const blob=new Blob([json],{type:'application/json'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    const d=new Date();
-    a.download='VerwaltungPro_Backup_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
-    a.click();
-    localStorage.setItem('vp_lastBackup',Date.now().toString());
-    toast('✅ Backup gespeichert ('+backup.globalTN.length+' TN, '+backup.kurse.length+' Kurse)');
-  }).catch(err=>toast('Fehler: '+err.message,'bad'));
-}
+function doFullBackup(){ /* entfernt: kein Datei-Export mehr */ }
 
 // Backup-Reminder: alle 30 Tage
 function checkDsgvoConsent(){
@@ -9242,72 +9191,10 @@ function submitDsgvoConsent(){
     toast('✓ Zustimmung gespeichert');
   }).catch(err=>{if(errEl)errEl.textContent='Fehler: '+err.message;});
 }
-function checkBackupReminder(){
-  const last=parseInt(localStorage.getItem('vp_lastBackup')||'0');
-  // Kein gespeichertes Backup-Datum oder unrealistisch alt (>2 Jahre) → ignorieren.
-  // Sonst zeigt der Reminder absurde Zahlen wie "vor 20000 Tagen" wenn last=0 (Epoch).
-  if(!last || (Date.now()-last) > 730*86400000) return;
-  const daysSince=Math.floor((Date.now()-last)/(1000*60*60*24));
-  if(daysSince>=30){
-    setTimeout(()=>{
-      if(confirm('📦 Letztes Backup vor '+daysSince+' Tagen.\n\nJetzt ein Backup erstellen?')){
-        doFullBackup();
-      } else {
-        // Snooze: 30 Tage nicht mehr nerven
-        localStorage.setItem('vp_lastBackup', Date.now().toString());
-      }
-    },3000);
-  }
-}
+function checkBackupReminder(){ /* entfernt: kein Datei-Export mehr */ }
 
 // ── RESTORE ──
-function doRestore(e){
-  if(_userRole!=='admin'){
-    toast('Nur Admin darf Restore ausführen','bad');
-    e.target.value='';
-    return;
-  }
-  const file=e.target.files[0];
-  if(!file) return;
-  e.target.value='';
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    let data;
-    try { data=JSON.parse(ev.target.result); }
-    catch(err){ toast('Ungültige JSON-Datei','bad'); return; }
-    // Validierung
-    if(!data.meta||!data.globalTN){
-      toast('Keine gültige VerwaltungPro-Backup-Datei','bad'); return;
-    }
-    const tnCnt=data.globalTN?data.globalTN.length:0;
-    const kursCnt=data.kurse?data.kurse.length:0;
-    const ausbCnt=data.kursSettings?.ausbilder?.length||0;
-    const lgCnt=data.kursSettings?.lehrgangsarten?.length||0;
-    const berufCnt=data.kursSettings?.berufe?.length||0;
-    const verwCnt=data.kursSettings?.verwaltung?.length||0;
-    const backupDate=data.meta.date?new Date(data.meta.date).toLocaleDateString('de-DE'):'unbekannt';
-
-    const msg='📥 BACKUP WIEDERHERSTELLEN\n\n'
-      +'Backup vom: '+backupDate+'\n'
-      +'Erstellt von: '+(data.meta.email||'?')+'\n\n'
-      +'Inhalt:\n'
-      +'  '+tnCnt+' Teilnehmer\n'
-      +'  '+kursCnt+' Kurse\n'
-      +'  '+ausbCnt+' Ausbilder\n'
-      +'  '+lgCnt+' Lehrgangsarten\n'
-      +'  '+berufCnt+' Berufsgruppen\n'
-      +'  '+verwCnt+' Verwaltung-MA\n\n'
-      +'⚠️ ACHTUNG: Bestehende Daten mit gleicher ID werden überschrieben!\n'
-      +'Neue Daten werden hinzugefügt.\n\n'
-      +'Wirklich wiederherstellen?';
-
-    if(!confirm(msg)) return;
-    if(!confirm('Letzte Sicherheitsfrage:\nSoll das Backup JETZT eingespielt werden?')) return;
-
-    restoreData(data);
-  };
-  reader.readAsText(file);
-}
+function doRestore(e){ /* entfernt: kein Datei-Export mehr */ }
 
 function restoreData(data){
   toast('📥 Wiederherstellung läuft…');
