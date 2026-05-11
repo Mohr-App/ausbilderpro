@@ -69,6 +69,11 @@ service cloud.firestore {
             );
           allow update: if request.auth != null
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['wunschSitzplatz']);
+          // Merge-Operation: Ausbilder fuehrt manuellen + selbst-registrierten Eintrag zusammen
+          allow update: if request.auth != null
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+              ['firma','beruf','berufGruppeId','ausbjahr','kontaktEmail','kontaktTelefon','wunschSitzplatz','mergedFromManual']
+            );
           allow create, delete: if request.auth != null && deep == 'dokumente';
           // Meldungen: Azubi darf erstellen, Ausbilder darf lesen/löschen
           allow create: if request.auth != null && deep == 'meldungen';
@@ -99,6 +104,11 @@ service cloud.firestore {
         );
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['beruf']);
+      // Merge-Operation (Ausbilder fuehrt manuell + selbstregistriert zusammen)
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['firma','beruf','berufGruppeId','ausbjahr','kontaktEmail','kontaktTelefon','wunschSitzplatz','aktiverKursId','kursHistory','mergedFromManual']
+        );
       // Firmencode-Verknüpfung: Azubi verknüpft sich mit Arbeitgeber
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId']);
