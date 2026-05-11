@@ -734,7 +734,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="gsr-drop" id="gsrDrop"></div>
   </div>
   <div class="hdr-r">
+    <div class="save-ind" id="saveInd"><div class="save-dot"></div><span id="saveIndTxt">—</span></div>
     <div class="hclk" id="clk"></div>
+    <div class="tbtn" id="cloudInd" style="cursor:default;font-size:.6rem;">☁ —</div>
     <div class="app-launcher-wrap" id="appLauncher">
       <button class="app-launcher-btn" onclick="toggleAppLauncher(event)" title="App wechseln (Admin)">
         <svg viewBox="0 0 24 24"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>
@@ -1709,7 +1711,17 @@ function autoExport(reason){
   _lastExportCount = _changeCount;
 }
 
-function showSaveInd(){/* Save-Indikator entfernt */}
+function showSaveInd(){
+  const ind = document.getElementById('saveInd');
+  const txt = document.getElementById('saveIndTxt');
+  if(!ind) return;
+  const now = new Date();
+  const t = now.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  txt.textContent = '✓ ' + t;
+  ind.className = 'save-ind ok';
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(()=>{ ind.className='save-ind'; txt.textContent='Gespeichert'; }, 4000);
+}
 
 let _toastTimer = null;
 let _infoToastTimer = null;
@@ -7212,7 +7224,6 @@ function init(){
   hydrate(); loadAusbilder(); tick(); setInterval(tick,1000);
   const ind=document.getElementById('saveInd');
   const txt=document.getElementById('saveIndTxt');
-  if(!ind||!txt) return; // Element entfernt
   if(ind&&txt){ txt.textContent='Bereit'; ind.className='save-ind'; }
   let _swX=0;
   const drw=document.getElementById('mobDrawer');
@@ -8907,7 +8918,7 @@ try{
           document.getElementById('pwScreen').style.display='none';
           document.getElementById('noAccessScreen').style.display='none';
           document.getElementById('fbLogoutBtn').style.display='';
-          {const _ci=document.getElementById('cloudInd');if(_ci)_ci.textContent='☁ '+email.split('@')[0];}
+          document.getElementById('cloudInd').textContent='☁ '+email.split('@')[0];
           fbLoadData();
         } else {
           showNoAccess(email);
@@ -8917,14 +8928,14 @@ try{
       // Firestore-Fehler → Offline-Fallback mit localStorage
       document.getElementById('pwScreen').style.display='none';
       document.getElementById('fbLogoutBtn').style.display='';
-      {const _ci=document.getElementById('cloudInd');if(_ci)_ci.textContent='☁ '+email.split('@')[0];}
+      document.getElementById('cloudInd').textContent='☁ '+email.split('@')[0];
       fbLoadData();
     });
   } else {
     _fbUid=null;_isAdmin=false;
     document.getElementById('pwScreen').style.display='flex';
     document.getElementById('fbLogoutBtn').style.display='none';
-    {const _ci=document.getElementById('cloudInd');if(_ci)_ci.textContent='☁ —';}
+    document.getElementById('cloudInd').textContent='☁ —';
     document.getElementById('roleChoice').style.display='none';
     document.getElementById('noAccessScreen').style.display='none';
   }
@@ -8953,7 +8964,7 @@ function showRoleChoice(email){
 function goAsAusbilder(){
   document.getElementById('roleChoice').style.display='none';
   document.getElementById('fbLogoutBtn').style.display='';
-  {const _ci=document.getElementById('cloudInd');if(_ci)_ci.textContent='☁ '+(_auth.currentUser?.email||'').split('@')[0];}
+  document.getElementById('cloudInd').textContent='☁ '+(_auth.currentUser?.email||'').split('@')[0];
   fbLoadData();
 }
 
@@ -9039,7 +9050,7 @@ function fbSave(){
   if(_dataOwner && _dataOwner !== _fbUid) return; // SCHUTZ: nie Daten eines anderen Users speichern
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>{
-    const ci=document.getElementById('cloudInd')||{style:{},textContent:''};
+    const ci=document.getElementById('cloudInd');
     ci.textContent='☁ Speichert…';
     _db.collection('users').doc(_fbUid).collection('data').doc('state')
       .set({s:JSON.stringify(S),ts:firebase.firestore.FieldValue.serverTimestamp()})
@@ -9059,8 +9070,8 @@ function showFeatureInfo(){
 function startDemo(){
   _demoMode=true;
   document.getElementById('pwScreen').style.display='none';
-  {const _ci=document.getElementById('cloudInd');if(_ci)_ci.textContent='🎯 Demo';}
-  {const _ci=document.getElementById('cloudInd');if(_ci)_ci.style.color='#d97706';}
+  document.getElementById('cloudInd').textContent='🎯 Demo';
+  document.getElementById('cloudInd').style.color='#d97706';
   document.getElementById('fbLogoutBtn').style.display='none';
   // Demo-Hinweis im Header
   const demoTag=document.createElement('div');
