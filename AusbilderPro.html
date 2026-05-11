@@ -2820,6 +2820,7 @@ function renderMain(){
     +'</div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
+    +'<div id="dupHintBanner" style="display:none;margin:10px 0;padding:12px 16px;background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(239,68,68,.06));border:1.5px solid rgba(245,158,11,.35);border-radius:10px;font-size:.74rem;color:var(--tx);line-height:1.55"></div>'
     +'<div id="poolHintBanner" style="display:none;margin:10px 0;padding:12px 16px;background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(5,150,105,.06));border:1.5px solid rgba(37,99,235,.25);border-radius:10px;font-size:.74rem;color:var(--tx);line-height:1.55">'
     +'<div style="display:flex;justify-content:space-between;align-items:start;gap:10px">'
     +'<div style="flex:1">'
@@ -6034,6 +6035,7 @@ function saveManualTN(){
         vorname, nachname, firma, beruf, berufGruppeId, ausbjahr,
         kontaktEmail, kontaktTelefon, wunschSitzplatz,
         status: 'active',
+        manuellAngelegt: true,
         addedAt: Date.now()
       }).then(()=>ref.id);
   }).then(tnId=>{
@@ -7758,6 +7760,140 @@ let _meldUnsub = null; // Meldungen listener
 let _meldSeen = new Set(); // bereits angezeigte Meldungen
 let _autoPlacedIds = new Set(); // Verhindert doppelte Toast-Meldungen
 
+// ── DUPLIKAT-CHECK: manuell angelegte vs. selbstregistrierte TN ──
+// Beim Snapshot vergleichen, ob ein manueller Eintrag und ein Selbst-
+// registrierter Eintrag den gleichen Namen haben. Banner-Vorschlag fuer
+// Ausbilder zum Zusammenfuehren.
+function checkDuplicateTNs(snapDocs, kursId){
+  const banner = document.getElementById('dupHintBanner');
+  if(!banner) return;
+  function normName(v,n){
+    const fn=((v||'').trim()+' '+(n||'').trim()).replace(/\s+/g,' ').trim().toLowerCase();
+    return fn;
+  }
+  const ignored = JSON.parse(localStorage.getItem(_lsKey('dupIgnore')||'ap_dupIgnore')||'{}');
+  // Index alle aktiven (nicht fehlt/wdh) per Namen
+  const byName = {};
+  snapDocs.forEach(doc=>{
+    const d = doc.data();
+    if(d.status==='absent' || d.status==='wiederholer') return;
+    const k = normName(d.vorname, d.nachname);
+    if(!k) return;
+    if(!byName[k]) byName[k]=[];
+    byName[k].push({id:doc.id, ...d});
+  });
+  // Finde Namen mit 2+ Eintraegen wo manuellAngelegt + ein anderer existiert
+  const matches = [];
+  Object.entries(byName).forEach(([name, list])=>{
+    if(list.length < 2) return;
+    const manuelle = list.filter(t=>t.manuellAngelegt);
+    const andere = list.filter(t=>!t.manuellAngelegt);
+    if(!manuelle.length || !andere.length) return;
+    // Fuer jede manuelle Eintrag-Andere-Eintrag-Kombi pruefen ob bereits ignoriert
+    manuelle.forEach(m=>{
+      andere.forEach(a=>{
+        const key = m.id+'__'+a.id;
+        if(ignored[key]) return;
+        matches.push({manuell:m, selbst:a, ignoreKey:key, displayName:((a.vorname||'')+' '+(a.nachname||'')).trim()});
+      });
+    });
+  });
+  if(!matches.length){
+    banner.style.display='none';
+    banner.innerHTML='';
+    return;
+  }
+  // Banner mit allen offenen Duplikat-Vorschlaegen
+  let html = '<div style="display:flex;align-items:center;gap:8px;font-weight:800;color:#b45309;margin-bottom:8px"><span style="font-size:1rem">🔔</span><span>Möglicher Duplikat-Eintrag erkannt</span></div>';
+  matches.forEach(m=>{
+    const sub = [m.manuell.beruf, m.manuell.firma].filter(Boolean).join(' · ');
+    html += '<div style="background:#fff;border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
+      + '<div style="font-size:.72rem;margin-bottom:6px"><b>'+esc(m.displayName)+'</b> hat sich gerade registriert.</div>'
+      + (sub ? '<div style="font-size:.62rem;color:var(--mu);margin-bottom:8px">Manuell angelegt: '+esc(sub)+'</div>' : '')
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+        + '<button onclick="mergeDupTN(\''+m.manuell.id+'\',\''+m.selbst.id+'\',\''+kursId+'\')" style="flex:1;min-width:120px;padding:8px 12px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.7rem">✓ Zusammenführen</button>'
+        + '<button onclick="ignoreDupTN(\''+m.ignoreKey+'\')" style="padding:8px 12px;background:rgba(100,116,139,.1);color:var(--tx);border:1px solid var(--brd);border-radius:7px;cursor:pointer;font-family:Sora,sans-serif;font-size:.7rem">Sind verschieden</button>'
+      + '</div></div>';
+  });
+  banner.innerHTML = html;
+  banner.style.display = 'block';
+}
+
+function ignoreDupTN(ignoreKey){
+  const k = _lsKey('dupIgnore')||'ap_dupIgnore';
+  const ignored = JSON.parse(localStorage.getItem(k)||'{}');
+  ignored[ignoreKey] = Date.now();
+  localStorage.setItem(k, JSON.stringify(ignored));
+  // Banner neu rendern - findet jetzt diesen Match nicht mehr
+  const inst = curInst();
+  if(inst && inst.sharedKursId) loadPool();
+}
+
+function mergeDupTN(manualId, selfId, kursId){
+  if(!_db){toast('Nicht verbunden','bad');return;}
+  if(!confirm('Manuellen Eintrag mit dem selbst-registrierten Eintrag zusammenführen?\n\nDer selbst-registrierte Eintrag bleibt erhalten. Fehlende Felder (Beruf, Firma etc.) werden vom manuellen Eintrag uebernommen. Der manuelle Eintrag wird danach gelöscht.')){
+    return;
+  }
+  const kursRef = _db.collection('shared').doc('kurse').collection('list').doc(kursId);
+  const manualSubRef = kursRef.collection('teilnehmer').doc(manualId);
+  const selfSubRef = kursRef.collection('teilnehmer').doc(selfId);
+  const manualGTNRef = _db.collection('globalTN').doc(manualId);
+  const selfGTNRef = _db.collection('globalTN').doc(selfId);
+  toast('Führe zusammen...');
+
+  Promise.all([manualSubRef.get(), selfSubRef.get(), manualGTNRef.get(), selfGTNRef.get()])
+    .then(([mSub, sSub, mGtn, sGtn])=>{
+      const m = mSub.exists ? mSub.data() : {};
+      const s = sSub.exists ? sSub.data() : {};
+      const mG = mGtn.exists ? mGtn.data() : {};
+      const sG = sGtn.exists ? sGtn.data() : {};
+
+      // Felder die uebernommen werden wenn beim selbst-registrierten leer
+      const fieldsToFill = ['firma','beruf','berufGruppeId','ausbjahr','kontaktEmail','kontaktTelefon'];
+      const subUpdate = {};
+      const gtnUpdate = {};
+      fieldsToFill.forEach(f=>{
+        if(!s[f] && m[f]) subUpdate[f] = m[f];
+        if(!sG[f] && mG[f]) gtnUpdate[f] = mG[f];
+      });
+      // wunschSitzplatz: manueller Wert nur uebernehmen wenn selbst-Reg keinen hat
+      // Aber Stefan wollte Option B: selbst-registrierter Sitz bleibt -> kein Sitzplatz-Override
+      // wunschSitzplatz hilft hier nicht, weil Sitz schon gerendert ist
+
+      // Markiere selbst-registriertes Doc als "merged"
+      subUpdate.mergedFromManual = manualId;
+      gtnUpdate.mergedFromManual = manualId;
+
+      // 1. Sub-Doc des selbst-Registrierten updaten
+      // 2. globalTN des selbst-Registrierten updaten
+      // 3. Sub-Doc des manuellen loeschen
+      // 4. globalTN des manuellen loeschen
+      // 5. Falls manueller Sitzplatz belegt -> freigeben (lokal in S, dann persist)
+      return Promise.all([
+        selfSubRef.set(subUpdate,{merge:true}),
+        selfGTNRef.set(gtnUpdate,{merge:true})
+      ]).then(()=>Promise.all([
+        manualSubRef.delete(),
+        manualGTNRef.delete()
+      ]));
+    }).then(()=>{
+      // Lokal: falls manualId auf einem Sitzplatz war -> freigeben
+      const inst = curInst();
+      if(inst && inst.seats){
+        Object.keys(inst.seats).forEach(seatId=>{
+          const sd = inst.seats[seatId];
+          if(sd && sd.poolTnId === manualId){
+            inst.seats[seatId] = {};
+          }
+        });
+        persist();
+        renderSeats();
+      }
+      toast('✓ Zusammengeführt');
+      loadPool();
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
 function loadPool(){
   if(_demoMode) return;
   // Alten Listener abmelden
@@ -7855,7 +7991,9 @@ function loadPool(){
     _poolUnsub = kursRef.collection('teilnehmer').orderBy('nachname').onSnapshot(snap=>{
       // ── Snapshot-Guard ──
       if(isStale()){if(_poolUnsub){_poolUnsub();_poolUnsub=null;}return;}
-      if(snap.empty){ body.innerHTML=poolEmptyGuideHtml('noTN'); renderFehlt(kursId); renderWiederholer(kursId); try{ updatePoolHint(); }catch(e){} return; }
+      if(snap.empty){ body.innerHTML=poolEmptyGuideHtml('noTN'); renderFehlt(kursId); renderWiederholer(kursId); try{ updatePoolHint(); }catch(e){} try{ checkDuplicateTNs([], kursId); }catch(e){} return; }
+      // Duplikat-Check (manuell angelegt vs. selbst registriert)
+      try{ checkDuplicateTNs(snap.docs, kursId); }catch(e){console.warn('dup check:',e);}
       const seats = curSeats();
       // Robust normalization: collapse spaces, trim, lowercase
       function normName(n){ return (n||'').replace(/\s+/g,' ').trim().toLowerCase(); }
