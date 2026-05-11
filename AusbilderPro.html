@@ -7764,37 +7764,64 @@ let _autoPlacedIds = new Set(); // Verhindert doppelte Toast-Meldungen
 // Beim Snapshot vergleichen, ob ein manueller Eintrag und ein Selbst-
 // registrierter Eintrag den gleichen Namen haben. Banner-Vorschlag fuer
 // Ausbilder zum Zusammenfuehren.
+// Fuzzy-Matching: Umlaut-Normalisierung + Levenshtein-Distanz <=2 fuer
+// 1-2 Tippfehler-Toleranz (Schmidt/Schmitt, Mueller/Müller, etc.)
+function _normNameFuzzy(v,n){
+  let s=((v||'').trim()+' '+(n||'').trim()).replace(/\s+/g,' ').trim().toLowerCase();
+  // Umlaut-Normalisierung
+  s = s.replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
+  return s;
+}
+function _levenshtein(a,b){
+  if(a===b) return 0;
+  if(!a.length) return b.length;
+  if(!b.length) return a.length;
+  // Schnell-Reject: bei zu grossem Laengen-Unterschied gar nicht erst rechnen
+  if(Math.abs(a.length-b.length) > 3) return 99;
+  const matrix = [];
+  for(let i=0;i<=b.length;i++) matrix[i]=[i];
+  for(let j=0;j<=a.length;j++) matrix[0][j]=j;
+  for(let i=1;i<=b.length;i++){
+    for(let j=1;j<=a.length;j++){
+      if(b.charAt(i-1)===a.charAt(j-1)){
+        matrix[i][j]=matrix[i-1][j-1];
+      } else {
+        matrix[i][j]=Math.min(matrix[i-1][j-1]+1, matrix[i][j-1]+1, matrix[i-1][j]+1);
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
 function checkDuplicateTNs(snapDocs, kursId){
   const banner = document.getElementById('dupHintBanner');
   if(!banner) return;
-  function normName(v,n){
-    const fn=((v||'').trim()+' '+(n||'').trim()).replace(/\s+/g,' ').trim().toLowerCase();
-    return fn;
-  }
   const ignored = JSON.parse(localStorage.getItem(_lsKey('dupIgnore')||'ap_dupIgnore')||'{}');
-  // Index alle aktiven (nicht fehlt/wdh) per Namen
-  const byName = {};
+  // Aktive TN sammeln (kein fehlt/wdh)
+  const active = [];
   snapDocs.forEach(doc=>{
     const d = doc.data();
     if(d.status==='absent' || d.status==='wiederholer') return;
-    const k = normName(d.vorname, d.nachname);
-    if(!k) return;
-    if(!byName[k]) byName[k]=[];
-    byName[k].push({id:doc.id, ...d});
+    const key = _normNameFuzzy(d.vorname, d.nachname);
+    if(!key) return;
+    active.push({id:doc.id, normName:key, ...d});
   });
-  // Finde Namen mit 2+ Eintraegen wo manuellAngelegt + ein anderer existiert
+  // Matches: jeder manuelle vs. jeder andere; Levenshtein <=2
   const matches = [];
-  Object.entries(byName).forEach(([name, list])=>{
-    if(list.length < 2) return;
-    const manuelle = list.filter(t=>t.manuellAngelegt);
-    const andere = list.filter(t=>!t.manuellAngelegt);
-    if(!manuelle.length || !andere.length) return;
-    // Fuer jede manuelle Eintrag-Andere-Eintrag-Kombi pruefen ob bereits ignoriert
-    manuelle.forEach(m=>{
-      andere.forEach(a=>{
-        const key = m.id+'__'+a.id;
-        if(ignored[key]) return;
-        matches.push({manuell:m, selbst:a, ignoreKey:key, displayName:((a.vorname||'')+' '+(a.nachname||'')).trim()});
+  const manuelle = active.filter(t=>t.manuellAngelegt);
+  const andere   = active.filter(t=>!t.manuellAngelegt);
+  manuelle.forEach(m=>{
+    andere.forEach(a=>{
+      if(m.id===a.id) return;
+      const dist = _levenshtein(m.normName, a.normName);
+      if(dist > 2) return;
+      const ignoreKey = m.id+'__'+a.id;
+      if(ignored[ignoreKey]) return;
+      matches.push({
+        manuell:m, selbst:a, ignoreKey,
+        exact: dist===0,
+        distance: dist,
+        displayName:((a.vorname||'')+' '+(a.nachname||'')).trim(),
+        manualDisplay:((m.vorname||'')+' '+(m.nachname||'')).trim()
       });
     });
   });
@@ -7803,12 +7830,19 @@ function checkDuplicateTNs(snapDocs, kursId){
     banner.innerHTML='';
     return;
   }
-  // Banner mit allen offenen Duplikat-Vorschlaegen
+  // Banner: exakte Matches zuerst, dann Fuzzy
+  matches.sort((a,b)=>a.distance-b.distance);
   let html = '<div style="display:flex;align-items:center;gap:8px;font-weight:800;color:#b45309;margin-bottom:8px"><span style="font-size:1rem">🔔</span><span>Möglicher Duplikat-Eintrag erkannt</span></div>';
   matches.forEach(m=>{
     const sub = [m.manuell.beruf, m.manuell.firma].filter(Boolean).join(' · ');
-    html += '<div style="background:#fff;border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
-      + '<div style="font-size:.72rem;margin-bottom:6px"><b>'+esc(m.displayName)+'</b> hat sich gerade registriert.</div>'
+    const isFuzzy = !m.exact;
+    const headline = isFuzzy
+      ? '<b>'+esc(m.displayName)+'</b> (registriert) ähnelt <b>'+esc(m.manualDisplay)+'</b> (manuell). <span style="color:#b45309">Eventuell ein Tippfehler?</span>'
+      : '<b>'+esc(m.displayName)+'</b> hat sich gerade registriert.';
+    const bg = isFuzzy ? 'rgba(245,158,11,.05)' : '#fff';
+    const border = isFuzzy ? 'rgba(245,158,11,.5)' : 'rgba(245,158,11,.3)';
+    html += '<div style="background:'+bg+';border:1px solid '+border+';border-radius:8px;padding:10px 12px;margin-bottom:8px">'
+      + '<div style="font-size:.72rem;margin-bottom:6px">'+headline+'</div>'
       + (sub ? '<div style="font-size:.62rem;color:var(--mu);margin-bottom:8px">Manuell angelegt: '+esc(sub)+'</div>' : '')
       + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
         + '<button onclick="mergeDupTN(\''+m.manuell.id+'\',\''+m.selbst.id+'\',\''+kursId+'\')" style="flex:1;min-width:120px;padding:8px 12px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.7rem">✓ Zusammenführen</button>'
