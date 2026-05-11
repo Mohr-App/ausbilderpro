@@ -8387,8 +8387,15 @@ function openEmptySeatChooser(seatId){
   }
   modal.innerHTML = '<div class="modal" style="max-width:420px"><div class="mhd"><div class="mtit">👤 Azubi auf Sitzplatz setzen</div><button class="xcls" onclick="closeSeatPicker()" title="Schließen">×</button></div><div class="mbdy" id="seatPickerBody"></div></div>';
   const body = document.getElementById('seatPickerBody');
-  let html = '<div style="font-size:.7rem;color:var(--mu);margin-bottom:10px">Aus dem Pool waehlen oder manuell eingeben:</div>';
-  cards.forEach(card=>{
+  // Bereits platzierte TN ausfiltern (sind eh schon auf einem Sitz)
+  const available = Array.from(cards).filter(card=>!card.classList.contains('placed'));
+  if(!available.length){
+    body.innerHTML = '<div style="text-align:center;padding:14px"><div style="font-size:2rem;margin-bottom:8px">✓</div><div style="font-weight:700;font-size:.82rem;margin-bottom:6px">Alle Pool-TN sind bereits platziert</div><div style="font-size:.7rem;color:#64748b;margin-bottom:14px;line-height:1.55">Lege einen weiteren Teilnehmer an, um ihn auf diesen Sitzplatz zu setzen.</div><button onclick="closeSeatPicker();openManualTNModal()" style="width:100%;padding:11px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.78rem">+ Neuen Teilnehmer anlegen</button></div>';
+    modal.classList.add('open');
+    return;
+  }
+  let html = '<div style="font-size:.7rem;color:var(--mu);margin-bottom:10px">Teilnehmer aus dem Pool wählen:</div>';
+  available.forEach(card=>{
     const name = card.dataset.name || '';
     const company = card.dataset.company || '';
     const profession = card.dataset.profession || '';
