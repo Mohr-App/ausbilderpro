@@ -5987,12 +5987,17 @@ function openManualTNModal(){
   _mtSuggestionList = [];
   const sg = document.getElementById('mtSuggBox');
   if(sg){sg.style.display='none'; sg.innerHTML='';}
-  // Existierende Azubi-TN aus globalTN laden (fuer Autocomplete)
+  // Existierende TN aus globalTN laden (fuer Autocomplete)
+  // Filter: alles AUSSER explizit als Arbeitnehmer/Mitarbeiter markiert,
+  // damit auch Legacy-Docs ohne typ-Feld erscheinen.
   if(_db){
-    _db.collection('globalTN').where('typ','==','azubi').limit(500).get().then(snap=>{
+    _db.collection('globalTN').limit(500).get().then(snap=>{
       _mtSuggestionList=[];
       snap.forEach(doc=>{
         const d=doc.data();
+        const t=(d.typ||'').toLowerCase();
+        // Nur Mitarbeiter/Arbeitnehmer ausschliessen
+        if(t==='arbeitnehmer'||t==='mitarbeiter') return;
         _mtSuggestionList.push({
           id:doc.id,
           vorname:d.vorname||'', nachname:d.nachname||'',
