@@ -623,8 +623,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   .katml{align-items:flex-end;padding:0;}
   .katml-box{border-radius:18px 18px 0 0;max-width:100%;width:100%;position:fixed;bottom:0;max-height:88vh;display:flex;flex-direction:column;}
   .katml-box .katml-bd{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 60px);}
-  #driveModal.dpov{align-items:flex-end;}
-  #driveModal .dpm{border-radius:18px 18px 0 0;max-width:100%;}
   /* tafel + legend */
   .tafel{font-size:.7rem;padding:9px 12px;margin:14px 0 0;}
   .legend{gap:8px;padding:8px 10px;}
@@ -770,7 +768,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" id="hdrExportBtn" onclick="doExport();closeHdrMenu()" style="width:100%;text-align:left" title="Daten als verschlüsselte .hbz Datei sichern">⬇ Export (.hbz)</button>
         <button class="tbtn" id="hdrExportPwBtn" onclick="doExportChangePw();closeHdrMenu()" style="width:100%;text-align:left" title="Passwort für Export-Dateien ändern">🔑 Export-Passwort</button>
         <button class="tbtn" id="hdrImportBtn" onclick="document.getElementById('impFile').click();closeHdrMenu()" style="width:100%;text-align:left" title="Gespeicherte .hbz Datei einlesen">⬆ Import</button>
-        <button class="tbtn gdrive-btn" id="gdriveBtn" onclick="gdriveAction();closeHdrMenu()" style="width:100%;text-align:left" title="Daten in Google Drive sichern/laden"><span id="gdriveBtnTxt">☁ Google Drive</span></button>
         <div id="hdrIoSep" style="border-top:1px solid var(--brd);margin:2px 0"></div>
         <button class="tbtn" onclick="openMeinUrlaub();closeHdrMenu()" style="width:100%;text-align:left" title="Eigene Urlaubstage eintragen">🏖 Mein Urlaub</button>
         <button class="tbtn" onclick="openAusbilderProfil();closeHdrMenu()" style="width:100%;text-align:left" title="Name, Telefon, E-Mail für Azubis hinterlegen">👤 Mein Profil</button>
@@ -964,16 +961,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
-<!-- GOOGLE DRIVE MODAL -->
-<div class="dpov" id="driveModal" onclick="if(event.target===this)closeDriveModal()">
-  <div class="dpm" style="max-width:480px">
-    <div class="dpm-hd">
-      <div class="dpm-tit" id="driveModalTitle">Google Drive</div>
-      <button class="xcls" onclick="closeDriveModal()" title="Schließen">✕</button>
-    </div>
-    <div class="dpm-bd" id="driveModalBody"></div>
-  </div>
-</div>
 </div>
 
 <!-- ROLLEN-AUSWAHL (nur für Admins) -->
@@ -1710,7 +1697,6 @@ let dpKatId=null;
 // Storage
 let _changeCount = 0;
 let _lastExportCount = 0;
-let _driveToken = null;
 let _saveTimer = null;
 let _autoExportTimer = null;
 
@@ -7111,61 +7097,6 @@ function doImport(e){
   r.readAsText(f);e.target.value='';
 }
 
-// ═══════════════════════════════════════════════════
-// GOOGLE DRIVE – einfacher Upload
-// ═══════════════════════════════════════════════════
-function gdriveAction(){
-  if(_demoMode){ showDemoUpgrade(); return; }
-  openDriveModal('menu');
-}
-
-function openDriveModal(view){
-  const body = document.getElementById('driveModalBody');
-  const title = document.getElementById('driveModalTitle');
-  title.textContent = '☁ In Google Drive speichern';
-  body.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div style="background:var(--sur2);border:2px solid #e2e8f0;border-radius:9px;padding:14px;font-size:.78rem;line-height:1.8;color:var(--mu)">
-        <b style="color:var(--tx);display:block;margin-bottom:6px">So funktioniert es:</b>
-        <span style="color:var(--acc);font-family:'JetBrains Mono',monospace">1.</span> Klick auf <b style="color:var(--tx)">„Exportieren &amp; Drive öffnen"</b><br>
-        <span style="color:var(--acc);font-family:'JetBrains Mono',monospace">2.</span> Die Datei wird heruntergeladen<br>
-        <span style="color:var(--acc);font-family:'JetBrains Mono',monospace">3.</span> Google Drive öffnet sich im Browser<br>
-        <span style="color:var(--acc);font-family:'JetBrains Mono',monospace">4.</span> Datei per <b style="color:var(--tx)">Drag &amp; Drop</b> in Drive ziehen<br>
-        <br>
-        <span style="color:var(--acc);font-family:'JetBrains Mono',monospace">↩</span> <b style="color:var(--tx)">Laden:</b> Datei aus Drive runterladen → Import-Button
-      </div>
-      <button class="dp-save" title="☁ Exportieren &amp; Drive öffnen" onclick="driveExportAndOpen()">
-        ☁ Exportieren &amp; Drive öffnen
-      </button>
-      <div style="font-size:.68rem;color:var(--mu);text-align:center;font-family:'JetBrains Mono',monospace">
-        Tipp: Lege die Datei in einen Drive-Ordner der mit dem PC synchronisiert ist<br>– dann reicht der normale Export-Button.
-      </div>
-    </div>`;
-  document.getElementById('driveModal').classList.add('open');
-}
-
-function closeDriveModal(){ document.getElementById('driveModal').classList.remove('open'); }
-
-function driveExportAndOpen(){
-  // 1. Download the file
-  _lastExportCount = _changeCount;
-  const b = new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(b);
-  a.download = 'ap_sitzplan.json';
-  a.click();
-  // 2. Open Google Drive after short delay
-  setTimeout(()=> window.open('https://drive.google.com/drive/my-drive','_blank'), 800);
-  closeDriveModal();
-  showInfoToast('☁ Datei heruntergeladen','Jetzt in Google Drive ziehen oder hochladen.');
-}
-
-function setDriveBtn(cls,txt){
-  const btn=document.getElementById('gdriveBtn');
-  const sp=document.getElementById('gdriveBtnTxt');
-  if(btn) btn.className='tbtn gdrive-btn'+(cls?' '+cls:'');
-  if(sp) sp.textContent=txt;
-}
 
 // Clock + init
 function tick(){const n=new Date();document.getElementById('clk').innerHTML=n.toLocaleDateString('de-DE')+'<br>'+n.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
