@@ -253,10 +253,10 @@ service cloud.firestore {
           && (request.resource.data.von == request.auth.uid
               || request.resource.data.system == true);
 
-        // Update: nur eigene Nachrichten + nur Soft-Delete-Felder
+        // Update: nur eigene Nachrichten + nur Soft-Delete-Felder (inkl. attachment-Entfernung)
         allow update: if request.auth != null
           && resource.data.von == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted','deletedAt','text']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted','deletedAt','text','attachment']);
 
         // Hard-Delete: eigene Nachrichten, ODER Admin bei Nachrichten >60 Tage alt (Admin-Sweep)
         allow delete: if request.auth != null

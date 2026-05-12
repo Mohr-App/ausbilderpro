@@ -496,6 +496,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .chat-bubble-time{font-size:.55rem;opacity:.7;margin-top:3px;display:block;}
 .chat-bubble-del{position:absolute;top:-6px;right:-6px;background:#fff;border:1px solid #e2e8f0;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:.6rem;display:none;align-items:center;justify-content:center;color:#ef4444;box-shadow:0 2px 6px rgba(0,0,0,.1);}
 .chat-bubble-wrap.me:hover .chat-bubble-del{display:flex;}
+.chat-att-img{display:block;max-width:240px;max-height:240px;border-radius:8px;cursor:zoom-in;margin-bottom:4px;}
+.chat-att-file{display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(0,0,0,.06);border-radius:8px;margin-bottom:4px;text-decoration:none;color:inherit;font-size:.74rem;}
+.chat-bubble.me .chat-att-file{background:rgba(255,255,255,.2);}
+.chat-att-file-ic{font-size:1.4rem;flex-shrink:0;}
+.chat-att-file-name{font-weight:700;word-break:break-all;}
+.chat-att-file-size{font-size:.62rem;opacity:.75;}
 .chat-sys-msg{align-self:center;background:rgba(100,116,139,.12);color:#475569;font-size:.65rem;padding:4px 10px;border-radius:10px;font-style:italic;}
 .chat-input-row{display:flex;gap:8px;padding:10px 12px;border-top:1px solid #e2e8f0;background:#fff;flex-shrink:0;}
 .chat-input-row textarea{flex:1;border:2px solid #e2e8f0;border-radius:10px;padding:8px 12px;font-family:'Sora',sans-serif;font-size:.82rem;resize:none;max-height:100px;min-height:38px;background:#f8fafc;}
@@ -875,7 +881,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="chat-hdr-btn" onclick="closeChatModal()" title="Schließen">✕</button>
       </div>
       <div class="chat-msgs" id="chatMsgsBody"></div>
+      <div id="chatAttPreview" style="display:none;padding:8px 12px;background:#f1f5f9;border-top:1px solid #e2e8f0;font-size:.72rem"></div>
       <div class="chat-input-row">
+        <input type="file" id="chatFileInp" style="display:none" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" onchange="onChatFilePicked(event)">
+        <button onclick="document.getElementById('chatFileInp').click()" title="Bild oder Datei (max 1 MB)" style="background:#f1f5f9;color:#475569;border:2px solid #e2e8f0;border-radius:10px;padding:0 12px;font-size:1rem;cursor:pointer;flex-shrink:0">📎</button>
         <textarea id="chatInpText" placeholder="Nachricht…" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
         <button id="chatSendBtn" onclick="sendChatMessage()" title="Senden">▶</button>
       </div>
@@ -922,6 +931,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
     </div>
   </div>
+</div>
+
+<!-- BILD-LIGHTBOX -->
+<div id="chatLightbox" onclick="closeChatLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10002;align-items:center;justify-content:center;cursor:zoom-out;padding:20px">
+  <button onclick="event.stopPropagation();closeChatLightbox()" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,.15);color:#fff;border:none;width:36px;height:36px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+  <img id="chatLightboxImg" src="" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px">
 </div>
 
 <!-- MITGLIED HINZUFÜGEN MODAL -->
@@ -10449,15 +10464,26 @@ async function chatSweepRun(){
         const snap=await _db.collection('chats').doc(chatId).collection('messages').orderBy('ts','asc').limit(200).get();
         if(snap.empty) break;
         const batch=_db.batch();
+        const storagePaths=[];
         let count=0,foundNew=false;
         snap.forEach(d=>{
-          const ts=d.data().ts?.toMillis?.()||0;
-          if(ts>0 && ts<cutoff){batch.delete(d.ref);count++;}
+          const m=d.data();
+          const ts=m.ts?.toMillis?.()||0;
+          if(ts>0 && ts<cutoff){
+            batch.delete(d.ref);count++;
+            if(m.attachment?.storagePath) storagePaths.push(m.attachment.storagePath);
+          }
           else if(ts>=cutoff){foundNew=true;}
         });
         if(count>0){
           await batch.commit();
           totalDeleted+=count;
+          // Storage-Files nachreichen
+          if(_st&&storagePaths.length){
+            for(const p of storagePaths){
+              try{await _st.ref(p).delete();}catch(e){console.warn('Storage-Delete '+p+':',e);}
+            }
+          }
         }
         if(foundNew||snap.size<200){hasMore=false;}
       }
@@ -10505,11 +10531,11 @@ function runChatAutoCleanup(){
   const THIRTY_DAYS=30*24*3600*1000;
   const now=Date.now();
   Object.keys(_chats).forEach(chatId=>{
-    // Aelteste 100 Nachrichten pro Chat anschauen (kein Composite-Index noetig)
     _db.collection('chats').doc(chatId).collection('messages')
       .orderBy('ts','asc').limit(100).get().then(snap=>{
         if(snap.empty) return;
         const batch=_db.batch();
+        const storagePaths=[];
         let count=0;
         snap.forEach(d=>{
           const m=d.data();
@@ -10518,11 +10544,18 @@ function runChatAutoCleanup(){
           const delMillis=m.deletedAt?.toMillis?.()||0;
           const tooOld=tsMillis>0 && (now-tsMillis)>SIX_MONTHS;
           const expiredSoftDel=m.deleted && delMillis>0 && (now-delMillis)>THIRTY_DAYS;
-          if(tooOld||expiredSoftDel){batch.delete(d.ref);count++;}
+          if(tooOld||expiredSoftDel){
+            batch.delete(d.ref);count++;
+            if(m.attachment?.storagePath) storagePaths.push(m.attachment.storagePath);
+          }
         });
         if(count>0){
           batch.commit().then(()=>{
             console.log('Chat-Cleanup '+chatId+': '+count+' eigene Nachrichten geloescht');
+            // Storage-Files nachreichen
+            if(_st&&storagePaths.length){
+              storagePaths.forEach(p=>_st.ref(p).delete().catch(()=>{}));
+            }
           }).catch(err=>console.warn('Chat-Cleanup commit:',err));
         }
       }).catch(err=>console.warn('Chat-Cleanup query:',err));
@@ -10767,6 +10800,153 @@ function _openChatUI(chatId){
   });
 }
 
+// ───────── ANHÄNGE ─────────
+let _pendingAtt=null; // {blob,name,size,mime,type,resizedBlob}
+async function onChatFilePicked(ev){
+  const file=ev.target.files?.[0];
+  ev.target.value=''; // reset
+  if(!file) return;
+  if(!_curChatId){toast('Bitte erst Chat öffnen','bad');return;}
+  const MAX=1024*1024;
+  let blob=file;
+  let name=file.name;
+  let mime=file.type||'application/octet-stream';
+  const isImg=mime.startsWith('image/');
+  if(isImg){
+    try{blob=await resizeImageForChat(file,1280,0.78);mime='image/jpeg';name=name.replace(/\.[^.]+$/i,'')+'.jpg';}
+    catch(e){toast('Bild-Verkleinerung fehlgeschlagen: '+e.message,'bad');return;}
+  }
+  if(blob.size>MAX){
+    toast('Datei zu groß: '+Math.round(blob.size/1024)+' KB (max 1024 KB)','bad');
+    return;
+  }
+  _pendingAtt={blob,name,size:blob.size,mime,type:isImg?'image':'file'};
+  // Preview anzeigen
+  const pv=document.getElementById('chatAttPreview');
+  pv.style.display='';
+  let inner='';
+  if(isImg){
+    const url=URL.createObjectURL(blob);
+    inner='<div style="display:flex;align-items:center;gap:10px"><img src="'+url+'" style="width:50px;height:50px;object-fit:cover;border-radius:6px"><div style="flex:1"><div style="font-weight:700">'+esc(name)+'</div><div style="color:#64748b">'+Math.round(blob.size/1024)+' KB · wird mit Nachricht gesendet</div></div><button onclick="clearChatAtt()" style="background:none;border:none;color:#ef4444;font-size:.9rem;cursor:pointer">✕</button></div>';
+  } else {
+    inner='<div style="display:flex;align-items:center;gap:10px"><span style="font-size:1.5rem">'+fileIconFor(mime)+'</span><div style="flex:1"><div style="font-weight:700">'+esc(name)+'</div><div style="color:#64748b">'+Math.round(blob.size/1024)+' KB · wird mit Nachricht gesendet</div></div><button onclick="clearChatAtt()" style="background:none;border:none;color:#ef4444;font-size:.9rem;cursor:pointer">✕</button></div>';
+  }
+  pv.innerHTML=inner;
+}
+function clearChatAtt(){
+  _pendingAtt=null;
+  const pv=document.getElementById('chatAttPreview');
+  if(pv){pv.style.display='none';pv.innerHTML='';}
+}
+function fileIconFor(mime){
+  if(!mime) return '📎';
+  if(mime.includes('pdf')) return '📕';
+  if(mime.includes('word')||mime.includes('document')) return '📘';
+  if(mime.includes('sheet')||mime.includes('excel')) return '📗';
+  if(mime.startsWith('image/')) return '🖼';
+  if(mime.startsWith('text/')) return '📄';
+  return '📎';
+}
+function resizeImageForChat(file,maxDim,quality){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.width,h=img.height;
+      if(Math.max(w,h)>maxDim){
+        if(w>=h){h=Math.round(h*maxDim/w);w=maxDim;}
+        else{w=Math.round(w*maxDim/h);h=maxDim;}
+      }
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      const ctx=canvas.getContext('2d');
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h); // weiß für transparente PNGs
+      ctx.drawImage(img,0,0,w,h);
+      canvas.toBlob(b=>b?resolve(b):reject(new Error('toBlob fehlgeschlagen')),'image/jpeg',quality);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Bild konnte nicht gelesen werden'));};
+    img.src=url;
+  });
+}
+
+function sendChatMessage(){
+  if(!_curChatId||!_db) return;
+  const ta=document.getElementById('chatInpText');
+  const text=(ta.value||'').trim();
+  if(!text && !_pendingAtt) return;
+  const chat=_chats[_curChatId];
+  if(!chat) return;
+  const sendBtn=document.getElementById('chatSendBtn');
+  sendBtn.disabled=true;
+  const myName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
+  _chatUsers[_fbUid]=_chatUsers[_fbUid]||{name:myName,email:_auth?.currentUser?.email||''};
+  const now=firebase.firestore.FieldValue.serverTimestamp();
+  const msgRef=_db.collection('chats').doc(_curChatId).collection('messages').doc();
+  const att=_pendingAtt;
+  // Optimistic UI
+  ta.value='';clearChatAtt();
+  // Upload (falls Att) + dann Message schreiben
+  const finalize=(attachment)=>{
+    const batch=_db.batch();
+    const msgData={von:_fbUid,text:text,ts:now,deleted:false};
+    if(attachment) msgData.attachment=attachment;
+    batch.set(msgRef,msgData);
+    const newUnread={...(chat.unread||{})};
+    (chat.participants||[]).forEach(uid=>{if(uid!==_fbUid) newUnread[uid]=(newUnread[uid]||0)+1;});
+    newUnread[_fbUid]=0;
+    const preview=attachment?(attachment.type==='image'?'📷 Bild':'📎 '+attachment.name):text.slice(0,140);
+    batch.update(_db.collection('chats').doc(_curChatId),{
+      lastMessage:{text:preview,von:_fbUid,ts:now},
+      unread:newUnread
+    });
+    return batch.commit();
+  };
+  if(att){
+    if(!_st){toast('Storage nicht verfügbar','bad');sendBtn.disabled=false;return;}
+    const safeName=att.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path='chats/'+_curChatId+'/'+msgRef.id+'/'+Date.now()+'_'+safeName;
+    const ref=_st.ref(path);
+    const task=ref.put(att.blob,{contentType:att.mime});
+    task.on('state_changed',
+      snap=>{
+        const pct=Math.round((snap.bytesTransferred/snap.totalBytes)*100);
+        const pv=document.getElementById('chatAttPreview');
+        if(pv){pv.style.display='';pv.innerHTML='<div style="color:#3b82f6;font-weight:700">⏳ Upload '+pct+'%</div>';}
+      },
+      err=>{
+        clearChatAtt();sendBtn.disabled=false;
+        toast('Upload fehlgeschlagen: '+(err.code||err.message),'bad');
+      },
+      ()=>{
+        task.snapshot.ref.getDownloadURL().then(url=>{
+          clearChatAtt();
+          return finalize({type:att.type,url:url,name:att.name,size:att.size,storagePath:path,mime:att.mime});
+        }).then(()=>{sendBtn.disabled=false;}).catch(err=>{
+          sendBtn.disabled=false;
+          toast('Senden fehlgeschlagen: '+(err.code||err.message),'bad');
+        });
+      }
+    );
+  } else {
+    finalize(null).then(()=>{sendBtn.disabled=false;}).catch(err=>{
+      sendBtn.disabled=false;
+      toast('Senden fehlgeschlagen: '+(err.code||err.message),'bad');
+      ta.value=text;
+    });
+  }
+}
+
+function openChatLightbox(url){
+  const lb=document.getElementById('chatLightbox');
+  document.getElementById('chatLightboxImg').src=url;
+  lb.style.display='flex';
+}
+function closeChatLightbox(){
+  document.getElementById('chatLightbox').style.display='none';
+  document.getElementById('chatLightboxImg').src='';
+}
+
 function renderMessages(msgs){
   const body=document.getElementById('chatMsgsBody');
   const chat=_chats[_curChatId];
@@ -10776,21 +10956,26 @@ function renderMessages(msgs){
   msgs.forEach(m=>{
     const ts=m.ts?(m.ts.toDate?m.ts.toDate():new Date(m.ts)):new Date();
     const dStr=ts.toLocaleDateString('de-DE');
-    if(dStr!==lastDate){
-      html+='<div class="chat-sys-msg">'+dStr+'</div>';
-      lastDate=dStr;
-    }
-    if(m.system){
-      html+='<div class="chat-sys-msg">'+esc(m.text||'')+'</div>';
-      return;
-    }
+    if(dStr!==lastDate){html+='<div class="chat-sys-msg">'+dStr+'</div>';lastDate=dStr;}
+    if(m.system){html+='<div class="chat-sys-msg">'+esc(m.text||'')+'</div>';return;}
     const isMe=m.von===_fbUid;
     const senderName=isMe?'':(_chatUsers[m.von]?.name||_chatUsers[m.von]?.email||'?');
     const timeStr=ts.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
     const isGroup=chat?.type==='group';
+    let attHtml='';
+    if(m.attachment&&!m.deleted){
+      const a=m.attachment;
+      if(a.type==='image'){
+        attHtml='<img class="chat-att-img" src="'+esc(a.url)+'" onclick="event.stopPropagation();openChatLightbox(\''+a.url.replace(/'/g,'\\\'')+'\')" alt="'+esc(a.name||'')+'">';
+      } else {
+        const kb=Math.round((a.size||0)/1024);
+        attHtml='<a class="chat-att-file" href="'+esc(a.url)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()"><span class="chat-att-file-ic">'+fileIconFor(a.mime||'')+'</span><div><div class="chat-att-file-name">'+esc(a.name||'Datei')+'</div><div class="chat-att-file-size">'+kb+' KB · Download</div></div></a>';
+      }
+    }
     html+='<div class="chat-bubble-wrap '+(isMe?'me':'you')+'">'
       +(!isMe&&isGroup?'<div class="chat-bubble-sender">'+esc(senderName)+'</div>':'')
       +'<div class="chat-bubble '+(isMe?'me':'you')+(m.deleted?' deleted':'')+'">'
+        +attHtml
         +esc(m.deleted?'Nachricht gelöscht':(m.text||''))
         +'<span class="chat-bubble-time">'+timeStr+'</span>'
         +(isMe&&!m.deleted?'<button class="chat-bubble-del" onclick="event.stopPropagation();deleteOwnMsg(\''+m.id+'\')" title="Nachricht löschen">✕</button>':'')
@@ -10801,43 +10986,21 @@ function renderMessages(msgs){
   body.scrollTop=body.scrollHeight;
 }
 
-function sendChatMessage(){
-  if(!_curChatId||!_db) return;
-  const ta=document.getElementById('chatInpText');
-  const text=(ta.value||'').trim();
-  if(!text) return;
-  const chat=_chats[_curChatId];
-  if(!chat) return;
-  ta.value='';
-  const myName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
-  _chatUsers[_fbUid]=_chatUsers[_fbUid]||{name:myName,email:_auth?.currentUser?.email||''};
-  const now=firebase.firestore.FieldValue.serverTimestamp();
-  const msgRef=_db.collection('chats').doc(_curChatId).collection('messages').doc();
-  const batch=_db.batch();
-  batch.set(msgRef,{von:_fbUid,text:text,ts:now,deleted:false});
-  // Unread für alle außer Sender + lastMessage
-  const newUnread={...(chat.unread||{})};
-  (chat.participants||[]).forEach(uid=>{
-    if(uid!==_fbUid) newUnread[uid]=(newUnread[uid]||0)+1;
-  });
-  newUnread[_fbUid]=0;
-  batch.update(_db.collection('chats').doc(_curChatId),{
-    lastMessage:{text:text.slice(0,140),von:_fbUid,ts:now},
-    unread:newUnread
-  });
-  batch.commit().catch(err=>{
-    toast('⚠ Senden fehlgeschlagen: '+(err.code||err.message),'bad');
-    ta.value=text; // wiederherstellen
-  });
-}
-
 function deleteOwnMsg(msgId){
   if(!_curChatId||!_db||!msgId) return;
   if(!confirm('Nachricht löschen? Andere sehen dann „Nachricht gelöscht". Endgültiges Entfernen nach 30 Tagen.')) return;
-  _db.collection('chats').doc(_curChatId).collection('messages').doc(msgId).update({
-    deleted:true,
-    deletedAt:firebase.firestore.FieldValue.serverTimestamp(),
-    text:''
+  // Erst Message lesen, um Storage-Path zu kennen (falls Attachment)
+  const ref=_db.collection('chats').doc(_curChatId).collection('messages').doc(msgId);
+  ref.get().then(doc=>{
+    if(!doc.exists) return;
+    const m=doc.data();
+    const storagePath=m.attachment?.storagePath;
+    return ref.update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp(),text:'',attachment:firebase.firestore.FieldValue.delete()}).then(()=>{
+      // Storage-File löschen, falls vorhanden
+      if(storagePath && _st){
+        _st.ref(storagePath).delete().catch(err=>console.warn('Storage-Delete:',err));
+      }
+    });
   }).catch(err=>toast('Löschen fehlgeschlagen: '+(err.code||err.message),'bad'));
 }
 
