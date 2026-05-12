@@ -5811,32 +5811,42 @@ function confirmMeldungGelesen(){
   const melds=_tnMeldungen[tnId]||[];
   _pendingMeldung=null;
   document.getElementById('tnDetailModal').classList.remove('open');
+  const finalize=()=>{
+    // Aus lokalem Cache entfernen
+    delete _tnMeldungen[tnId];
+    // Seats neu rendern (entfernt Rahmen/Icon)
+    renderSeats();
+    // Jetzt normales Modal öffnen
+    _meldSkipSeat=true;
+    openModal(seatId);
+  };
   if(kursId&&_db){
     const batch=_db.batch();
     const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
     docIds.forEach(did=>{
       batch.update(_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('meldungen').doc(did),{gelesen:true,gelesenVon:ausName,gelesenAm:new Date().toISOString()});
     });
-    batch.commit().catch(()=>{});
-    // Azubi benachrichtigen
-    const meldTyp=melds.length?melds[0].type:'text';
-    const meldLabels={'spaeter':'Verspätung','frueher':'Früheres Gehen','krank':'Krankmeldung','text':'Nachricht'};
-    _db.collection('globalTN').doc(tnId).update({
-      benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
-        typ:'meldung_gelesen',
-        text:'Deine Meldung ('+( meldLabels[meldTyp]||'Nachricht')+') wurde von '+ausName+' zur Kenntnis genommen.',
-        datum: new Date().toISOString(),
-        gelesen: false
-      })
-    }).catch(()=>{});
+    batch.commit().then(()=>{
+      // Azubi benachrichtigen
+      const meldTyp=melds.length?melds[0].type:'text';
+      const meldLabels={'spaeter':'Verspätung','frueher':'Früheres Gehen','krank':'Krankmeldung','text':'Nachricht'};
+      _db.collection('globalTN').doc(tnId).update({
+        benachrichtigungen: firebase.firestore.FieldValue.arrayUnion({
+          typ:'meldung_gelesen',
+          text:'Deine Meldung ('+( meldLabels[meldTyp]||'Nachricht')+') wurde von '+ausName+' zur Kenntnis genommen.',
+          datum: new Date().toISOString(),
+          gelesen: false
+        })
+      }).catch(err=>console.warn('Azubi-Notify fehlgeschlagen:',err));
+      finalize();
+    }).catch(err=>{
+      console.error('Meldung-Update fehlgeschlagen:',err);
+      toast('⚠ Meldung konnte nicht als gelesen markiert werden ('+(err.code||err.message||'Fehler')+') – Firestore Rules prüfen!','bad');
+      // Cache NICHT löschen, damit der Listener konsistent bleibt
+    });
+  } else {
+    finalize();
   }
-  // Aus lokalem Cache entfernen
-  delete _tnMeldungen[tnId];
-  // Seats neu rendern (entfernt Rahmen/Icon)
-  renderSeats();
-  // Jetzt normales Modal öffnen
-  _meldSkipSeat=true;
-  openModal(seatId);
 }
 
 function adminResetTN(tnId){
