@@ -954,6 +954,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <!-- MOBILE BOTTOM NAV -->
 <div class="mob-bottom-nav">
+  <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
 <div class="copyright">© AusbilderPro v2.7.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
@@ -10302,6 +10303,7 @@ function startChatListener(){
   // Defensive: sicherstellen dass die Buttons sichtbar sind (falls über exotischen Login-Pfad reingekommen)
   const w=document.getElementById('hdrChatWrap'); if(w) w.style.display='';
   const m=document.getElementById('mobChatMehrBtn'); if(m) m.style.display='';
+  const mn=document.getElementById('mobNavChatBtn'); if(mn) mn.style.display='';
   // Listener auf eigene Chats
   _chatListenerUnsub=_db.collection('chats').where('participants','array-contains',_fbUid).onSnapshot(snap=>{
     _chats={};
@@ -10317,6 +10319,8 @@ function stopChatListener(){
   _chats={};_curChatId=null;
   const b=document.getElementById('hdrChatBadge'); if(b) b.style.display='none';
   const mb=document.getElementById('mobChatBadge'); if(mb) mb.style.display='none';
+  const mnb=document.getElementById('mobNavChatBadge'); if(mnb) mnb.style.display='none';
+  const mn=document.getElementById('mobNavChatBtn'); if(mn) mn.style.display='none';
 }
 function updateChatUnreadBadge(){
   let total=0;
@@ -10325,6 +10329,8 @@ function updateChatUnreadBadge(){
   if(b){if(total>0){b.textContent=total>99?'99+':total;b.style.display='';}else{b.style.display='none';}}
   const mb=document.getElementById('mobChatBadge');
   if(mb){if(total>0){mb.textContent=total>99?'99+':total;mb.style.display='';}else{mb.style.display='none';}}
+  const mnb=document.getElementById('mobNavChatBadge');
+  if(mnb){if(total>0){mnb.textContent=total>99?'99+':total;mnb.style.display='';}else{mnb.style.display='none';}}
 }
 
 // Liste aller Ausbilder im Firestore laden (für Liste + Gruppe-Erstellen)
