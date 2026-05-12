@@ -831,6 +831,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="openTrennlinienModal();closeHdrMenu()" style="width:100%;text-align:left" title="Sitzplan-Trennlinien konfigurieren">📐 Trennlinien</button>
         <button class="tbtn" onclick="openTrash();closeHdrMenu()" style="width:100%;text-align:left" title="Gelöschte Lehrgänge wiederherstellen (30 Tage)">🗑 Papierkorb</button>
         <button class="tbtn" onclick="appReset();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#991b1b" title="App-Cache und alte lokale Dateien zurücksetzen (bei Problemen)">🔄 App zurücksetzen</button>
+        <button class="tbtn" id="hdrChatSweepBtn" onclick="openChatSweep();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:#6d28d9;display:none" title="Alte Chat-Nachrichten manuell entfernen (Admin/DSGVO)">🧹 Chat-Bereinigung</button>
         <button class="tbtn" onclick="recoverOrphanSeats();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.2);color:#4338ca" title="TN, die direkt am Sitzplatz eingegeben wurden (statt über +TN), nachträglich in globalTN + Kurs-Liste anlegen">🔗 Verwaiste Sitze nachtragen</button>
         <button class="tbtn" onclick="showHilfeModal();closeHdrMenu()" style="width:100%;text-align:left" title="Anleitungen und Tipps">❓ Brauchst du Hilfe?</button>
       </div>
@@ -900,6 +901,29 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- CHAT-BEREINIGUNG MODAL (Admin) -->
+<div class="ov" id="chatSweepModal" onclick="if(event.target===this)closeChatSweep()" style="z-index:101">
+  <div class="modal" style="max-width:520px">
+    <div class="mhd"><div class="mtit">🧹 Chat-Bereinigung</div><button class="xcls" onclick="closeChatSweep()" title="Schließen">✕</button></div>
+    <div class="mbdy" style="padding:18px">
+      <p style="font-size:.78rem;color:#475569;line-height:1.5;margin-bottom:14px">Entfernt alle Chat-Nachrichten (auch fremde), die älter als die gewählte Frist sind. Wird im <b>Audit-Log</b> protokolliert.</p>
+      <div style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:14px">
+        <div style="font-size:.7rem;font-weight:700;color:#92400e;margin-bottom:3px">⚠ Hinweis</div>
+        <div style="font-size:.7rem;color:#78350f">Vorgang ist <b>endgültig</b>. Nachrichten können nicht wiederhergestellt werden. Minimum: 60 Tage (Firestore-Regel).</div>
+      </div>
+      <label style="font-size:.72rem;font-weight:700;color:#475569;display:block;margin-bottom:6px">Nachrichten älter als (Tage)</label>
+      <input type="number" id="chatSweepDays" value="180" min="60" max="3650" step="1" style="width:100%;padding:9px 12px;border:2px solid #e2e8f0;border-radius:8px;font-family:'Sora',sans-serif;font-size:.82rem;margin-bottom:6px">
+      <div style="font-size:.65rem;color:#94a3b8;margin-bottom:14px">Standard 180 Tage (6 Monate) entspricht der DSGVO-Aufbewahrung</div>
+      <div id="chatSweepResult" style="display:none;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:14px;font-size:.78rem"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="closeChatSweep()" style="flex:1;padding:10px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:8px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif;font-size:.78rem;color:#475569">Abbrechen</button>
+        <button id="chatSweepPreviewBtn" onclick="chatSweepPreview()" style="flex:1;padding:10px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;font-size:.78rem">🔍 Vorschau</button>
+        <button id="chatSweepRunBtn" onclick="chatSweepRun()" style="flex:1;padding:10px;background:linear-gradient(135deg,#dc2626,#991b1b);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;font-size:.78rem;display:none">🧹 Endgültig löschen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MITGLIED HINZUFÜGEN MODAL -->
 <div class="ov" id="addMemberModal" onclick="if(event.target===this)closeAddMemberModal()" style="z-index:101">
   <div class="modal" style="max-width:480px">
@@ -964,6 +988,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <button class="tbtn" onclick="openAusbilderProfil();closeMobMoreMenu()" style="width:100%;text-align:left" title="Name, Telefon, E-Mail für Azubis hinterlegen">👤 Mein Profil</button>
       <button class="tbtn" onclick="openTrennlinienModal();closeMobMoreMenu()" style="width:100%;text-align:left" title="Sitzplan-Trennlinien konfigurieren">📐 Trennlinien</button>
       <button class="tbtn" onclick="openTrash();closeMobMoreMenu()" style="width:100%;text-align:left" title="Gelöschte Lehrgänge wiederherstellen (30 Tage)">🗑 Papierkorb</button>
+      <button class="tbtn" id="mobChatSweepBtn" onclick="openChatSweep();closeMobMoreMenu()" style="width:100%;text-align:left;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:#6d28d9;display:none" title="Alte Chat-Nachrichten manuell entfernen (Admin/DSGVO)">🧹 Chat-Bereinigung</button>
       <button class="tbtn" onclick="showHilfeModal();closeMobMoreMenu()" style="width:100%;text-align:left" title="Anleitungen und Tipps">❓ Brauchst du Hilfe?</button>
     </div>
   </div>
@@ -10321,6 +10346,11 @@ function startChatListener(){
   const w=document.getElementById('hdrChatWrap'); if(w) w.style.display='';
   const m=document.getElementById('mobChatMehrBtn'); if(m) m.style.display='';
   const mn=document.getElementById('mobNavChatBtn'); if(mn) mn.style.display='';
+  // Admin-Sweep-Buttons nur für Admin sichtbar
+  if(_isAdmin){
+    const cs=document.getElementById('hdrChatSweepBtn'); if(cs) cs.style.display='';
+    const mcs=document.getElementById('mobChatSweepBtn'); if(mcs) mcs.style.display='';
+  }
   // Listener auf eigene Chats
   let firstSnap=true;
   _chatListenerUnsub=_db.collection('chats').where('participants','array-contains',_fbUid).onSnapshot(snap=>{
@@ -10333,7 +10363,136 @@ function startChatListener(){
   },err=>console.warn('Chat-Listener:',err));
 }
 
-// DSGVO-Auto-Cleanup: eigene Nachrichten >12 Monate + Soft-Deletes >30 Tage
+// ───────── ADMIN-SWEEP ─────────
+let _sweepInProgress=false;
+function openChatSweep(){
+  if(!_isAdmin){toast('Nur Admin','bad');return;}
+  document.getElementById('chatSweepDays').value=180;
+  document.getElementById('chatSweepResult').style.display='none';
+  document.getElementById('chatSweepResult').innerHTML='';
+  document.getElementById('chatSweepPreviewBtn').style.display='';
+  document.getElementById('chatSweepRunBtn').style.display='none';
+  document.getElementById('chatSweepModal').classList.add('open');
+}
+function closeChatSweep(){
+  if(_sweepInProgress){toast('Bereinigung läuft – bitte warten','info');return;}
+  document.getElementById('chatSweepModal').classList.remove('open');
+}
+function _sweepDays(){
+  const v=parseInt(document.getElementById('chatSweepDays').value||'180');
+  if(isNaN(v)||v<60){toast('Mindestens 60 Tage (Firestore-Regel)','bad');return null;}
+  return v;
+}
+async function chatSweepPreview(){
+  const days=_sweepDays();if(!days) return;
+  const cutoff=Date.now()-days*86400000;
+  const res=document.getElementById('chatSweepResult');
+  res.style.display='';res.innerHTML='<div style="text-align:center;color:#64748b">⏳ Suche läuft…</div>';
+  let totalOld=0,chatsWithOld=0;
+  const chatIds=Object.keys(_chats);
+  for(const chatId of chatIds){
+    try{
+      // Aelteste 200 lesen, prüfen wie viele alt sind
+      const snap=await _db.collection('chats').doc(chatId).collection('messages').orderBy('ts','asc').limit(200).get();
+      let chatOld=0;
+      snap.forEach(d=>{
+        const ts=d.data().ts?.toMillis?.()||0;
+        if(ts>0 && ts<cutoff) chatOld++;
+      });
+      // Falls 200 voll und ALLE alt → es gibt vermutlich noch mehr, paginieren
+      if(snap.size===200 && chatOld===200){
+        let last=snap.docs[199];
+        while(true){
+          const next=await _db.collection('chats').doc(chatId).collection('messages').orderBy('ts','asc').startAfter(last).limit(500).get();
+          if(next.empty) break;
+          let allOld=true;
+          next.forEach(d=>{
+            const ts=d.data().ts?.toMillis?.()||0;
+            if(ts>0 && ts<cutoff) chatOld++;
+            else allOld=false;
+          });
+          if(!allOld||next.size<500) break;
+          last=next.docs[next.size-1];
+        }
+      }
+      if(chatOld>0){totalOld+=chatOld;chatsWithOld++;}
+    }catch(err){console.warn('Sweep-Preview '+chatId+':',err);}
+  }
+  const cutoffStr=new Date(cutoff).toLocaleDateString('de-DE');
+  if(totalOld===0){
+    res.innerHTML='<div style="color:#059669;font-weight:700">✓ Keine Nachrichten älter als '+cutoffStr+' gefunden.</div>';
+    document.getElementById('chatSweepRunBtn').style.display='none';
+  } else {
+    res.innerHTML='<div style="font-weight:700;color:#dc2626;margin-bottom:4px">'+totalOld+' Nachrichten würden gelöscht</div>'
+      +'<div style="font-size:.7rem;color:#64748b">In '+chatsWithOld+' von '+chatIds.length+' Chats · Vor dem '+cutoffStr+'</div>';
+    document.getElementById('chatSweepRunBtn').style.display='';
+  }
+}
+async function chatSweepRun(){
+  const days=_sweepDays();if(!days) return;
+  if(!confirm('Endgültig '+days+' Tage zurück bereinigen?\n\nDieser Vorgang kann nicht rückgängig gemacht werden.')) return;
+  _sweepInProgress=true;
+  const cutoff=Date.now()-days*86400000;
+  const res=document.getElementById('chatSweepResult');
+  res.style.display='';
+  document.getElementById('chatSweepPreviewBtn').disabled=true;
+  document.getElementById('chatSweepRunBtn').disabled=true;
+  let totalDeleted=0;
+  const chatIds=Object.keys(_chats);
+  let chatIdx=0;
+  for(const chatId of chatIds){
+    chatIdx++;
+    res.innerHTML='<div style="color:#64748b">⏳ Chat '+chatIdx+'/'+chatIds.length+' · '+totalDeleted+' Nachrichten gelöscht…</div>';
+    try{
+      let hasMore=true;
+      while(hasMore){
+        const snap=await _db.collection('chats').doc(chatId).collection('messages').orderBy('ts','asc').limit(200).get();
+        if(snap.empty) break;
+        const batch=_db.batch();
+        let count=0,foundNew=false;
+        snap.forEach(d=>{
+          const ts=d.data().ts?.toMillis?.()||0;
+          if(ts>0 && ts<cutoff){batch.delete(d.ref);count++;}
+          else if(ts>=cutoff){foundNew=true;}
+        });
+        if(count>0){
+          await batch.commit();
+          totalDeleted+=count;
+        }
+        if(foundNew||snap.size<200){hasMore=false;}
+      }
+    }catch(err){
+      console.error('Sweep-Run '+chatId+':',err);
+      res.innerHTML='<div style="color:#dc2626;font-weight:700">⚠ Fehler in Chat '+chatIdx+': '+esc(err.code||err.message)+'</div><div style="color:#64748b;font-size:.7rem;margin-top:4px">Bisher gelöscht: '+totalDeleted+'</div>';
+      _sweepInProgress=false;
+      document.getElementById('chatSweepPreviewBtn').disabled=false;
+      document.getElementById('chatSweepRunBtn').disabled=false;
+      return;
+    }
+  }
+  // Audit-Log
+  try{
+    await _db.collection('auditLog').add({
+      typ:'chat_admin_sweep',
+      uid:_fbUid,
+      email:_auth?.currentUser?.email||'',
+      timestamp:firebase.firestore.FieldValue.serverTimestamp(),
+      retentionDays:days,
+      cutoffISO:new Date(cutoff).toISOString(),
+      deletedCount:totalDeleted,
+      chatCount:chatIds.length
+    });
+  }catch(err){console.warn('Audit-Log:',err);}
+  _sweepInProgress=false;
+  document.getElementById('chatSweepPreviewBtn').disabled=false;
+  document.getElementById('chatSweepRunBtn').disabled=false;
+  document.getElementById('chatSweepRunBtn').style.display='none';
+  res.innerHTML='<div style="color:#059669;font-weight:700;margin-bottom:4px">✓ Bereinigung abgeschlossen</div>'
+    +'<div style="font-size:.74rem;color:#475569">'+totalDeleted+' Nachrichten gelöscht · Audit-Log geschrieben</div>';
+  toast('🧹 Bereinigung: '+totalDeleted+' Nachrichten entfernt','ok');
+}
+
+// DSGVO-Auto-Cleanup: eigene Nachrichten >6 Monate + Soft-Deletes >30 Tage
 function runChatAutoCleanup(){
   if(!_db||!_fbUid) return;
   // Throttle: max 1x pro 12h pro Geraet
@@ -10342,10 +10501,9 @@ function runChatAutoCleanup(){
     if(Date.now()-last<12*3600*1000) return;
     localStorage.setItem('chatCleanupLast',String(Date.now()));
   } catch(e){}
-  const TWELVE_MONTHS=365*24*3600*1000;
+  const SIX_MONTHS=180*24*3600*1000;
   const THIRTY_DAYS=30*24*3600*1000;
   const now=Date.now();
-  let totalDeleted=0;
   Object.keys(_chats).forEach(chatId=>{
     // Aelteste 100 Nachrichten pro Chat anschauen (kein Composite-Index noetig)
     _db.collection('chats').doc(chatId).collection('messages')
@@ -10358,13 +10516,12 @@ function runChatAutoCleanup(){
           if(m.von!==_fbUid) return; // Nur eigene
           const tsMillis=m.ts?.toMillis?.()||0;
           const delMillis=m.deletedAt?.toMillis?.()||0;
-          const tooOld=tsMillis>0 && (now-tsMillis)>TWELVE_MONTHS;
+          const tooOld=tsMillis>0 && (now-tsMillis)>SIX_MONTHS;
           const expiredSoftDel=m.deleted && delMillis>0 && (now-delMillis)>THIRTY_DAYS;
           if(tooOld||expiredSoftDel){batch.delete(d.ref);count++;}
         });
         if(count>0){
           batch.commit().then(()=>{
-            totalDeleted+=count;
             console.log('Chat-Cleanup '+chatId+': '+count+' eigene Nachrichten geloescht');
           }).catch(err=>console.warn('Chat-Cleanup commit:',err));
         }

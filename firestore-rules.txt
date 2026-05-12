@@ -258,9 +258,12 @@ service cloud.firestore {
           && resource.data.von == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted','deletedAt','text']);
 
-        // Hard-Delete: eigene Nachrichten (manuelle Lösch + Auto-Cleanup nach 30 Tagen)
+        // Hard-Delete: eigene Nachrichten, ODER Admin bei Nachrichten >60 Tage alt (Admin-Sweep)
         allow delete: if request.auth != null
-          && resource.data.von == request.auth.uid;
+          && (resource.data.von == request.auth.uid
+              || (isAdmin()
+                  && resource.data.ts is timestamp
+                  && resource.data.ts.toMillis() < (request.time.toMillis() - 60 * 24 * 60 * 60 * 1000)));
       }
     }
   }
