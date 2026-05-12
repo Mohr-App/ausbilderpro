@@ -2076,12 +2076,10 @@ function renderSidebar(){
     // kat row
     const row=document.createElement('div');
     row.className='kat-row'+(k.open?' open':'');
-    row.draggable=true;
     row.dataset.katId=id;
     row.style.borderLeft='3px solid '+katCol;
     if(!k.open) row.style.background=katCol+'0F';
     row.innerHTML=
-      '<span class="kat-drag" title="Ziehen zum Sortieren">⠿</span>'+
       '<span class="kat-arr">▶</span>'+
       '<span class="kat-lbl">'+esc(k.label)+'</span>'+
       (totalStudents?'<span class="kat-cnt">'+totalStudents+'</span>':'')+
@@ -2090,51 +2088,27 @@ function renderSidebar(){
       '<button class="kat-edit" onclick="renameKat(\''+id+'\',event)" title="Lehrgangsart umbenennen">✎</button>'+
       '<button class="kat-del" onclick="delKat(\''+id+'\',event)" title="Löschen">✕</button>';
     row.addEventListener('click',e=>{
-      if(e.target.classList.contains('kat-del')||e.target.classList.contains('kat-drag')||e.target.classList.contains('kat-edit'))return;
+      if(e.target.classList.contains('kat-del')||e.target.classList.contains('kat-edit'))return;
       toggleKat(id);
     });
 
-    // drag events (kat reorder + HBZ kurs drop)
-    row.addEventListener('dragstart',e=>{
-      _dragSrcId=id;
-      e.dataTransfer.effectAllowed='move';
-      e.dataTransfer.setData('text/plain', id); // Firefox-Pflicht
-      row.classList.add('dragging');
-    });
-    row.addEventListener('dragend',()=>{
-      _dragSrcId=null;
-      document.querySelectorAll('.kat-row').forEach(r=>r.classList.remove('dragging','drag-over','hbz-drop-target'));
-    });
+    // Drag-Drop NUR fuer HBZ-Kurs-Drop in diese Lehrgangsart (Sortier-Drag wurde entfernt – Pfeile reichen)
     row.addEventListener('dragover',e=>{
-      e.preventDefault();
-      if(_dragSrcId && _dragSrcId!==id){
-        e.dataTransfer.dropEffect='move';
-        document.querySelectorAll('.kat-row').forEach(r=>r.classList.remove('drag-over'));
-        row.classList.add('drag-over');
-      }
       if(_hbzDragKursId){
+        e.preventDefault();
         e.dataTransfer.dropEffect='copy';
         document.querySelectorAll('.kat-row').forEach(r=>r.classList.remove('hbz-drop-target'));
         row.classList.add('hbz-drop-target');
       }
     });
-    row.addEventListener('dragleave',()=>{ row.classList.remove('drag-over','hbz-drop-target'); });
+    row.addEventListener('dragleave',()=>{ row.classList.remove('hbz-drop-target'); });
     row.addEventListener('drop',e=>{
-      e.preventDefault();
-      row.classList.remove('hbz-drop-target','drag-over');
-      // HBZ Kurs drop → in diese Lehrgangsart einfügen
       if(_hbzDragKursId && _hbzDragData){
+        e.preventDefault();
+        row.classList.remove('hbz-drop-target');
         linkHBZKurs(_hbzDragKursId, _hbzDragData, id);
         _hbzDragKursId=null; _hbzDragData=null;
-        return;
       }
-      // Kat reorder drop
-      if(!_dragSrcId||_dragSrcId===id)return;
-      const fromIdx=S.katOrder.indexOf(_dragSrcId);
-      const toIdx=S.katOrder.indexOf(id);
-      S.katOrder.splice(fromIdx,1);
-      S.katOrder.splice(toIdx,0,_dragSrcId);
-      persist();renderSidebar();
     });
 
     list.appendChild(row);
