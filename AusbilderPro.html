@@ -1249,6 +1249,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="mhd"><div class="mtit">👤 Mein Profil</div><button class="xcls" onclick="document.getElementById('ausbilderProfilModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
 <div class="mbdy">
 <div style="font-size:.62rem;color:var(--mu);margin-bottom:10px;padding:8px 10px;background:rgba(59,130,246,.04);border:1px solid rgba(59,130,246,.15);border-radius:8px">Diese Daten werden an Azubis und Arbeitgeber weitergegeben, damit sie dich kontaktieren können.</div>
+<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;padding:10px;background:#f8fafc;border-radius:10px">
+  <div id="profPhotoPreview" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#059669);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1.4rem;flex-shrink:0;overflow:hidden;font-family:'Sora',sans-serif">--</div>
+  <div style="flex:1;min-width:0">
+    <div style="font-size:.72rem;font-weight:700;color:#475569;margin-bottom:4px">Profilbild</div>
+    <div style="font-size:.6rem;color:#94a3b8;margin-bottom:6px">Wird in Chat & Listen sichtbar (max 500 KB)</div>
+    <input type="file" id="profPhotoInp" style="display:none" accept="image/*" onchange="onProfilPhotoPicked(event)">
+    <button onclick="document.getElementById('profPhotoInp').click()" style="padding:5px 10px;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📷 Hochladen</button>
+    <button id="profPhotoRemoveBtn" onclick="removeProfilPhoto()" style="display:none;padding:5px 10px;background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;margin-left:4px">✕ Entfernen</button>
+  </div>
+</div>
 <div class="fg"><label class="fl">Name <span style="color:#ef4444">*</span></label><input class="fi" id="apName" placeholder="Vor- und Nachname"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Telefon</label><input class="fi" id="apTelefon" type="tel" placeholder="0170 1234567"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">E-Mail (für Azubis sichtbar)</label><input class="fi" id="apEmail" type="email" placeholder="deine@arbeits-email.de"></div>
@@ -5653,6 +5663,7 @@ function openAusbilderProfil(){
   document.getElementById('apTelefon').value=p.telefon||'';
   document.getElementById('apEmail').value=p.email||'';
   document.getElementById('ausbilderProfilModal').classList.add('open');
+  initProfilPhotoPreview();
   // Nach Anzeigen: frische Firestore-Daten nachladen (overwrite falls neuer)
   if(_fbUid && _db){
     _db.collection('users').doc(_fbUid).collection('data').doc('profil').get().then(doc=>{
@@ -5669,6 +5680,70 @@ function openAusbilderProfil(){
       if(eEl && !eEl.value) eEl.value=d.email||'';
     }).catch(()=>{});
   }
+}
+
+// ──── Profilbild ────
+function _setProfPhotoPreview(photoUrl, fallbackInitials){
+  const el=document.getElementById('profPhotoPreview');
+  const remBtn=document.getElementById('profPhotoRemoveBtn');
+  if(!el) return;
+  if(photoUrl){
+    el.style.cssText="width:64px;height:64px;border-radius:50%;background:url('"+photoUrl+"') center/cover #ddd;flex-shrink:0;overflow:hidden";
+    el.innerHTML='';
+    if(remBtn) remBtn.style.display='';
+  } else {
+    el.style.cssText="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#059669);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1.4rem;flex-shrink:0;overflow:hidden;font-family:'Sora',sans-serif";
+    el.innerHTML=esc(fallbackInitials||'?');
+    if(remBtn) remBtn.style.display='none';
+  }
+}
+function _initialsFromName(nm){
+  if(!nm) return '?';
+  return nm.trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';
+}
+function initProfilPhotoPreview(){
+  const nm=(document.getElementById('apName')?.value)||_auth?.currentUser?.email||'?';
+  _setProfPhotoPreview(null,_initialsFromName(nm)); // sofort initials zeigen
+  if(_db&&_fbUid){
+    _db.collection('users').doc(_fbUid).get().then(doc=>{
+      const url=doc.exists?doc.data()?.photoUrl:null;
+      if(url) _setProfPhotoPreview(url,null);
+    }).catch(()=>{});
+  }
+}
+async function onProfilPhotoPicked(ev){
+  const file=ev.target.files?.[0];
+  ev.target.value='';
+  if(!file) return;
+  if(!_fbUid||!_st||!_db){toast('Nicht eingeloggt','bad');return;}
+  let blob;
+  try {blob=await resizeImageForChat(file,256,0.85);}
+  catch(e){toast('Bild-Verkleinerung fehlgeschlagen','bad');return;}
+  if(blob.size>500*1024){toast('Nach Verkleinerung noch '+Math.round(blob.size/1024)+' KB – max 500 KB','bad');return;}
+  const path='userProfiles/'+_fbUid+'/avatar.jpg';
+  const el=document.getElementById('profPhotoPreview');
+  if(el) el.innerHTML='⏳';
+  try {
+    await _st.ref(path).put(blob,{contentType:'image/jpeg'});
+    const url=await _st.ref(path).getDownloadURL();
+    // Cache-Busting Parameter, damit altes Bild ggf. invalidiert wird
+    const finalUrl=url;
+    await _db.collection('users').doc(_fbUid).set({photoUrl:finalUrl,email:_auth.currentUser.email,lastApp:'AusbilderPro'},{merge:true});
+    _setProfPhotoPreview(finalUrl,null);
+    if(_chatUsers[_fbUid]) _chatUsers[_fbUid].photoUrl=finalUrl;
+    toast('Profilbild aktualisiert ✓','ok');
+  } catch(err){
+    toast('Upload fehlgeschlagen: '+(err.code||err.message),'bad');
+    initProfilPhotoPreview(); // Zurücksetzen
+  }
+}
+async function removeProfilPhoto(){
+  if(!confirm('Profilbild entfernen?')) return;
+  try {await _st.ref('userProfiles/'+_fbUid+'/avatar.jpg').delete();} catch(e){}
+  try {await _db.collection('users').doc(_fbUid).update({photoUrl:firebase.firestore.FieldValue.delete()});} catch(e){}
+  if(_chatUsers[_fbUid]) delete _chatUsers[_fbUid].photoUrl;
+  initProfilPhotoPreview();
+  toast('Profilbild entfernt','info');
 }
 function saveAusbilderProfil(){
   const name=(document.getElementById('apName').value||'').trim();
@@ -10612,14 +10687,19 @@ function loadAusbilderListe(){
       const email=(d.email||'').toLowerCase();
       const stammData=stamm[email]||{};
       const displayName=stammData.name || d.ausbilderName || d.profil?.name || (email?email.split('@')[0]:'Unbekannt');
-      _chatUsers[doc.id]={email:d.email||'',name:displayName,berufGruppeId:stammData.berufId||d.berufGruppeId||''};
+      _chatUsers[doc.id]={email:d.email||'',name:displayName,berufGruppeId:stammData.berufId||d.berufGruppeId||'',photoUrl:d.photoUrl||''};
       arr.push({uid:doc.id,...(_chatUsers[doc.id])});
     });
     // Eigene UID auch cachen
     if(_fbUid&&_auth?.currentUser){
       const myEmail=(_auth.currentUser.email||'').toLowerCase();
       const myStamm=stamm[myEmail]||{};
-      _chatUsers[_fbUid]={email:_auth.currentUser.email,name:myStamm.name||myEmail.split('@')[0],berufGruppeId:myStamm.berufId||''};
+      // Eigenes photoUrl aus users-Doc separat laden (sich selbst gefiltert oben)
+      _db.collection('users').doc(_fbUid).get().then(d=>{
+        _chatUsers[_fbUid]={email:_auth.currentUser.email,name:myStamm.name||myEmail.split('@')[0],berufGruppeId:myStamm.berufId||'',photoUrl:d.data()?.photoUrl||''};
+      }).catch(()=>{
+        _chatUsers[_fbUid]={email:_auth.currentUser.email,name:myStamm.name||myEmail.split('@')[0],berufGruppeId:myStamm.berufId||'',photoUrl:''};
+      });
     }
     arr.sort((a,b)=>(a.name||'').localeCompare(b.name||'','de',{sensitivity:'base'}));
     return arr;
@@ -10663,15 +10743,22 @@ function chatSubtitle(chat){
   const otherUid=(chat.participants||[]).find(u=>u!==_fbUid);
   return _chatUsers[otherUid]?.email || '';
 }
+function _userAvatar(uid, cssClass){
+  const u=_chatUsers[uid]||{};
+  if(u.photoUrl){
+    return '<div class="'+cssClass+'" style="background:url(\''+esc(u.photoUrl)+'\') center/cover #ddd"></div>';
+  }
+  const nm=u.name||u.email||'?';
+  const initials=nm.split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';
+  return '<div class="'+cssClass+'">'+esc(initials)+'</div>';
+}
 function chatAvatar(chat){
   if(chat.type==='group'){
     const initials=(chat.name||'GR').replace(/[^A-Za-zÄÖÜäöü0-9 ]/g,'').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'GR';
     return '<div class="chat-avatar group">'+esc(initials)+'</div>';
   }
   const other=(chat.participants||[]).find(u=>u!==_fbUid);
-  const nm=_chatUsers[other]?.name||_chatUsers[other]?.email||'?';
-  const initials=nm.split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';
-  return '<div class="chat-avatar">'+esc(initials)+'</div>';
+  return _userAvatar(other,'chat-avatar');
 }
 function fmtChatTime(ts){
   if(!ts) return '';
@@ -10719,10 +10806,9 @@ function renderChatList(){
     if(ausbFiltered.length){
       html+='<div class="chat-sec-title">Alle Ausbilder</div>';
       ausbFiltered.forEach(a=>{
-        // Cache für Anzeige in Conversation
-        const initials=(a.name||a.email||'?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';
+        const avatar=_userAvatar(a.uid,'chat-avatar');
         html+='<div class="chat-list-item" onclick="startChatWith(\''+a.uid+'\')">'
-          +'<div class="chat-avatar">'+esc(initials)+'</div>'
+          +avatar
           +'<div class="chat-meta">'
             +'<div class="chat-name">'+esc(a.name||a.email)+'</div>'
             +'<div class="chat-preview">'+esc(a.email)+'</div>'

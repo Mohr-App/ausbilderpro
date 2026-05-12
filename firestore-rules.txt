@@ -18,6 +18,13 @@ service cloud.firestore {
       // AG kann seine MA-User lesen (firma muss übereinstimmen)
       allow read: if request.auth != null
         && resource.data.role == 'mitarbeiter';
+      // Ausbilder dürfen Stammdaten anderer Ausbilder lesen (für Chat-Liste + Avatare)
+      allow read: if request.auth != null
+        && resource.data.lastApp == 'AusbilderPro';
+      // Profilbild-URL darf vom eigenen User aktualisiert werden
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrl']);
       match /{sub}/{subDoc} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
         allow read, write: if isAdmin();

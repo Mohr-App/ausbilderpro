@@ -31,5 +31,23 @@ service firebase.storage {
       allow delete: if request.auth != null
         && request.auth.uid in firestore.get(/databases/(default)/documents/chats/$(chatId)).data.participants;
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // Profilbilder: userProfiles/{uid}/avatar.jpg max 500 KB
+    // ═══════════════════════════════════════════════════════════
+    match /userProfiles/{uid}/{filename} {
+      // Lesen: jeder authentifizierte User (Avatare in Chat & Listen sichtbar)
+      allow read: if request.auth != null;
+
+      // Hochladen/Überschreiben: nur eigener User + max 500 KB + nur Bilder
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 500 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      // Löschen: nur eigener User
+      allow delete: if request.auth != null
+        && request.auth.uid == uid;
+    }
   }
 }
