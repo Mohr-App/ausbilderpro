@@ -10334,16 +10334,43 @@ function updateChatUnreadBadge(){
 }
 
 // Liste aller Ausbilder im Firestore laden (für Liste + Gruppe-Erstellen)
+let _ausbStammCache=null;
 function loadAusbilderListe(){
   if(!_db) return Promise.resolve([]);
-  return _db.collection('users').where('lastApp','==','AusbilderPro').get().then(snap=>{
+  // 1) Stammdaten aus shared/kursSettings/ausbilder (echte Namen)
+  const stammPromise=_ausbStammCache?Promise.resolve(_ausbStammCache):_db.collection('shared').doc('kursSettings').collection('ausbilder').get().then(snap=>{
+    const m={};
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const email=(d.email||'').toLowerCase();
+      if(!email) return;
+      const vn=(d.vorname||'').trim();
+      const nn=(d.nachname||'').trim();
+      const fullName=(vn+' '+nn).trim()||(d.name||'').trim();
+      m[email]={name:fullName,berufId:d.berufId||'',vorname:vn,nachname:nn};
+    });
+    _ausbStammCache=m;
+    return m;
+  }).catch(err=>{console.warn('Ausbilder-Stamm:',err);return{};});
+  // 2) Aktive AusbilderPro-Nutzer aus users
+  const usersPromise=_db.collection('users').where('lastApp','==','AusbilderPro').get();
+  return Promise.all([stammPromise,usersPromise]).then(([stamm,snap])=>{
     const arr=[];
     snap.forEach(doc=>{
       if(doc.id===_fbUid) return; // Sich selbst raus
       const d=doc.data();
-      _chatUsers[doc.id]={email:d.email||'',name:d.ausbilderName||d.profil?.name||(d.email||'').split('@')[0],berufGruppeId:d.berufGruppeId||''};
+      const email=(d.email||'').toLowerCase();
+      const stammData=stamm[email]||{};
+      const displayName=stammData.name || d.ausbilderName || d.profil?.name || (email?email.split('@')[0]:'Unbekannt');
+      _chatUsers[doc.id]={email:d.email||'',name:displayName,berufGruppeId:stammData.berufId||d.berufGruppeId||''};
       arr.push({uid:doc.id,...(_chatUsers[doc.id])});
     });
+    // Eigene UID auch cachen
+    if(_fbUid&&_auth?.currentUser){
+      const myEmail=(_auth.currentUser.email||'').toLowerCase();
+      const myStamm=stamm[myEmail]||{};
+      _chatUsers[_fbUid]={email:_auth.currentUser.email,name:myStamm.name||myEmail.split('@')[0],berufGruppeId:myStamm.berufId||''};
+    }
     arr.sort((a,b)=>(a.name||'').localeCompare(b.name||'','de',{sensitivity:'base'}));
     return arr;
   }).catch(err=>{console.warn('Ausbilder-Liste:',err);return[];});
@@ -10461,17 +10488,28 @@ function startChatWith(otherUid){
   if(!_db||!_fbUid) return;
   const chatId='c1_'+[_fbUid,otherUid].sort().join('_');
   const ref=_db.collection('chats').doc(chatId);
-  ref.get().then(doc=>{
-    if(doc.exists){openChat(chatId);return;}
+  const tryCreate=()=>{
     const now=firebase.firestore.FieldValue.serverTimestamp();
-    ref.set({
+    return ref.set({
       type:'1to1',
       participants:[_fbUid,otherUid],
       joinedAt:{[_fbUid]:Date.now(),[otherUid]:Date.now()},
       createdBy:_fbUid,
       createdAt:now,
       unread:{[_fbUid]:0,[otherUid]:0}
-    }).then(()=>openChat(chatId)).catch(err=>toast('Chat-Erstellung fehlgeschlagen: '+err.code,'bad'));
+    });
+  };
+  ref.get().then(doc=>{
+    if(doc.exists){openChat(chatId);return;}
+    tryCreate().then(()=>openChat(chatId)).catch(err=>toast('Chat-Erstellung: '+(err.code||err.message),'bad'));
+  }).catch(err=>{
+    // Permission-denied bei get() = Doc existiert noch nicht (Rule blockt nicht-existente Docs).
+    // Direkt erstellen.
+    if(err.code==='permission-denied'){
+      tryCreate().then(()=>openChat(chatId)).catch(e2=>toast('Chat-Erstellung: '+(e2.code||e2.message),'bad'));
+    } else {
+      toast('Chat-Fehler: '+(err.code||err.message),'bad');
+    }
   });
 }
 
