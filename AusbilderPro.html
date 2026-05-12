@@ -536,6 +536,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .seat.meld-krank{outline:3px solid #ef4444!important;outline-offset:-3px;animation:pulseMeld 1.5s infinite!important;}
 .seat.meld-text{outline:3px solid #7c3aed!important;outline-offset:-3px;animation:pulseMeld 1.5s infinite!important;}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+@keyframes blinkSave{0%,100%{box-shadow:0 4px 14px rgba(59,130,246,.25);transform:scale(1);}50%{box-shadow:0 4px 24px rgba(59,130,246,.9),0 0 0 4px rgba(59,130,246,.35);transform:scale(1.03);}}
+.btn-blink{animation:blinkSave 1.1s ease-in-out infinite;}
 /* PASSWORD SCREEN */
 .pw-screen{position:fixed;inset:0;background:#ffffff;z-index:9999;display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;overflow:auto;}
 .pw-box{background:#fff;border:2px solid #e2e8f0;border-radius:16px;padding:36px 32px;width:100%;max-width:340px;box-shadow:0 24px 80px rgba(0,0,0,.12);display:flex;flex-direction:column;align-items:center;gap:18px;box-sizing:border-box;flex-shrink:0;}
@@ -4204,7 +4206,7 @@ function openModal(id){
   document.querySelectorAll('.att-main-btn').forEach(b=>b.className='att-main-btn');
   // Speichern-Button: immer ausgegraut bis Hinzufügen gedrückt wird
   const saveAttBtn=document.getElementById('btnSaveAtt');
-  if(saveAttBtn){saveAttBtn.style.opacity='.35';saveAttBtn.style.pointerEvents='none';}
+  if(saveAttBtn){saveAttBtn.style.opacity='.35';saveAttBtn.style.pointerEvents='none';saveAttBtn.classList.remove('btn-blink');}
   // Initial-Tab: Anwesenheit wenn Platz belegt, sonst Person
   const initialTab=(d.name&&d.name.trim())?'att':'info';
   updGrades();renderAtt();stab(initialTab);refreshDataLists();
@@ -4503,7 +4505,7 @@ function _commitAttEntry(entry){
   tmpAtt.sort((a,b)=>a.date>b.date?-1:1);
   document.getElementById('aNote').value='';
   const saveBtn=document.getElementById('btnSaveAtt');
-  if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';}
+  if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';saveBtn.classList.add('btn-blink');}
   renderAtt();
   return true;
 }
@@ -4602,7 +4604,7 @@ function delAtt(i){
   tmpAtt.splice(i,1);
   renderAtt();
   const saveBtn=document.getElementById('btnSaveAtt');
-  if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';}
+  if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';saveBtn.classList.add('btn-blink');}
 }
 // Nachträgliches Bearbeiten eines Anwesenheitseintrags
 // (z.B. "Zu spät" oder "Früher gegangen" zu einem bestehenden Anwesend-Eintrag hinzufügen)
@@ -4671,7 +4673,7 @@ function saveEditAtt(i){
   closeEditAtt();
   renderAtt();
   const saveBtn=document.getElementById('btnSaveAtt');
-  if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';}
+  if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';saveBtn.classList.add('btn-blink');}
   toast('Eintrag aktualisiert','ok');
 }
 function renderAtt(){
