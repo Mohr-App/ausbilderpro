@@ -2016,17 +2016,79 @@ function renameKat(id,e){
   if(e) e.stopPropagation();
   const kat=S.kats[id];
   if(!kat) return;
+  if(document.getElementById('renameKatOv')) return; // Doppelklick-Schutz
   const oldLabel=kat.label;
-  const newLabel=prompt('Lehrgangsart umbenennen:\n\nAlte Bezeichnung: „'+oldLabel+'"\n\nNeue Bezeichnung:',oldLabel);
-  if(newLabel===null) return; // Abbrechen
-  const trimmed=newLabel.trim();
+  const ov=document.createElement('div');
+  ov.id='renameKatOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,18,25,.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick=ev=>{if(ev.target===ov)closeRenameKat();};
+  ov.innerHTML='<div style="max-width:480px;width:100%;max-height:85vh;overflow-y:auto;background:var(--sur);border:2px solid var(--acc);border-radius:14px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.4)">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+      +'<div style="font-size:1rem;font-weight:800;color:var(--tx)">✎ Lehrgangsart umbenennen</div>'
+      +'<button type="button" onclick="closeRenameKat()" class="xcls" title="Schließen" style="background:#f1f5f9;border:2px solid #e2e8f0;color:#475569;width:26px;height:26px;border-radius:5px;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center">✕</button>'
+    +'</div>'
+    +'<div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Aktuelle Bezeichnung: <b>'+esc(oldLabel)+'</b></div>'
+    +'<p style="font-size:.74rem;color:var(--mu);margin-bottom:10px">Aus vordefinierten Lehrgangsarten wählen:</p>'
+    +'<div id="renameKatSugg" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:8px"><div style="font-size:.7rem;color:var(--mu);font-style:italic">Lade Vorschläge…</div></div>'
+    +'<div style="border-top:1px solid var(--brd);margin:14px 0"></div>'
+    +'<p style="font-size:.74rem;color:var(--mu);margin-bottom:8px">Oder eigene Bezeichnung eingeben:</p>'
+    +'<div style="display:flex;gap:8px">'
+      +'<input class="katml-inp" id="renameKatInp" type="text" placeholder="z.B. ET1, Klasse 4a…" style="flex:1" onkeydown="if(event.key===\'Enter\')_doRenameKat(\''+id+'\',this.value)">'
+      +'<button class="katml-add" type="button" onclick="_doRenameKat(\''+id+'\',document.getElementById(\'renameKatInp\').value)">✓ Umbenennen</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  const inp=document.getElementById('renameKatInp');
+  if(inp){inp.value=oldLabel;inp.focus();inp.select();}
+  // Vorschläge laden (gleiche Logik wie openKatModal, aber alten Namen NICHT ausfiltern)
+  const sugg=document.getElementById('renameKatSugg');
+  if(!_db||!_auth||!_auth.currentUser){
+    sugg.innerHTML='<div style="font-size:.7rem;color:var(--mu);font-style:italic">Bitte einloggen für Vorschläge</div>';
+    return;
+  }
+  _db.collection('shared').doc('kursSettings').collection('lehrgangsarten').get()
+    .then(snap=>{
+      const usedLabels=new Set(Object.entries(S.kats||{}).filter(([kid])=>kid!==id).map(([,k])=>String(k.label||'').trim().toLowerCase()));
+      const myBeruf=_myAusbBerufId||'';
+      const items=snap.docs
+        .map(d=>{const x=d.data();return {name:String(x.name||'').trim(),berufGruppeId:x.berufGruppeId||''};})
+        .filter(x=>x.name && !usedLabels.has(x.name.toLowerCase()))
+        .filter(x=>!myBeruf || !x.berufGruppeId || x.berufGruppeId===myBeruf)
+        .map(x=>x.name);
+      const unique=[...new Set(items)].sort((a,b)=>a.localeCompare(b,'de',{sensitivity:'base'}));
+      if(!unique.length){
+        sugg.innerHTML='<div style="font-size:.7rem;color:var(--mu);font-style:italic">Keine Vorschläge für deine Berufsgruppe</div>';
+        return;
+      }
+      sugg.innerHTML=unique.map(name=>{
+        const isCurrent=name.toLowerCase()===oldLabel.toLowerCase();
+        const style=isCurrent
+          ?'background:rgba(59,130,246,.15);color:var(--acc);border:1.5px solid var(--acc);padding:5px 10px;font-size:.74rem;font-weight:700;cursor:default'
+          :'background:var(--sur2);color:var(--tx);border:1.5px solid var(--brd);padding:5px 10px;font-size:.74rem;font-weight:600';
+        const safe=name.replace(/'/g,"\\'");
+        return '<button type="button" class="katml-add" style="'+style+'" '
+          +(isCurrent?'disabled title="Aktuelle Bezeichnung"':'onclick="_doRenameKat(\''+id+'\',\''+safe+'\')" title="Übernehmen"')
+          +'>'+esc(name)+(isCurrent?' ✓':'')+'</button>';
+      }).join('');
+    })
+    .catch(err=>{
+      console.warn('Lehrgangsarten laden fehlgeschlagen:',err);
+      sugg.innerHTML='<div style="font-size:.7rem;color:var(--mu);font-style:italic">Vorschläge nicht verfügbar</div>';
+    });
+}
+function closeRenameKat(){const ov=document.getElementById('renameKatOv');if(ov)ov.remove();}
+function _doRenameKat(id,newLabel){
+  const kat=S.kats[id];
+  if(!kat){closeRenameKat();return;}
+  const oldLabel=kat.label;
+  const trimmed=String(newLabel||'').trim();
   if(!trimmed){toast('Bezeichnung darf nicht leer sein','bad');return;}
-  if(trimmed===oldLabel) return; // keine Änderung
-  // Doppelten Namen verhindern
-  const dup=Object.entries(S.kats).find(([kid,k])=>kid!==id&&k.label.toLowerCase()===trimmed.toLowerCase());
+  if(trimmed===oldLabel){closeRenameKat();return;}
+  // Duplikat verhindern
+  const dup=Object.entries(S.kats).find(([kid,k])=>kid!==id&&String(k.label||'').toLowerCase()===trimmed.toLowerCase());
   if(dup){toast('Lehrgangsart „'+trimmed+'" existiert bereits','bad');return;}
   kat.label=trimmed;
-  // Firestore-Sync für alle Kurse dieser Lehrgangsart
+  // Firestore-Sync für alle Cloud-Kurse dieser Lehrgangsart
   if(_db){
     Object.values(kat.instances||{}).forEach(inst=>{
       if(inst.sharedKursId){
@@ -2035,6 +2097,7 @@ function renameKat(id,e){
       }
     });
   }
+  closeRenameKat();
   persist();renderAll();
   toast('✎ Umbenannt: „'+oldLabel+'" → „'+trimmed+'"');
 }
@@ -2875,7 +2938,7 @@ function renderMain(){
     +'<button class="tbtn main-docs-btn" onclick="generateTNListeAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">📋 TN-Liste</button>'
     +'<button class="tbtn main-docs-btn" onclick="generateAlleBescheinigungenAusbilder()" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3);color:#6366f1" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen</button>'
     +(inst.sharedKursId?'<button class="tbtn main-docs-btn" onclick="openManualTNModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981" title="Teilnehmer manuell zum Kurs hinzufügen">👤+ TN</button><button class="tbtn main-docs-btn" onclick="openQRModal()" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10b981" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button>':'<button class="tbtn main-docs-btn" onclick="activateFirestore()" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.2);color:#10b981;border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
-    +'<button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Diesen Lehrgang in eine andere Lehrgangsart verschieben">↔ Lehrgang in andere Lehrgangsart verschieben</button>'
+    +'<button class="tbtn main-docs-btn" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6" title="Diesen Lehrgang in eine andere Lehrgangsart verschieben">↔ Lehrgang verschieben</button>'
     +'<button class="tbtn main-docs-btn" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:#ef4444" title="Lehrgang löschen (30 Tage im Papierkorb)">🗑 Löschen</button>'
     +'<button class="tbtn main-docs-btn" onclick="showAktionsVerlauf()" style="background:rgba(100,116,139,.08);border-color:rgba(100,116,139,.25);color:#475569" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">📋 Aktions-Verlauf</button>'
     +'</div>'
