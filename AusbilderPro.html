@@ -9530,6 +9530,9 @@ try{
       document.getElementById('pwScreen').style.display='none';
       document.getElementById('fbLogoutBtn').style.display='';
       document.getElementById('cloudInd').textContent='☁ '+email.split('@')[0];
+      document.getElementById('hdrChatWrap').style.display='';
+      const mobChat=document.getElementById('mobChatMehrBtn'); if(mobChat) mobChat.style.display='';
+      startChatListener();
       fbLoadData();
     });
   } else {
@@ -9569,6 +9572,9 @@ function goAsAusbilder(){
   document.getElementById('roleChoice').style.display='none';
   document.getElementById('fbLogoutBtn').style.display='';
   document.getElementById('cloudInd').textContent='☁ '+(_auth.currentUser?.email||'').split('@')[0];
+  document.getElementById('hdrChatWrap').style.display='';
+  const mobChat=document.getElementById('mobChatMehrBtn'); if(mobChat) mobChat.style.display='';
+  startChatListener();
   fbLoadData();
 }
 
@@ -10293,6 +10299,9 @@ let _newGroupSelected={}; // uid -> true
 function startChatListener(){
   if(!_db||!_fbUid) return;
   stopChatListener();
+  // Defensive: sicherstellen dass die Buttons sichtbar sind (falls über exotischen Login-Pfad reingekommen)
+  const w=document.getElementById('hdrChatWrap'); if(w) w.style.display='';
+  const m=document.getElementById('mobChatMehrBtn'); if(m) m.style.display='';
   // Listener auf eigene Chats
   _chatListenerUnsub=_db.collection('chats').where('participants','array-contains',_fbUid).onSnapshot(snap=>{
     _chats={};
@@ -10752,6 +10761,9 @@ function leaveGroup(){
     toast('Gruppe verlassen','info');
   }).catch(err=>toast('Fehler: '+(err.code||err.message),'bad'));
 }
+
+// Auto-Init: falls Listener nicht laeuft (exotischer Login-Pfad)
+setInterval(()=>{if(_fbUid&&_db&&!_chatListenerUnsub) startChatListener();},2000);
 
 </script>
 
