@@ -900,6 +900,22 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- MITGLIED HINZUFÜGEN MODAL -->
+<div class="ov" id="addMemberModal" onclick="if(event.target===this)closeAddMemberModal()" style="z-index:101">
+  <div class="modal" style="max-width:480px">
+    <div class="mhd"><div class="mtit">➕ Mitglied hinzufügen</div><button class="xcls" onclick="closeAddMemberModal()" title="Schließen">✕</button></div>
+    <div class="mbdy" style="padding:16px">
+      <p style="font-size:.74rem;color:#64748b;margin-bottom:10px">Mehrfachauswahl möglich</p>
+      <input type="text" id="addMemberSearch" placeholder="Suchen…" oninput="renderAddMemberList()" style="width:100%;padding:7px 11px;border:2px solid #e2e8f0;border-radius:7px;font-size:.74rem;margin-bottom:8px;font-family:'Sora',sans-serif">
+      <div id="addMemberList" style="max-height:340px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px"></div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button onclick="closeAddMemberModal()" style="flex:1;padding:10px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:8px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif;font-size:.78rem;color:#475569">Abbrechen</button>
+        <button onclick="confirmAddMembers()" style="flex:1;padding:10px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;font-size:.78rem">✓ Hinzufügen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- GRUPPEN-EINSTELLUNGEN -->
 <div class="ov" id="groupSettModal" onclick="if(event.target===this)closeGroupSettings()">
   <div class="modal" style="max-width:480px">
@@ -10306,13 +10322,54 @@ function startChatListener(){
   const m=document.getElementById('mobChatMehrBtn'); if(m) m.style.display='';
   const mn=document.getElementById('mobNavChatBtn'); if(mn) mn.style.display='';
   // Listener auf eigene Chats
+  let firstSnap=true;
   _chatListenerUnsub=_db.collection('chats').where('participants','array-contains',_fbUid).onSnapshot(snap=>{
     _chats={};
     snap.forEach(doc=>{_chats[doc.id]={id:doc.id,...doc.data()};});
     updateChatUnreadBadge();
     if(document.getElementById('chatModal').classList.contains('open')
        && document.getElementById('chatViewList').style.display!=='none') renderChatList();
+    if(firstSnap){firstSnap=false;setTimeout(runChatAutoCleanup,5000);}
   },err=>console.warn('Chat-Listener:',err));
+}
+
+// DSGVO-Auto-Cleanup: eigene Nachrichten >12 Monate + Soft-Deletes >30 Tage
+function runChatAutoCleanup(){
+  if(!_db||!_fbUid) return;
+  // Throttle: max 1x pro 12h pro Geraet
+  try {
+    const last=parseInt(localStorage.getItem('chatCleanupLast')||'0');
+    if(Date.now()-last<12*3600*1000) return;
+    localStorage.setItem('chatCleanupLast',String(Date.now()));
+  } catch(e){}
+  const TWELVE_MONTHS=365*24*3600*1000;
+  const THIRTY_DAYS=30*24*3600*1000;
+  const now=Date.now();
+  let totalDeleted=0;
+  Object.keys(_chats).forEach(chatId=>{
+    // Aelteste 100 Nachrichten pro Chat anschauen (kein Composite-Index noetig)
+    _db.collection('chats').doc(chatId).collection('messages')
+      .orderBy('ts','asc').limit(100).get().then(snap=>{
+        if(snap.empty) return;
+        const batch=_db.batch();
+        let count=0;
+        snap.forEach(d=>{
+          const m=d.data();
+          if(m.von!==_fbUid) return; // Nur eigene
+          const tsMillis=m.ts?.toMillis?.()||0;
+          const delMillis=m.deletedAt?.toMillis?.()||0;
+          const tooOld=tsMillis>0 && (now-tsMillis)>TWELVE_MONTHS;
+          const expiredSoftDel=m.deleted && delMillis>0 && (now-delMillis)>THIRTY_DAYS;
+          if(tooOld||expiredSoftDel){batch.delete(d.ref);count++;}
+        });
+        if(count>0){
+          batch.commit().then(()=>{
+            totalDeleted+=count;
+            console.log('Chat-Cleanup '+chatId+': '+count+' eigene Nachrichten geloescht');
+          }).catch(err=>console.warn('Chat-Cleanup commit:',err));
+        }
+      }).catch(err=>console.warn('Chat-Cleanup query:',err));
+  });
 }
 function stopChatListener(){
   if(_chatListenerUnsub){_chatListenerUnsub();_chatListenerUnsub=null;}
@@ -10760,30 +10817,68 @@ function kickMember(uid){
     openGroupSettings();
   }).catch(err=>toast('Fehler: '+(err.code||err.message),'bad'));
 }
+let _addMemberSelected={};
 function openAddMember(){
+  const chat=_chats[_curChatId];if(!chat||chat.admin!==_fbUid) return;
+  _addMemberSelected={};
+  document.getElementById('addMemberSearch').value='';
+  document.getElementById('addMemberList').innerHTML='<div style="padding:14px;text-align:center;color:#94a3b8;font-size:.74rem">Lade…</div>';
+  document.getElementById('addMemberModal').classList.add('open');
+  renderAddMemberList();
+}
+function closeAddMemberModal(){document.getElementById('addMemberModal').classList.remove('open');}
+function renderAddMemberList(){
   const chat=_chats[_curChatId];if(!chat) return;
   loadAusbilderListe().then(ausb=>{
+    const filter=(document.getElementById('addMemberSearch')?.value||'').toLowerCase().trim();
     const available=ausb.filter(a=>!chat.participants.includes(a.uid));
-    if(!available.length){toast('Alle Ausbilder sind bereits Mitglied','info');return;}
-    const list=available.map(a=>(a.name||a.email)+' ('+a.email+')').join('\n');
-    const choice=prompt('Mitglied hinzufügen – Nummer wählen:\n\n'+available.map((a,i)=>(i+1)+'. '+(a.name||a.email)).join('\n'));
-    if(!choice) return;
-    const idx=parseInt(choice)-1;
-    if(idx<0||idx>=available.length){toast('Ungültige Auswahl','bad');return;}
-    const uid=available[idx].uid;const nm=available[idx].name||available[idx].email;
-    const newParts=[...chat.participants,uid];
-    const newJoined={...(chat.joinedAt||{}),[uid]:Date.now()};
-    const newUnread={...(chat.unread||{}),[uid]:0};
-    _db.collection('chats').doc(_curChatId).update({participants:newParts,joinedAt:newJoined,unread:newUnread}).then(()=>{
-      const myName=_chatUsers[_fbUid]?.name||'Admin';
-      _db.collection('chats').doc(_curChatId).collection('messages').add({
+    const list=filter?available.filter(a=>(a.name||'').toLowerCase().includes(filter)||(a.email||'').toLowerCase().includes(filter)):available;
+    const cnt=document.getElementById('addMemberList');
+    if(!available.length){cnt.innerHTML='<div style="padding:14px;text-align:center;color:#94a3b8;font-size:.74rem">Alle Ausbilder sind bereits Mitglied</div>';return;}
+    if(!list.length){cnt.innerHTML='<div style="padding:14px;text-align:center;color:#94a3b8;font-size:.74rem">Keine Treffer</div>';return;}
+    cnt.innerHTML=list.map(a=>{
+      const sel=_addMemberSelected[a.uid]?'checked':'';
+      return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer">'
+        +'<input type="checkbox" '+sel+' onchange="_addMemberSelected[\''+a.uid+'\']=this.checked||undefined" style="width:18px;height:18px;cursor:pointer">'
+        +'<div style="flex:1;font-size:.78rem;font-weight:600;color:#1e293b">'+esc(a.name||a.email)+'</div>'
+        +'<span style="font-size:.6rem;color:#64748b">'+esc(a.email)+'</span>'
+      +'</label>';
+    }).join('');
+  });
+}
+function confirmAddMembers(){
+  const chat=_chats[_curChatId];if(!chat||chat.admin!==_fbUid) return;
+  const newUids=Object.keys(_addMemberSelected).filter(u=>_addMemberSelected[u]);
+  if(!newUids.length){toast('Mindestens 1 Mitglied auswählen','bad');return;}
+  const newParts=[...chat.participants];
+  const newJoined={...(chat.joinedAt||{})};
+  const newUnread={...(chat.unread||{})};
+  newUids.forEach(uid=>{
+    if(!newParts.includes(uid)){
+      newParts.push(uid);
+      newJoined[uid]=Date.now();
+      newUnread[uid]=0;
+    }
+  });
+  _db.collection('chats').doc(_curChatId).update({participants:newParts,joinedAt:newJoined,unread:newUnread}).then(()=>{
+    const myName=_chatUsers[_fbUid]?.name||'Admin';
+    // System-Message pro hinzugefügtem User
+    const batch=_db.batch();
+    newUids.forEach(uid=>{
+      const nm=_chatUsers[uid]?.name||_chatUsers[uid]?.email||'?';
+      const ref=_db.collection('chats').doc(_curChatId).collection('messages').doc();
+      batch.set(ref,{
         von:_fbUid,system:true,deleted:false,
         text:myName+' hat '+nm+' hinzugefügt',
         ts:firebase.firestore.FieldValue.serverTimestamp()
-      }).catch(()=>{});
-      closeGroupSettings();openGroupSettings();
-    }).catch(err=>toast('Fehler: '+(err.code||err.message),'bad'));
-  });
+      });
+    });
+    batch.commit().catch(()=>{});
+    closeAddMemberModal();
+    closeGroupSettings();
+    openGroupSettings();
+    toast(newUids.length+' Mitglied'+(newUids.length>1?'er':'')+' hinzugefügt','ok');
+  }).catch(err=>toast('Fehler: '+(err.code||err.message),'bad'));
 }
 function leaveGroup(){
   const chat=_chats[_curChatId];if(!chat) return;
