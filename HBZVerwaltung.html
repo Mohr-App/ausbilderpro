@@ -1584,6 +1584,7 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 const APP_VERSION = 'v1.6.0';
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'v1.6.2', d:'13.05.2026', items:['📊 Dashboard-Chart „Teilnehmer nach Beruf": Dubletten behoben — TN mit verschiedenen Beruf-Schreibweisen (z.B. „Bäcker" vs „Bäcker – Bäcker") werden jetzt korrekt auf eine Berufsgruppe zusammengefasst']},
   {v:'v1.6.1', d:'13.05.2026', items:['📑 Sidebar-Sections optisch klarer: Ausbilder/Teilnehmer mit Sticky-Header, fettem Block-Design und blauem Trennstrich','📌 Beim Scrollen durch lange Listen bleibt der aktuelle Section-Header oben sichtbar']},
   {v:'v1.6.0', d:'07.05.2026', items:['🔁 Status/Wiederholer-Auto-Reset bei gleicher Lehrgangsart','💼 Pilot-Modus komplett beendet (Banner, Anonymisierung, Import-Kürzung)']},
   {v:'v1.4.0', d:'04.03.2026', items:['📊 Anwesenheits-Daten vom Ausbilder sichtbar (% + Details pro TN)','📊 Kursdetail zeigt Anwesenheits-Zusammenfassung','👤 TN-Profil zeigt detaillierte Anwesenheitsstatistik']},
@@ -3261,9 +3262,13 @@ function renderDashCharts(){
       options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom',labels:{font:{size:11,family:"'Sora',sans-serif",weight:600},padding:12,usePointStyle:true,pointStyle:'circle'}}},cutout:'65%'}
     });
   }
-  // TN nach Beruf
+  // TN nach Beruf (gruppiert über kanonische BERUFE-Gruppe statt freiem beruf-String)
   const berufMap={};
-  _globalTN.forEach(t=>{const b=t.beruf||'Ohne Beruf';berufMap[b]=(berufMap[b]||0)+1;});
+  _globalTN.forEach(t=>{
+    const key = getBerufKey(t.beruf, t.berufGruppeId);
+    const label = (BERUFE[key]?.label) || (BERUFE[key]?.name) || (t.beruf || 'Ohne Beruf');
+    berufMap[label] = (berufMap[label]||0) + 1;
+  });
   const berufLabels=Object.keys(berufMap).sort((a,b)=>berufMap[b]-berufMap[a]);
   const berufData=berufLabels.map(b=>berufMap[b]);
   const berufColors=['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
@@ -9341,7 +9346,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.6.1 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.6.2 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
