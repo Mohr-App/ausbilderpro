@@ -1584,6 +1584,7 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 const APP_VERSION = 'v1.6.0';
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'v1.6.3', d:'13.05.2026', items:['🎨 Lehrgangsarten in der Ausbilder-Sidebar (ET1, ET3, …) jetzt in der Farbe ihrer Berufsgruppe — klare visuelle Zuordnung beim Aufklappen']},
   {v:'v1.6.2', d:'13.05.2026', items:['📊 Dashboard-Chart „Teilnehmer nach Beruf": Dubletten behoben — TN mit verschiedenen Beruf-Schreibweisen (z.B. „Bäcker" vs „Bäcker – Bäcker") werden jetzt korrekt auf eine Berufsgruppe zusammengefasst']},
   {v:'v1.6.1', d:'13.05.2026', items:['📑 Sidebar-Sections optisch klarer: Ausbilder/Teilnehmer mit Sticky-Header, fettem Block-Design und blauem Trennstrich','📌 Beim Scrollen durch lange Listen bleibt der aktuelle Section-Header oben sichtbar']},
   {v:'v1.6.0', d:'07.05.2026', items:['🔁 Status/Wiederholer-Auto-Reset bei gleicher Lehrgangsart','💼 Pilot-Modus komplett beendet (Banner, Anonymisierung, Import-Kürzung)']},
@@ -2129,13 +2130,15 @@ function renderSbAusbTree(){
         });
 
         Object.entries(byLgart).sort().forEach(([lgName, kurse]) => {
+          const _lgCol = berufColor(bKey);
           const lgDiv  = document.createElement('div'); lgDiv.className = 'sb-kurs';
           const lgHdr  = document.createElement('div'); lgHdr.className = 'sb-kurs-hdr open';
+          lgHdr.style.cssText = 'border-left:3px solid '+_lgCol+';background:linear-gradient(90deg,'+_lgCol+'14,transparent 60%);border-radius:0 5px 5px 0;margin:2px 4px 2px 0;';
           const lgBody = document.createElement('div'); lgBody.className = 'sb-kurs-body open';
           lgHdr.innerHTML =
-            '<span class="sk">&#9654;</span>'
-            + '<span style="flex:1">' + esc(lgName) + '</span>'
-            + '<span style="font-size:.6rem;color:var(--mu)">' + kurse.length + '</span>';
+            '<span class="sk" style="color:'+_lgCol+'">&#9654;</span>'
+            + '<span style="flex:1;color:'+_lgCol+';font-weight:700">' + esc(lgName) + '</span>'
+            + '<span style="font-size:.6rem;color:'+_lgCol+';opacity:.7">' + kurse.length + '</span>';
           lgHdr.onclick = function(){ this.classList.toggle('open'); lgBody.classList.toggle('open'); };
 
           const today = new Date().toISOString().slice(0,10);
@@ -8703,6 +8706,11 @@ function safeClose(modalId, closeFn){
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 const _berufColors=['#2563eb','#059669','#d97706','#7c3aed','#ef4444','#0891b2','#c026d3','#65a30d'];
+function berufColor(bKey){
+  const keys=Object.keys(BERUFE);
+  const idx=keys.indexOf(bKey);
+  return _berufColors[(idx>=0?idx:0)%_berufColors.length];
+}
 function berufBarHTML(bKey){
   const keys=Object.keys(BERUFE);
   const idx=keys.indexOf(bKey);
@@ -9346,7 +9354,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.6.2 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.6.3 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
