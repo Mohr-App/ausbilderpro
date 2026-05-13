@@ -1016,7 +1016,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright">© AusbilderPro v2.7.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright">© AusbilderPro v2.7.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1693,9 +1693,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Lehrgangsarten an
-const APP_VERSION = 'v2.7.2';
+const APP_VERSION = 'v2.7.3';
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'v2.7.3', d:'13.05.2026', items:['🐛 Chat: „Unbekannt"-Anzeige behoben — Sender-Name wird jetzt in jeder Nachricht mitgespeichert, fehlende Chat-Teilnehmer werden bei Bedarf direkt nachgeladen (unabhängig vom Filter auf zuletzt genutzte App)']},
   {v:'v2.7.2', d:'13.05.2026', items:['🎨 Lehrgangsart-Reiter & Container in der Sidebar nochmal deutlich kräftiger (Border 5px, Tint 25%/30%, kräftige Border-Tönung) — klare visuelle Trennung der Kategorien']},
   {v:'v2.7.1', d:'13.05.2026', items:['🎨 Lehrgangsarten-Reiter in der Sidebar deutlich kräftiger eingefärbt (Volltöne, dickerer Akzentstreifen, Schüler-Zähler als farbige Pille); Farbe bleibt auch beim Aufklappen erhalten — kein blauer Override mehr','🎨 Lehrgangs-Liste unter aufgeklapptem Reiter erbt die Kategorie-Farbe (Border + zarter Tint) für klare visuelle Zugehörigkeit']},
   {v:'v2.7.0', d:'07.05.2026', items:['⏱ Mehrere Stempel-Paare pro Tag (z.B. private Erledigungen mittags)','⚖ Pflicht-Pause nach §4 ArbZG automatisch berücksichtigt (>6h: 30min, >9h: 45min)','🔁 Status/Wiederholer-Auto-Reset bei gleicher Lehrgangsart','🔗 Recovery-Funktion für TN, die direkt am Sitz angelegt wurden','✋ Stempel-Doppel-Klick-Schutz mit Sofort-Feedback','📌 Hinweis bei leerem Sitz auf Cloud-Kurs (zwingt zu +TN-Sidebar)','💼 Pilot-Modus beendet: Klarnamen + Telefon + alle Datei-Typen wieder offen','📧 E-Mail-Branding einheitlich (Antragsteller als Absender + replyTo)','🐛 Sitzplatz-Modal schließt nicht mehr beim Klick ins Leere']},
@@ -10685,6 +10686,46 @@ function loadAusbilderListe(){
   }).catch(err=>{console.warn('Ausbilder-Liste:',err);return[];});
 }
 
+// Lazy-Loader: stellt sicher dass alle Teilnehmer in den eigenen Chats im _chatUsers-Cache sind.
+// Unabhängig von 'lastApp'-Filter — fragt users/{uid} direkt ab.
+async function ensureChatUsersLoaded(){
+  if(!_db||!_fbUid) return;
+  const missing=new Set();
+  Object.values(_chats||{}).forEach(c=>{
+    (c.participants||[]).forEach(uid=>{
+      if(uid && uid!==_fbUid && !_chatUsers[uid]) missing.add(uid);
+    });
+  });
+  if(!missing.size) return;
+  // Stamm-Cache laden falls noch nicht da
+  if(!_ausbStammCache){
+    try{
+      const snap=await _db.collection('shared').doc('kursSettings').collection('ausbilder').get();
+      const m={};
+      snap.forEach(doc=>{
+        const d=doc.data();
+        const email=(d.email||'').toLowerCase();
+        if(!email) return;
+        const vn=(d.vorname||'').trim();
+        const nn=(d.nachname||'').trim();
+        m[email]={name:(vn+' '+nn).trim()||(d.name||'').trim(),berufId:d.berufId||'',vorname:vn,nachname:nn};
+      });
+      _ausbStammCache=m;
+    }catch(e){_ausbStammCache={};}
+  }
+  await Promise.all([...missing].map(uid=>
+    _db.collection('users').doc(uid).get().then(doc=>{
+      const d=doc.exists?(doc.data()||{}):{};
+      const email=(d.email||'').toLowerCase();
+      const stammData=_ausbStammCache[email]||{};
+      const displayName=stammData.name||d.ausbilderName||d.profil?.name||(email?email.split('@')[0]:'Unbekannt');
+      _chatUsers[uid]={email:d.email||'',name:displayName,berufGruppeId:stammData.berufId||d.berufGruppeId||'',photoUrl:d.photoUrl||''};
+    }).catch(()=>{
+      _chatUsers[uid]={email:'',name:'Unbekannt',berufGruppeId:'',photoUrl:''};
+    })
+  ));
+}
+
 function openChatModal(){
   if(!_fbUid){toast('Bitte zuerst einloggen','bad');return;}
   document.getElementById('chatViewList').style.display='flex';
@@ -10751,7 +10792,7 @@ function fmtChatTime(ts){
 }
 
 function renderChatList(){
-  loadAusbilderListe().then(ausb=>{
+  ensureChatUsersLoaded().then(()=>loadAusbilderListe()).then(ausb=>{
     const body=document.getElementById('chatListBody');
     const filter=(document.getElementById('chatSearchInp')?.value||'').toLowerCase().trim();
     const activeChats=Object.values(_chats).filter(c=>c.lastMessage)
@@ -10848,10 +10889,16 @@ function _openChatUI(chatId){
   if(!chat) return;
   document.getElementById('chatViewList').style.display='none';
   document.getElementById('chatViewConv').style.display='flex';
+  document.getElementById('chatMsgsBody').innerHTML='<div class="chat-empty">Lade…</div>';
+  // Erst Teilnehmer-Cache sicherstellen, dann Titel + Subtitle setzen
+  ensureChatUsersLoaded().then(()=>{
+    if(_curChatId!==chatId) return;
+    document.getElementById('chatConvTitle').textContent=chatDisplayName(chat);
+    document.getElementById('chatConvSub').textContent=chatSubtitle(chat);
+  });
   document.getElementById('chatConvTitle').textContent=chatDisplayName(chat);
   document.getElementById('chatConvSub').textContent=chatSubtitle(chat);
   document.getElementById('chatConvSettBtn').style.display=chat.type==='group'?'':'none';
-  document.getElementById('chatMsgsBody').innerHTML='<div class="chat-empty">Lade…</div>';
   // Unread auf 0
   if((chat.unread&&chat.unread[_fbUid])>0){
     const newUnread={...(chat.unread||{}),[_fbUid]:0};
@@ -10956,7 +11003,7 @@ function sendChatMessage(){
   // Upload (falls Att) + dann Message schreiben
   const finalize=(attachment)=>{
     const batch=_db.batch();
-    const msgData={von:_fbUid,text:text,ts:now,deleted:false};
+    const msgData={von:_fbUid,name:myName,text:text,ts:now,deleted:false};
     if(attachment) msgData.attachment=attachment;
     batch.set(msgRef,msgData);
     const newUnread={...(chat.unread||{})};
@@ -11026,7 +11073,7 @@ function renderMessages(msgs){
     if(dStr!==lastDate){html+='<div class="chat-sys-msg">'+dStr+'</div>';lastDate=dStr;}
     if(m.system){html+='<div class="chat-sys-msg">'+esc(m.text||'')+'</div>';return;}
     const isMe=m.von===_fbUid;
-    const senderName=isMe?'':(_chatUsers[m.von]?.name||_chatUsers[m.von]?.email||'?');
+    const senderName=isMe?'':(m.name||_chatUsers[m.von]?.name||_chatUsers[m.von]?.email||'Unbekannt');
     const timeStr=ts.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
     const isGroup=chat?.type==='group';
     let attHtml='';
