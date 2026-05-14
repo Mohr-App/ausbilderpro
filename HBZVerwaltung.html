@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=1280,initial-scale=1,user-scalable=yes">
 <title>VerwaltungPro – Ausbildungsverwaltung</title>
 <link rel="manifest" href="manifest-vp.json">
 <meta name="theme-color" content="#1e2230">
@@ -489,15 +489,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 /* ── MOBILE RESPONSIVE ── */
 .hdr-burger{display:none;background:none;border:none;color:#e2e8f0;font-size:1.4rem;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1;}
 .hdr-burger:hover{background:rgba(255,255,255,.1);}
-.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:299;}
-.sb-overlay.show{display:block;}
-/* MOBILE DRAWER (komplett deaktiviert - .sb wird auf Mobile direkt angezeigt) */
-.mob-drawer{display:none!important;}
-.sb-overlay{display:none!important;}
-@media(max-width:1024px){
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:149;}
+@media(max-width:768px){
   #dashCharts{grid-template-columns:1fr!important;}
   #dashStatusGrid{grid-template-columns:1fr!important;}
-  .hdr-burger{display:none!important;}
+  .hdr-burger{display:block;}
   .hdr-search-wrap{max-width:none;margin:0 6px;}
   .hdr-badge{display:none;}
   .hdr-user{display:none;}
@@ -515,17 +511,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   .sb-app-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:.72rem;font-weight:800;font-family:'Sora',sans-serif;}
   .sb-app-label{flex:1;min-width:0;font-size:.75rem;font-weight:700;line-height:1.2;}
   .sb-app-label small{display:block;font-size:.55rem;font-weight:500;color:var(--mu);margin-top:2px;}
-  /* WEG B: .sb auf Mobile sichtbar, oben gestapelt vor .main */
-  .body{flex-direction:column;}
-  .sb{width:100%!important;max-height:45vh;position:static!important;height:auto!important;border-right:none!important;border-bottom:2px solid var(--brd);overflow-y:auto;padding:8px 6px;}
-  .sb-bot{flex-direction:row!important;flex-wrap:wrap;gap:4px;padding:6px 0;border-top:1px solid var(--brd);margin-top:6px;}
-  .sb-bot .sb-icon-btn{flex:1 1 30%;min-width:0;padding:8px 4px;font-size:.62rem;}
-  .sb-bot .sb-icon-btn .nav-label{font-size:.55rem;}
+  .sb{position:fixed;left:0;top:54px;bottom:0;width:280px;z-index:300;display:none;box-shadow:none;-webkit-overflow-scrolling:touch;}
+  .sb.mobile-open{display:flex;box-shadow:4px 0 24px rgba(0,0,0,.12);}
+  .sb-overlay{background:rgba(0,0,0,.4)!important;z-index:299!important;}
+  .sb-overlay.show{display:block;}
   .main{padding:14px 8px;overflow-x:hidden;max-width:100vw;}
-  /* WEG B: sticky-Positionierung auf Mobile DEAKTIVIEREN - Hauptverdaechtiger fuer Chrome-Android Paint-Bug */
-  .hdr{position:relative!important;}
-  .sb-sec-hdr{position:relative!important;}
-  .mhd{position:relative!important;}
   .grid2,.grid3,#dashStatusGrid{grid-template-columns:1fr!important;}
   #globalTNList,#kursDetailTNGrid{grid-template-columns:1fr;}
   .modal{max-width:95vw!important;margin:0 10px;}
@@ -675,46 +665,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
   <div class="body">
     <div class="sb-overlay" id="sbOverlay" onclick="toggleMobileSb()"></div>
-
-    <!-- MOBILE DRAWER (AP-Pattern: separates DOM für Mobile, immer im Layout, slide-in via transform) -->
-    <div class="mob-drawer" id="mobDrawer">
-      <div class="mob-drawer-hd">
-        <div class="mob-drawer-title">☰ Verwaltung</div>
-        <button class="mob-drawer-close" onclick="toggleMobileSb()" title="Menü schließen">✕</button>
-      </div>
-      <div class="mob-drawer-scroll">
-        <div class="sb-sec-hdr" onclick="toggleMobSbSection('mobAusbTree','mobAusbArr')">
-          <span style="display:flex;align-items:center;gap:8px"><span class="card-icon blue" style="width:22px;height:22px"><svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>AUSBILDER</span>
-          <span id="mobAusbArr" class="sb-arr">▼</span>
-        </div>
-        <div id="mobAusbTree" class="sb-tree"><div class="sb-loading">Lädt…</div></div>
-        <div class="sb-sec-hdr" onclick="toggleMobSbSection('mobTnTree','mobTnArr')">
-          <span style="display:flex;align-items:center;gap:8px"><span class="card-icon green" style="width:22px;height:22px"><svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>TEILNEHMER</span>
-          <span id="mobTnArr" class="sb-arr">▼</span>
-        </div>
-        <div id="mobTnTree" class="sb-tree"></div>
-
-        <!-- Action-Buttons (wie in Desktop-Sidebar) -->
-        <div style="padding:10px 8px 6px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--brd);margin-top:8px">
-          <button class="sb-new-btn" onclick="closeMobileSb();openKursBuilder()">Neuen Kurs erstellen<div style="font-size:.55rem;font-weight:500;color:var(--mu);margin-top:2px">Lehrgang mit Datum und TN anlegen</div></button>
-          <button class="sb-new-btn" onclick="closeMobileSb();openNewTNModal()" style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);color:#22c55e">+ Neuer Teilnehmer<div style="font-size:.55rem;font-weight:500;color:var(--mu);margin-top:2px">Azubi manuell hinzufügen</div></button>
-          <button class="sb-new-btn" onclick="closeMobileSb();openImportModal()" style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#6366f1">TN importieren<div style="font-size:.55rem;font-weight:500;color:var(--mu);margin-top:2px">Liste aus Excel/CSV hochladen</div></button>
-        </div>
-
-        <!-- Navigation (Pages) -->
-        <div style="padding:8px;border-top:1px solid var(--brd);background:linear-gradient(180deg,rgba(59,130,246,.06),rgba(59,130,246,.02));margin-top:6px">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--mu);text-transform:uppercase;letter-spacing:.1em;padding:4px 6px 8px;font-weight:700">Navigation</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-            <button class="sb-icon-btn" onclick="closeMobileSb();showPage('dashboard')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border:1px solid var(--brd);border-radius:8px;cursor:pointer;font-size:.72rem;font-weight:600;color:var(--tx);text-align:left">📊 Dashboard</button>
-            <button class="sb-icon-btn" onclick="closeMobileSb();showPage('fortschritt')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border:1px solid var(--brd);border-radius:8px;cursor:pointer;font-size:.72rem;font-weight:600;color:var(--tx);text-align:left">📋 Fortschritt</button>
-            <button class="sb-icon-btn" onclick="closeMobileSb();showPage('urlaub')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border:1px solid var(--brd);border-radius:8px;cursor:pointer;font-size:.72rem;font-weight:600;color:var(--tx);text-align:left">📅 Urlaub</button>
-            <button class="sb-icon-btn" onclick="closeMobileSb();showPage('kursplanung')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border:1px solid var(--brd);border-radius:8px;cursor:pointer;font-size:.72rem;font-weight:600;color:var(--tx);text-align:left">🗓 Planung</button>
-            <button class="sb-icon-btn" onclick="closeMobileSb();showPage('einstellungen')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border:1px solid var(--brd);border-radius:8px;cursor:pointer;font-size:.72rem;font-weight:600;color:var(--tx);text-align:left">⚙ Settings</button>
-            <button class="sb-icon-btn" onclick="closeMobileSb();showPage('agverwaltung')" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border:1px solid var(--brd);border-radius:8px;cursor:pointer;font-size:.72rem;font-weight:600;color:var(--tx);text-align:left">🏢 Betriebe</button>
-          </div>
-        </div>
-      </div>
-    </div>
     <!-- SIDEBAR NAV -->
     <div class="sb">
       <!-- APP-LAUNCHER (nur Mobile, nur Admin) -->
@@ -1632,11 +1582,8 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
 const APP_VERSION = 'v1.6.0';
-const APP_BUILD = '2026-05-14';
+const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
-  {v:'v1.7.0', d:'14.05.2026', items:['🐛 Mobile-Sidebar komplett auf AusbilderPro-Architektur umgestellt: separater Mobile-Drawer mit eigenem DOM und eigenen Tree-Containern. Render schreibt jetzt parallel in Desktop-Sidebar UND Mobile-Drawer — Tree wird auf Tablet/Mobile zuverlässig angezeigt']},
-  {v:'v1.6.9', d:'14.05.2026', items:['🐛 Mobile-Sidebar repariert (Drawer-Mechanik wie in AusbilderPro): Sidebar wird nicht mehr via display:none/flex umgeschaltet sondern via transform:translateX ein-/ausgeschoben']},
-  {v:'v1.6.8', d:'14.05.2026', items:['🐛 Mobile-Fix: leere Sidebar auf Tablet/Smartphone (Samsung Internet) behoben — Sticky-Section-Header bricht in fixed-Sidebar nicht mehr die Tree-Renderung; auf Mobile jetzt statisch']},
   {v:'v1.6.7', d:'13.05.2026', items:['🎨 Sidebar-Rahmen insgesamt dezenter (Border-Bottom 2px statt 3px, Lehrgangsart-Akzent 3px statt 4px, weichere Tints)','📄 Einzelne Lehrgang-Zeilen (Datumsangaben) jetzt als weiße Karten mit dezentem Rahmen auf dem getönten Berufsgruppen-Hintergrund']},
   {v:'v1.6.6', d:'13.05.2026', items:['🎨 Berufsgruppen-Farben vereinheitlicht: nur noch alternierend Blau/Grün (passend zum Header-Verlauf) — gilt für Sidebar-Bäume und das Dashboard-Chart „TN nach Beruf"']},
   {v:'v1.6.5', d:'13.05.2026', items:['🎨 Klare farbige Trennlinie zwischen Berufsgruppen in beiden Sidebar-Bäumen (Ausbilder + Teilnehmer) — jede Berufsgruppe schließt mit 3px Bottom-Border in ihrer eigenen Farbe ab']},
@@ -1990,31 +1937,21 @@ document.addEventListener('keydown', function(e){
 });
 
 function toggleMobileSb(){
-  const drawer=document.getElementById('mobDrawer');
-  if(!drawer) return;
-  if(drawer.classList.contains('show')){
-    closeMobileSb();
-  } else {
-    openMobileSb();
+  const sb=document.querySelector('.sb');
+  const ov=document.getElementById('sbOverlay');
+  const open=sb.classList.toggle('mobile-open');
+  ov.classList.toggle('show',open);
+  if(open){
+    // Tree-Render synchron beim Oeffnen wie in AusbilderPro drawerOpen()
+    // Damit Composite-Layer-Probleme garantiert weg sind
+    try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){}
+    try{ if(typeof renderSbKurseTree==='function') renderSbKurseTree(); }catch(e){}
+    try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){}
   }
 }
-function openMobileSb(){
-  try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){}
-  try{ if(typeof renderSbKurseTree==='function') renderSbKurseTree(); }catch(e){}
-  try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){}
-  document.getElementById('sbOverlay')?.classList.add('show');
-  document.getElementById('mobDrawer')?.classList.add('show');
-}
 function closeMobileSb(){
+  document.querySelector('.sb')?.classList.remove('mobile-open');
   document.getElementById('sbOverlay')?.classList.remove('show');
-  document.getElementById('mobDrawer')?.classList.remove('show');
-}
-function toggleMobSbSection(treeId, arrId){
-  const tree=document.getElementById(treeId);
-  const arr=document.getElementById(arrId);
-  if(!tree||!arr) return;
-  tree.classList.toggle('collapsed');
-  arr.textContent=tree.classList.contains('collapsed')?'▶':'▼';
 }
 
 function toggleSCard(el){
@@ -2039,16 +1976,6 @@ window.addEventListener('popstate',e=>{
   if(e.state&&e.state.page){_navFromPop=true;showPage(e.state.page);}
   else{_navFromPop=true;showPage('dashboard');history.replaceState({page:'dashboard'},'');}
 });
-function _forceRepaint(){
-  // Chrome-Android Repaint-Workaround: erzwingt sofortigen Neuaufbau
-  document.body.offsetHeight;
-  document.body.style.transform='translateZ(0)';
-  requestAnimationFrame(()=>{
-    document.body.style.transform='';
-    window.scrollBy(0,0);
-  });
-}
-
 function showPage(id){
   if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
   _curPage=id; _navFromPop=false;
@@ -2070,7 +1997,6 @@ function showPage(id){
   if(id==='kursplanung') renderGantt();
   if(id==='einstellungen'){ loadHVKontakt(); loadAGUsers(); initCleanupCard(); }
   if(id==='agverwaltung'){ loadAgVerwaltung(); }
-  _forceRepaint();
 }
 
 function toggleSbSection(treeId, arrId){
@@ -2079,7 +2005,6 @@ function toggleSbSection(treeId, arrId){
   if(!tree) return;
   const collapsed=tree.classList.toggle('collapsed');
   if(arr) arr.classList.toggle('closed', collapsed);
-  _forceRepaint();
 }
 
 // ── Sidebar Ausbildungsmeister Baum ──
@@ -2098,11 +2023,7 @@ function populateAusbBerufSelect(){
 }
 
 function renderSbAusbTree(){
-  _doRenderAusbTreeInto('sbAusbTree');
-  _doRenderAusbTreeInto('mobAusbTree');
-}
-function _doRenderAusbTreeInto(_rootId){
-  const root = document.getElementById(_rootId);
+  const root = document.getElementById('sbAusbTree');
   if(!root) return;
   if(!_ausbilder.length && !_kurse.length){
     root.innerHTML='<div class="sb-loading" style="font-size:.68rem;padding:10px 14px">Noch keine Ausbilder angelegt.</div>';
@@ -2291,11 +2212,7 @@ function _doRenderAusbTreeInto(_rootId){
 
 // ── Sidebar Teilnehmer Baum (aufklappbar mit einzelnen TN) ──
 function renderSbTnTree(){
-  _doRenderTnTreeInto('sbTnTree');
-  _doRenderTnTreeInto('mobTnTree');
-}
-function _doRenderTnTreeInto(_rootId){
-  const root = document.getElementById(_rootId);
+  const root = document.getElementById('sbTnTree');
   if(!root) return;
 
   // Group TN by beruf
@@ -9442,7 +9359,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.8.4 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.8.5 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
