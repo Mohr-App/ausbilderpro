@@ -1584,6 +1584,7 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 const APP_VERSION = 'v1.6.0';
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'v1.6.6', d:'13.05.2026', items:['🎨 Berufsgruppen-Farben vereinheitlicht: nur noch alternierend Blau/Grün (passend zum Header-Verlauf) — gilt für Sidebar-Bäume und das Dashboard-Chart „TN nach Beruf"']},
   {v:'v1.6.5', d:'13.05.2026', items:['🎨 Klare farbige Trennlinie zwischen Berufsgruppen in beiden Sidebar-Bäumen (Ausbilder + Teilnehmer) — jede Berufsgruppe schließt mit 3px Bottom-Border in ihrer eigenen Farbe ab']},
   {v:'v1.6.4', d:'13.05.2026', items:['🎨 Lehrgangsart-Reiter in der Sidebar deutlich kräftiger eingefärbt (Volltöne statt verblassendem Gradient, dickerer Akzentstreifen, Zähler als farbige Pille)']},
   {v:'v1.6.3', d:'13.05.2026', items:['🎨 Lehrgangsarten in der Ausbilder-Sidebar (ET1, ET3, …) jetzt in der Farbe ihrer Berufsgruppe — klare visuelle Zuordnung beim Aufklappen']},
@@ -3276,13 +3277,14 @@ function renderDashCharts(){
   });
   const berufLabels=Object.keys(berufMap).sort((a,b)=>berufMap[b]-berufMap[a]);
   const berufData=berufLabels.map(b=>berufMap[b]);
-  const berufColors=['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+  const berufColors=['#2563eb','#059669'];
+  const _chartBarColors=berufLabels.map((_,i)=>berufColors[i%berufColors.length]);
   const ctx2=document.getElementById('chartBeruf');
   if(ctx2){
     if(_chartBeruf) _chartBeruf.destroy();
     _chartBeruf=new Chart(ctx2,{
       type:'bar',
-      data:{labels:berufLabels,datasets:[{data:berufData,backgroundColor:berufColors.slice(0,berufLabels.length),borderRadius:6,barThickness:22}]},
+      data:{labels:berufLabels,datasets:[{data:berufData,backgroundColor:_chartBarColors,borderRadius:6,barThickness:22}]},
       options:{responsive:true,maintainAspectRatio:true,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10,family:"'JetBrains Mono',monospace"}}},y:{grid:{display:false},ticks:{font:{size:10,family:"'Sora',sans-serif",weight:600}}}}}
     });
   }
@@ -8707,7 +8709,7 @@ function safeClose(modalId, closeFn){
 }
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-const _berufColors=['#2563eb','#059669','#d97706','#7c3aed','#ef4444','#0891b2','#c026d3','#65a30d'];
+const _berufColors=['#2563eb','#059669'];
 function berufColor(bKey){
   const keys=Object.keys(BERUFE);
   const idx=keys.indexOf(bKey);
@@ -9356,7 +9358,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.6.5 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.6.6 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
