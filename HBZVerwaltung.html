@@ -489,10 +489,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 /* ── MOBILE RESPONSIVE ── */
 .hdr-burger{display:none;background:none;border:none;color:#e2e8f0;font-size:1.4rem;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1;}
 .hdr-burger:hover{background:rgba(255,255,255,.1);}
-.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:149;}
-/* MOBILE DRAWER (AP-Pattern: transform mit kurzer Distanz) */
-.mob-drawer{display:flex;position:fixed;top:0;left:0;height:100vh;width:82vw;max-width:310px;background:#ffffff;z-index:9999;flex-direction:column;border-right:1px solid var(--brd);box-shadow:8px 0 24px rgba(0,0,0,.08);visibility:visible;transform:translateX(-105%);transition:transform .25s cubic-bezier(.4,0,.2,1);}
-.mob-drawer.show{transform:translateX(0)!important;}
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:299;}
+.sb-overlay.show{display:block;}
+/* MOBILE DRAWER (1:1 wie AusbilderPro) */
+.mob-drawer{position:fixed;top:0;left:0;bottom:0;width:82vw;max-width:310px;background:#ffffff;z-index:300;transform:translateX(-110%);transition:transform .27s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;border-right:1px solid var(--brd);box-shadow:8px 0 24px rgba(0,0,0,.08);}
+.mob-drawer.show{transform:translateX(0);}
 .mob-drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;border-bottom:1px solid var(--brd);flex-shrink:0;background:linear-gradient(135deg,#2563eb,#059669);}
 .mob-drawer-title{font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:700;color:#fff;}
 .mob-drawer-close{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:.95rem;display:flex;align-items:center;justify-content:center;}
@@ -519,8 +520,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   .sb-app-label{flex:1;min-width:0;font-size:.75rem;font-weight:700;line-height:1.2;}
   .sb-app-label small{display:block;font-size:.55rem;font-weight:500;color:var(--mu);margin-top:2px;}
   .sb{display:none!important;}
-  .sb-overlay{background:rgba(0,0,0,.4)!important;z-index:299!important;}
-  .sb-overlay.show{display:block;}
   .main{padding:14px 8px;overflow-x:hidden;max-width:100vw;}
   .grid2,.grid3,#dashStatusGrid{grid-template-columns:1fr!important;}
   #globalTNList,#kursDetailTNGrid{grid-template-columns:1fr;}
@@ -1987,38 +1986,24 @@ document.addEventListener('keydown', function(e){
 
 function toggleMobileSb(){
   const drawer=document.getElementById('mobDrawer');
-  const ov=document.getElementById('sbOverlay');
   if(!drawer) return;
-  const isCurrentlyOpen=drawer.classList.contains('show');
-  // Inline-Style komplett wegputzen (falls von alter Version noch da)
-  drawer.style.transform='';
-  drawer.style.left='';
-  if(isCurrentlyOpen){
-    drawer.classList.remove('show');
-    if(ov) ov.classList.remove('show');
+  if(drawer.classList.contains('show')){
+    closeMobileSb();
   } else {
-    drawer.classList.add('show');
-    if(ov) ov.classList.add('show');
-    try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){}
-    try{ if(typeof renderSbKurseTree==='function') renderSbKurseTree(); }catch(e){}
-    try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){}
+    openMobileSb();
   }
+}
+function openMobileSb(){
+  try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){}
+  try{ if(typeof renderSbKurseTree==='function') renderSbKurseTree(); }catch(e){}
+  try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){}
+  document.getElementById('sbOverlay')?.classList.add('show');
+  document.getElementById('mobDrawer')?.classList.add('show');
 }
 function closeMobileSb(){
-  const drawer=document.getElementById('mobDrawer');
-  if(drawer){
-    // Transition kurzzeitig ausschalten -> Drawer verschwindet sofort, keine Animation-Race-Condition mit showPage
-    const prev=drawer.style.transition;
-    drawer.style.transition='none';
-    drawer.style.transform='';
-    drawer.style.left='';
-    drawer.classList.remove('show');
-    // Nach 1 Frame Transition wieder anschalten (fuers naechste Oeffnen)
-    requestAnimationFrame(()=>{ drawer.style.transition=prev||''; });
-  }
   document.getElementById('sbOverlay')?.classList.remove('show');
+  document.getElementById('mobDrawer')?.classList.remove('show');
 }
-
 function toggleMobSbSection(treeId, arrId){
   const tree=document.getElementById(treeId);
   const arr=document.getElementById(arrId);
@@ -9440,7 +9425,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.7.11 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.8.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
