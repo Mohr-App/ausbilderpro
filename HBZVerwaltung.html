@@ -490,9 +490,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .hdr-burger{display:none;background:none;border:none;color:#e2e8f0;font-size:1.4rem;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1;}
 .hdr-burger:hover{background:rgba(255,255,255,.1);}
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:149;}
-/* MOBILE DRAWER (left-based slide statt transform — kompatibler mit WebView/Chrome-Bugs) */
-.mob-drawer{display:flex;position:fixed;top:0;left:-330px;bottom:0;width:82vw;max-width:310px;background:#ffffff;z-index:9999;transition:left .27s cubic-bezier(.4,0,.2,1);flex-direction:column;border-right:1px solid var(--brd);box-shadow:8px 0 24px rgba(0,0,0,.08);visibility:visible;}
-.mob-drawer.show{left:0;}
+/* MOBILE DRAWER (Inline-Style-Mechanik, kein transition) */
+.mob-drawer{display:flex;position:fixed;top:0;left:-9999px;bottom:0;width:82vw;max-width:310px;background:#ffffff;z-index:9999;flex-direction:column;border-right:1px solid var(--brd);box-shadow:8px 0 24px rgba(0,0,0,.08);visibility:visible;}
+.mob-drawer.show{left:0!important;}
 .mob-drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;border-bottom:1px solid var(--brd);flex-shrink:0;background:linear-gradient(135deg,#2563eb,#059669);}
 .mob-drawer-title{font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:700;color:#fff;}
 .mob-drawer-close{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:.95rem;display:flex;align-items:center;justify-content:center;}
@@ -1969,16 +1969,18 @@ function toggleMobileSb(){
   const drawer=document.getElementById('mobDrawer');
   const ov=document.getElementById('sbOverlay');
   if(!drawer){ alert('Drawer-Element FEHLT'); return; }
-  // ERST toggle, DANN diagnostizieren — so sehen wir den tatsaechlichen CSS-Zustand
-  const open=drawer.classList.toggle('show');
-  if(ov) ov.classList.toggle('show',open);
-  // Computed Style auslesen
-  const cs=window.getComputedStyle(drawer);
-  alert('VP v1.7.5 nach Toggle:\nshow-Klasse: '+drawer.classList.contains('show')+'\ndisplay: '+cs.display+'\nposition: '+cs.position+'\nleft: '+cs.left+'\ntransform: '+cs.transform+'\nz-index: '+cs.zIndex+'\nvisibility: '+cs.visibility+'\nopacity: '+cs.opacity+'\nwidth: '+cs.width);
-  if(open){
-    try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){alert('Render Ausb Fehler: '+e.message);}
+  const isCurrentlyOpen=drawer.classList.contains('show');
+  if(isCurrentlyOpen){
+    drawer.classList.remove('show');
+    drawer.style.left='-9999px';
+    if(ov) ov.classList.remove('show');
+  } else {
+    drawer.classList.add('show');
+    drawer.style.left='0px';
+    if(ov) ov.classList.add('show');
+    try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){}
     try{ if(typeof renderSbKurseTree==='function') renderSbKurseTree(); }catch(e){}
-    try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){alert('Render TN Fehler: '+e.message);}
+    try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){}
   }
 }
 function closeMobileSb(){
@@ -9407,7 +9409,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.7.5 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.7.6 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
