@@ -1971,14 +1971,23 @@ document.addEventListener('keydown', function(e){
 function toggleMobileSb(){
   const drawer=document.getElementById('mobDrawer');
   const ov=document.getElementById('sbOverlay');
+  // Diagnose-Toast: zeigt was der Burger findet
+  try{
+    const a=_ausbilder?.length||0;
+    const k=_kurse?.length||0;
+    const t=_globalTN?.length||0;
+    const dOk=drawer?'OK':'FEHLT';
+    const ovOk=ov?'OK':'FEHLT';
+    toast('🔍 Drawer:'+dOk+' · Overlay:'+ovOk+' · Ausb:'+a+' · Kurse:'+k+' · TN:'+t,'info');
+  }catch(_){}
   if(!drawer) return;
   const open=drawer.classList.toggle('show');
   ov.classList.toggle('show',open);
   if(open){
     // Tree-Render synchron beim Oeffnen (rendert in mobAusbTree + mobTnTree)
-    try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){}
+    try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){toast('Render Ausb Err: '+e.message,'bad');}
     try{ if(typeof renderSbKurseTree==='function') renderSbKurseTree(); }catch(e){}
-    try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){}
+    try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){toast('Render TN Err: '+e.message,'bad');}
   }
 }
 function closeMobileSb(){
@@ -9407,7 +9416,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.7.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.7.1 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
