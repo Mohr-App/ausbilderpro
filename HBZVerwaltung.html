@@ -2035,6 +2035,16 @@ window.addEventListener('popstate',e=>{
   if(e.state&&e.state.page){_navFromPop=true;showPage(e.state.page);}
   else{_navFromPop=true;showPage('dashboard');history.replaceState({page:'dashboard'},'');}
 });
+function _forceRepaint(){
+  // Chrome-Android Repaint-Workaround: erzwingt sofortigen Neuaufbau
+  document.body.offsetHeight;
+  document.body.style.transform='translateZ(0)';
+  requestAnimationFrame(()=>{
+    document.body.style.transform='';
+    window.scrollBy(0,0);
+  });
+}
+
 function showPage(id){
   if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
   _curPage=id; _navFromPop=false;
@@ -2056,6 +2066,7 @@ function showPage(id){
   if(id==='kursplanung') renderGantt();
   if(id==='einstellungen'){ loadHVKontakt(); loadAGUsers(); initCleanupCard(); }
   if(id==='agverwaltung'){ loadAgVerwaltung(); }
+  _forceRepaint();
 }
 
 function toggleSbSection(treeId, arrId){
@@ -2064,7 +2075,14 @@ function toggleSbSection(treeId, arrId){
   if(!tree) return;
   const collapsed=tree.classList.toggle('collapsed');
   if(arr) arr.classList.toggle('closed', collapsed);
+  _forceRepaint();
 }
+
+// Globaler Click-Repaint-Workaround fuer Chrome-Android Paint-Bug
+// Touch nur, nicht Click — wird einmal pro Tap ausgeloest, nicht doppelt
+document.addEventListener('touchend', function(){
+  setTimeout(_forceRepaint, 0);
+}, {passive:true, capture:false});
 
 // ── Sidebar Ausbildungsmeister Baum ──
 function populateAusbBerufSelect(){
@@ -9426,7 +9444,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.8.2 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.8.3 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
