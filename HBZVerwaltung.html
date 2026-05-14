@@ -490,6 +490,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .hdr-burger{display:none;background:none;border:none;color:#e2e8f0;font-size:1.4rem;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1;}
 .hdr-burger:hover{background:rgba(255,255,255,.1);}
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:149;}
+/* MOBILE DRAWER (AP-Pattern, nur Mobile sichtbar) */
+.mob-drawer{display:none;}
+@media(max-width:768px){
+  .mob-drawer{display:flex;position:fixed;top:0;left:0;bottom:0;width:82vw;max-width:310px;background:#ffffff;z-index:300;transform:translateX(-110%);transition:transform .27s cubic-bezier(.4,0,.2,1);flex-direction:column;border-right:1px solid var(--brd);box-shadow:8px 0 24px rgba(0,0,0,.08);}
+  .mob-drawer.show{transform:translateX(0);}
+  .mob-drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;border-bottom:1px solid var(--brd);flex-shrink:0;background:linear-gradient(135deg,#2563eb,#059669);}
+  .mob-drawer-title{font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:700;color:#fff;}
+  .mob-drawer-close{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:.95rem;display:flex;align-items:center;justify-content:center;}
+  .mob-drawer-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+}
 @media(max-width:768px){
   #dashCharts{grid-template-columns:1fr!important;}
   #dashStatusGrid{grid-template-columns:1fr!important;}
@@ -511,8 +521,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   .sb-app-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:.72rem;font-weight:800;font-family:'Sora',sans-serif;}
   .sb-app-label{flex:1;min-width:0;font-size:.75rem;font-weight:700;line-height:1.2;}
   .sb-app-label small{display:block;font-size:.55rem;font-weight:500;color:var(--mu);margin-top:2px;}
-  .sb{position:fixed;left:0;top:54px;bottom:0;width:280px;z-index:300;display:flex;box-shadow:none;-webkit-overflow-scrolling:touch;transform:translateX(-110%);transition:transform .27s cubic-bezier(.4,0,.2,1);}
-  .sb.mobile-open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.12);}
+  .sb{display:none!important;}
   .sb-overlay{background:rgba(0,0,0,.4)!important;z-index:299!important;}
   .sb-overlay.show{display:block;}
   .main{padding:14px 8px;overflow-x:hidden;max-width:100vw;}
@@ -665,6 +674,26 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
   <div class="body">
     <div class="sb-overlay" id="sbOverlay" onclick="toggleMobileSb()"></div>
+
+    <!-- MOBILE DRAWER (AP-Pattern: separates DOM für Mobile, immer im Layout, slide-in via transform) -->
+    <div class="mob-drawer" id="mobDrawer">
+      <div class="mob-drawer-hd">
+        <div class="mob-drawer-title">☰ Verwaltung</div>
+        <button class="mob-drawer-close" onclick="toggleMobileSb()" title="Menü schließen">✕</button>
+      </div>
+      <div class="mob-drawer-scroll">
+        <div class="sb-sec-hdr" onclick="toggleMobSbSection('mobAusbTree','mobAusbArr')">
+          <span style="display:flex;align-items:center;gap:8px"><span class="card-icon blue" style="width:22px;height:22px"><svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>AUSBILDER</span>
+          <span id="mobAusbArr" class="sb-arr">▼</span>
+        </div>
+        <div id="mobAusbTree" class="sb-tree"><div class="sb-loading">Lädt…</div></div>
+        <div class="sb-sec-hdr" onclick="toggleMobSbSection('mobTnTree','mobTnArr')">
+          <span style="display:flex;align-items:center;gap:8px"><span class="card-icon green" style="width:22px;height:22px"><svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>TEILNEHMER</span>
+          <span id="mobTnArr" class="sb-arr">▼</span>
+        </div>
+        <div id="mobTnTree" class="sb-tree"></div>
+      </div>
+    </div>
     <!-- SIDEBAR NAV -->
     <div class="sb">
       <!-- APP-LAUNCHER (nur Mobile, nur Admin) -->
@@ -1584,7 +1613,8 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 const APP_VERSION = 'v1.6.0';
 const APP_BUILD = '2026-05-14';
 const CHANGELOG = [
-  {v:'v1.6.9', d:'14.05.2026', items:['🐛 Mobile-Sidebar repariert (Drawer-Mechanik wie in AusbilderPro): Sidebar wird nicht mehr via display:none/flex umgeschaltet sondern via transform:translateX ein-/ausgeschoben — das löst die leere Tree-Anzeige auf Samsung Tab / Mobile-Browsern']},
+  {v:'v1.7.0', d:'14.05.2026', items:['🐛 Mobile-Sidebar komplett auf AusbilderPro-Architektur umgestellt: separater Mobile-Drawer mit eigenem DOM und eigenen Tree-Containern. Render schreibt jetzt parallel in Desktop-Sidebar UND Mobile-Drawer — Tree wird auf Tablet/Mobile zuverlässig angezeigt']},
+  {v:'v1.6.9', d:'14.05.2026', items:['🐛 Mobile-Sidebar repariert (Drawer-Mechanik wie in AusbilderPro): Sidebar wird nicht mehr via display:none/flex umgeschaltet sondern via transform:translateX ein-/ausgeschoben']},
   {v:'v1.6.8', d:'14.05.2026', items:['🐛 Mobile-Fix: leere Sidebar auf Tablet/Smartphone (Samsung Internet) behoben — Sticky-Section-Header bricht in fixed-Sidebar nicht mehr die Tree-Renderung; auf Mobile jetzt statisch']},
   {v:'v1.6.7', d:'13.05.2026', items:['🎨 Sidebar-Rahmen insgesamt dezenter (Border-Bottom 2px statt 3px, Lehrgangsart-Akzent 3px statt 4px, weichere Tints)','📄 Einzelne Lehrgang-Zeilen (Datumsangaben) jetzt als weiße Karten mit dezentem Rahmen auf dem getönten Berufsgruppen-Hintergrund']},
   {v:'v1.6.6', d:'13.05.2026', items:['🎨 Berufsgruppen-Farben vereinheitlicht: nur noch alternierend Blau/Grün (passend zum Header-Verlauf) — gilt für Sidebar-Bäume und das Dashboard-Chart „TN nach Beruf"']},
@@ -1939,21 +1969,29 @@ document.addEventListener('keydown', function(e){
 });
 
 function toggleMobileSb(){
-  const sb=document.querySelector('.sb');
+  const drawer=document.getElementById('mobDrawer');
   const ov=document.getElementById('sbOverlay');
-  const open=sb.classList.toggle('mobile-open');
+  if(!drawer) return;
+  const open=drawer.classList.toggle('show');
   ov.classList.toggle('show',open);
   if(open){
-    // Tree-Render synchron beim Oeffnen wie in AusbilderPro drawerOpen()
-    // Damit Composite-Layer-Probleme garantiert weg sind
+    // Tree-Render synchron beim Oeffnen (rendert in mobAusbTree + mobTnTree)
     try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){}
     try{ if(typeof renderSbKurseTree==='function') renderSbKurseTree(); }catch(e){}
     try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){}
   }
 }
 function closeMobileSb(){
-  document.querySelector('.sb')?.classList.remove('mobile-open');
+  document.getElementById('mobDrawer')?.classList.remove('show');
   document.getElementById('sbOverlay')?.classList.remove('show');
+}
+
+function toggleMobSbSection(treeId, arrId){
+  const tree=document.getElementById(treeId);
+  const arr=document.getElementById(arrId);
+  if(!tree||!arr) return;
+  tree.classList.toggle('collapsed');
+  arr.textContent=tree.classList.contains('collapsed')?'▶':'▼';
 }
 
 function toggleSCard(el){
@@ -2025,7 +2063,11 @@ function populateAusbBerufSelect(){
 }
 
 function renderSbAusbTree(){
-  const root = document.getElementById('sbAusbTree');
+  _doRenderAusbTreeInto('sbAusbTree');
+  _doRenderAusbTreeInto('mobAusbTree');
+}
+function _doRenderAusbTreeInto(_rootId){
+  const root = document.getElementById(_rootId);
   if(!root) return;
   if(!_ausbilder.length && !_kurse.length){
     root.innerHTML='<div class="sb-loading" style="font-size:.68rem;padding:10px 14px">Noch keine Ausbilder angelegt.</div>';
@@ -2214,7 +2256,11 @@ function renderSbAusbTree(){
 
 // ── Sidebar Teilnehmer Baum (aufklappbar mit einzelnen TN) ──
 function renderSbTnTree(){
-  const root = document.getElementById('sbTnTree');
+  _doRenderTnTreeInto('sbTnTree');
+  _doRenderTnTreeInto('mobTnTree');
+}
+function _doRenderTnTreeInto(_rootId){
+  const root = document.getElementById(_rootId);
   if(!root) return;
 
   // Group TN by beruf
@@ -9361,7 +9407,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.6.9 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.7.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
