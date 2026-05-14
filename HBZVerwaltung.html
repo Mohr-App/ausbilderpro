@@ -490,16 +490,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .hdr-burger{display:none;background:none;border:none;color:#e2e8f0;font-size:1.4rem;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1;}
 .hdr-burger:hover{background:rgba(255,255,255,.1);}
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:149;}
-/* MOBILE DRAWER (AP-Pattern, nur Mobile sichtbar) */
-.mob-drawer{display:none;}
-@media(max-width:1024px){
-  .mob-drawer{display:flex;position:fixed;top:0;left:0;bottom:0;width:82vw;max-width:310px;background:#ffffff;z-index:300;transform:translateX(-110%);transition:transform .27s cubic-bezier(.4,0,.2,1);flex-direction:column;border-right:1px solid var(--brd);box-shadow:8px 0 24px rgba(0,0,0,.08);}
-  .mob-drawer.show{transform:translateX(0);}
-  .mob-drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;border-bottom:1px solid var(--brd);flex-shrink:0;background:linear-gradient(135deg,#2563eb,#059669);}
-  .mob-drawer-title{font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:700;color:#fff;}
-  .mob-drawer-close{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:.95rem;display:flex;align-items:center;justify-content:center;}
-  .mob-drawer-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-}
+/* MOBILE DRAWER (AP-Pattern: immer im Layout via display:flex, slide-in via transform) */
+.mob-drawer{display:flex;position:fixed;top:0;left:0;bottom:0;width:82vw;max-width:310px;background:#ffffff;z-index:300;transform:translateX(-110%);transition:transform .27s cubic-bezier(.4,0,.2,1);flex-direction:column;border-right:1px solid var(--brd);box-shadow:8px 0 24px rgba(0,0,0,.08);}
+.mob-drawer.show{transform:translateX(0);}
+.mob-drawer-hd{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;border-bottom:1px solid var(--brd);flex-shrink:0;background:linear-gradient(135deg,#2563eb,#059669);}
+.mob-drawer-title{font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:700;color:#fff;}
+.mob-drawer-close{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:.95rem;display:flex;align-items:center;justify-content:center;}
+.mob-drawer-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 @media(max-width:1024px){
   #dashCharts{grid-template-columns:1fr!important;}
   #dashStatusGrid{grid-template-columns:1fr!important;}
@@ -1971,23 +1968,14 @@ document.addEventListener('keydown', function(e){
 function toggleMobileSb(){
   const drawer=document.getElementById('mobDrawer');
   const ov=document.getElementById('sbOverlay');
-  // Diagnose-Toast: zeigt was der Burger findet
-  try{
-    const a=_ausbilder?.length||0;
-    const k=_kurse?.length||0;
-    const t=_globalTN?.length||0;
-    const dOk=drawer?'OK':'FEHLT';
-    const ovOk=ov?'OK':'FEHLT';
-    toast('🔍 Drawer:'+dOk+' · Overlay:'+ovOk+' · Ausb:'+a+' · Kurse:'+k+' · TN:'+t,'info');
-  }catch(_){}
-  if(!drawer) return;
+  if(!drawer){ try{toast('Drawer-Element FEHLT','bad');}catch(_){} return; }
   const open=drawer.classList.toggle('show');
   ov.classList.toggle('show',open);
   if(open){
     // Tree-Render synchron beim Oeffnen (rendert in mobAusbTree + mobTnTree)
-    try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){toast('Render Ausb Err: '+e.message,'bad');}
+    try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){}
     try{ if(typeof renderSbKurseTree==='function') renderSbKurseTree(); }catch(e){}
-    try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){toast('Render TN Err: '+e.message,'bad');}
+    try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){}
   }
 }
 function closeMobileSb(){
@@ -9416,7 +9404,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.7.2 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.7.3 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
