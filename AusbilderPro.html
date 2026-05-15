@@ -232,9 +232,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .seat.pool-target{outline:2px dashed var(--acc);outline-offset:2px;}
 @media(max-width:900px){.pool-sidebar{display:none;}}
 .main-docs-btn{font-size:.65rem!important;padding:3px 9px!important;}
-/* Aktionen-Menue: blau/gruen abwechselnd statt bunt — Loeschen bleibt rot */
+/* Aktionen-Menue: blau/gruen abwechselnd statt bunt — Warn-Aktionen am Ende eskalierend gelb→orange→rot */
 .hdr-actions .ka-b{background:rgba(37,99,235,.08)!important;border-color:rgba(37,99,235,.3)!important;color:#2563eb!important;}
 .hdr-actions .ka-g{background:rgba(5,150,105,.08)!important;border-color:rgba(5,150,105,.3)!important;color:#059669!important;}
+.hdr-actions .ka-warn{background:rgba(234,179,8,.12)!important;border-color:rgba(234,179,8,.4)!important;color:#a16207!important;}
+.hdr-actions .ka-orange{background:rgba(249,115,22,.12)!important;border-color:rgba(249,115,22,.4)!important;color:#c2410c!important;}
 .hdr-actions .ka-del{background:rgba(239,68,68,.1)!important;border-color:rgba(239,68,68,.3)!important;color:#ef4444!important;}
 .hdr-actions{display:none;position:fixed;background:var(--sur);border:2px solid #e2e8f0;border-radius:10px;padding:36px 8px 8px 8px;z-index:500;box-shadow:0 8px 32px rgba(0,0,0,.15);width:260px;max-height:80vh;overflow-y:auto;flex-direction:column;gap:4px;animation:slideDown .15s ease;}
 .hdr-actions.show{display:flex;}
@@ -1027,7 +1029,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright">© AusbilderPro v2.8.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright">© AusbilderPro v2.8.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -3120,14 +3122,14 @@ function renderMain(){
     +'<button class="tbtn main-docs-btn ka-g" onclick="markBerufsschultag()" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="refreshAllSeatNamesFromGlobalTN()" title="Klarnamen aus Datenbank holen (für alle Sitzplätze in allen Lehrgängen)">🔄 Namen aktualisieren</button>'
     +'<button class="tbtn main-docs-btn ka-g" onclick="openCourseDocsModal()" title="Kursunterlagen hochladen und verwalten">📁 Dokumente</button>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="ausbilderKommtSpaeter()" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
-    +'<button class="tbtn main-docs-btn ka-g" onclick="kursAusfall()" title="Kurs für heute als ausgefallen markieren">⚠️ Ausfall</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="generateTNListeAusbilder()" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">📋 TN-Liste</button>'
     +'<button class="tbtn main-docs-btn ka-g" onclick="generateAlleBescheinigungenAusbilder()" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen</button>'
     +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-b" onclick="openManualTNModal()" title="Teilnehmer manuell zum Kurs hinzufügen">👤+ TN</button><button class="tbtn main-docs-btn ka-g" onclick="openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button>':'<button class="tbtn main-docs-btn ka-b" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
     +'<button class="tbtn main-docs-btn ka-b" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Diesen Lehrgang in eine andere Lehrgangsart verschieben">↔ Lehrgang verschieben</button>'
-    +'<button class="tbtn main-docs-btn ka-del" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Lehrgang löschen (30 Tage im Papierkorb)">🗑 Löschen</button>'
     +'<button class="tbtn main-docs-btn ka-g" onclick="showAktionsVerlauf()" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">📋 Aktions-Verlauf</button>'
+    +'<button class="tbtn main-docs-btn ka-warn" onclick="ausbilderKommtSpaeter()" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
+    +'<button class="tbtn main-docs-btn ka-orange" onclick="kursAusfall()" title="Kurs für heute als ausgefallen markieren">⚠️ Ausfall</button>'
+    +'<button class="tbtn main-docs-btn ka-del" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Lehrgang löschen (30 Tage im Papierkorb)">🗑 Löschen</button>'
     +'</div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
