@@ -1540,16 +1540,16 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
   </div><!-- /body -->
 </div><!-- /appWrap -->
 
-<!-- BURGER MENU MODAL (Mobile Sidebar) -->
-<div class="mob-menu-modal" id="mobMenuModal" onclick="if(event.target===this)closeMobileSb()">
-  <div class="mob-menu-content">
-    <div class="mob-menu-hd">
-      <div class="mob-menu-title">☰ Alle Bereiche</div>
-      <button class="mob-menu-close" onclick="closeMobileSb()" title="Schließen">✕</button>
+<!-- BURGER MENU MODAL (Mobile Sidebar) - nutzt bewaehrtes .ov Pattern -->
+<div class="ov" id="mobMenuModal" onclick="if(event.target===this)closeMobileSb()" style="z-index:300;align-items:flex-start;justify-content:flex-start">
+  <div class="modal" style="max-width:none;width:100%;height:100vh;height:100dvh;border-radius:0;margin:0;display:flex;flex-direction:column;transform:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;flex-shrink:0">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.85rem;font-weight:800">☰ Alle Bereiche</div>
+      <button onclick="closeMobileSb()" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:manipulation">✕</button>
     </div>
-    <div class="mob-menu-scroll">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748b;font-weight:800;letter-spacing:.1em;padding:12px 6px 6px;text-transform:uppercase">Navigation</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748b;font-weight:800;letter-spacing:.1em;padding:0 0 8px;text-transform:uppercase">Navigation</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         <button class="mob-menu-link" onclick="closeMobileSb();showPage('dashboard')">📊 Dashboard</button>
         <button class="mob-menu-link" onclick="closeMobileSb();showPage('fortschritt')">📋 Fortschritt</button>
         <button class="mob-menu-link" onclick="closeMobileSb();showPage('kursplanung')">🗓 Planung</button>
@@ -1558,8 +1558,8 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
         <button class="mob-menu-link" onclick="closeMobileSb();showPage('einstellungen')">⚙ Settings</button>
       </div>
 
-      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748b;font-weight:800;letter-spacing:.1em;padding:14px 6px 6px;text-transform:uppercase">Schnellaktionen</div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748b;font-weight:800;letter-spacing:.1em;padding:0 0 8px;text-transform:uppercase">Schnellaktionen</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
         <button class="mob-menu-link" onclick="closeMobileSb();openKursBuilder()">📚 Neuen Kurs erstellen</button>
         <button class="mob-menu-link" onclick="closeMobileSb();openNewTNModal()">👤 Neuer Teilnehmer</button>
         <button class="mob-menu-link" onclick="closeMobileSb();openImportModal()">📂 TN importieren</button>
@@ -1593,11 +1593,13 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 </div>
 
 <!-- MOBILE FLOATING ACTION BUTTON -->
-<button class="mob-fab show" id="mobFab" onclick="toggleMobFab(event)" title="Schnellaktionen">+</button>
-<div class="mob-fab-menu" id="mobFabMenu">
-  <button onclick="closeMobFab();openKursBuilder()">📚 Neuen Kurs erstellen</button>
-  <button onclick="closeMobFab();openNewTNModal()">👤 Neuer Teilnehmer</button>
-  <button onclick="closeMobFab();openImportModal()">📂 TN importieren</button>
+<button class="mob-fab show" id="mobFab" onclick="openMobFab()" title="Schnellaktionen">+</button>
+<div class="ov" id="mobFabMenu" onclick="if(event.target===this)closeMobFab()" style="z-index:299;align-items:flex-end;justify-content:flex-end;padding:0 14px 84px 14px">
+  <div class="modal" style="max-width:240px;width:100%;padding:6px;display:flex;flex-direction:column;gap:4px;transform:none">
+    <button class="mob-menu-link" onclick="closeMobFab();openKursBuilder()">📚 Neuen Kurs erstellen</button>
+    <button class="mob-menu-link" onclick="closeMobFab();openNewTNModal()">👤 Neuer Teilnehmer</button>
+    <button class="mob-menu-link" onclick="closeMobFab();openImportModal()">📂 TN importieren</button>
+  </div>
 </div>
 
 <!-- KURS DETAIL MODAL -->
@@ -2057,15 +2059,10 @@ document.addEventListener('keydown', function(e){
 function toggleMobileSb(){
   const m=document.getElementById('mobMenuModal');
   if(!m){ alert('mobMenuModal FEHLT'); return; }
-  const opened = m.classList.toggle('show');
-  if(opened){
-    try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){}
-    try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){}
-  }
+  m.classList.toggle('open');
 }
 function closeMobileSb(){
-  const m=document.getElementById('mobMenuModal');
-  if(m) m.classList.remove('show');
+  document.getElementById('mobMenuModal')?.classList.remove('open');
 }
 
 function toggleSCard(el){
@@ -2117,26 +2114,13 @@ function showPage(id){
   if(id==='agverwaltung'){ loadAgVerwaltung(); }
 }
 
-// FAB-Menue (Mobile)
-function toggleMobFab(ev){
-  if(ev) ev.stopPropagation();
-  const m=document.getElementById('mobFabMenu');
-  if(m) m.classList.toggle('show');
+// FAB-Menue (Mobile) - .ov Pattern
+function openMobFab(){
+  document.getElementById('mobFabMenu')?.classList.add('open');
 }
 function closeMobFab(){
-  const m=document.getElementById('mobFabMenu');
-  if(m) m.classList.remove('show');
+  document.getElementById('mobFabMenu')?.classList.remove('open');
 }
-// Klick ausserhalb schliesst FAB
-document.addEventListener('click', function(e){
-  const fab=document.getElementById('mobFab');
-  const menu=document.getElementById('mobFabMenu');
-  if(menu && menu.classList.contains('show')){
-    if(!menu.contains(e.target) && e.target!==fab){
-      menu.classList.remove('show');
-    }
-  }
-});
 
 function toggleSbSection(treeId, arrId){
   const tree=document.getElementById(treeId);
@@ -9515,7 +9499,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.0.2 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.0.3 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
