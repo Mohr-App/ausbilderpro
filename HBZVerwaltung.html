@@ -683,10 +683,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <a href="AusbilderPro.html" class="sb-app-item"><span class="sb-app-icon" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">AB</span><span class="sb-app-label">AusbilderPro<small>Sitzplan · Noten</small></span></a>
         <div style="height:1px;background:var(--brd);margin:6px 10px"></div>
       </div>
-      <div class="sb-sec-hdr sb-sec-ausb" style="cursor:default">
+      <div class="sb-sec-hdr sb-sec-ausb" title="Section auf-/zuklappen" onclick="toggleSbSection('sbAusbTree','sbAusbArr')">
         <span style="display:flex;align-items:center;gap:8px"><span class="card-icon blue" style="width:22px;height:22px"><svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>AUSBILDER</span>
         <span style="display:flex;gap:4px;align-items:center;margin-left:auto">
           <button class="sb-sort-btn" onclick="event.stopPropagation();sortBerufAlpha('ausb')" title="A-Z sortieren">A↓</button>
+          <span id="sbAusbArr" class="sb-arr">▼</span>
         </span>
       </div>
       <div id="sbAusbTree" class="sb-tree"><div class="sb-loading">Lädt…</div></div>
@@ -2012,6 +2013,20 @@ function toggleSbSection(treeId, arrId){
   const arr=document.getElementById(arrId);
   if(!tree) return;
   const collapsed=tree.classList.toggle('collapsed');
+  if(arr) arr.classList.toggle('closed', collapsed);
+  // Zustand in localStorage merken
+  try{ localStorage.setItem('vp-sb-'+treeId+'-collapsed', collapsed?'1':'0'); }catch(_){}
+}
+
+// Sidebar-Sections: gespeicherten Zustand wiederherstellen
+function _restoreSbSectionState(treeId, arrId, defaultCollapsed){
+  const tree=document.getElementById(treeId);
+  const arr=document.getElementById(arrId);
+  if(!tree) return;
+  let stored=null;
+  try{ stored=localStorage.getItem('vp-sb-'+treeId+'-collapsed'); }catch(_){}
+  const collapsed = (stored===null) ? defaultCollapsed : (stored==='1');
+  tree.classList.toggle('collapsed', collapsed);
   if(arr) arr.classList.toggle('closed', collapsed);
 }
 
@@ -9356,6 +9371,9 @@ function dismissInstallBig(){
 }
 
 window.addEventListener('load',()=>{
+  // Sidebar-Section-Zustand wiederherstellen (Default: Ausbilder offen, TN zu)
+  _restoreSbSectionState('sbAusbTree','sbAusbArr',false);
+  _restoreSbSectionState('sbTnTree','sbTnArr',true);
   if(isStandalone()) return;
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
   if(isIOS&&!_installPrompt){
@@ -9367,7 +9385,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v1.8.9 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v1.9.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
