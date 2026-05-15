@@ -1549,29 +1549,28 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 </div>
 
 <!-- BURGER-MODAL (Vollbild, .ov Pattern) -->
-<div class="ov" id="mobMenuModal" onclick="if(event.target===this)closeMobileSb()" style="align-items:flex-start;justify-content:flex-start">
-  <div class="modal" style="max-width:none;width:100%;height:100vh;height:100dvh;border-radius:0;margin:0;display:flex;flex-direction:column;padding:0;transform:none">
+<div class="ov" id="mobMenuModal" onclick="if(event.target===this)closeMobileSb()" style="align-items:stretch;justify-content:stretch;padding:0">
+  <div class="modal" style="max-width:none;width:100vw;height:100vh;height:100dvh;max-height:none;border-radius:0;margin:0;display:flex;flex-direction:column;padding:0;transform:none">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;flex-shrink:0">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:.85rem;font-weight:800">☰ Alle Bereiche</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.85rem;font-weight:800">👥 Ausbilder & Teilnehmer</div>
       <button onclick="closeMobileSb()" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:manipulation">✕</button>
     </div>
-    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748b;font-weight:800;letter-spacing:.1em;padding:0 0 8px;text-transform:uppercase">Navigation</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-        <button class="mob-menu-link" onclick="closeMobileSb();showPage('dashboard')">📊 Dashboard</button>
-        <button class="mob-menu-link" onclick="closeMobileSb();showPage('fortschritt')">📋 Fortschritt</button>
-        <button class="mob-menu-link" onclick="closeMobileSb();showPage('kursplanung')">🗓 Planung</button>
-        <button class="mob-menu-link" onclick="closeMobileSb();showPage('urlaub')">📅 Urlaub</button>
-        <button class="mob-menu-link" onclick="closeMobileSb();showPage('agverwaltung')">🏢 Betriebe</button>
-        <button class="mob-menu-link" onclick="closeMobileSb();showPage('einstellungen')">⚙ Settings</button>
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px">
+      <!-- AUSBILDER Section -->
+      <div class="sb-sec-hdr sb-sec-ausb" onclick="toggleSbSection('mobAusbTreeContainer','mobAusbArr')">
+        <span style="display:flex;align-items:center;gap:8px"><span class="card-icon blue" style="width:22px;height:22px"><svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>AUSBILDER</span>
+        <span id="mobAusbArr" class="sb-arr">▼</span>
       </div>
+      <div id="mobAusbTreeContainer" class="sb-tree"></div>
 
-      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748b;font-weight:800;letter-spacing:.1em;padding:0 0 8px;text-transform:uppercase">Schnellaktionen</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <button class="mob-menu-link" onclick="closeMobileSb();openKursBuilder()">📚 Neuen Kurs erstellen</button>
-        <button class="mob-menu-link" onclick="closeMobileSb();openNewTNModal()">👤 Neuer Teilnehmer</button>
-        <button class="mob-menu-link" onclick="closeMobileSb();openImportModal()">📂 TN importieren</button>
+      <div class="sb-divider"></div>
+
+      <!-- TEILNEHMER Section -->
+      <div class="sb-sec-hdr sb-sec-tn" onclick="toggleSbSection('mobTnTreeContainer','mobTnArr')">
+        <span style="display:flex;align-items:center;gap:8px"><span class="card-icon green" style="width:22px;height:22px"><svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>TEILNEHMER</span>
+        <span id="mobTnArr" class="sb-arr">▼</span>
       </div>
+      <div id="mobTnTreeContainer" class="sb-tree collapsed"></div>
     </div>
   </div>
 </div>
@@ -2031,7 +2030,20 @@ document.addEventListener('keydown', function(e){
 });
 
 function toggleMobileSb(){
-  document.getElementById('mobMenuModal')?.classList.toggle('open');
+  const m=document.getElementById('mobMenuModal');
+  if(!m) return;
+  const opened = m.classList.toggle('open');
+  if(opened){
+    // Trees aus Desktop-Sidebar in Mobile-Modal kopieren
+    try{
+      const ausbD=document.getElementById('sbAusbTree');
+      const ausbM=document.getElementById('mobAusbTreeContainer');
+      if(ausbD && ausbM) ausbM.innerHTML=ausbD.innerHTML;
+      const tnD=document.getElementById('sbTnTree');
+      const tnM=document.getElementById('mobTnTreeContainer');
+      if(tnD && tnM) tnM.innerHTML=tnD.innerHTML;
+    }catch(_){}
+  }
 }
 function closeMobileSb(){
   document.getElementById('mobMenuModal')?.classList.remove('open');
@@ -9470,7 +9482,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.1.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.1.1 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
