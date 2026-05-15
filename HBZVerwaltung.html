@@ -153,6 +153,17 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .mob-fab-menu button{background:none;border:none;padding:12px 14px;text-align:left;font-family:'Sora',sans-serif;font-size:.82rem;font-weight:600;color:#0f172a;cursor:pointer;border-radius:8px;-webkit-tap-highlight-color:transparent;}
 .mob-fab-menu button:active{background:#f1f5f9;}
 
+/* Burger-Modal (Mobile Sidebar als Vollbild-Modal) */
+.mob-menu-modal{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.5);align-items:flex-start;justify-content:center;}
+.mob-menu-modal.show{display:flex;}
+.mob-menu-content{background:#fff;width:100%;max-width:420px;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+.mob-menu-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:linear-gradient(135deg,#2563eb,#059669);color:#fff;flex-shrink:0;}
+.mob-menu-title{font-family:'JetBrains Mono',monospace;font-size:.85rem;font-weight:800;}
+.mob-menu-close{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
+.mob-menu-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;}
+.mob-menu-link{display:flex;align-items:center;gap:10px;padding:14px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:9px;cursor:pointer;font-family:'Sora',sans-serif;font-size:.85rem;font-weight:600;color:#0f172a;text-align:left;width:100%;-webkit-tap-highlight-color:transparent;transition:background .12s;}
+.mob-menu-link:active{background:#e2e8f0;}
+
 @media(max-width:768px){
   /* ECHTE MOBILE-VARIANTE - Pages absolut + visibility statt display (umgeht Chrome-Android Repaint-Bug) */
   body{overflow:hidden;height:100vh;height:100dvh;}
@@ -1529,6 +1540,34 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
   </div><!-- /body -->
 </div><!-- /appWrap -->
 
+<!-- BURGER MENU MODAL (Mobile Sidebar) -->
+<div class="mob-menu-modal" id="mobMenuModal" onclick="if(event.target===this)closeMobileSb()">
+  <div class="mob-menu-content">
+    <div class="mob-menu-hd">
+      <div class="mob-menu-title">☰ Alle Bereiche</div>
+      <button class="mob-menu-close" onclick="closeMobileSb()" title="Schließen">✕</button>
+    </div>
+    <div class="mob-menu-scroll">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748b;font-weight:800;letter-spacing:.1em;padding:12px 6px 6px;text-transform:uppercase">Navigation</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+        <button class="mob-menu-link" onclick="closeMobileSb();showPage('dashboard')">📊 Dashboard</button>
+        <button class="mob-menu-link" onclick="closeMobileSb();showPage('fortschritt')">📋 Fortschritt</button>
+        <button class="mob-menu-link" onclick="closeMobileSb();showPage('kursplanung')">🗓 Planung</button>
+        <button class="mob-menu-link" onclick="closeMobileSb();showPage('urlaub')">📅 Urlaub</button>
+        <button class="mob-menu-link" onclick="closeMobileSb();showPage('agverwaltung')">🏢 Betriebe</button>
+        <button class="mob-menu-link" onclick="closeMobileSb();showPage('einstellungen')">⚙ Settings</button>
+      </div>
+
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#64748b;font-weight:800;letter-spacing:.1em;padding:14px 6px 6px;text-transform:uppercase">Schnellaktionen</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px">
+        <button class="mob-menu-link" onclick="closeMobileSb();openKursBuilder()">📚 Neuen Kurs erstellen</button>
+        <button class="mob-menu-link" onclick="closeMobileSb();openNewTNModal()">👤 Neuer Teilnehmer</button>
+        <button class="mob-menu-link" onclick="closeMobileSb();openImportModal()">📂 TN importieren</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MOBILE BOTTOM TAB BAR (nur unter 768px sichtbar) -->
 <div class="mob-tabbar" id="mobTabbar">
   <button class="mob-tab active" id="mobtab-dashboard" onclick="showPage('dashboard')" title="Dashboard">
@@ -2016,21 +2055,17 @@ document.addEventListener('keydown', function(e){
 });
 
 function toggleMobileSb(){
-  const sb=document.querySelector('.sb');
-  const ov=document.getElementById('sbOverlay');
-  const open=sb.classList.toggle('mobile-open');
-  ov.classList.toggle('show',open);
-  if(open){
-    // Tree-Render synchron beim Oeffnen wie in AusbilderPro drawerOpen()
-    // Damit Composite-Layer-Probleme garantiert weg sind
+  const m=document.getElementById('mobMenuModal');
+  if(!m) return;
+  const opened = m.classList.toggle('show');
+  if(opened){
     try{ if(typeof renderSbAusbTree==='function') renderSbAusbTree(); }catch(e){}
-    try{ if(typeof renderSbKurseTree==='function') renderSbKurseTree(); }catch(e){}
     try{ if(typeof renderSbTnTree==='function') renderSbTnTree(); }catch(e){}
   }
 }
 function closeMobileSb(){
-  document.querySelector('.sb')?.classList.remove('mobile-open');
-  document.getElementById('sbOverlay')?.classList.remove('show');
+  const m=document.getElementById('mobMenuModal');
+  if(m) m.classList.remove('show');
 }
 
 function toggleSCard(el){
@@ -9480,7 +9515,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.0.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.0.1 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
