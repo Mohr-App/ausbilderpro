@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.3.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.3.5 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5717,8 +5717,8 @@ function generateAlleBescheinigungenAusbilder(){
 </div>
 <hr class="header-line">
 <div class="hbz-checks">
-  <div class="hbz-check"><span class="cb-box ${isBonn?'checked':''}"></span> HBZ Bonn</div>
-  <div class="hbz-check"><span class="cb-box ${isSieg?'checked':''}"></span> HBZ Siegburg</div>
+  <div class="hbz-check" onclick="toggleStandort('${tnId}','bonn')"><span class="cb-box cb-bonn ${isBonn?'checked':''}" data-tn="${tnId}"></span> HBZ Bonn</div>
+  <div class="hbz-check" onclick="toggleStandort('${tnId}','sieg')"><span class="cb-box cb-sieg ${isSieg?'checked':''}" data-tn="${tnId}"></span> HBZ Siegburg</div>
 </div>
 <h1>Teilnahmebescheinigung</h1>
 <div class="body-block">
@@ -5781,7 +5781,9 @@ body{max-width:210mm;margin:0 auto;padding:8mm 12mm;}
 
 /* HBZ Checks rechts - Checkboxen vertikal in Flucht */
 .hbz-checks{display:flex;flex-direction:column;align-items:flex-start;width:fit-content;margin-left:auto;margin-top:5mm;}
-.hbz-check{font-size:12pt;margin-bottom:3mm;white-space:nowrap;}
+.hbz-check{font-size:12pt;margin-bottom:3mm;white-space:nowrap;cursor:pointer;padding:1mm 2mm;border-radius:3pt;user-select:none;}
+.hbz-check:hover{background:rgba(0,0,0,.05);}
+@media print{.hbz-check{cursor:default;padding:0;}.hbz-check:hover{background:transparent;}}
 .cb-box{display:inline-block;width:11pt;height:11pt;border:1pt solid #000;position:relative;vertical-align:middle;margin-right:5pt;}
 .cb-box.checked::after{content:'✓';position:absolute;top:-4pt;left:-1pt;font-size:14pt;font-weight:bold;}
 
@@ -5840,6 +5842,8 @@ h1{text-align:center;font-size:24pt;font-weight:bold;font-style:italic;margin:6m
 .print-btn:hover{background:#1d4ed8;}
 .bulk-btn{padding:6px 14px;font-size:12px;font-weight:600;background:#10b981;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:'Segoe UI',Arial,sans-serif;}
 .bulk-btn:hover{background:#059669;}
+.bulk-btn-standort{background:#2563eb;}
+.bulk-btn-standort:hover{background:#1d4ed8;}
 .bulk-btn-reset{background:#64748b;}
 .bulk-btn-reset:hover{background:#475569;}
 .print-hint{font-size:11px;color:#475569;margin:6px 0;line-height:1.5;font-family:'Segoe UI',Arial,sans-serif;}
@@ -5847,9 +5851,14 @@ h1{text-align:center;font-size:24pt;font-weight:bold;font-style:italic;margin:6m
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="window.print()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
   <div style="margin:8px 0;display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:center">
+    <span style="font-size:11px;color:#475569;align-self:center;margin-right:4px"><b>Standort:</b></span>
+    <button class="bulk-btn bulk-btn-standort" onclick="setAllStandort('bonn')">Alle HBZ Bonn</button>
+    <button class="bulk-btn bulk-btn-standort" onclick="setAllStandort('sieg')">Alle HBZ Siegburg</button>
+    <span style="width:8px"></span>
+    <span style="font-size:11px;color:#475569;align-self:center;margin-right:4px"><b>Nachweis:</b></span>
     <button class="bulk-btn" onclick="setAllNachweis('yes')">Alle „ja" ✓</button>
     <button class="bulk-btn" onclick="setAllNachweis('no')">Alle „nein" ✓</button>
-    <button class="bulk-btn bulk-btn-reset" onclick="setAllNachweis('reset')">Zurücksetzen</button>
+    <button class="bulk-btn bulk-btn-reset" onclick="setAllNachweis('reset')">Reset</button>
   </div>
   <div class="print-hint">${seats.length} Teilnehmer · ${sigCount} unterschrieben · ${seats.length-sigCount} offen<br><b>Tipp:</b> Im Druck-Dialog unter „Weitere Einstellungen" → „Kopf- und Fußzeilen" deaktivieren (entfernt Datum, URL und Seitenzahl)</div>
 </div>
@@ -5872,6 +5881,24 @@ function setAllNachweis(val){
   var noAll=document.querySelectorAll('.rb-no');
   yesAll.forEach(function(r){r.classList.toggle('checked',val==='yes');});
   noAll.forEach(function(r){r.classList.toggle('checked',val==='no');});
+}
+function toggleStandort(tnId,ort){
+  var bonn=document.querySelector('.cb-bonn[data-tn="'+tnId+'"]');
+  var sieg=document.querySelector('.cb-sieg[data-tn="'+tnId+'"]');
+  if(!bonn||!sieg)return;
+  if(ort==='bonn'){
+    sieg.classList.remove('checked');
+    bonn.classList.toggle('checked');
+  } else {
+    bonn.classList.remove('checked');
+    sieg.classList.toggle('checked');
+  }
+}
+function setAllStandort(ort){
+  var bonnAll=document.querySelectorAll('.cb-bonn');
+  var siegAll=document.querySelectorAll('.cb-sieg');
+  bonnAll.forEach(function(r){r.classList.toggle('checked',ort==='bonn');});
+  siegAll.forEach(function(r){r.classList.toggle('checked',ort==='sieg');});
 }
 </script>
 </body></html>`);
