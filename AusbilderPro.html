@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.4.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.4.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1594,6 +1594,15 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <label class="fl">Ausbildungsbetrieb</label>
             <input class="fi" type="text" id="iCo" placeholder="Firma GmbH" autocomplete="off" oninput="acInput('iCo','acCo')" onkeydown="acKey(event,'acCo')" onfocus="acInput('iCo','acCo')" onblur="acBlur('acCo')">
             <div class="ac-drop" id="acCo"></div>
+          </div>
+        </div>
+
+        <!-- Kontakt -->
+        <div class="tp-section">
+          <div class="tp-section-hd">📞 Kontakt</div>
+          <div style="display:flex;gap:8px">
+            <div class="fg" style="flex:1"><label class="fl">E-Mail</label><input class="fi" type="email" id="iEmail" placeholder="max@firma.de" autocomplete="off"></div>
+            <div class="fg" style="flex:1"><label class="fl">Telefon</label><input class="fi" type="tel" id="iTelefon" placeholder="+49 …" autocomplete="off"></div>
           </div>
         </div>
 
@@ -4487,6 +4496,11 @@ function openModal(id){
           h+=fld('📧','E-Mail',t.kontaktEmail||t.email||'');
           h+=fld('📱','Telefon',t.kontaktTelefon||t.tel||'');
           h+=fld('🪑','Wunsch-Sitzplatz',t.wunschSitzplatz?'Platz '+t.wunschSitzplatz:'');
+          // Felder im Person-Tab mit gespeicherten Werten fuellen
+          const _iEmailEl=document.getElementById('iEmail');
+          const _iTelEl=document.getElementById('iTelefon');
+          if(_iEmailEl && !_iEmailEl.value) _iEmailEl.value=t.kontaktEmail||t.email||'';
+          if(_iTelEl && !_iTelEl.value) _iTelEl.value=t.kontaktTelefon||t.tel||'';
           if(t.selfRegistered){
             const rd=t.registeredAt?new Date(t.registeredAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
             h+=fld('📝','Selbst registriert am',rd);
@@ -4536,6 +4550,9 @@ function openModal(id){
   }catch(e){console.warn('fsInfo error',e);}
   document.getElementById('iName').value=d.name||'';
   document.getElementById('iCo').value=d.company||'';
+  // E-Mail + Telefon werden gleich async aus globalTN gefuellt (sobald geladen) - erstmal leer
+  document.getElementById('iEmail').value='';
+  document.getElementById('iTelefon').value='';
   populateProfOber(); setProfFromValue(d.profession||'');
   document.getElementById('iAusbjahr').value=d.ausbjahr||'';
   document.getElementById('iNote').value=d.note||'';
@@ -5212,9 +5229,19 @@ function saveSeat(){
   const newProf=(document.getElementById('iProf').value||'').trim();
   const oldProf=(oldSeat.profession||'').trim();
   const poolTnId=oldSeat.poolTnId||null;
+  // E-Mail/Telefon aus Person-Tab nach globalTN syncen
+  const _newEmail=(document.getElementById('iEmail')?.value||'').trim();
+  const _newTelefon=(document.getElementById('iTelefon')?.value||'').trim();
   persist();renderSeats();updBadge();renderSidebar();closeModal();
   // Attendance + Noten an HBZ synchronisieren
   syncAttendanceToFirestore(_saveSeatId);
+  // E-Mail + Telefon nach globalTN syncen (auch bei leerem Wert, falls Stefan eine bestehende loescht)
+  if(_db&&poolTnId){
+    const _tnUpdate={};
+    _tnUpdate.kontaktEmail=_newEmail;
+    _tnUpdate.kontaktTelefon=_newTelefon;
+    _db.collection('globalTN').doc(poolTnId).update(_tnUpdate).catch(()=>{});
+  }
   // Beruf/Fachrichtung zurück an globalTN synchen
   if(_db&&poolTnId&&newProf&&newProf!==oldProf){
     _db.collection('globalTN').doc(poolTnId).update({beruf:newProf})
