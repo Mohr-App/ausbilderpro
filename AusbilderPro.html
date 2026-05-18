@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.3.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.3.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5679,6 +5679,32 @@ function generateAlleBescheinigungenAusbilder(){
         const extKey=Object.keys(sync.noten_extra).find(k=>k.toLowerCase().includes('theor'));
         if(extKey) theorie=sync.noten_extra[extKey]||'';
       }
+      // Variable Noten-Zeilen: nur Felder mit Werten zeigen
+      const notenHtmlParts=[];
+      if(fuehrung) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Führung:</span><span class="note-line">${esc(String(fuehrung))}</span></div>`);
+      if(mitarbeit) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Mitarbeit:</span><span class="note-line">${esc(String(mitarbeit))}</span></div>`);
+      if(theorie && praxis){
+        notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fachkenntnisse (theoretisch):</span><span class="note-line note-line-half">${esc(String(theorie))}</span><span class="note-label-inline">(praktisch):</span><span class="note-line note-line-half">${esc(String(praxis))}</span></div>`);
+      } else if(theorie){
+        notenHtmlParts.push(`<div class="note-row"><span class="note-label">Fachkenntnisse (theoretisch):</span><span class="note-line">${esc(String(theorie))}</span></div>`);
+      } else if(praxis){
+        notenHtmlParts.push(`<div class="note-row"><span class="note-label">Fachkenntnisse (praktisch):</span><span class="note-line">${esc(String(praxis))}</span></div>`);
+      }
+      // Weitere custom Noten aus noten_extra (nicht-Theorie)
+      if(sync.noten_extra && typeof sync.noten_extra==='object'){
+        Object.entries(sync.noten_extra).forEach(([key,val])=>{
+          if(!val) return;
+          if(key.toLowerCase().includes('theor')) return; // bereits behandelt
+          notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(key)}:</span><span class="note-line">${esc(String(val))}</span></div>`);
+        });
+      }
+      if(fehltage || verspaetungen){
+        notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage||''}</span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short">${verspaetungen||''}</span></div>`);
+      }
+      if(bemerkung){
+        notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
+      }
+      const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
       const pb=idx>0?'page-break-before:always;':'';
       return `<div class="page" style="${pb}">
 <div class="header-row">
@@ -5701,19 +5727,7 @@ function generateAlleBescheinigungenAusbilder(){
   <div class="field">an folgender überbetrieblichen Unterweisung teilgenommen.</div>
   <div class="field kurs-title"><b>${esc(kursLabel)}</b></div>
 </div>
-<div class="noten-block">
-  <div class="note-row"><span class="note-label">Führung:</span><span class="note-line">${fuehrung?esc(fuehrung):''}</span></div>
-  <div class="note-row"><span class="note-label">Mitarbeit:</span><span class="note-line">${mitarbeit?esc(mitarbeit):''}</span></div>
-  <div class="note-row note-row-split">
-    <span class="note-label">Fachkenntnisse (theoretisch):</span><span class="note-line note-line-half">${theorie?esc(theorie):''}</span>
-    <span class="note-label-inline">(praktisch):</span><span class="note-line note-line-half">${praxis?esc(praxis):''}</span>
-  </div>
-  <div class="note-row note-row-split">
-    <span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage||''}</span>
-    <span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short">${verspaetungen||''}</span>
-  </div>
-  <div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${bemerkung?' '+esc(bemerkung)+' ':''}</span></div>
-</div>
+${notenHtml}
 <div class="ausbildungsnachweis"><b>Ausbildungsnachweis wurde für den Zeitraum der überbetrieblichen<br>Unterweisung geführt:</b> &nbsp;&nbsp;<span class="radio"></span> ja &nbsp;&nbsp;&nbsp;<span class="radio"></span> nein</div>
 <div class="datum-zeile"><b>Siegburg, den ${heute}</b></div>
 <div class="sig-row">
@@ -5744,82 +5758,83 @@ function generateAlleBescheinigungenAusbilder(){
     }).join('');
     const w=window.open('','_blank');
     if(!w){toast('Popup blockiert','bad');return;}
-    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Bescheinigungen – ${esc(kursName)}</title>
+    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title> </title>
 <style>
-@page{size:A4;margin:15mm 18mm 12mm 18mm;}
+@page{size:A4;margin:8mm 12mm 8mm 12mm;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Times New Roman',Times,serif;font-size:11pt;color:#000;line-height:1.4;max-width:210mm;margin:0 auto;padding:15mm 18mm;}
-@media print{body{padding:0;}.no-print{display:none !important;}}
-.page{position:relative;}
+html,body{font-family:'Times New Roman',Times,serif;font-size:11.5pt;color:#000;line-height:1.45;max-width:210mm;margin:0 auto;padding:8mm 12mm;}
+@media print{html,body{padding:0;}.no-print{display:none !important;}@page{margin:8mm 12mm 8mm 12mm;}}
+.page{position:relative;min-height:277mm;}
 
 /* Header */
 .header-row{display:flex;align-items:flex-start;justify-content:space-between;}
-.header-text{flex:1;text-align:center;padding-right:30mm;}
-.header-text .org{font-size:13pt;letter-spacing:1px;font-family:'Times New Roman',serif;}
-.header-text .sub{font-size:11pt;font-style:italic;margin-top:1mm;}
-.khs-logo{position:absolute;right:0;top:0;width:18mm;height:18mm;display:flex;align-items:center;justify-content:center;font-size:32pt;color:#1e3a8a;font-weight:bold;border:1.5pt solid transparent;}
-.header-line{border:none;border-top:1pt solid #000;margin:4mm 0 0 0;}
+.header-text{flex:1;text-align:center;padding-right:25mm;}
+.header-text .org{font-size:14pt;letter-spacing:1px;font-family:'Times New Roman',serif;}
+.header-text .sub{font-size:11pt;font-style:normal;margin-top:1mm;}
+.khs-logo{position:absolute;right:0;top:0;width:18mm;height:18mm;display:flex;align-items:center;justify-content:center;font-size:32pt;color:#1e3a8a;font-weight:bold;}
+.header-line{border:none;border-top:1pt solid #000;margin:3mm 0 0 0;}
 
-/* HBZ Checks rechts */
-.hbz-checks{display:flex;flex-direction:column;align-items:flex-end;gap:2mm;margin-top:4mm;font-size:11pt;}
-.hbz-check{display:flex;align-items:center;gap:3mm;}
-.cb-box{display:inline-block;width:10pt;height:10pt;border:1pt solid #000;position:relative;flex-shrink:0;}
+/* HBZ Checks rechts - explizit untereinander */
+.hbz-checks{display:block;text-align:right;margin-top:5mm;}
+.hbz-check{display:flex;justify-content:flex-end;align-items:center;gap:4mm;margin-bottom:3mm;font-size:12pt;}
+.cb-box{display:inline-block;width:11pt;height:11pt;border:1pt solid #000;position:relative;flex-shrink:0;}
 .cb-box.checked::after{content:'✓';position:absolute;top:-4pt;left:-1pt;font-size:14pt;font-weight:bold;}
 
-/* Titel */
-h1{text-align:center;font-size:22pt;font-weight:bold;margin:6mm 0 8mm 0;font-family:'Times New Roman',serif;}
+/* Titel - kursiv */
+h1{text-align:center;font-size:24pt;font-weight:bold;font-style:italic;margin:8mm 0 10mm 0;font-family:'Times New Roman',serif;}
 
 /* Body */
-.body-block{margin-bottom:4mm;}
-.field{margin:2.5mm 0;font-size:11pt;}
-.kurs-title{margin-top:5mm;font-size:11.5pt;}
+.body-block{margin-bottom:5mm;}
+.field{margin:3.5mm 0;font-size:12pt;}
+.kurs-title{margin-top:6mm;font-size:12pt;}
 
-/* Noten Block – eingerückt */
-.noten-block{margin:5mm 0 5mm 20mm;}
-.note-row{display:flex;align-items:baseline;margin:3mm 0;font-size:11pt;font-weight:bold;}
+/* Noten Block – eingerueckt */
+.noten-block{margin:6mm 0 6mm 20mm;}
+.note-row{display:flex;align-items:baseline;margin:4mm 0;font-size:12pt;font-weight:bold;}
 .note-row-split{flex-wrap:wrap;}
-.note-label{flex-shrink:0;min-width:50mm;font-weight:bold;}
-.note-label-inline{flex-shrink:0;margin-left:3mm;font-weight:bold;}
-.note-line{flex:1;border-bottom:1.2pt dotted #555;min-height:13pt;padding:0 2mm;}
+.note-label{flex-shrink:0;min-width:55mm;font-weight:bold;}
+.note-label-inline{flex-shrink:0;margin-left:4mm;font-weight:bold;}
+.note-line{flex:1;border-bottom:1.2pt dotted #555;min-height:14pt;padding:0 2mm;font-weight:normal;}
 .note-line-half{flex:1;min-width:30mm;}
 .note-line-short{flex:1;min-width:25mm;max-width:35mm;}
 .note-line-long{flex:1;min-width:80mm;}
 
 /* Ausbildungsnachweis */
-.ausbildungsnachweis{margin:5mm 0;font-size:11pt;line-height:1.5;}
-.radio{display:inline-block;width:11pt;height:11pt;border:1pt solid #000;border-radius:50%;vertical-align:middle;margin:0 2pt;}
+.ausbildungsnachweis{margin:7mm 0 5mm 0;font-size:12pt;line-height:1.5;}
+.radio{display:inline-block;width:12pt;height:12pt;border:1pt solid #000;border-radius:50%;vertical-align:middle;margin:0 2pt;}
 
 /* Datum */
-.datum-zeile{margin:5mm 0 10mm 0;font-size:11pt;}
+.datum-zeile{margin:5mm 0 12mm 0;font-size:12pt;}
 
 /* Unterschriften */
-.sig-row{display:flex;justify-content:space-between;margin:8mm 0;gap:10mm;}
+.sig-row{display:flex;justify-content:space-between;margin:10mm 0;gap:15mm;}
 .sig-block{flex:1;text-align:center;}
-.sig-space{height:12mm;}
-.sig-line{border-top:1pt dotted #000;padding-top:1mm;font-size:10pt;}
-.sig-img{max-width:100%;max-height:12mm;object-fit:contain;}
+.sig-space{height:14mm;}
+.sig-line{border-top:1pt dotted #000;padding-top:1mm;font-size:11pt;}
+.sig-img{max-width:100%;max-height:14mm;object-fit:contain;}
 
 /* Hinweis + Handwerk Logo */
-.hinweis-row{display:flex;justify-content:space-between;align-items:center;margin:6mm 0;gap:10mm;}
-.hinweis{flex:1;font-size:10pt;line-height:1.4;}
+.hinweis-row{display:flex;justify-content:space-between;align-items:center;margin:8mm 0;gap:10mm;}
+.hinweis{flex:1;font-size:10.5pt;line-height:1.4;}
 .handwerk-logo{flex-shrink:0;font-size:11pt;font-weight:bold;letter-spacing:1px;color:#d97706;border:2pt solid #d97706;padding:3mm 6mm;background:#fff;font-family:Arial,sans-serif;}
 
 /* Footer */
-.footer{margin-top:8mm;padding-top:2mm;border-top:1pt solid #000;font-size:8pt;}
-.footer-cols{display:flex;justify-content:space-between;gap:10mm;margin-bottom:2mm;}
+.footer{margin-top:10mm;padding-top:3mm;border-top:1pt solid #000;font-size:8.5pt;}
+.footer-cols{display:flex;justify-content:space-between;gap:10mm;margin-bottom:3mm;}
 .footer-col{flex:1;}
 .footer-head{font-weight:bold;margin-bottom:1mm;}
 .footer-row-2{display:flex;gap:8mm;}
 .footer-row-2>div{flex:1;}
-.footer-contact{text-align:center;border-top:none;padding-top:1mm;font-size:8pt;}
+.footer-contact{text-align:center;padding-top:1mm;font-size:8.5pt;}
 
 /* Print-Button */
 .print-btn{display:inline-block;margin:8px 4px;padding:12px 28px;font-size:14px;font-weight:bold;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;}
 .print-btn:hover{background:#1d4ed8;}
+.print-hint{font-size:11px;color:#475569;margin:6px 0;line-height:1.5;}
 </style></head><body>
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="window.print()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
-  <div style="font-size:12px;color:#475569;margin:6px 0">${seats.length} Teilnehmer · ${sigCount} unterschrieben · ${seats.length-sigCount} offen</div>
+  <div class="print-hint">${seats.length} Teilnehmer · ${sigCount} unterschrieben · ${seats.length-sigCount} offen<br><b>Tipp:</b> Im Druck-Dialog unter „Weitere Einstellungen" → „Kopf- und Fußzeilen" deaktivieren (entfernt Datum, URL und Seitenzahl)</div>
 </div>
 ${pages}
 </body></html>`);
