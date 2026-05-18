@@ -1964,8 +1964,26 @@ function saveSitzplatzPopup(){
   saveHomeSitzplatz();
 }
 
+// Anti-Doppel-Meldung: pro Typ + ID + Tag merken ob schon gesendet
+function _meldungSentKey(cat, type, refId){
+  const today = new Date().toISOString().slice(0,10);
+  return 'azubi-meld-'+cat+'-'+type+'-'+(refId||'_')+'-'+today;
+}
+function _meldungAlreadySent(cat, type, refId){
+  try{ return localStorage.getItem(_meldungSentKey(cat,type,refId))==='1'; }
+  catch(_){ return false; }
+}
+function _markMeldungSent(cat, type, refId){
+  try{ localStorage.setItem(_meldungSentKey(cat,type,refId),'1'); }catch(_){}
+}
+
 function sendMeldung(type, kursId){
   if(!_tnId||!kursId) return;
+  // Doppel-Schutz: Wurde diese Meldung heute schon fuer diesen Kurs gesendet?
+  if(type!=='text' && _meldungAlreadySent('kurs', type, kursId)){
+    toast('ℹ Meldung ist heute schon raus','info');
+    return;
+  }
   // Krankmeldung: erst AG-Hinweis anzeigen
   if(type==='krank'){
     _pendingKrankKursId=kursId;
@@ -2023,6 +2041,7 @@ function _doSendMeldung(type, kursId){
       if(type==='text'){const inp=document.getElementById('meldungText');if(inp)inp.value='';}
       setTimeout(()=>{if(st)st.style.display='none';},3000);
       toast('Meldung gesendet ✓');
+      if(type!=='text') _markMeldungSent('kurs', type, kursId);
       // E-Mail an Ausbilder
       if(type==='krank'||type==='spaeter'||type==='frueher'||type==='text'){
         _sendMeldungEmailAusbilder(kursId, type, text, name);
@@ -2270,6 +2289,11 @@ function showBetriebTab(tab){
 
 function sendBetriebMeldung(type){
   if(!_tnId||!db) return;
+  // Doppel-Schutz fuer Betrieb-Meldungen
+  if(type!=='text' && _meldungAlreadySent('betrieb', type, null)){
+    toast('ℹ Meldung ist heute schon raus','info');
+    return;
+  }
   const msgs={'krank':'🤒 Ich bin heute krank','spaeter':'🕐 Ich komme heute später','frueher':'🚶 Ich gehe heute früher'};
   let text=msgs[type]||'';
   if(type==='text'){
@@ -2306,6 +2330,7 @@ function _doSendBetriebMeldung(type, text){
     gelesen: false
   }).then(()=>{
     toast('✓ Meldung an Betrieb gesendet');
+    if(type!=='text') _markMeldungSent('betrieb', type, null);
     if(type==='text'){const inp=document.getElementById('betriebMeldungText');if(inp)inp.value='';}
     loadBetriebMeldungen();
     // E-Mail an Arbeitgeber
