@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.3.8 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.4.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5674,6 +5674,15 @@ function generateAlleBescheinigungenAusbilder(){
       const sigData=sync.bescheinigungSignatur||'';
       if(sigData) sigCount++;
       const tnId=s.poolTnId||idx;
+      // Gespeicherte Bescheinigungs-Auswahl pro TN (falls vorhanden)
+      const storedStandort=sync.bescheinigungStandort;
+      const validStandort=storedStandort==='bonn'||storedStandort==='sieg';
+      const initStandort=validStandort?storedStandort:(isBonn?'bonn':'sieg');
+      const initBonnChecked=initStandort==='bonn';
+      const initSiegChecked=initStandort==='sieg';
+      const storedNachweis=sync.bescheinigungNachweis;
+      const initYesChecked=storedNachweis==='yes';
+      const initNoChecked=storedNachweis==='no';
       // Generische Noten-Liste: FIXED_GRADES + inst.customGrades, nur Felder mit Werten
       const notenHtmlParts=[];
       const deletedFixed=(inst.deletedFixedGrades||[]);
@@ -5710,8 +5719,8 @@ function generateAlleBescheinigungenAusbilder(){
 </div>
 <hr class="header-line">
 <div class="hbz-checks">
-  <div class="hbz-check" onclick="toggleStandort('${tnId}','bonn')"><span class="cb-box cb-bonn ${isBonn?'checked':''}" data-tn="${tnId}"></span> HBZ Bonn</div>
-  <div class="hbz-check" onclick="toggleStandort('${tnId}','sieg')"><span class="cb-box cb-sieg ${isSieg?'checked':''}" data-tn="${tnId}"></span> HBZ Siegburg</div>
+  <div class="hbz-check" onclick="toggleStandort('${tnId}','bonn')"><span class="cb-box cb-bonn ${initBonnChecked?'checked':''}" data-tn="${tnId}"></span> HBZ Bonn</div>
+  <div class="hbz-check" onclick="toggleStandort('${tnId}','sieg')"><span class="cb-box cb-sieg ${initSiegChecked?'checked':''}" data-tn="${tnId}"></span> HBZ Siegburg</div>
 </div>
 <h1>Teilnahmebescheinigung</h1>
 <div class="body-block">
@@ -5722,7 +5731,7 @@ function generateAlleBescheinigungenAusbilder(){
   <div class="field kurs-title"><b>${esc(kursLabel)}</b></div>
 </div>
 ${notenHtml}
-<div class="ausbildungsnachweis"><b>Ausbildungsnachweis wurde für den Zeitraum der überbetrieblichen<br>Unterweisung geführt:</b> &nbsp;&nbsp;<span class="radio rb-yes" data-tn="${tnId}" onclick="toggleNachweis('${tnId}','yes')"></span> ja &nbsp;&nbsp;&nbsp;<span class="radio rb-no" data-tn="${tnId}" onclick="toggleNachweis('${tnId}','no')"></span> nein</div>
+<div class="ausbildungsnachweis"><b>Ausbildungsnachweis wurde für den Zeitraum der überbetrieblichen<br>Unterweisung geführt:</b> &nbsp;&nbsp;<span class="radio rb-yes ${initYesChecked?'checked':''}" data-tn="${tnId}" onclick="toggleNachweis('${tnId}','yes')"></span> ja &nbsp;&nbsp;&nbsp;<span class="radio rb-no ${initNoChecked?'checked':''}" data-tn="${tnId}" onclick="toggleNachweis('${tnId}','no')"></span> nein</div>
 <div class="datum-zeile"><b>Siegburg, den ${heute}</b></div>
 <div class="sig-row">
   <div class="sig-block"><div class="sig-space"></div><div class="sig-line">Lehrgangsleiter</div></div>
@@ -5857,6 +5866,7 @@ h1{text-align:center;font-size:24pt;font-weight:bold;font-style:italic;margin:6m
 </div>
 ${pages}
 <script>
+window._kursId='${kursId}';
 function toggleNachweis(tnId,val){
   var yes=document.querySelector('.rb-yes[data-tn="'+tnId+'"]');
   var no=document.querySelector('.rb-no[data-tn="'+tnId+'"]');
@@ -5868,23 +5878,37 @@ function toggleNachweis(tnId,val){
     yes.classList.remove('checked');
     no.classList.toggle('checked');
   }
+  var newVal=yes.classList.contains('checked')?'yes':(no.classList.contains('checked')?'no':null);
+  if(window.opener&&window.opener._saveBescheinigungData){
+    window.opener._saveBescheinigungData(window._kursId,tnId,'bescheinigungNachweis',newVal);
+  }
 }
 function setAllNachweis(val){
   var yesAll=document.querySelectorAll('.rb-yes');
   var noAll=document.querySelectorAll('.rb-no');
   yesAll.forEach(function(r){r.classList.toggle('checked',val==='yes');});
   noAll.forEach(function(r){r.classList.toggle('checked',val==='no');});
+  var tnIds=[];
+  yesAll.forEach(function(r){var tn=r.getAttribute('data-tn');if(tn)tnIds.push(tn);});
+  var saveVal=val==='yes'?'yes':(val==='no'?'no':null);
+  if(window.opener&&window.opener._saveBescheinigungDataBulk){
+    window.opener._saveBescheinigungDataBulk(window._kursId,tnIds,'bescheinigungNachweis',saveVal);
+  }
 }
 function toggleStandort(tnId,ort){
   var bonn=document.querySelector('.cb-bonn[data-tn="'+tnId+'"]');
   var sieg=document.querySelector('.cb-sieg[data-tn="'+tnId+'"]');
   if(!bonn||!sieg)return;
+  // Strict-Radio: Klick setzt immer einen, anderen weg (kein Uncheck durch zweiten Klick)
   if(ort==='bonn'){
+    bonn.classList.add('checked');
     sieg.classList.remove('checked');
-    bonn.classList.toggle('checked');
   } else {
+    sieg.classList.add('checked');
     bonn.classList.remove('checked');
-    sieg.classList.toggle('checked');
+  }
+  if(window.opener&&window.opener._saveBescheinigungData){
+    window.opener._saveBescheinigungData(window._kursId,tnId,'bescheinigungStandort',ort);
   }
 }
 function setAllStandort(ort){
@@ -5892,6 +5916,11 @@ function setAllStandort(ort){
   var siegAll=document.querySelectorAll('.cb-sieg');
   bonnAll.forEach(function(r){r.classList.toggle('checked',ort==='bonn');});
   siegAll.forEach(function(r){r.classList.toggle('checked',ort==='sieg');});
+  var tnIds=[];
+  bonnAll.forEach(function(r){var tn=r.getAttribute('data-tn');if(tn)tnIds.push(tn);});
+  if(window.opener&&window.opener._saveBescheinigungDataBulk){
+    window.opener._saveBescheinigungDataBulk(window._kursId,tnIds,'bescheinigungStandort',ort);
+  }
 }
 <\/script>
 </body></html>`);
@@ -10941,6 +10970,25 @@ let _presenceUnsub=null;
 let _onlineUids=new Set();   // UIDs die in den letzten 60s ein lastSeen geschrieben haben
 const PRESENCE_HEARTBEAT_MS = 30000;
 const PRESENCE_OFFLINE_MS = 60000;
+
+// Globale Save-Funktionen fuer Bescheinigungs-Auswahl (vom neuen Tab via window.opener gerufen)
+window._saveBescheinigungData=function(kursId,tnId,field,value){
+  if(!_db||!kursId||!tnId||!field) return Promise.resolve();
+  const data={};
+  data[field]=value;
+  return _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId).set(data,{merge:true}).catch(err=>console.error('Bescheinigung save:',err));
+};
+window._saveBescheinigungDataBulk=function(kursId,tnIds,field,value){
+  if(!_db||!kursId||!tnIds||!tnIds.length||!field) return Promise.resolve();
+  const batch=_db.batch();
+  tnIds.forEach(tnId=>{
+    const ref=_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId);
+    const data={};
+    data[field]=value;
+    batch.set(ref,data,{merge:true});
+  });
+  return batch.commit().catch(err=>console.error('Bescheinigung bulk save:',err));
+};
 
 function startPresence(){
   if(!_db||!_fbUid) return;
