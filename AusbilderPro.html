@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.5.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.5.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -7606,7 +7606,6 @@ function generateBescheinigungAusbilder(){
     const w=window.open('','_blank');
     if(!w){toast('Popup blockiert – bitte Popups erlauben','bad');return;}
     w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title> </title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
 <style>
 @page{size:A4;margin:8mm 12mm 8mm 12mm;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -7877,6 +7876,14 @@ ${existingSig?'document.getElementById("btnSend").textContent="✅ Bereits abges
 <\/script>
 </body></html>`);
     w.document.close();
+    // html2pdf nach document.close() dynamisch laden (nicht parser-blocking)
+    setTimeout(()=>{
+      try{
+        const pdfScript=w.document.createElement('script');
+        pdfScript.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        w.document.head.appendChild(pdfScript);
+      }catch(e){console.warn('PDF-Lib Load Fehler:',e);}
+    },50);
   }).catch(err=>{
     toast('Fehler: '+err.message,'bad');
   });
@@ -11144,17 +11151,18 @@ const PRESENCE_OFFLINE_MS = 60000;
 // Globale Save-Funktionen fuer Bescheinigungs-Auswahl (vom neuen Tab via window.opener gerufen)
 window._saveBescheinigungData=function(kursId,tnId,field,value){
   if(!_db||!kursId||!tnId||!field) return Promise.resolve();
-  const data={};
-  data[field]=value;
-  return _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId).set(data,{merge:true}).catch(err=>console.error('Bescheinigung save:',err));
+  const data=JSON.parse(JSON.stringify({[String(field)]:value===null?null:String(value)}));
+  return _db.collection('shared').doc('kurse').collection('list').doc(String(kursId)).collection('teilnehmer').doc(String(tnId)).set(data,{merge:true}).catch(err=>console.error('Bescheinigung save:',err));
 };
 window._saveBescheinigungDataBulk=function(kursId,tnIds,field,value){
   if(!_db||!kursId||!tnIds||!tnIds.length||!field) return Promise.resolve();
   const batch=_db.batch();
-  tnIds.forEach(tnId=>{
-    const ref=_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId);
+  const safeIds=JSON.parse(JSON.stringify(Array.from(tnIds).map(String)));
+  const safeVal=value===null?null:String(value);
+  safeIds.forEach(tnId=>{
+    const ref=_db.collection('shared').doc('kurse').collection('list').doc(String(kursId)).collection('teilnehmer').doc(tnId);
     const data={};
-    data[field]=value;
+    data[String(field)]=safeVal;
     batch.set(ref,data,{merge:true});
   });
   return batch.commit().catch(err=>console.error('Bescheinigung bulk save:',err));
@@ -11162,27 +11170,30 @@ window._saveBescheinigungDataBulk=function(kursId,tnIds,field,value){
 // Signatur speichern (Parent-Context damit Firestore das Object erkennt)
 window._saveBescheinigungSignature=function(kursId,tnId,signatureData){
   if(!_db||!kursId||!tnId) return Promise.reject(new Error('Missing kursId/tnId'));
-  return _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId).set({
-    bescheinigungSignatur:signatureData,
+  // JSON-Roundtrip + lokales Object stellt sicher dass es 100% plain ist
+  const data=JSON.parse(JSON.stringify({
+    bescheinigungSignatur:String(signatureData||''),
     bescheinigungDatum:Date.now()
-  },{merge:true});
+  }));
+  return _db.collection('shared').doc('kurse').collection('list').doc(String(kursId)).collection('teilnehmer').doc(String(tnId)).set(data,{merge:true});
 };
 // Bescheinigungs-Mail mit PDF-Anhang versenden (Parent-Context!)
 window._sendBescheinigungMail=function(toEmail,subject,htmlBody,pdfBase64,filename){
   if(!_db) return Promise.reject(new Error('Keine DB-Verbindung'));
-  return _db.collection('mail').add({
-    to:toEmail,
+  const mailData=JSON.parse(JSON.stringify({
+    to:String(toEmail||''),
     message:{
-      subject:subject,
-      html:htmlBody,
+      subject:String(subject||''),
+      html:String(htmlBody||''),
       attachments:[{
-        filename:filename,
-        content:pdfBase64,
+        filename:String(filename||'Bescheinigung.pdf'),
+        content:String(pdfBase64||''),
         encoding:'base64',
         contentType:'application/pdf'
       }]
     }
-  });
+  }));
+  return _db.collection('mail').add(mailData);
 };
 
 function startPresence(){
