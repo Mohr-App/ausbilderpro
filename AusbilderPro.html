@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.5.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.5.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -7828,13 +7828,12 @@ async function sendBescheinigung(){
     if(area) area.innerHTML='<div class="sig-canvas-wrap signed"><img src="'+sig+'" class="sig-img"></div>';
   }
   try {
-    // 1. Signatur in Firestore speichern
+    // 1. Signatur in Firestore speichern (via Parent-Helper damit Cross-Tab Object-Problem vermieden wird)
     btn.textContent='Speichere…';
-    await openerDb.collection('shared').doc('kurse').collection('list').doc(window._kursId)
-      .collection('teilnehmer').doc(window._tnId).set({
-        bescheinigungSignatur:sigToSave,
-        bescheinigungDatum:Date.now()
-      },{merge:true});
+    if(!window.opener._saveBescheinigungSignature){
+      throw new Error('Bitte AusbilderPro im Hauptfenster neu laden');
+    }
+    await window.opener._saveBescheinigungSignature(window._kursId,window._tnId,sigToSave);
     // 2. PDF aus .page generieren
     btn.textContent='Erstelle PDF…';
     const pageEl=document.querySelector('.page');
@@ -7847,9 +7846,10 @@ async function sendBescheinigung(){
     };
     const pdfDataUri=await html2pdf().set(pdfOpt).from(pageEl).output('datauristring');
     const pdfBase64=pdfDataUri.split(',')[1];
-    // 3. E-Mail mit PDF-Anhang senden
+    // 3. E-Mail mit PDF-Anhang senden (via Parent-Helper)
     btn.textContent='Sende…';
     const subject='📄 Deine Teilnahmebescheinigung – '+window._kursLabel;
+    const filename='Teilnahmebescheinigung_'+window._tnName.replace(/\\s+/g,'_')+'.pdf';
     const emailHtml='<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f8fafc">'
       +'<div style="text-align:center;margin-bottom:20px">'
       +'<span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span>'
@@ -7858,23 +7858,14 @@ async function sendBescheinigung(){
       +'<p style="margin:0 0 12px;font-size:15px;color:#374151">Hallo '+window._tnName+',</p>'
       +'<p style="margin:0 0 14px;font-size:14px;color:#374151;line-height:1.6"><b>anbei deine Teilnahmebescheinigung.</b></p>'
       +'<p style="margin:0 0 20px;font-size:14px;color:#374151;line-height:1.6">Bitte <b>speichere diese ab</b> und leite sie an deinen <b>Ausbildungsbetrieb zur Unterschrift</b> weiter — oder drucke sie aus und lasse sie von deinem Ausbildungsbetrieb unterschreiben.</p>'
-      +'<div style="margin-top:16px;padding:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;text-align:center"><p style="margin:0;font-size:13px;color:#075985">📎 <b>Bescheinigung_'+window._tnName+'.pdf</b> findest du als Anhang in dieser E-Mail.</p></div>'
+      +'<div style="margin-top:16px;padding:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;text-align:center"><p style="margin:0;font-size:13px;color:#075985">📎 <b>'+filename+'</b> findest du als Anhang in dieser E-Mail.</p></div>'
       +'</div>'
       +'<p style="margin:16px 0 0;font-size:11px;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
       +'</div>';
-    await openerDb.collection('mail').add({
-      to:window._tnEmail,
-      message:{
-        subject:subject,
-        html:emailHtml,
-        attachments:[{
-          filename:'Teilnahmebescheinigung_'+window._tnName.replace(/\\s+/g,'_')+'.pdf',
-          content:pdfBase64,
-          encoding:'base64',
-          contentType:'application/pdf'
-        }]
-      }
-    });
+    if(!window.opener._sendBescheinigungMail){
+      throw new Error('Bitte AusbilderPro im Hauptfenster neu laden');
+    }
+    await window.opener._sendBescheinigungMail(window._tnEmail,subject,emailHtml,pdfBase64,filename);
     document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#f0fdf4;color:#16a34a">✅ Bescheinigung als PDF-Anhang an '+window._tnEmail+' versendet!</div>';
     btn.textContent='✅ Gesendet';
   } catch(err){
@@ -11167,6 +11158,31 @@ window._saveBescheinigungDataBulk=function(kursId,tnIds,field,value){
     batch.set(ref,data,{merge:true});
   });
   return batch.commit().catch(err=>console.error('Bescheinigung bulk save:',err));
+};
+// Signatur speichern (Parent-Context damit Firestore das Object erkennt)
+window._saveBescheinigungSignature=function(kursId,tnId,signatureData){
+  if(!_db||!kursId||!tnId) return Promise.reject(new Error('Missing kursId/tnId'));
+  return _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId).set({
+    bescheinigungSignatur:signatureData,
+    bescheinigungDatum:Date.now()
+  },{merge:true});
+};
+// Bescheinigungs-Mail mit PDF-Anhang versenden (Parent-Context!)
+window._sendBescheinigungMail=function(toEmail,subject,htmlBody,pdfBase64,filename){
+  if(!_db) return Promise.reject(new Error('Keine DB-Verbindung'));
+  return _db.collection('mail').add({
+    to:toEmail,
+    message:{
+      subject:subject,
+      html:htmlBody,
+      attachments:[{
+        filename:filename,
+        content:pdfBase64,
+        encoding:'base64',
+        contentType:'application/pdf'
+      }]
+    }
+  });
 };
 
 function startPresence(){
