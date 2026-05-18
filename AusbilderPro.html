@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.4.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.4.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -7517,9 +7517,6 @@ function generateBescheinigungAusbilder(){
   const inst=curInst();
   const kursId=d.poolKursId||inst?.sharedKursId;
   if(!kursId){toast('Kein Kurs verknüpft','bad');return;}
-  // 1. globalTN für Geburtsdatum laden
-  // 2. Kurs-Daten laden
-  // 3. Sync-Daten (Noten/Anwesenheit) laden
   const tnId=d.poolTnId;
   Promise.all([
     _db.collection('globalTN').doc(tnId).get(),
@@ -7536,49 +7533,110 @@ function generateBescheinigungAusbilder(){
     const kursName=kurs.lehrgangsart||(kurs.name||'');
     const kursBeschreibung=kurs.inhalt||kurs.beschreibung||'';
     const kursLabel=kursName+(kursBeschreibung?' '+kursBeschreibung:'');
-    const ort=kurs.standort||'Siegburg';
-    const fuehrung=sync.noten_fuehrung||d.fuehrung||'';
-    const mitarbeit=sync.noten_mitarbeit||d.mitarbeit||'';
-    const praxis=sync.noten_praxis||d.praxis||'';
+    const standortLow=(kurs.standort||'').toLowerCase();
+    const isBonn=standortLow.includes('bonn');
+    const isSieg=!isBonn;
+    const heute=new Date().toLocaleDateString('de-DE');
     const fehltage=(sync.attAbsentE||0)+(sync.attAbsentU||0)+(sync.attSick||0);
     const verspaetungen=sync.attLate||0;
     const bemerkung=sync.bemerkung||d.bemerkung||'';
-    const ausbilderName=_auth?.currentUser?.displayName||_auth?.currentUser?.email?.split('@')[0]||'';
-    // Bereits vorhandene Signatur?
     const existingSig=sync.bescheinigungSignatur||'';
+    // Gespeicherte Bescheinigungs-Auswahl
+    const storedStandort=sync.bescheinigungStandort;
+    const validStandort=storedStandort==='bonn'||storedStandort==='sieg';
+    const initStandort=validStandort?storedStandort:(isBonn?'bonn':'sieg');
+    const initBonnChecked=initStandort==='bonn';
+    const initSiegChecked=initStandort==='sieg';
+    const storedNachweis=sync.bescheinigungNachweis;
+    const initYesChecked=storedNachweis==='yes';
+    const initNoChecked=storedNachweis==='no';
+    // Generische Noten-Liste aus FIXED_GRADES + customGrades
+    const notenHtmlParts=[];
+    const deletedFixed=(inst.deletedFixedGrades||[]);
+    const fixedActive=FIXED_GRADES.filter(g=>!deletedFixed.includes(g.id));
+    const allGradeDefs=[...fixedActive,...(inst.customGrades||[])];
+    allGradeDefs.forEach(g=>{
+      if(!g||!g.label||!String(g.label).trim())return;
+      let val='';
+      if(g.fixed===false){
+        val=(sync.noten_extra||{})[g.id]||(d.extraGrades||{})[g.id]||'';
+      } else {
+        val=sync['noten_'+g.id]||d[g.id]||'';
+      }
+      val=String(val||'').trim();
+      if(val){
+        notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(g.label).trim())}:</span><span class="note-line">${esc(val)}</span></div>`);
+      }
+    });
+    if(fehltage||verspaetungen){
+      notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage||''}</span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short">${verspaetungen||''}</span></div>`);
+    }
+    if(bemerkung){
+      notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
+    }
+    const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
     const w=window.open('','_blank');
     if(!w){toast('Popup blockiert – bitte Popups erlauben','bad');return;}
-    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Teilnahmebescheinigung – ${esc(name)}</title>
+    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title> </title>
 <style>
-@page{size:A4;margin:20mm 20mm 15mm 20mm;}
+@page{size:A4;margin:8mm 12mm 8mm 12mm;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Times New Roman',Times,serif;font-size:12pt;color:#000;line-height:1.5;padding:20mm;max-width:210mm;margin:0 auto;}
-@media print{body{padding:0;}.no-print{display:none !important;}}
-.header{text-align:center;margin-bottom:8mm;border-bottom:1px solid #000;padding-bottom:4mm;}
-.header .org{font-size:13pt;font-weight:bold;letter-spacing:.5px;}
-.header .sub{font-size:10pt;margin-top:1mm;}
-.header .standorte{font-size:9pt;color:#444;margin-top:2mm;}
-h1{text-align:center;font-size:16pt;font-weight:bold;margin:8mm 0;text-decoration:underline;}
-.field{margin:3mm 0;}
-.field b{font-weight:bold;}
-.dots{display:inline-block;min-width:60mm;border-bottom:1px dotted #888;padding-bottom:1px;}
-.dots-long{display:inline-block;min-width:120mm;border-bottom:1px dotted #888;padding-bottom:1px;}
-.noten-table{width:100%;margin:5mm 0;border-collapse:collapse;}
-.noten-table td{padding:2mm 3mm;font-size:11pt;}
-.noten-table td:first-child{font-weight:bold;width:45%;}
-.noten-table td:last-child{border-bottom:1px dotted #888;}
-.sig-row{display:flex;justify-content:space-between;margin-top:12mm;align-items:flex-end;}
-.sig-block{text-align:center;width:45%;}
-.sig-line{border-top:1px solid #000;padding-top:2mm;font-size:9pt;}
-.sig-canvas-wrap{border:2px dashed #999;border-radius:8px;padding:4px;margin-bottom:4px;background:#fafafa;position:relative;}
+html,body{font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:11.5pt;color:#000;line-height:1.45;}
+body{max-width:210mm;margin:0 auto;padding:8mm 12mm;}
+@media print{html,body{padding:0;margin:0;}.no-print{display:none !important;}@page{margin:8mm 12mm 8mm 12mm;}}
+.page{display:flex;flex-direction:column;min-height:calc(297mm - 16mm);position:relative;}
+.page-content{flex:1 1 auto;}
+.header-row{display:flex;align-items:flex-start;justify-content:space-between;position:relative;}
+.header-text{flex:1;text-align:center;padding-right:25mm;font-family:'Times New Roman',Times,serif;}
+.header-text .org{font-size:14pt;letter-spacing:1px;}
+.header-text .sub{font-size:11pt;font-style:normal;margin-top:1mm;}
+.khs-logo{position:absolute;right:0;top:0;width:18mm;height:18mm;display:flex;align-items:center;justify-content:center;font-size:32pt;color:#1e3a8a;font-weight:bold;}
+.header-line{border:none;border-top:1pt solid #000;margin:3mm 0 0 0;}
+.hbz-checks{display:flex;flex-direction:column;align-items:flex-start;width:fit-content;margin-left:auto;margin-top:5mm;}
+.hbz-check{font-size:12pt;margin-bottom:3mm;white-space:nowrap;cursor:pointer;padding:1mm 2mm;border-radius:3pt;user-select:none;}
+.hbz-check:hover{background:rgba(0,0,0,.05);}
+@media print{.hbz-check{cursor:default;padding:0;}.hbz-check:hover{background:transparent;}}
+.cb-box{display:inline-block;width:11pt;height:11pt;border:1pt solid #000;position:relative;vertical-align:middle;margin-right:5pt;}
+.cb-box.checked::after{content:'✓';position:absolute;top:-4pt;left:-1pt;font-size:14pt;font-weight:bold;}
+h1{text-align:center;font-size:24pt;font-weight:bold;font-style:italic;margin:6mm 0 8mm 0;}
+.body-block{margin-bottom:4mm;}
+.field{margin:3mm 0;font-size:12pt;}
+.kurs-title{margin-top:5mm;font-size:12pt;}
+.noten-block{margin:5mm 0 5mm 20mm;}
+.note-row{display:flex;align-items:baseline;margin:3mm 0;font-size:12pt;font-weight:bold;}
+.note-row-split{flex-wrap:wrap;}
+.note-label{flex-shrink:0;min-width:55mm;font-weight:bold;}
+.note-label-inline{flex-shrink:0;margin-left:4mm;font-weight:bold;}
+.note-line{flex:1;border-bottom:1.2pt dotted #555;min-height:14pt;padding:0 2mm;font-weight:normal;}
+.note-line-half{flex:1;min-width:30mm;}
+.note-line-short{flex:1;min-width:25mm;max-width:35mm;}
+.note-line-long{flex:1;min-width:80mm;}
+.ausbildungsnachweis{margin:6mm 0 4mm 0;font-size:12pt;line-height:1.5;}
+.radio{display:inline-block;width:12pt;height:12pt;border:1pt solid #000;border-radius:50%;vertical-align:middle;margin:0 2pt;cursor:pointer;position:relative;}
+.radio.checked::after{content:'';position:absolute;top:2pt;left:2pt;width:6pt;height:6pt;background:#000;border-radius:50%;}
+.radio:hover{background:rgba(0,0,0,.08);}
+@media print{.radio{cursor:default;}.radio:hover{background:transparent;}}
+.datum-zeile{margin:4mm 0 8mm 0;font-size:12pt;}
+.sig-row{display:flex;justify-content:space-between;margin:8mm 0;gap:15mm;}
+.sig-block{flex:1;text-align:center;}
+.sig-space{height:12mm;}
+.sig-line{border-top:1pt dotted #000;padding-top:1mm;font-size:11pt;}
+.sig-canvas-wrap{border:2px dashed #999;border-radius:8px;padding:4px;margin-bottom:4px;background:#fafafa;position:relative;height:12mm;}
 .sig-canvas-wrap.signed{border-color:#22c55e;border-style:solid;background:#f0fdf4;}
-canvas.sig{display:block;width:100%;height:80px;cursor:crosshair;touch-action:none;}
-.sig-img{width:100%;height:80px;object-fit:contain;}
-.footer{margin-top:10mm;padding-top:4mm;border-top:1px solid #ccc;font-size:8pt;text-align:center;color:#444;}
-.hinweis{margin-top:8mm;font-size:9pt;font-style:italic;text-align:center;}
-.checkbox-row{margin:3mm 0;font-size:11pt;}
-.cb{display:inline-block;width:12pt;height:12pt;border:1.5pt solid #000;border-radius:2pt;margin:0 3pt;vertical-align:middle;}
-.action-bar{display:flex;gap:8px;justify-content:center;margin:16px 0;}
+@media print{.sig-canvas-wrap{border:none;background:none;padding:0;}}
+canvas.sig{display:block;width:100%;height:100%;cursor:crosshair;touch-action:none;}
+.sig-img{max-width:100%;max-height:12mm;object-fit:contain;display:block;margin:0 auto;}
+.hinweis-row{display:flex;justify-content:space-between;align-items:center;margin:6mm 0;gap:10mm;}
+.hinweis{flex:1;font-size:10.5pt;line-height:1.4;}
+.handwerk-logo{flex-shrink:0;font-size:11pt;font-weight:bold;letter-spacing:1px;color:#d97706;border:2pt solid #d97706;padding:3mm 6mm;background:#fff;}
+.footer{flex-shrink:0;margin-top:auto;padding-top:3mm;border-top:1pt solid #000;font-size:8.5pt;font-family:'Times New Roman',Times,serif;}
+.footer-cols{display:flex;justify-content:space-between;gap:10mm;margin-bottom:3mm;}
+.footer-col{flex:1;}
+.footer-head{font-weight:bold;margin-bottom:1mm;}
+.footer-row-2{display:flex;gap:8mm;}
+.footer-row-2>div{flex:1;}
+.footer-contact{text-align:center;padding-top:1mm;font-size:8.5pt;}
+.action-bar{display:flex;gap:8px;justify-content:center;margin:16px 0;flex-wrap:wrap;font-family:'Segoe UI',Arial,sans-serif;}
 .action-bar button{padding:12px 28px;font-size:14px;font-weight:bold;border:none;border-radius:8px;cursor:pointer;transition:all .15s;}
 .btn-print{background:#e5e7eb;color:#333;}
 .btn-print:hover{background:#d1d5db;}
@@ -7586,56 +7644,98 @@ canvas.sig{display:block;width:100%;height:80px;cursor:crosshair;touch-action:no
 .btn-send:hover{background:#1d4ed8;}
 .btn-send:disabled{background:#93c5fd;cursor:not-allowed;}
 .btn-clear-sig{background:none;border:1px solid #ccc!important;color:#666;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;}
-.status-msg{text-align:center;padding:8px;border-radius:8px;font-size:13px;font-weight:600;margin:8px 0;}
+.status-msg{text-align:center;padding:8px;border-radius:8px;font-size:13px;font-weight:600;margin:8px 0;font-family:'Segoe UI',Arial,sans-serif;}
 </style></head><body>
 <div class="action-bar no-print">
   <button class="btn-print" onclick="window.print()" title="Drucken">🖨 Drucken</button>
-  <button class="btn-send" id="btnSend" title="📤 Abschicken" onclick="sendBescheinigung()">📤 Abschicken</button>
+  <button class="btn-send" id="btnSend" title="Bescheinigung mit Signatur speichern" onclick="sendBescheinigung()">📤 Abschicken</button>
 </div>
 <div id="statusArea" class="no-print"></div>
-<div class="header">
-  <div class="org">KREISHANDWERKERSCHAFT BONN · RHEIN-SIEG</div>
-  <div class="sub">– Handwerkliches Bildungszentrum –</div>
-  <div class="standorte">HBZ Bonn &nbsp;&nbsp;|&nbsp;&nbsp; HBZ Siegburg</div>
+
+<div class="page">
+<div class="page-content">
+<div class="header-row">
+  <div class="header-text">
+    <div class="org">KREISHANDWERKERSCHAFT BONN · RHEIN-SIEG</div>
+    <div class="sub">- Handwerkliche Bildungszentrum -</div>
+  </div>
+  <div class="khs-logo">◆</div>
+</div>
+<hr class="header-line">
+<div class="hbz-checks">
+  <div class="hbz-check" onclick="toggleStandort('bonn')"><span class="cb-box cb-bonn ${initBonnChecked?'checked':''}"></span> HBZ Bonn</div>
+  <div class="hbz-check" onclick="toggleStandort('sieg')"><span class="cb-box cb-sieg ${initSiegChecked?'checked':''}"></span> HBZ Siegburg</div>
 </div>
 <h1>Teilnahmebescheinigung</h1>
-<div class="field">Der/die Auszubildende <b>${esc(name)}</b></div>
-<div class="field">geboren am <b>${geb}</b></div>
-<div class="field" style="margin-top:5mm">hat in der Zeit vom <b>${von}</b> bis <b>${bis}</b></div>
-<div class="field">an folgender überbetrieblichen Unterweisung teilgenommen.</div>
-<div class="field" style="margin-top:4mm"><b>${esc(kursLabel)}</b></div>
-<table class="noten-table">
-<tr><td>Führung:</td><td>${fuehrung||'...'}</td></tr>
-<tr><td>Mitarbeit:</td><td>${mitarbeit||'...'}</td></tr>
-<tr><td>Fachkenntnisse (praktisch):</td><td>${praxis||'...'}</td></tr>
-</table>
-<div class="field"><b>Fehltage:</b> <span class="dots">${fehltage||'...'}</span> &nbsp;&nbsp; <b>Verspätungen:</b> <span class="dots">${verspaetungen||'...'}</span></div>
-<div class="field" style="margin-top:3mm"><b>Besondere Bemerkungen:</b><br><span class="dots-long">${bemerkung?' '+esc(bemerkung)+' ':'...'}</span></div>
-<div class="checkbox-row" style="margin-top:5mm">
-  <b>Ausbildungsnachweis wurde für den Zeitraum der ÜLU geführt:</b>
-  &nbsp;<span class="cb"></span> ja &nbsp;&nbsp;<span class="cb"></span> nein
+<div class="body-block">
+  <div class="field">Der/die Auszubildende <b>${esc(name)}</b></div>
+  <div class="field">geboren am <b>${geb}</b></div>
+  <div class="field">hat in der Zeit vom <b>${von}</b> bis <b>${bis}</b></div>
+  <div class="field">an folgender überbetrieblichen Unterweisung teilgenommen.</div>
+  <div class="field kurs-title"><b>${esc(kursLabel)}</b></div>
 </div>
-<div class="field" style="margin-top:8mm"><b>${esc(ort)}, den ${bis}</b></div>
+${notenHtml}
+<div class="ausbildungsnachweis"><b>Ausbildungsnachweis wurde für den Zeitraum der überbetrieblichen<br>Unterweisung geführt:</b> &nbsp;&nbsp;<span class="radio rb-yes ${initYesChecked?'checked':''}" onclick="toggleNachweis('yes')"></span> ja &nbsp;&nbsp;&nbsp;<span class="radio rb-no ${initNoChecked?'checked':''}" onclick="toggleNachweis('no')"></span> nein</div>
+<div class="datum-zeile"><b>Siegburg, den ${heute}</b></div>
 <div class="sig-row">
-  <div class="sig-block">
-    <div class="sig-line">Lehrgangsleiter</div>
-  </div>
+  <div class="sig-block"><div class="sig-space"></div><div class="sig-line">Lehrgangsleiter</div></div>
   <div class="sig-block">
     <div id="sigArea">
       ${existingSig
         ?'<div class="sig-canvas-wrap signed"><img src="'+existingSig+'" class="sig-img"></div>'
         :'<div class="sig-canvas-wrap" id="sigWrap"><canvas class="sig" id="sigCanvas"></canvas></div><button class="btn-clear-sig no-print" title="↺ Neu" onclick="clearSig()">↺ Neu</button>'}
     </div>
-    <div class="sig-line">Ausbilder (Meister)${ausbilderName?' – '+esc(ausbilderName):''}</div>
+    <div class="sig-line">Ausbilder (Meister)</div>
   </div>
 </div>
-<div class="hinweis">Diese Bescheinigung ist nach Beendigung des Lehrgangs dem Meister zur Unterschrift vorzulegen<br>und später mit den Anmeldeunterlagen zur Gesellenprüfung einzureichen.</div>
-<div class="footer">
-  <b>HBZ Siegburg</b> · Gerhart-Hauptmann-Weg 2 · 53721 Siegburg &nbsp;|&nbsp; <b>HBZ Bonn</b> · Ennemoseste. 10 · 53119 Bonn<br>
-  Tel.: 02241/990-0 · Fax 02241/990-100 · www.khs-handwerk.de · postfach@khs-handwerk.de
+<div class="hinweis-row">
+  <div class="hinweis"><b>Diese Bescheinigung ist nach Beendigung des Lehrgangs dem Meister zur Unterschrift<br>vorzulegen und später mit den Anmeldeunterlagen zur Gesellenprüfung einzureichen.</b></div>
+  <div class="handwerk-logo">DAS HANDWERK</div>
 </div>
+</div>
+<div class="footer">
+  <div class="footer-cols">
+    <div class="footer-col">
+      <div class="footer-head">Besucher/Lieferadresse</div>
+      <div class="footer-row-2">
+        <div><b>HBZ Siegburg</b><br>Gerhart-Hauptmann-Weg 2<br>53721 Siegburg</div>
+        <div><b>HBZ Bonn</b><br>Ennemoserste.10<br>53119 Bonn</div>
+      </div>
+    </div>
+    <div class="footer-col">
+      <div class="footer-head">Rechnungs-/Postadresse</div>
+      <div>Kreishandwerkerschaft Bonn·Rhein-Sieg<br>Postfach 1554<br>53705 Siegburg</div>
+    </div>
+  </div>
+  <div class="footer-contact">Tel.: 02241/990-0 · Fax 02241/990-100 · <u>www.khs-handwerk.de</u> · <u>postfach@khs-handwerk.de</u></div>
+</div>
+</div>
+
 <script>
-// ─── Signature Canvas ───
+window._kursId='${kursId}';
+window._tnId='${tnId}';
+function toggleStandort(ort){
+  var bonn=document.querySelector('.cb-bonn');
+  var sieg=document.querySelector('.cb-sieg');
+  if(!bonn||!sieg)return;
+  if(ort==='bonn'){bonn.classList.add('checked');sieg.classList.remove('checked');}
+  else{sieg.classList.add('checked');bonn.classList.remove('checked');}
+  if(window.opener&&window.opener._saveBescheinigungData){
+    window.opener._saveBescheinigungData(window._kursId,window._tnId,'bescheinigungStandort',ort);
+  }
+}
+function toggleNachweis(val){
+  var yes=document.querySelector('.rb-yes');
+  var no=document.querySelector('.rb-no');
+  if(!yes||!no)return;
+  if(val==='yes'){no.classList.remove('checked');yes.classList.toggle('checked');}
+  else{yes.classList.remove('checked');no.classList.toggle('checked');}
+  var newVal=yes.classList.contains('checked')?'yes':(no.classList.contains('checked')?'no':null);
+  if(window.opener&&window.opener._saveBescheinigungData){
+    window.opener._saveBescheinigungData(window._kursId,window._tnId,'bescheinigungNachweis',newVal);
+  }
+}
+// Signature Canvas
 const canvas=document.getElementById('sigCanvas');
 let ctx,drawing=false,hasSig=${existingSig?'true':'false'};
 if(canvas){
@@ -7667,15 +7767,11 @@ function getSignatureData(){
   if(!canvas||!hasSig)return null;
   return canvas.toDataURL('image/png');
 }
-// ─── Abschicken ───
 function sendBescheinigung(){
   const sig=getSignatureData();
-  if(!sig&&!${existingSig?'true':'false'}){
-    alert('Bitte zuerst unterschreiben!');return;
-  }
+  if(!sig&&!${existingSig?'true':'false'}){alert('Bitte zuerst unterschreiben!');return;}
   const btn=document.getElementById('btnSend');
   btn.disabled=true;btn.textContent='Wird gesendet…';
-  // Firebase aus dem Opener-Window nutzen
   const openerDb=window.opener?window.opener._db:null;
   if(!openerDb){
     document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#fef2f2;color:#dc2626">Verbindung zum Hauptfenster verloren. Bitte AusbilderPro nicht schließen.</div>';
@@ -7684,15 +7780,13 @@ function sendBescheinigung(){
   }
   const saveData={
     bescheinigungSignatur:sig||'${existingSig}',
-    bescheinigungDatum:Date.now(),
-    bescheinigungVon:'${esc(ausbilderName)}'
+    bescheinigungDatum:Date.now()
   };
-  openerDb.collection('shared').doc('kurse').collection('list').doc('${kursId}')
-    .collection('teilnehmer').doc('${tnId}').set(saveData,{merge:true})
+  openerDb.collection('shared').doc('kurse').collection('list').doc(window._kursId)
+    .collection('teilnehmer').doc(window._tnId).set(saveData,{merge:true})
     .then(()=>{
       document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#f0fdf4;color:#16a34a">✅ Bescheinigung erfolgreich abgeschickt!</div>';
       btn.textContent='✅ Gesendet';
-      // Signatur-Canvas durch Bild ersetzen
       if(sig){
         const area=document.getElementById('sigArea');
         if(area) area.innerHTML='<div class="sig-canvas-wrap signed"><img src="'+sig+'" class="sig-img"></div>';
