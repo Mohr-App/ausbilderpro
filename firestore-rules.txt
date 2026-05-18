@@ -273,5 +273,15 @@ service cloud.firestore {
                   && resource.data.ts.toMillis() < (request.time.toMillis() - 60 * 24 * 60 * 60 * 1000)));
       }
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // Online-Presence (Wer ist online jetzt)
+    // ═══════════════════════════════════════════════════════════
+    match /presence/{uid} {
+      // Jeder eingeloggte User darf alle Presence-Stati sehen
+      allow read: if request.auth != null;
+      // Jeder darf nur sein eigenes Presence-Doc schreiben (create/update/delete)
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }
