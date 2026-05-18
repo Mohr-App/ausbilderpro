@@ -220,11 +220,15 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .pool-all-btn{width:100%;margin-bottom:8px;font-size:.68rem;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:7px;color:#2563eb;padding:7px;cursor:pointer;font-family:'Sora',sans-serif;font-weight:600;transition:all .12s;}
 .pool-all-btn:hover{background:rgba(59,130,246,.2);}
 /* Fehlt/Wiederholer Container - voll umrandet wie offener Kurs in Sidebar */
-.fehlt-card-wrap{background:#fff;border:1.5px solid #94a3b8;border-left:3px solid #dc2626;border-radius:8px;margin:6px 8px;overflow:hidden;display:flex;flex-direction:column;flex:1;}
+.fehlt-card-wrap{background:#fff;border:1.5px solid #94a3b8;border-left:3px solid #dc2626;border-radius:8px;margin:6px 8px;overflow:hidden;display:flex;flex-direction:column;flex:0 0 auto;}
 .fehlt-card-wrap-wdh{border-left-color:#d97706;}
-.fehlt-hdr{padding:9px 14px;font-size:.68rem;font-weight:800;color:#991b1b;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;background:rgba(220,38,38,.05);border-bottom:1px solid #cbd5e1;flex-shrink:0;display:flex;align-items:center;gap:6px;}
+.fehlt-hdr{padding:9px 14px;font-size:.68rem;font-weight:800;color:#991b1b;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;background:rgba(220,38,38,.05);border-bottom:1px solid #cbd5e1;flex-shrink:0;display:flex;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;justify-content:space-between;}
 .fehlt-hdr.fehlt-hdr-wdh{color:#92400e;background:rgba(217,119,6,.05);}
-.fehlt-body{min-height:100px;max-height:280px;overflow-y:auto;overflow-x:hidden;padding:8px;background:#fff;flex:1;}
+.fehlt-hdr-arr{font-size:.7rem;color:#94a3b8;transition:transform .15s;margin-left:auto;}
+.fehlt-card-wrap.collapsed .fehlt-hdr-arr{transform:rotate(-90deg);}
+.fehlt-card-wrap.collapsed .fehlt-body{max-height:0;min-height:0;padding:0;border:none;overflow:hidden;}
+.fehlt-card-wrap.collapsed .fehlt-hdr{border-bottom:none;}
+.fehlt-body{min-height:60px;max-height:220px;overflow-y:auto;overflow-x:hidden;padding:8px;background:#fff;flex:0 0 auto;transition:max-height .2s,min-height .2s,padding .2s;}
 .fehlt-body.fehlt-dropover{background:rgba(239,68,68,.1);outline:2px dashed #ef4444;outline-offset:-4px;}
 .fehlt-card{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:7px 10px;margin-bottom:4px;cursor:default;display:flex;align-items:center;gap:8px;transition:all .12s;min-width:0;}
 .fehlt-card:hover{border-color:#ef4444;}
@@ -1051,7 +1055,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.0.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.0.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1235,31 +1239,37 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="pool-sb-body hide-placed" id="poolSbBody" ondragover="event.preventDefault();this.classList.add('pool-sb-dropover')" ondragleave="this.classList.remove('pool-sb-dropover')" ondrop="poolDropBack(event)">
       <div class="pool-empty">Noch keine Teilnehmer im Pool.</div>
     </div>
-    <!-- FEHLT + WIEDERHOLER gleichgroß -->
+    <!-- FEHLT + WIEDERHOLER kompakt + kollabierbar -->
     <div style="display:flex;flex-direction:column;flex-shrink:0;gap:4px">
-      <div class="fehlt-card-wrap">
-        <div class="fehlt-hdr">✗ Nicht angetreten</div>
+      <div class="fehlt-card-wrap" id="fehltCardWrap">
+        <div class="fehlt-hdr" onclick="toggleFehltCard('fehltCardWrap')">
+          <span>✗ Nicht angetreten</span>
+          <span class="fehlt-hdr-arr">▼</span>
+        </div>
         <div class="fehlt-body" id="fehltBody"
           ondragover="event.preventDefault();this.classList.add('fehlt-dropover')" 
           ondragleave="this.classList.remove('fehlt-dropover')" 
           ondrop="dropToFehlt(event)">
-          <div class="pool-empty pool-empty-rich" style="padding:18px 14px">
-            <div style="font-size:1.6rem;opacity:.6;margin-bottom:6px">🚫</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:.78rem;font-weight:800;color:#dc2626;margin-bottom:4px;letter-spacing:.04em">Schüler hierher ziehen</div>
-            <div style="font-family:'Sora',sans-serif;font-size:.7rem;color:#475569;line-height:1.45;max-width:240px;margin:0 auto">wenn der Teilnehmer <b>nicht zum Kurs erschienen</b> ist (z.B. unentschuldigtes Fehlen am ersten Tag)</div>
+          <div class="pool-empty pool-empty-rich" style="padding:14px 10px">
+            <div style="font-size:1.4rem;opacity:.6;margin-bottom:4px">🚫</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.74rem;font-weight:800;color:#dc2626;margin-bottom:3px;letter-spacing:.04em">Schüler hierher ziehen</div>
+            <div style="font-family:'Sora',sans-serif;font-size:.66rem;color:#475569;line-height:1.4;max-width:230px;margin:0 auto">wenn der Teilnehmer <b>nicht zum Kurs erschienen</b> ist</div>
           </div>
         </div>
       </div>
-      <div class="fehlt-card-wrap fehlt-card-wrap-wdh">
-        <div class="fehlt-hdr fehlt-hdr-wdh">↩ Kurs wiederholen</div>
+      <div class="fehlt-card-wrap fehlt-card-wrap-wdh" id="wdhCardWrap">
+        <div class="fehlt-hdr fehlt-hdr-wdh" onclick="toggleFehltCard('wdhCardWrap')">
+          <span>Kurs wiederholen</span>
+          <span class="fehlt-hdr-arr">▼</span>
+        </div>
         <div class="fehlt-body" id="wiederholerBody"
           ondragover="event.preventDefault();this.classList.add('wiederholer-dropover')" 
           ondragleave="this.classList.remove('wiederholer-dropover')" 
           ondrop="dropToWiederholer(event)">
-          <div class="pool-empty pool-empty-rich" style="padding:18px 14px">
-            <div style="font-size:1.6rem;opacity:.6;margin-bottom:6px">↩</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:.78rem;font-weight:800;color:#d97706;margin-bottom:4px;letter-spacing:.04em">Schüler hierher ziehen</div>
-            <div style="font-family:'Sora',sans-serif;font-size:.7rem;color:#475569;line-height:1.45;max-width:240px;margin:0 auto">bei <b>zu vielen Fehlstunden</b>, <b>langer Krankheit</b> oder ähnlichen Gründen — der Schüler muss den Kurs wiederholen</div>
+          <div class="pool-empty pool-empty-rich" style="padding:14px 10px">
+            <div style="font-size:1.4rem;opacity:.6;margin-bottom:4px">↩</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:.74rem;font-weight:800;color:#d97706;margin-bottom:3px;letter-spacing:.04em">Schüler hierher ziehen</div>
+            <div style="font-family:'Sora',sans-serif;font-size:.66rem;color:#475569;line-height:1.4;max-width:230px;margin:0 auto">bei <b>zu vielen Fehlstunden</b>, <b>langer Krankheit</b> o.ä.</div>
           </div>
         </div>
       </div>
@@ -8638,21 +8648,39 @@ function mergeDupTN(manualId, selfId, kursId){
     });
 }
 
-// Rich Empty-State HTML fuer Fehlt- und Wiederholer-Container
+// Rich Empty-State HTML fuer Fehlt- und Wiederholer-Container (kompakt)
 function _poolEmptyFehltHTML(){
-  return '<div class="pool-empty pool-empty-rich" style="padding:18px 14px">'
-    +'<div style="font-size:1.6rem;opacity:.6;margin-bottom:6px">🚫</div>'
-    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.78rem;font-weight:800;color:#dc2626;margin-bottom:4px;letter-spacing:.04em">Schüler hierher ziehen</div>'
-    +'<div style="font-family:\'Sora\',sans-serif;font-size:.7rem;color:#475569;line-height:1.45;max-width:240px;margin:0 auto">wenn der Teilnehmer <b>nicht zum Kurs erschienen</b> ist (z.B. unentschuldigtes Fehlen am ersten Tag)</div>'
+  return '<div class="pool-empty pool-empty-rich" style="padding:14px 10px">'
+    +'<div style="font-size:1.4rem;opacity:.6;margin-bottom:4px">🚫</div>'
+    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.74rem;font-weight:800;color:#dc2626;margin-bottom:3px;letter-spacing:.04em">Schüler hierher ziehen</div>'
+    +'<div style="font-family:\'Sora\',sans-serif;font-size:.66rem;color:#475569;line-height:1.4;max-width:230px;margin:0 auto">wenn der Teilnehmer <b>nicht zum Kurs erschienen</b> ist</div>'
     +'</div>';
 }
 function _poolEmptyWdhHTML(){
-  return '<div class="pool-empty pool-empty-rich" style="padding:18px 14px">'
-    +'<div style="font-size:1.6rem;opacity:.6;margin-bottom:6px">↩</div>'
-    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.78rem;font-weight:800;color:#d97706;margin-bottom:4px;letter-spacing:.04em">Schüler hierher ziehen</div>'
-    +'<div style="font-family:\'Sora\',sans-serif;font-size:.7rem;color:#475569;line-height:1.45;max-width:240px;margin:0 auto">bei <b>zu vielen Fehlstunden</b>, <b>langer Krankheit</b> oder ähnlichen Gründen — der Schüler muss den Kurs wiederholen</div>'
+  return '<div class="pool-empty pool-empty-rich" style="padding:14px 10px">'
+    +'<div style="font-size:1.4rem;opacity:.6;margin-bottom:4px">↩</div>'
+    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.74rem;font-weight:800;color:#d97706;margin-bottom:3px;letter-spacing:.04em">Schüler hierher ziehen</div>'
+    +'<div style="font-family:\'Sora\',sans-serif;font-size:.66rem;color:#475569;line-height:1.4;max-width:230px;margin:0 auto">bei <b>zu vielen Fehlstunden</b>, <b>langer Krankheit</b> o.ä.</div>'
     +'</div>';
 }
+
+// Klick auf Fehlt/Wdh Header: zuklappen oder aufklappen, Zustand merken
+function toggleFehltCard(wrapId){
+  const w=document.getElementById(wrapId);
+  if(!w) return;
+  const collapsed=w.classList.toggle('collapsed');
+  try{ localStorage.setItem('ap-'+wrapId+'-collapsed', collapsed?'1':'0'); }catch(_){}
+}
+// Beim Laden: gespeicherten Zustand wiederherstellen
+function _restoreFehltCardState(){
+  ['fehltCardWrap','wdhCardWrap'].forEach(id=>{
+    try{
+      const v=localStorage.getItem('ap-'+id+'-collapsed');
+      if(v==='1') document.getElementById(id)?.classList.add('collapsed');
+    }catch(_){}
+  });
+}
+document.addEventListener('DOMContentLoaded', _restoreFehltCardState);
 
 function loadPool(){
   if(_demoMode) return;
