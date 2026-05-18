@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.3.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.3.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5673,6 +5673,7 @@ function generateAlleBescheinigungenAusbilder(){
       const bemerkung=sync.bemerkung||s.bemerkung||'';
       const sigData=sync.bescheinigungSignatur||'';
       if(sigData) sigCount++;
+      const tnId=s.poolTnId||idx;
       // Theoretische Note: erst aus dediziertem Feld, sonst aus noten_extra Object
       let theorie=sync.noten_theorie||'';
       if(!theorie && sync.noten_extra && typeof sync.noten_extra==='object'){
@@ -5728,7 +5729,7 @@ function generateAlleBescheinigungenAusbilder(){
   <div class="field kurs-title"><b>${esc(kursLabel)}</b></div>
 </div>
 ${notenHtml}
-<div class="ausbildungsnachweis"><b>Ausbildungsnachweis wurde für den Zeitraum der überbetrieblichen<br>Unterweisung geführt:</b> &nbsp;&nbsp;<span class="radio"></span> ja &nbsp;&nbsp;&nbsp;<span class="radio"></span> nein</div>
+<div class="ausbildungsnachweis"><b>Ausbildungsnachweis wurde für den Zeitraum der überbetrieblichen<br>Unterweisung geführt:</b> &nbsp;&nbsp;<span class="radio rb-yes" data-tn="${tnId}" onclick="toggleNachweis('${tnId}','yes')"></span> ja &nbsp;&nbsp;&nbsp;<span class="radio rb-no" data-tn="${tnId}" onclick="toggleNachweis('${tnId}','no')"></span> nein</div>
 <div class="datum-zeile"><b>Siegburg, den ${heute}</b></div>
 <div class="sig-row">
   <div class="sig-block"><div class="sig-space"></div><div class="sig-line">Lehrgangsleiter</div></div>
@@ -5805,7 +5806,10 @@ h1{text-align:center;font-size:24pt;font-weight:bold;font-style:italic;margin:6m
 
 /* Ausbildungsnachweis */
 .ausbildungsnachweis{margin:6mm 0 4mm 0;font-size:12pt;line-height:1.5;}
-.radio{display:inline-block;width:12pt;height:12pt;border:1pt solid #000;border-radius:50%;vertical-align:middle;margin:0 2pt;}
+.radio{display:inline-block;width:12pt;height:12pt;border:1pt solid #000;border-radius:50%;vertical-align:middle;margin:0 2pt;cursor:pointer;position:relative;}
+.radio.checked::after{content:'';position:absolute;top:2pt;left:2pt;width:6pt;height:6pt;background:#000;border-radius:50%;}
+.radio:hover{background:rgba(0,0,0,.08);}
+@media print{.radio{cursor:default;}.radio:hover{background:transparent;}}
 
 /* Datum */
 .datum-zeile{margin:4mm 0 8mm 0;font-size:12pt;}
@@ -5834,13 +5838,42 @@ h1{text-align:center;font-size:24pt;font-weight:bold;font-style:italic;margin:6m
 /* Print-Button */
 .print-btn{display:inline-block;margin:8px 4px;padding:12px 28px;font-size:14px;font-weight:bold;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Segoe UI',Arial,sans-serif;}
 .print-btn:hover{background:#1d4ed8;}
+.bulk-btn{padding:6px 14px;font-size:12px;font-weight:600;background:#10b981;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:'Segoe UI',Arial,sans-serif;}
+.bulk-btn:hover{background:#059669;}
+.bulk-btn-reset{background:#64748b;}
+.bulk-btn-reset:hover{background:#475569;}
 .print-hint{font-size:11px;color:#475569;margin:6px 0;line-height:1.5;font-family:'Segoe UI',Arial,sans-serif;}
 </style></head><body>
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="window.print()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
+  <div style="margin:8px 0;display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:center">
+    <button class="bulk-btn" onclick="setAllNachweis('yes')">Alle „ja" ✓</button>
+    <button class="bulk-btn" onclick="setAllNachweis('no')">Alle „nein" ✓</button>
+    <button class="bulk-btn bulk-btn-reset" onclick="setAllNachweis('reset')">Zurücksetzen</button>
+  </div>
   <div class="print-hint">${seats.length} Teilnehmer · ${sigCount} unterschrieben · ${seats.length-sigCount} offen<br><b>Tipp:</b> Im Druck-Dialog unter „Weitere Einstellungen" → „Kopf- und Fußzeilen" deaktivieren (entfernt Datum, URL und Seitenzahl)</div>
 </div>
 ${pages}
+<script>
+function toggleNachweis(tnId,val){
+  var yes=document.querySelector('.rb-yes[data-tn="'+tnId+'"]');
+  var no=document.querySelector('.rb-no[data-tn="'+tnId+'"]');
+  if(!yes||!no)return;
+  if(val==='yes'){
+    no.classList.remove('checked');
+    yes.classList.toggle('checked');
+  } else {
+    yes.classList.remove('checked');
+    no.classList.toggle('checked');
+  }
+}
+function setAllNachweis(val){
+  var yesAll=document.querySelectorAll('.rb-yes');
+  var noAll=document.querySelectorAll('.rb-no');
+  yesAll.forEach(function(r){r.classList.toggle('checked',val==='yes');});
+  noAll.forEach(function(r){r.classList.toggle('checked',val==='no');});
+}
+</script>
 </body></html>`);
     w.document.close();
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
