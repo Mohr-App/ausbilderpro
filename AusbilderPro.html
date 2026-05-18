@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.4.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.4.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -7541,6 +7541,7 @@ function generateBescheinigungAusbilder(){
     const verspaetungen=sync.attLate||0;
     const bemerkung=sync.bemerkung||d.bemerkung||'';
     const existingSig=sync.bescheinigungSignatur||'';
+    const tnEmail=(tn.kontaktEmail||tn.email||'').trim();
     // Gespeicherte Bescheinigungs-Auswahl
     const storedStandort=sync.bescheinigungStandort;
     const validStandort=storedStandort==='bonn'||storedStandort==='sieg';
@@ -7714,6 +7715,10 @@ ${notenHtml}
 <script>
 window._kursId='${kursId}';
 window._tnId='${tnId}';
+window._tnEmail=${JSON.stringify(tnEmail)};
+window._tnName=${JSON.stringify(name)};
+window._kursLabel=${JSON.stringify(kursLabel)};
+window._bisDate=${JSON.stringify(bis)};
 function toggleStandort(ort){
   var bonn=document.querySelector('.cb-bonn');
   var sieg=document.querySelector('.cb-sieg');
@@ -7768,6 +7773,11 @@ function getSignatureData(){
   return canvas.toDataURL('image/png');
 }
 function sendBescheinigung(){
+  // Pruefen ob E-Mail vorhanden
+  if(!window._tnEmail){
+    document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#fef2f2;color:#dc2626">❌ <b>Keine E-Mail-Adresse beim Teilnehmer hinterlegt!</b><br>Bitte im TN-Modal (AusbilderPro) E-Mail nachtragen und erneut versuchen.</div>';
+    return;
+  }
   const sig=getSignatureData();
   if(!sig&&!${existingSig?'true':'false'}){alert('Bitte zuerst unterschreiben!');return;}
   const btn=document.getElementById('btnSend');
@@ -7778,14 +7788,28 @@ function sendBescheinigung(){
     btn.disabled=false;btn.textContent='📤 Abschicken';
     return;
   }
+  const sigToSave=sig||'${existingSig}';
   const saveData={
-    bescheinigungSignatur:sig||'${existingSig}',
+    bescheinigungSignatur:sigToSave,
     bescheinigungDatum:Date.now()
   };
+  // 1. Signatur in Firestore speichern
   openerDb.collection('shared').doc('kurse').collection('list').doc(window._kursId)
     .collection('teilnehmer').doc(window._tnId).set(saveData,{merge:true})
     .then(()=>{
-      document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#f0fdf4;color:#16a34a">✅ Bescheinigung erfolgreich abgeschickt!</div>';
+      // 2. E-Mail an TN senden via mail collection
+      const subject='📄 Deine Teilnahmebescheinigung – '+window._kursLabel;
+      const htmlBody='<p style="margin:0 0 12px;font-size:.9rem;color:#374151">deine <b>Teilnahmebescheinigung</b> für den Lehrgang <b>'+window._kursLabel+'</b> (bis '+window._bisDate+') wurde vom Ausbilder erstellt und unterzeichnet.</p>'
+        +'<p style="margin:0 0 12px;font-size:.85rem;color:#374151">Du erhältst die offizielle Bescheinigung in Papierform bei deinem nächsten Kurs-Termin oder direkt vom Ausbilder.</p>'
+        +(sigToSave?'<div style="margin:12px 0;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;text-align:center"><p style="margin:0 0 6px;font-size:.7rem;color:#64748b">Signatur des Ausbilders:</p><img src="'+sigToSave+'" style="max-width:200px;max-height:60px;object-fit:contain"></div>':'');
+      // Schicke via opener.sendTnEmail wenn verfuegbar, sonst direkt
+      if(window.opener&&window.opener.sendTnEmail){
+        window.opener.sendTnEmail({kontaktEmail:window._tnEmail,vorname:window._tnName.split(' ')[0],nachname:window._tnName.split(' ').slice(1).join(' ')},subject,htmlBody);
+      } else {
+        // Fallback: direkt in mail collection schreiben
+        openerDb.collection('mail').add({to:window._tnEmail,message:{subject:subject,html:'<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px"><div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div><div style="padding:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px"><p style="margin:0 0 12px;font-size:.9rem;color:#374151">Hallo '+window._tnName+',</p>'+htmlBody+'</div></div>'}}).catch(()=>{});
+      }
+      document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#f0fdf4;color:#16a34a">✅ Bescheinigung gespeichert und E-Mail an '+window._tnEmail+' versendet!</div>';
       btn.textContent='✅ Gesendet';
       if(sig){
         const area=document.getElementById('sigArea');
