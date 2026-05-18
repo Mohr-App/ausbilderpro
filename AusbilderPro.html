@@ -1058,7 +1058,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.1.5 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.1.6 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -10839,24 +10839,19 @@ function isOnline(uid){
   return !!uid && _onlineUids.has(uid);
 }
 function _updatePresenceUI(){
-  // Sprechblase: gruener Glow je nach Anteil online (inkl. eigene als visuelles Feedback)
+  // Sprechblase: gruener Glow je nach Anteil ANDERER online (nicht bei nur self)
   const btn=document.getElementById('hdrChatBtn');
   if(btn){
-    const totalOnline = _onlineUids.size;
-    const onlineOthers = totalOnline - (_onlineUids.has(_fbUid)?1:0);
-    const totalUsers = Math.max(1, Object.keys(_chatUsers||{}).length);
-    const pct = Math.min(1, totalOnline / totalUsers);
+    const onlineOthers = _onlineUids.size - (_onlineUids.has(_fbUid)?1:0);
+    const totalUsers = Object.keys(_chatUsers||{}).length;
+    const totalOthers = Math.max(1, totalUsers - (_chatUsers && _chatUsers[_fbUid] ? 1 : 0));
+    const pct = Math.min(1, onlineOthers / totalOthers);
     let tip='Ausbilder-Chat';
-    if(totalOnline>0){
-      // Glow waechst von 8px (nur ich) bis 20px (alle)
+    if(onlineOthers>0){
       const glowSize = Math.round(8 + pct*12);
       const glowAlpha = (0.45 + pct*0.50).toFixed(2);
       btn.style.boxShadow = '0 3px 10px rgba(37,99,235,.32),0 0 0 1px rgba(0,0,0,.08),0 0 '+glowSize+'px '+(glowSize/3)+'px rgba(16,185,129,'+glowAlpha+')';
-      if(onlineOthers>0){
-        tip='Ausbilder-Chat — '+onlineOthers+' weitere online ('+Math.round(pct*100)+'%)';
-      } else {
-        tip='Ausbilder-Chat — nur Du online';
-      }
+      tip='Ausbilder-Chat — '+onlineOthers+' weitere online ('+Math.round(pct*100)+'%)';
     } else {
       btn.style.boxShadow = '0 3px 10px rgba(37,99,235,.32),0 0 0 1px rgba(0,0,0,.08)';
     }
