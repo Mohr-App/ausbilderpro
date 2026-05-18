@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.3.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.3.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5705,8 +5705,8 @@ function generateAlleBescheinigungenAusbilder(){
         notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
       }
       const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
-      const pb=idx>0?'page-break-before:always;':'';
-      return `<div class="page" style="${pb}">
+      return `<div class="page">
+<div class="page-content">
 <div class="header-row">
   <div class="header-text">
     <div class="org">KREISHANDWERKERSCHAFT BONN · RHEIN-SIEG</div>
@@ -5732,11 +5732,12 @@ ${notenHtml}
 <div class="datum-zeile"><b>Siegburg, den ${heute}</b></div>
 <div class="sig-row">
   <div class="sig-block"><div class="sig-space"></div><div class="sig-line">Lehrgangsleiter</div></div>
-  <div class="sig-block">${sigData?'<img src="'+sigData+'" class="sig-img">':'<div class="sig-space"></div>'}<div class="sig-line">Ausbilder (Meister)${ausbName?' &mdash; '+esc(ausbName):''}</div></div>
+  <div class="sig-block">${sigData?'<img src="'+sigData+'" class="sig-img">':'<div class="sig-space"></div>'}<div class="sig-line">Ausbilder (Meister)</div></div>
 </div>
 <div class="hinweis-row">
   <div class="hinweis"><b>Diese Bescheinigung ist nach Beendigung des Lehrgangs dem Meister zur Unterschrift<br>vorzulegen und später mit den Anmeldeunterlagen zur Gesellenprüfung einzureichen.</b></div>
   <div class="handwerk-logo">DAS HANDWERK</div>
+</div>
 </div>
 <div class="footer">
   <div class="footer-cols">
@@ -5762,35 +5763,38 @@ ${notenHtml}
 <style>
 @page{size:A4;margin:8mm 12mm 8mm 12mm;}
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{font-family:'Times New Roman',Times,serif;font-size:11.5pt;color:#000;line-height:1.45;max-width:210mm;margin:0 auto;padding:8mm 12mm;}
-@media print{html,body{padding:0;}.no-print{display:none !important;}@page{margin:8mm 12mm 8mm 12mm;}}
-.page{position:relative;min-height:277mm;}
+html,body{font-family:'Times New Roman',Times,serif;font-size:11.5pt;color:#000;line-height:1.45;}
+body{max-width:210mm;margin:0 auto;padding:8mm 12mm;}
+@media print{html,body{padding:0;margin:0;}.no-print{display:none !important;}@page{margin:8mm 12mm 8mm 12mm;}}
+.page{display:flex;flex-direction:column;min-height:calc(297mm - 16mm);page-break-after:always;position:relative;}
+.page:last-child{page-break-after:auto;}
+.page-content{flex:1 1 auto;}
 
 /* Header */
-.header-row{display:flex;align-items:flex-start;justify-content:space-between;}
+.header-row{display:flex;align-items:flex-start;justify-content:space-between;position:relative;}
 .header-text{flex:1;text-align:center;padding-right:25mm;}
 .header-text .org{font-size:14pt;letter-spacing:1px;font-family:'Times New Roman',serif;}
 .header-text .sub{font-size:11pt;font-style:normal;margin-top:1mm;}
 .khs-logo{position:absolute;right:0;top:0;width:18mm;height:18mm;display:flex;align-items:center;justify-content:center;font-size:32pt;color:#1e3a8a;font-weight:bold;}
 .header-line{border:none;border-top:1pt solid #000;margin:3mm 0 0 0;}
 
-/* HBZ Checks rechts - explizit untereinander */
-.hbz-checks{display:block;text-align:right;margin-top:5mm;}
-.hbz-check{display:flex;justify-content:flex-end;align-items:center;gap:4mm;margin-bottom:3mm;font-size:12pt;}
-.cb-box{display:inline-block;width:11pt;height:11pt;border:1pt solid #000;position:relative;flex-shrink:0;}
+/* HBZ Checks rechts - jede Zeile als block-Element */
+.hbz-checks{margin-top:5mm;text-align:right;display:block;}
+.hbz-checks > .hbz-check{display:block;font-size:12pt;margin-bottom:3mm;text-align:right;line-height:1.2;}
+.cb-box{display:inline-block;width:11pt;height:11pt;border:1pt solid #000;position:relative;vertical-align:middle;margin-right:5pt;}
 .cb-box.checked::after{content:'✓';position:absolute;top:-4pt;left:-1pt;font-size:14pt;font-weight:bold;}
 
 /* Titel - kursiv */
-h1{text-align:center;font-size:24pt;font-weight:bold;font-style:italic;margin:8mm 0 10mm 0;font-family:'Times New Roman',serif;}
+h1{text-align:center;font-size:24pt;font-weight:bold;font-style:italic;margin:6mm 0 8mm 0;font-family:'Times New Roman',serif;}
 
 /* Body */
-.body-block{margin-bottom:5mm;}
-.field{margin:3.5mm 0;font-size:12pt;}
-.kurs-title{margin-top:6mm;font-size:12pt;}
+.body-block{margin-bottom:4mm;}
+.field{margin:3mm 0;font-size:12pt;}
+.kurs-title{margin-top:5mm;font-size:12pt;}
 
-/* Noten Block – eingerueckt */
-.noten-block{margin:6mm 0 6mm 20mm;}
-.note-row{display:flex;align-items:baseline;margin:4mm 0;font-size:12pt;font-weight:bold;}
+/* Noten Block - eingerueckt */
+.noten-block{margin:5mm 0 5mm 20mm;}
+.note-row{display:flex;align-items:baseline;margin:3mm 0;font-size:12pt;font-weight:bold;}
 .note-row-split{flex-wrap:wrap;}
 .note-label{flex-shrink:0;min-width:55mm;font-weight:bold;}
 .note-label-inline{flex-shrink:0;margin-left:4mm;font-weight:bold;}
@@ -5800,26 +5804,26 @@ h1{text-align:center;font-size:24pt;font-weight:bold;font-style:italic;margin:8m
 .note-line-long{flex:1;min-width:80mm;}
 
 /* Ausbildungsnachweis */
-.ausbildungsnachweis{margin:7mm 0 5mm 0;font-size:12pt;line-height:1.5;}
+.ausbildungsnachweis{margin:6mm 0 4mm 0;font-size:12pt;line-height:1.5;}
 .radio{display:inline-block;width:12pt;height:12pt;border:1pt solid #000;border-radius:50%;vertical-align:middle;margin:0 2pt;}
 
 /* Datum */
-.datum-zeile{margin:5mm 0 12mm 0;font-size:12pt;}
+.datum-zeile{margin:4mm 0 8mm 0;font-size:12pt;}
 
 /* Unterschriften */
-.sig-row{display:flex;justify-content:space-between;margin:10mm 0;gap:15mm;}
+.sig-row{display:flex;justify-content:space-between;margin:8mm 0;gap:15mm;}
 .sig-block{flex:1;text-align:center;}
-.sig-space{height:14mm;}
+.sig-space{height:12mm;}
 .sig-line{border-top:1pt dotted #000;padding-top:1mm;font-size:11pt;}
-.sig-img{max-width:100%;max-height:14mm;object-fit:contain;}
+.sig-img{max-width:100%;max-height:12mm;object-fit:contain;}
 
 /* Hinweis + Handwerk Logo */
-.hinweis-row{display:flex;justify-content:space-between;align-items:center;margin:8mm 0;gap:10mm;}
+.hinweis-row{display:flex;justify-content:space-between;align-items:center;margin:6mm 0;gap:10mm;}
 .hinweis{flex:1;font-size:10.5pt;line-height:1.4;}
 .handwerk-logo{flex-shrink:0;font-size:11pt;font-weight:bold;letter-spacing:1px;color:#d97706;border:2pt solid #d97706;padding:3mm 6mm;background:#fff;font-family:Arial,sans-serif;}
 
-/* Footer */
-.footer{margin-top:10mm;padding-top:3mm;border-top:1pt solid #000;font-size:8.5pt;}
+/* Footer - immer unten auf der Seite */
+.footer{flex-shrink:0;margin-top:auto;padding-top:3mm;border-top:1pt solid #000;font-size:8.5pt;}
 .footer-cols{display:flex;justify-content:space-between;gap:10mm;margin-bottom:3mm;}
 .footer-col{flex:1;}
 .footer-head{font-weight:bold;margin-bottom:1mm;}
