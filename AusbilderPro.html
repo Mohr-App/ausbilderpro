@@ -1058,7 +1058,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.2.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.2.5 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -11236,8 +11236,15 @@ function sendChatMessage(){
   if(!chat) return;
   const sendBtn=document.getElementById('chatSendBtn');
   sendBtn.disabled=true;
-  const myName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
+  // Name-Fallback-Kette: lokales Profil -> Stammdaten -> displayName -> Email-Prefix
+  const myName=getAusbilderProfil().name
+    ||_chatUsers[_fbUid]?.name
+    ||_auth?.currentUser?.displayName
+    ||_auth?.currentUser?.email?.split('@')[0]
+    ||'Ausbilder';
   _chatUsers[_fbUid]=_chatUsers[_fbUid]||{name:myName,email:_auth?.currentUser?.email||''};
+  // Sicherstellen dass Name im Cache aktuell ist
+  if(_chatUsers[_fbUid] && (!_chatUsers[_fbUid].name||_chatUsers[_fbUid].name==='Unbekannt')) _chatUsers[_fbUid].name=myName;
   const now=firebase.firestore.FieldValue.serverTimestamp();
   const msgRef=_db.collection('chats').doc(_curChatId).collection('messages').doc();
   const att=_pendingAtt;
@@ -11316,7 +11323,7 @@ function renderMessages(msgs){
     if(dStr!==lastDate){html+='<div class="chat-sys-msg">'+dStr+'</div>';lastDate=dStr;}
     if(m.system){html+='<div class="chat-sys-msg">'+esc(m.text||'')+'</div>';return;}
     const isMe=m.von===_fbUid;
-    const senderName=isMe?'':(m.name||_chatUsers[m.von]?.name||_chatUsers[m.von]?.email||'Unbekannt');
+    const senderName=isMe?'':(_chatUsers[m.von]?.name||m.name||_chatUsers[m.von]?.email||'Unbekannt');
     const timeStr=ts.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
     const isGroup=chat?.type==='group';
     let attHtml='';
