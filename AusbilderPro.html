@@ -500,6 +500,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .chat-list-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #e2e8f0;background:#fff;transition:background .12s;}
 .chat-list-item:hover{background:#f1f5f9;}
 .chat-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#059669);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.85rem;flex-shrink:0;font-family:'Sora',sans-serif;}
+.online-dot{position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;border-radius:50%;background:#10b981;border:2px solid #fff;box-shadow:0 0 4px rgba(16,185,129,.5);}
 .chat-avatar.group{background:linear-gradient(135deg,#7c3aed,#3b82f6);}
 .chat-meta{flex:1;min-width:0;}
 .chat-name{font-family:'Sora',sans-serif;font-weight:700;font-size:.82rem;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px;}
@@ -841,6 +842,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
   <div style="position:relative;display:none;margin-left:10px" id="hdrChatWrap">
     <button class="hdr-chat-btn" id="hdrChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="background:linear-gradient(135deg,#2563eb,#059669);border:2px solid #fff;color:#fff;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:1.3rem;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(37,99,235,.32),0 0 0 1px rgba(0,0,0,.08);transition:transform .15s,box-shadow .15s;padding:0;line-height:1">💬<span class="hdr-chat-badge" id="hdrChatBadge" style="display:none">0</span></button>
+    <span id="hdrOnlinePill" onclick="openChatModal()" style="display:none;align-items:center;gap:4px;padding:4px 10px;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.35);border-radius:14px;color:#065f46;font-family:'JetBrains Mono',monospace;font-size:.62rem;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent" title="Aktuell online (Klick für Chat)">
+      <span style="width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 4px rgba(16,185,129,.6);display:inline-block"></span>
+      <span class="hop-num">0</span> online
+    </span>
   </div>
   <div class="hdr-r">
     <div class="save-ind" id="saveInd"><div class="save-dot"></div><span id="saveIndTxt">—</span></div>
@@ -1055,7 +1060,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.0.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.1.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -10571,6 +10576,7 @@ function startChatListener(){
        && document.getElementById('chatViewList').style.display!=='none') renderChatList();
     if(firstSnap){firstSnap=false;setTimeout(runChatAutoCleanup,5000);}
   },err=>console.warn('Chat-Listener:',err));
+  startPresence();
 }
 
 // ───────── ADMIN-SWEEP ─────────
@@ -10764,6 +10770,87 @@ function stopChatListener(){
   const mb=document.getElementById('mobChatBadge'); if(mb) mb.style.display='none';
   const mnb=document.getElementById('mobNavChatBadge'); if(mnb) mnb.style.display='none';
   const mn=document.getElementById('mobNavChatBtn'); if(mn) mn.style.display='none';
+  stopPresence();
+}
+
+// ───────── PRESENCE (Wer ist online) ─────────
+let _presenceTimer=null;
+let _presenceUnsub=null;
+let _onlineUids=new Set();   // UIDs die in den letzten 60s ein lastSeen geschrieben haben
+const PRESENCE_HEARTBEAT_MS = 30000;
+const PRESENCE_OFFLINE_MS = 60000;
+
+function startPresence(){
+  if(!_db||!_fbUid) return;
+  stopPresence();
+  // 1) Eigenes Heartbeat sofort und dann alle 30s
+  const writeHb=()=>{
+    if(!_db||!_fbUid) return;
+    const u=_auth?.currentUser;
+    _db.collection('presence').doc(_fbUid).set({
+      lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+      name: u?.displayName||'',
+      email: u?.email||''
+    },{merge:true}).catch(()=>{});
+  };
+  writeHb();
+  _presenceTimer=setInterval(writeHb, PRESENCE_HEARTBEAT_MS);
+
+  // 2) Listener auf alle presence-Docs
+  _presenceUnsub=_db.collection('presence').onSnapshot(snap=>{
+    const newSet=new Set();
+    const now=Date.now();
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const ms=d.lastSeen?.toMillis?.()||0;
+      if(ms && (now-ms)<PRESENCE_OFFLINE_MS) newSet.add(doc.id);
+    });
+    _onlineUids=newSet;
+    _updatePresenceUI();
+  },err=>console.warn('Presence:',err));
+
+  // 3) Beim Schliessen: lastSeen ueberschreiben mit altem Datum -> sofort offline
+  window.addEventListener('beforeunload', _markOffline);
+  // 4) Periodisch UI refreshen falls ein User-Eintrag ohne Update aelter als 60s wird
+  setInterval(_updatePresenceUI, 15000);
+}
+function stopPresence(){
+  if(_presenceTimer){ clearInterval(_presenceTimer); _presenceTimer=null; }
+  if(_presenceUnsub){ _presenceUnsub(); _presenceUnsub=null; }
+  _onlineUids=new Set();
+  _updatePresenceUI();
+}
+function _markOffline(){
+  if(!_db||!_fbUid) return;
+  try{
+    // navigator.sendBeacon ist zuverlaessiger als async-write in beforeunload
+    // Fallback: alten Zeitstempel setzen
+    _db.collection('presence').doc(_fbUid).set({
+      lastSeen: new Date(Date.now()-120000) // 2 min in der Vergangenheit
+    },{merge:true});
+  }catch(_){}
+}
+function isOnline(uid){
+  return !!uid && _onlineUids.has(uid);
+}
+function _updatePresenceUI(){
+  // Header-Pille aktualisieren
+  const pill=document.getElementById('hdrOnlinePill');
+  if(pill){
+    const cnt=_onlineUids.size;
+    const cntOthers = cnt - (_onlineUids.has(_fbUid)?1:0);
+    if(cntOthers>0){
+      pill.style.display='inline-flex';
+      pill.querySelector('.hop-num').textContent=cntOthers;
+    } else {
+      pill.style.display='none';
+    }
+  }
+  // Chat-Liste neu rendern falls offen
+  if(document.getElementById('chatModal')?.classList.contains('open')
+     && document.getElementById('chatViewList')?.style.display!=='none'){
+    try{ renderChatList(); }catch(_){}
+  }
 }
 function updateChatUnreadBadge(){
   let total=0;
@@ -10948,8 +11035,14 @@ function renderChatList(){
         const unread=(c.unread&&c.unread[_fbUid])||0;
         const lm=c.lastMessage||{};
         const preview=lm.text?(lm.von===_fbUid?'Du: ':'')+lm.text:'';
+        // Online-Status fuer 1:1 Chats
+        let onlineDot='';
+        if(c.type!=='group' && Array.isArray(c.participants)){
+          const other=c.participants.find(p=>p!==_fbUid);
+          if(other && isOnline(other)) onlineDot='<span class="online-dot" title="Online jetzt"></span>';
+        }
         html+='<div class="chat-list-item" onclick="openChat(\''+c.id+'\')">'
-          +chatAvatar(c)
+          +'<div style="position:relative">'+chatAvatar(c)+onlineDot+'</div>'
           +'<div class="chat-meta">'
             +'<div class="chat-name">'+esc(chatDisplayName(c))+(c.type==='group'?' <span class="chat-name-tag">Gruppe</span>':'')+'</div>'
             +(preview?'<div class="chat-preview">'+esc(preview).slice(0,80)+'</div>':'')
@@ -10965,8 +11058,9 @@ function renderChatList(){
       html+='<div class="chat-sec-title">Alle Ausbilder</div>';
       ausbFiltered.forEach(a=>{
         const avatar=_userAvatar(a.uid,'chat-avatar');
+        const onlineDot = isOnline(a.uid) ? '<span class="online-dot" title="Online jetzt"></span>' : '';
         html+='<div class="chat-list-item" onclick="startChatWith(\''+a.uid+'\')">'
-          +avatar
+          +'<div style="position:relative">'+avatar+onlineDot+'</div>'
           +'<div class="chat-meta">'
             +'<div class="chat-name">'+esc(a.name||a.email)+'</div>'
             +'<div class="chat-preview">'+esc(a.email)+'</div>'
