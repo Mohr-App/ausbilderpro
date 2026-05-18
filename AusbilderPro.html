@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.3.7 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.3.8 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5680,16 +5680,16 @@ function generateAlleBescheinigungenAusbilder(){
       const fixedActive=FIXED_GRADES.filter(g=>!deletedFixed.includes(g.id));
       const allGradeDefs=[...fixedActive,...(inst.customGrades||[])];
       allGradeDefs.forEach(g=>{
+        if(!g||!g.label||!String(g.label).trim()) return; // ignoriere kaputte/leere Definitionen
         let val='';
         if(g.fixed===false){
-          // Custom: aus extraGrades
           val=(sync.noten_extra||{})[g.id]||(s.extraGrades||{})[g.id]||'';
         } else {
-          // Fixed: direkt aus sync.noten_<id> oder s.<id>
           val=sync['noten_'+g.id]||s[g.id]||'';
         }
+        val=String(val||'').trim();
         if(val){
-          notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(g.label)}:</span><span class="note-line">${esc(String(val))}</span></div>`);
+          notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(g.label).trim())}:</span><span class="note-line">${esc(val)}</span></div>`);
         }
       });
       if(fehltage || verspaetungen){
