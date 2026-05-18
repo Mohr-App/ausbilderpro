@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.2.6 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.3.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5652,6 +5652,10 @@ function generateAlleBescheinigungenAusbilder(){
     const von=fmtDE(kurs.von)||'___________';
     const bis=fmtDE(kurs.bis)||'___________';
     const ort=kurs.standort||'Siegburg';
+    const standortLow=(kurs.standort||'').toLowerCase();
+    const isBonn=standortLow.includes('bonn');
+    const isSieg=!isBonn; // Siegburg als Default falls Bonn nicht explizit
+    const heute=new Date().toLocaleDateString('de-DE');
     const ausbName=_auth?.currentUser?.displayName||_auth?.currentUser?.email?.split('@')[0]||'';
     const tnDocs=results.slice(1, 1+seats.length);
     const syncDocs=results.slice(1+seats.length);
@@ -5669,60 +5673,147 @@ function generateAlleBescheinigungenAusbilder(){
       const bemerkung=sync.bemerkung||s.bemerkung||'';
       const sigData=sync.bescheinigungSignatur||'';
       if(sigData) sigCount++;
+      // Theoretische Note: erst aus dediziertem Feld, sonst aus noten_extra Object
+      let theorie=sync.noten_theorie||'';
+      if(!theorie && sync.noten_extra && typeof sync.noten_extra==='object'){
+        const extKey=Object.keys(sync.noten_extra).find(k=>k.toLowerCase().includes('theor'));
+        if(extKey) theorie=sync.noten_extra[extKey]||'';
+      }
       const pb=idx>0?'page-break-before:always;':'';
-      return `<div style="${pb}">
-<div class="header"><div class="org">KREISHANDWERKERSCHAFT BONN · RHEIN-SIEG</div><div class="sub">– Handwerkliches Bildungszentrum –</div><div class="standorte">HBZ Bonn &nbsp;|&nbsp; HBZ Siegburg</div></div>
-<h1>Teilnahmebescheinigung</h1>
-<div class="field">Der/die Auszubildende <b>${esc(name)}</b></div>
-<div class="field">geboren am <b>${geb}</b></div>
-<div class="field" style="margin-top:5mm">hat in der Zeit vom <b>${von}</b> bis <b>${bis}</b></div>
-<div class="field">an folgender überbetrieblichen Unterweisung teilgenommen.</div>
-<div class="field" style="margin-top:4mm"><b>${esc(kursLabel)}</b></div>
-<table class="noten-table">
-<tr><td>Führung:</td><td>${fuehrung||'...'}</td></tr>
-<tr><td>Mitarbeit:</td><td>${mitarbeit||'...'}</td></tr>
-<tr><td>Fachkenntnisse (praktisch):</td><td>${praxis||'...'}</td></tr>
-</table>
-<div class="field"><b>Fehltage:</b> <span class="dots">${fehltage||'...'}</span> &nbsp;&nbsp; <b>Verspätungen:</b> <span class="dots">${verspaetungen||'...'}</span></div>
-<div class="field" style="margin-top:3mm"><b>Besondere Bemerkungen:</b><br><span class="dots-long">${bemerkung?' '+esc(bemerkung)+' ':'...'}</span></div>
-<div class="checkbox-row" style="margin-top:5mm"><b>Ausbildungsnachweis wurde für den Zeitraum der ÜLU geführt:</b> &nbsp;<span class="cb"></span> ja &nbsp;&nbsp;<span class="cb"></span> nein</div>
-<div class="field" style="margin-top:8mm"><b>${esc(ort)}, den ${bis}</b></div>
-<div class="sig-row">
-  <div class="sig-block"><div style="height:80px"></div><div class="sig-line">Lehrgangsleiter</div></div>
-  <div class="sig-block">${sigData?'<img src="'+sigData+'" class="sig-img">':'<div style="height:80px"></div>'}<div class="sig-line">Ausbilder (Meister)${ausbName?' – '+esc(ausbName):''}</div></div>
+      return `<div class="page" style="${pb}">
+<div class="header-row">
+  <div class="header-text">
+    <div class="org">KREISHANDWERKERSCHAFT BONN · RHEIN-SIEG</div>
+    <div class="sub">- Handwerkliche Bildungszentrum -</div>
+  </div>
+  <div class="khs-logo">◆</div>
 </div>
-<div class="hinweis">Diese Bescheinigung ist nach Beendigung des Lehrgangs dem Meister zur Unterschrift vorzulegen<br>und später mit den Anmeldeunterlagen zur Gesellenprüfung einzureichen.</div>
-<div class="footer"><b>HBZ Siegburg</b> · Gerhart-Hauptmann-Weg 2 · 53721 Siegburg &nbsp;|&nbsp; <b>HBZ Bonn</b> · Ennemoseste. 10 · 53119 Bonn<br>Tel.: 02241/990-0 · Fax 02241/990-100 · www.khs-handwerk.de · postfach@khs-handwerk.de</div>
+<hr class="header-line">
+<div class="hbz-checks">
+  <div class="hbz-check"><span class="cb-box ${isBonn?'checked':''}"></span> HBZ Bonn</div>
+  <div class="hbz-check"><span class="cb-box ${isSieg?'checked':''}"></span> HBZ Siegburg</div>
+</div>
+<h1>Teilnahmebescheinigung</h1>
+<div class="body-block">
+  <div class="field">Der/die Auszubildende <b>${esc(name)}</b></div>
+  <div class="field">geboren am <b>${geb}</b></div>
+  <div class="field">hat in der Zeit vom <b>${von}</b> bis <b>${bis}</b></div>
+  <div class="field">an folgender überbetrieblichen Unterweisung teilgenommen.</div>
+  <div class="field kurs-title"><b>${esc(kursLabel)}</b></div>
+</div>
+<div class="noten-block">
+  <div class="note-row"><span class="note-label">Führung:</span><span class="note-line">${fuehrung?esc(fuehrung):''}</span></div>
+  <div class="note-row"><span class="note-label">Mitarbeit:</span><span class="note-line">${mitarbeit?esc(mitarbeit):''}</span></div>
+  <div class="note-row note-row-split">
+    <span class="note-label">Fachkenntnisse (theoretisch):</span><span class="note-line note-line-half">${theorie?esc(theorie):''}</span>
+    <span class="note-label-inline">(praktisch):</span><span class="note-line note-line-half">${praxis?esc(praxis):''}</span>
+  </div>
+  <div class="note-row note-row-split">
+    <span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage||''}</span>
+    <span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short">${verspaetungen||''}</span>
+  </div>
+  <div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${bemerkung?' '+esc(bemerkung)+' ':''}</span></div>
+</div>
+<div class="ausbildungsnachweis"><b>Ausbildungsnachweis wurde für den Zeitraum der überbetrieblichen<br>Unterweisung geführt:</b> &nbsp;&nbsp;<span class="radio"></span> ja &nbsp;&nbsp;&nbsp;<span class="radio"></span> nein</div>
+<div class="datum-zeile"><b>Siegburg, den ${heute}</b></div>
+<div class="sig-row">
+  <div class="sig-block"><div class="sig-space"></div><div class="sig-line">Lehrgangsleiter</div></div>
+  <div class="sig-block">${sigData?'<img src="'+sigData+'" class="sig-img">':'<div class="sig-space"></div>'}<div class="sig-line">Ausbilder (Meister)${ausbName?' &mdash; '+esc(ausbName):''}</div></div>
+</div>
+<div class="hinweis-row">
+  <div class="hinweis"><b>Diese Bescheinigung ist nach Beendigung des Lehrgangs dem Meister zur Unterschrift<br>vorzulegen und später mit den Anmeldeunterlagen zur Gesellenprüfung einzureichen.</b></div>
+  <div class="handwerk-logo">DAS HANDWERK</div>
+</div>
+<div class="footer">
+  <div class="footer-cols">
+    <div class="footer-col">
+      <div class="footer-head">Besucher/Lieferadresse</div>
+      <div class="footer-row-2">
+        <div><b>HBZ Siegburg</b><br>Gerhart-Hauptmann-Weg 2<br>53721 Siegburg</div>
+        <div><b>HBZ Bonn</b><br>Ennemoserste.10<br>53119 Bonn</div>
+      </div>
+    </div>
+    <div class="footer-col">
+      <div class="footer-head">Rechnungs-/Postadresse</div>
+      <div>Kreishandwerkerschaft Bonn·Rhein-Sieg<br>Postfach 1554<br>53705 Siegburg</div>
+    </div>
+  </div>
+  <div class="footer-contact">Tel.: 02241/990-0 · Fax 02241/990-100 · <u>www.khs-handwerk.de</u> · <u>postfach@khs-handwerk.de</u></div>
+</div>
 </div>`;
     }).join('');
     const w=window.open('','_blank');
     if(!w){toast('Popup blockiert','bad');return;}
     w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Bescheinigungen – ${esc(kursName)}</title>
 <style>
-@page{size:A4;margin:20mm 20mm 15mm 20mm;}
+@page{size:A4;margin:15mm 18mm 12mm 18mm;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Times New Roman',Times,serif;font-size:12pt;color:#000;line-height:1.5;padding:20mm;max-width:210mm;margin:0 auto;}
+body{font-family:'Times New Roman',Times,serif;font-size:11pt;color:#000;line-height:1.4;max-width:210mm;margin:0 auto;padding:15mm 18mm;}
 @media print{body{padding:0;}.no-print{display:none !important;}}
-.header{text-align:center;margin-bottom:8mm;border-bottom:1px solid #000;padding-bottom:4mm;}
-.header .org{font-size:13pt;font-weight:bold;letter-spacing:.5px;}
-.header .sub{font-size:10pt;margin-top:1mm;}
-.header .standorte{font-size:9pt;color:#444;margin-top:2mm;}
-h1{text-align:center;font-size:16pt;font-weight:bold;margin:8mm 0;text-decoration:underline;}
-.field{margin:3mm 0;}.field b{font-weight:bold;}
-.dots{display:inline-block;min-width:60mm;border-bottom:1px dotted #888;padding-bottom:1px;}
-.dots-long{display:inline-block;min-width:120mm;border-bottom:1px dotted #888;padding-bottom:1px;}
-.noten-table{width:100%;margin:5mm 0;border-collapse:collapse;}
-.noten-table td{padding:2mm 3mm;font-size:11pt;}
-.noten-table td:first-child{font-weight:bold;width:45%;}
-.noten-table td:last-child{border-bottom:1px dotted #888;}
-.sig-row{display:flex;justify-content:space-between;margin-top:12mm;align-items:flex-end;}
-.sig-block{text-align:center;width:45%;}
-.sig-line{border-top:1px solid #000;padding-top:2mm;font-size:9pt;}
-.sig-img{width:100%;max-width:200px;height:80px;object-fit:contain;}
-.footer{margin-top:10mm;padding-top:4mm;border-top:1px solid #ccc;font-size:8pt;text-align:center;color:#444;}
-.hinweis{margin-top:8mm;font-size:9pt;font-style:italic;text-align:center;}
-.checkbox-row{margin:3mm 0;font-size:11pt;}
-.cb{display:inline-block;width:12pt;height:12pt;border:1.5pt solid #000;border-radius:2pt;margin:0 3pt;vertical-align:middle;}
+.page{position:relative;}
+
+/* Header */
+.header-row{display:flex;align-items:flex-start;justify-content:space-between;}
+.header-text{flex:1;text-align:center;padding-right:30mm;}
+.header-text .org{font-size:13pt;letter-spacing:1px;font-family:'Times New Roman',serif;}
+.header-text .sub{font-size:11pt;font-style:italic;margin-top:1mm;}
+.khs-logo{position:absolute;right:0;top:0;width:18mm;height:18mm;display:flex;align-items:center;justify-content:center;font-size:32pt;color:#1e3a8a;font-weight:bold;border:1.5pt solid transparent;}
+.header-line{border:none;border-top:1pt solid #000;margin:4mm 0 0 0;}
+
+/* HBZ Checks rechts */
+.hbz-checks{display:flex;flex-direction:column;align-items:flex-end;gap:2mm;margin-top:4mm;font-size:11pt;}
+.hbz-check{display:flex;align-items:center;gap:3mm;}
+.cb-box{display:inline-block;width:10pt;height:10pt;border:1pt solid #000;position:relative;flex-shrink:0;}
+.cb-box.checked::after{content:'✓';position:absolute;top:-4pt;left:-1pt;font-size:14pt;font-weight:bold;}
+
+/* Titel */
+h1{text-align:center;font-size:22pt;font-weight:bold;margin:6mm 0 8mm 0;font-family:'Times New Roman',serif;}
+
+/* Body */
+.body-block{margin-bottom:4mm;}
+.field{margin:2.5mm 0;font-size:11pt;}
+.kurs-title{margin-top:5mm;font-size:11.5pt;}
+
+/* Noten Block – eingerückt */
+.noten-block{margin:5mm 0 5mm 20mm;}
+.note-row{display:flex;align-items:baseline;margin:3mm 0;font-size:11pt;font-weight:bold;}
+.note-row-split{flex-wrap:wrap;}
+.note-label{flex-shrink:0;min-width:50mm;font-weight:bold;}
+.note-label-inline{flex-shrink:0;margin-left:3mm;font-weight:bold;}
+.note-line{flex:1;border-bottom:1.2pt dotted #555;min-height:13pt;padding:0 2mm;}
+.note-line-half{flex:1;min-width:30mm;}
+.note-line-short{flex:1;min-width:25mm;max-width:35mm;}
+.note-line-long{flex:1;min-width:80mm;}
+
+/* Ausbildungsnachweis */
+.ausbildungsnachweis{margin:5mm 0;font-size:11pt;line-height:1.5;}
+.radio{display:inline-block;width:11pt;height:11pt;border:1pt solid #000;border-radius:50%;vertical-align:middle;margin:0 2pt;}
+
+/* Datum */
+.datum-zeile{margin:5mm 0 10mm 0;font-size:11pt;}
+
+/* Unterschriften */
+.sig-row{display:flex;justify-content:space-between;margin:8mm 0;gap:10mm;}
+.sig-block{flex:1;text-align:center;}
+.sig-space{height:12mm;}
+.sig-line{border-top:1pt dotted #000;padding-top:1mm;font-size:10pt;}
+.sig-img{max-width:100%;max-height:12mm;object-fit:contain;}
+
+/* Hinweis + Handwerk Logo */
+.hinweis-row{display:flex;justify-content:space-between;align-items:center;margin:6mm 0;gap:10mm;}
+.hinweis{flex:1;font-size:10pt;line-height:1.4;}
+.handwerk-logo{flex-shrink:0;font-size:11pt;font-weight:bold;letter-spacing:1px;color:#d97706;border:2pt solid #d97706;padding:3mm 6mm;background:#fff;font-family:Arial,sans-serif;}
+
+/* Footer */
+.footer{margin-top:8mm;padding-top:2mm;border-top:1pt solid #000;font-size:8pt;}
+.footer-cols{display:flex;justify-content:space-between;gap:10mm;margin-bottom:2mm;}
+.footer-col{flex:1;}
+.footer-head{font-weight:bold;margin-bottom:1mm;}
+.footer-row-2{display:flex;gap:8mm;}
+.footer-row-2>div{flex:1;}
+.footer-contact{text-align:center;border-top:none;padding-top:1mm;font-size:8pt;}
+
+/* Print-Button */
 .print-btn{display:inline-block;margin:8px 4px;padding:12px 28px;font-size:14px;font-weight:bold;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;}
 .print-btn:hover{background:#1d4ed8;}
 </style></head><body>
