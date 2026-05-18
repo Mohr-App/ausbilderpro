@@ -1047,7 +1047,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright">© AusbilderPro v2.9.5 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright">© AusbilderPro v2.9.6 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -8634,6 +8634,22 @@ function mergeDupTN(manualId, selfId, kursId){
     });
 }
 
+// Rich Empty-State HTML fuer Fehlt- und Wiederholer-Container
+function _poolEmptyFehltHTML(){
+  return '<div class="pool-empty pool-empty-rich" style="padding:18px 14px">'
+    +'<div style="font-size:1.6rem;opacity:.6;margin-bottom:6px">🚫</div>'
+    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.78rem;font-weight:800;color:#dc2626;margin-bottom:4px;letter-spacing:.04em">Schüler hierher ziehen</div>'
+    +'<div style="font-family:\'Sora\',sans-serif;font-size:.7rem;color:#475569;line-height:1.45;max-width:240px;margin:0 auto">wenn der Teilnehmer <b>nicht zum Kurs erschienen</b> ist (z.B. unentschuldigtes Fehlen am ersten Tag)</div>'
+    +'</div>';
+}
+function _poolEmptyWdhHTML(){
+  return '<div class="pool-empty pool-empty-rich" style="padding:18px 14px">'
+    +'<div style="font-size:1.6rem;opacity:.6;margin-bottom:6px">↩</div>'
+    +'<div style="font-family:\'JetBrains Mono\',monospace;font-size:.78rem;font-weight:800;color:#d97706;margin-bottom:4px;letter-spacing:.04em">Schüler hierher ziehen</div>'
+    +'<div style="font-family:\'Sora\',sans-serif;font-size:.7rem;color:#475569;line-height:1.45;max-width:240px;margin:0 auto">bei <b>zu vielen Fehlstunden</b>, <b>langer Krankheit</b> oder ähnlichen Gründen — der Schüler muss den Kurs wiederholen</div>'
+    +'</div>';
+}
+
 function loadPool(){
   if(_demoMode) return;
   // Alten Listener abmelden
@@ -8663,8 +8679,8 @@ function loadPool(){
   // Container IMMER sofort leeren beim Lehrgang-Wechsel
   const fehltBody = document.getElementById('fehltBody');
   const wiederholerBody = document.getElementById('wiederholerBody');
-  if(fehltBody) fehltBody.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>';
-  if(wiederholerBody) wiederholerBody.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>';
+  if(fehltBody) fehltBody.innerHTML=_poolEmptyFehltHTML();
+  if(wiederholerBody) wiederholerBody.innerHTML=_poolEmptyWdhHTML();
 
   // Pool-Header aufräumen wenn kein Kurs verknüpft
   ['pool-sb-kursname','pool-sb-dates'].forEach(cls=>{ const el=hdr.querySelector('.'+cls); if(el) el.remove(); });
@@ -9371,7 +9387,7 @@ function renderFehlt(kursId){
 
   // Kein Firestore → nur lokale anzeigen
   if(!_db||!kursId){
-    if(!localFehlt.length){ body.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>'; return; }
+    if(!localFehlt.length){ body.innerHTML=_poolEmptyFehltHTML(); return; }
     body.innerHTML='';
     localFehlt.forEach(f=>body.appendChild(makeCard(f.name, f.company, f.poolTnId, f.poolKursId, f.profession, f.ausbjahr)));
     setupSeatDropTargets();
@@ -9397,7 +9413,7 @@ function renderFehlt(kursId){
         if(!shown.has(f.name.toLowerCase()))
           body.appendChild(makeCard(f.name, f.company, f.poolTnId, f.poolKursId, f.profession, f.ausbjahr));
       });
-      if(!body.children.length) body.innerHTML='<div class="pool-empty" style="padding:12px">Schüler hierher ziehen</div>';
+      if(!body.children.length) body.innerHTML=_poolEmptyFehltHTML();
       setupSeatDropTargets();
     }).catch(()=>{});
 }
