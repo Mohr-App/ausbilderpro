@@ -542,6 +542,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .hdr-chat-btn{position:relative;}
 .hdr-chat-btn:hover{transform:scale(1.08);box-shadow:0 5px 18px rgba(37,99,235,.5),0 0 0 1px rgba(0,0,0,.08)!important;}
 .hdr-chat-badge{position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:.58rem;font-weight:800;padding:2px 5px;border-radius:10px;min-width:18px;text-align:center;border:2px solid #fff;line-height:1;}
+#hdrOnlineBadge{position:absolute;bottom:-2px;right:-2px;background:#10b981;color:#fff;border:2px solid #fff;border-radius:10px;min-width:18px;height:18px;font-size:.58rem;font-weight:800;font-family:'JetBrains Mono',monospace;padding:0 4px;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(16,185,129,.5);line-height:1;}
+#hdrOnlineBadge.show{display:flex;}
 /* Group settings modal */
 .gs-member{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid #e2e8f0;}
 .gs-member-name{flex:1;font-size:.78rem;font-weight:600;color:#1e293b;}
@@ -841,11 +843,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="gsr-drop" id="gsrDrop"></div>
   </div>
   <div style="position:relative;display:none;margin-left:10px" id="hdrChatWrap">
-    <button class="hdr-chat-btn" id="hdrChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="background:linear-gradient(135deg,#2563eb,#059669);border:2px solid #fff;color:#fff;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:1.3rem;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(37,99,235,.32),0 0 0 1px rgba(0,0,0,.08);transition:transform .15s,box-shadow .15s;padding:0;line-height:1">💬<span class="hdr-chat-badge" id="hdrChatBadge" style="display:none">0</span></button>
-    <span id="hdrOnlinePill" onclick="openChatModal()" style="display:none;align-items:center;gap:4px;padding:4px 10px;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.35);border-radius:14px;color:#065f46;font-family:'JetBrains Mono',monospace;font-size:.62rem;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent" title="Aktuell online (Klick für Chat)">
-      <span style="width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 4px rgba(16,185,129,.6);display:inline-block"></span>
-      <span class="hop-num">0</span> online
-    </span>
+    <div id="hdrChatWrap" style="position:relative;display:flex;align-items:center">
+    <button class="hdr-chat-btn" id="hdrChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="background:linear-gradient(135deg,#2563eb,#059669);border:2px solid #fff;color:#fff;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:1.3rem;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(37,99,235,.32),0 0 0 1px rgba(0,0,0,.08);transition:transform .15s,box-shadow .15s;padding:0;line-height:1;position:relative">💬<span class="hdr-chat-badge" id="hdrChatBadge" style="display:none">0</span><span id="hdrOnlineBadge" style="display:none" title="Online jetzt">0</span></button>
+    </div>
   </div>
   <div class="hdr-r">
     <div class="save-ind" id="saveInd"><div class="save-dot"></div><span id="saveIndTxt">—</span></div>
@@ -1060,7 +1060,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.1.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.1.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -10834,16 +10834,16 @@ function isOnline(uid){
   return !!uid && _onlineUids.has(uid);
 }
 function _updatePresenceUI(){
-  // Header-Pille aktualisieren
-  const pill=document.getElementById('hdrOnlinePill');
-  if(pill){
+  // Online-Badge am Chat-Button aktualisieren
+  const badge=document.getElementById('hdrOnlineBadge');
+  if(badge){
     const cnt=_onlineUids.size;
     const cntOthers = cnt - (_onlineUids.has(_fbUid)?1:0);
     if(cntOthers>0){
-      pill.style.display='inline-flex';
-      pill.querySelector('.hop-num').textContent=cntOthers;
+      badge.classList.add('show');
+      badge.textContent=cntOthers;
     } else {
-      pill.style.display='none';
+      badge.classList.remove('show');
     }
   }
   // Chat-Liste neu rendern falls offen
