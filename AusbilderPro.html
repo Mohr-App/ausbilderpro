@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.3.6 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.3.7 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5674,31 +5674,24 @@ function generateAlleBescheinigungenAusbilder(){
       const sigData=sync.bescheinigungSignatur||'';
       if(sigData) sigCount++;
       const tnId=s.poolTnId||idx;
-      // Theoretische Note: erst aus dediziertem Feld, sonst aus noten_extra Object
-      let theorie=sync.noten_theorie||'';
-      if(!theorie && sync.noten_extra && typeof sync.noten_extra==='object'){
-        const extKey=Object.keys(sync.noten_extra).find(k=>k.toLowerCase().includes('theor'));
-        if(extKey) theorie=sync.noten_extra[extKey]||'';
-      }
-      // Variable Noten-Zeilen: nur Felder mit Werten zeigen
+      // Generische Noten-Liste: FIXED_GRADES + inst.customGrades, nur Felder mit Werten
       const notenHtmlParts=[];
-      if(fuehrung) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Führung:</span><span class="note-line">${esc(String(fuehrung))}</span></div>`);
-      if(mitarbeit) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Mitarbeit:</span><span class="note-line">${esc(String(mitarbeit))}</span></div>`);
-      if(theorie && praxis){
-        notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fachkenntnisse (theoretisch):</span><span class="note-line note-line-half">${esc(String(theorie))}</span><span class="note-label-inline">(praktisch):</span><span class="note-line note-line-half">${esc(String(praxis))}</span></div>`);
-      } else if(theorie){
-        notenHtmlParts.push(`<div class="note-row"><span class="note-label">Fachkenntnisse (theoretisch):</span><span class="note-line">${esc(String(theorie))}</span></div>`);
-      } else if(praxis){
-        notenHtmlParts.push(`<div class="note-row"><span class="note-label">Fachkenntnisse (praktisch):</span><span class="note-line">${esc(String(praxis))}</span></div>`);
-      }
-      // Weitere custom Noten aus noten_extra (nicht-Theorie)
-      if(sync.noten_extra && typeof sync.noten_extra==='object'){
-        Object.entries(sync.noten_extra).forEach(([key,val])=>{
-          if(!val) return;
-          if(key.toLowerCase().includes('theor')) return; // bereits behandelt
-          notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(key)}:</span><span class="note-line">${esc(String(val))}</span></div>`);
-        });
-      }
+      const deletedFixed=(inst.deletedFixedGrades||[]);
+      const fixedActive=FIXED_GRADES.filter(g=>!deletedFixed.includes(g.id));
+      const allGradeDefs=[...fixedActive,...(inst.customGrades||[])];
+      allGradeDefs.forEach(g=>{
+        let val='';
+        if(g.fixed===false){
+          // Custom: aus extraGrades
+          val=(sync.noten_extra||{})[g.id]||(s.extraGrades||{})[g.id]||'';
+        } else {
+          // Fixed: direkt aus sync.noten_<id> oder s.<id>
+          val=sync['noten_'+g.id]||s[g.id]||'';
+        }
+        if(val){
+          notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(g.label)}:</span><span class="note-line">${esc(String(val))}</span></div>`);
+        }
+      });
       if(fehltage || verspaetungen){
         notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage||''}</span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short">${verspaetungen||''}</span></div>`);
       }
