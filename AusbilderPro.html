@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.5.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.6.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1320,6 +1320,57 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="fg" style="margin-top:6px"><label class="fl">Telefon</label><input class="fi" id="apTelefon" type="tel" placeholder="0170 1234567"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">E-Mail (für Azubis sichtbar)</label><input class="fi" id="apEmail" type="email" placeholder="deine@arbeits-email.de"></div>
 <button class="bsave" onclick="saveAusbilderProfil()" style="margin-top:12px" title="Profil speichern">💾 Speichern</button>
+
+<!-- Stempel & Signatur (verschluesselt) -->
+<div style="margin-top:16px;padding-top:14px;border-top:1.5px solid var(--brd)">
+<div style="font-size:.72rem;font-weight:700;color:var(--tx);margin-bottom:4px">🔐 Stempel & Signatur</div>
+<div style="font-size:.6rem;color:var(--mu);margin-bottom:10px">Wird PIN-verschlüsselt gespeichert und kann beim Erstellen von Bescheinigungen eingefügt werden.</div>
+
+<div id="sigStempelStatus" style="font-size:.68rem;color:#16a34a;margin-bottom:8px;display:none">✅ Stempel + Signatur gespeichert</div>
+
+<div style="margin-bottom:10px">
+  <div style="font-size:.65rem;font-weight:700;color:var(--mu);margin-bottom:4px">Signatur</div>
+  <div id="apSigPreview" style="border:2px dashed #cbd5e1;border-radius:8px;padding:4px;background:#fafafa;height:80px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:.7rem">— noch keine Signatur —</div>
+  <div style="display:flex;gap:6px;margin-top:6px">
+    <button onclick="apOpenSigDraw()" style="flex:1;padding:6px;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✏️ Zeichnen</button>
+    <button id="apSigClearBtn" onclick="apClearSig()" style="display:none;padding:6px 10px;background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✕</button>
+  </div>
+</div>
+
+<div style="margin-bottom:10px">
+  <div style="font-size:.65rem;font-weight:700;color:var(--mu);margin-bottom:4px">Stempel</div>
+  <div id="apStempelPreview" style="border:2px dashed #cbd5e1;border-radius:8px;padding:4px;background:#fafafa;height:80px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:.7rem">— noch kein Stempel —</div>
+  <input type="file" id="apStempelInp" style="display:none" accept="image/png,image/jpeg,image/webp" onchange="apOnStempelPicked(event)">
+  <div style="display:flex;gap:6px;margin-top:6px">
+    <button onclick="document.getElementById('apStempelInp').click()" style="flex:1;padding:6px;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📤 Hochladen (PNG, max 200 KB)</button>
+    <button id="apStempelClearBtn" onclick="apClearStempel()" style="display:none;padding:6px 10px;background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✕</button>
+  </div>
+</div>
+
+<div class="fg" style="margin-top:8px">
+  <label class="fl">PIN (4-stellig) <span style="color:#ef4444">*</span></label>
+  <input class="fi" id="apSigPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="••••" autocomplete="new-password" style="font-family:'JetBrains Mono',monospace;letter-spacing:.3em;text-align:center">
+</div>
+<div id="apSigPinErr" style="font-size:.65rem;color:#dc2626;margin-top:4px;display:none"></div>
+<div style="display:flex;gap:6px;margin-top:8px">
+  <button class="bsave" onclick="saveAusbilderSigStempel()" style="flex:1;background:linear-gradient(135deg,#7c3aed,#9333ea)" title="Verschluesselt speichern">🔐 Verschlüsselt speichern</button>
+</div>
+</div>
+
+<!-- Sig-Zeichen Overlay -->
+<div id="apSigDrawOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,18,25,.85);z-index:10000;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;padding:20px;max-width:500px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.4)">
+    <div style="font-size:1rem;font-weight:800;color:#0f172a;margin-bottom:10px">✏️ Signatur zeichnen</div>
+    <div style="font-size:.7rem;color:#64748b;margin-bottom:10px">Mit Maus, Finger oder Stift im Feld unten unterschreiben.</div>
+    <div style="border:2px solid #cbd5e1;border-radius:10px;background:#f8fafc;padding:6px"><canvas id="apSigDrawCanvas" style="display:block;width:100%;height:160px;cursor:crosshair;touch-action:none;background:#fff;border-radius:6px"></canvas></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="apSigDrawClear()" style="padding:8px 14px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;cursor:pointer">↺ Neu</button>
+      <button onclick="apSigDrawCancel()" style="padding:8px 14px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;cursor:pointer">Abbrechen</button>
+      <button onclick="apSigDrawSave()" style="flex:1;padding:8px 14px;background:linear-gradient(135deg,#7c3aed,#9333ea);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✅ Übernehmen</button>
+    </div>
+  </div>
+</div>
+
 <div style="margin-top:16px;padding-top:14px;border-top:1.5px solid var(--brd)">
 <div style="font-size:.72rem;font-weight:700;color:var(--tx);margin-bottom:8px">🔑 Passwort ändern</div>
 <div class="fg"><label class="fl">Neues Passwort</label><input class="fi" id="apPwNew" type="password" placeholder="Min. 6 Zeichen" autocomplete="new-password"></div>
@@ -5960,6 +6011,141 @@ function setAllStandort(ort){
 function getAusbilderProfil(){
   try{return JSON.parse(localStorage.getItem(_lsKey('ausbilderProfil'))||'{}');}catch(e){return{};}
 }
+
+// ─── STEMPEL + SIGNATUR (PIN-verschluesselt) ───
+async function _deriveKey(pin, salt){
+  const enc=new TextEncoder();
+  const keyMat=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2',salt,iterations:120000,hash:'SHA-256'},
+    keyMat,
+    {name:'AES-GCM',length:256},
+    false,['encrypt','decrypt']
+  );
+}
+async function _encryptString(plaintext, pin){
+  const enc=new TextEncoder();
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await _deriveKey(pin,salt);
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(plaintext));
+  const buf=new Uint8Array(salt.length+iv.length+ct.byteLength);
+  buf.set(salt,0); buf.set(iv,salt.length); buf.set(new Uint8Array(ct),salt.length+iv.length);
+  return btoa(String.fromCharCode.apply(null,buf));
+}
+async function _decryptString(b64, pin){
+  const data=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+  const salt=data.slice(0,16);
+  const iv=data.slice(16,28);
+  const ct=data.slice(28);
+  const key=await _deriveKey(pin,salt);
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,ct);
+  return new TextDecoder().decode(pt);
+}
+let _apSigDataUrl='';
+let _apStempelDataUrl='';
+let _apSigPinSession='';
+function _getSigStempelStore(){try{return JSON.parse(localStorage.getItem(_lsKey('sigStempel'))||'{}');}catch(e){return{};}}
+function _setSigStempelStore(obj){localStorage.setItem(_lsKey('sigStempel'),JSON.stringify(obj));}
+function _updateSigStempelUI(){
+  const store=_getSigStempelStore();
+  const hasEnc=!!(store.encSig||store.encStempel);
+  const status=document.getElementById('sigStempelStatus');
+  if(status) status.style.display=hasEnc?'block':'none';
+  const sigPrev=document.getElementById('apSigPreview');
+  if(sigPrev){
+    if(_apSigDataUrl){sigPrev.innerHTML='<img src="'+_apSigDataUrl+'" style="max-width:100%;max-height:100%;object-fit:contain">';sigPrev.style.cssText='border:2px solid #22c55e;border-radius:8px;padding:4px;background:#f0fdf4;height:80px;display:flex;align-items:center;justify-content:center';}
+    else if(store.encSig){sigPrev.innerHTML='<span style="color:#7c3aed;font-size:.65rem">🔐 Verschlüsselt — PIN unten + Speichern zum Anzeigen</span>';sigPrev.style.cssText='border:2px solid #a78bfa;border-radius:8px;padding:4px;background:#faf5ff;height:80px;display:flex;align-items:center;justify-content:center;text-align:center';}
+    else {sigPrev.innerHTML='— noch keine Signatur —';sigPrev.style.cssText='border:2px dashed #cbd5e1;border-radius:8px;padding:4px;background:#fafafa;height:80px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:.7rem';}
+  }
+  const sigClr=document.getElementById('apSigClearBtn');if(sigClr) sigClr.style.display=(_apSigDataUrl||store.encSig)?'inline-block':'none';
+  const stPrev=document.getElementById('apStempelPreview');
+  if(stPrev){
+    if(_apStempelDataUrl){stPrev.innerHTML='<img src="'+_apStempelDataUrl+'" style="max-width:100%;max-height:100%;object-fit:contain">';stPrev.style.cssText='border:2px solid #22c55e;border-radius:8px;padding:4px;background:#f0fdf4;height:80px;display:flex;align-items:center;justify-content:center';}
+    else if(store.encStempel){stPrev.innerHTML='<span style="color:#7c3aed;font-size:.65rem">🔐 Verschlüsselt — PIN unten + Speichern zum Anzeigen</span>';stPrev.style.cssText='border:2px solid #a78bfa;border-radius:8px;padding:4px;background:#faf5ff;height:80px;display:flex;align-items:center;justify-content:center;text-align:center';}
+    else {stPrev.innerHTML='— noch kein Stempel —';stPrev.style.cssText='border:2px dashed #cbd5e1;border-radius:8px;padding:4px;background:#fafafa;height:80px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:.7rem';}
+  }
+  const stClr=document.getElementById('apStempelClearBtn');if(stClr) stClr.style.display=(_apStempelDataUrl||store.encStempel)?'inline-block':'none';
+}
+let _apSigDrawCtx=null,_apSigDrawing=false,_apSigDrawHasInk=false;
+function apOpenSigDraw(){
+  document.getElementById('apSigDrawOverlay').style.display='flex';
+  setTimeout(()=>{
+    const c=document.getElementById('apSigDrawCanvas');if(!c)return;
+    c.width=c.offsetWidth*2;c.height=c.offsetHeight*2;
+    _apSigDrawCtx=c.getContext('2d');
+    _apSigDrawCtx.scale(2,2);
+    _apSigDrawCtx.strokeStyle='#1a1a2e';_apSigDrawCtx.lineWidth=2;
+    _apSigDrawCtx.lineCap='round';_apSigDrawCtx.lineJoin='round';
+    _apSigDrawHasInk=false;
+    c.onpointerdown=e=>{_apSigDrawing=true;const r=c.getBoundingClientRect();_apSigDrawCtx.beginPath();_apSigDrawCtx.moveTo(e.clientX-r.left,e.clientY-r.top);c.setPointerCapture(e.pointerId);};
+    c.onpointermove=e=>{if(!_apSigDrawing)return;const r=c.getBoundingClientRect();_apSigDrawCtx.lineTo(e.clientX-r.left,e.clientY-r.top);_apSigDrawCtx.stroke();_apSigDrawHasInk=true;};
+    c.onpointerup=()=>{_apSigDrawing=false;};
+    c.onpointerleave=()=>{_apSigDrawing=false;};
+  },50);
+}
+function apSigDrawClear(){const c=document.getElementById('apSigDrawCanvas');if(_apSigDrawCtx&&c){_apSigDrawCtx.clearRect(0,0,c.width,c.height);_apSigDrawHasInk=false;}}
+function apSigDrawCancel(){document.getElementById('apSigDrawOverlay').style.display='none';}
+function apSigDrawSave(){
+  if(!_apSigDrawHasInk){toast('Bitte zuerst zeichnen','bad');return;}
+  _apSigDataUrl=document.getElementById('apSigDrawCanvas').toDataURL('image/png');
+  document.getElementById('apSigDrawOverlay').style.display='none';
+  _updateSigStempelUI();
+  toast('Signatur übernommen — jetzt PIN setzen + Speichern','ok');
+}
+function apClearSig(){
+  if(!confirm('Signatur wirklich entfernen?'))return;
+  _apSigDataUrl='';
+  const store=_getSigStempelStore();delete store.encSig;_setSigStempelStore(store);
+  _updateSigStempelUI();
+}
+function apOnStempelPicked(ev){
+  const f=ev.target.files&&ev.target.files[0];if(!f)return;
+  if(f.size>200*1024){toast('Stempel zu groß (max 200 KB)','bad');return;}
+  const reader=new FileReader();
+  reader.onload=()=>{_apStempelDataUrl=reader.result;_updateSigStempelUI();toast('Stempel übernommen — jetzt PIN setzen + Speichern','ok');};
+  reader.readAsDataURL(f);
+}
+function apClearStempel(){
+  if(!confirm('Stempel wirklich entfernen?'))return;
+  _apStempelDataUrl='';
+  const store=_getSigStempelStore();delete store.encStempel;_setSigStempelStore(store);
+  _updateSigStempelUI();
+}
+async function saveAusbilderSigStempel(){
+  const pinEl=document.getElementById('apSigPin');
+  const errEl=document.getElementById('apSigPinErr');
+  errEl.style.display='none';errEl.textContent='';
+  const pin=(pinEl.value||'').trim();
+  if(!/^\d{4}$/.test(pin)){errEl.textContent='PIN muss genau 4 Ziffern sein.';errEl.style.display='block';return;}
+  const store=_getSigStempelStore();
+  try {
+    if(store.encSig && !_apSigDataUrl) _apSigDataUrl=await _decryptString(store.encSig,pin);
+    if(store.encStempel && !_apStempelDataUrl) _apStempelDataUrl=await _decryptString(store.encStempel,pin);
+  } catch(e){errEl.textContent='Falsche PIN — kann gespeicherte Daten nicht entschlüsseln.';errEl.style.display='block';return;}
+  try {
+    if(_apSigDataUrl) store.encSig=await _encryptString(_apSigDataUrl,pin);
+    if(_apStempelDataUrl) store.encStempel=await _encryptString(_apStempelDataUrl,pin);
+    _setSigStempelStore(store);
+    _apSigPinSession=pin;
+    _updateSigStempelUI();
+    toast('✅ Stempel + Signatur verschlüsselt gespeichert','ok');
+    pinEl.value='';
+  } catch(e){errEl.textContent='Fehler beim Verschlüsseln: '+(e.message||e);errEl.style.display='block';}
+}
+window._getDefaultSigStempel=async function(pin){
+  const store=_getSigStempelStore();
+  if(!store.encSig && !store.encStempel) return {error:'no-data',msg:'Keine Signatur/Stempel hinterlegt'};
+  try {
+    const result={};
+    if(store.encSig) result.sig=await _decryptString(store.encSig,pin);
+    if(store.encStempel) result.stempel=await _decryptString(store.encStempel,pin);
+    _apSigPinSession=pin;
+    return result;
+  } catch(e){return {error:'bad-pin',msg:'PIN falsch'};}
+};
+window._getCachedSigStempelPin=function(){return _apSigPinSession||'';};
+
 function openAusbilderProfil(){
   const p=getAusbilderProfil();
   document.getElementById('apName').value=p.name||_auth?.currentUser?.displayName||'';
@@ -5967,6 +6153,9 @@ function openAusbilderProfil(){
   document.getElementById('apEmail').value=p.email||'';
   document.getElementById('ausbilderProfilModal').classList.add('open');
   initProfilPhotoPreview();
+  // Sig+Stempel UI initialisieren
+  _apSigDataUrl='';_apStempelDataUrl='';
+  _updateSigStempelUI();
   // Nach Anzeigen: frische Firestore-Daten nachladen (overwrite falls neuer)
   if(_fbUid && _db){
     _db.collection('users').doc(_fbUid).collection('data').doc('profil').get().then(doc=>{
@@ -7672,14 +7861,22 @@ body.pdf-mode .btn-clear-sig{display:none !important;}
 .action-bar button{padding:12px 28px;font-size:14px;font-weight:bold;border:none;border-radius:8px;cursor:pointer;transition:all .15s;}
 .btn-print{background:#e5e7eb;color:#333;}
 .btn-print:hover{background:#d1d5db;}
+.btn-default{background:linear-gradient(135deg,#7c3aed,#9333ea);color:#fff;}
+.btn-default:hover{background:linear-gradient(135deg,#6d28d9,#7e22ce);}
 .btn-send{background:#2563eb;color:#fff;}
 .btn-send:hover{background:#1d4ed8;}
 .btn-send:disabled{background:#93c5fd;cursor:not-allowed;}
+
+/* Stempel zwischen den Sig-Bloecken */
+.stempel-slot{position:absolute;top:-25mm;left:50%;transform:translateX(-50%);width:32mm;height:32mm;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.stempel-slot img{max-width:100%;max-height:100%;object-fit:contain;opacity:.85;}
+.sig-row{position:relative;}
 .btn-clear-sig{background:none;border:1px solid #ccc!important;color:#666;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;}
 .status-msg{text-align:center;padding:8px;border-radius:8px;font-size:13px;font-weight:600;margin:8px 0;font-family:'Segoe UI',Arial,sans-serif;}
 </style></head><body>
 <div class="action-bar no-print">
   <button class="btn-print" onclick="window.print()" title="Drucken">🖨 Drucken</button>
+  <button class="btn-default" id="btnInsertDefault" title="Hinterlegten Stempel und Signatur einfuegen" onclick="insertDefaultSigStempel()">📝 Standard einfügen</button>
   <button class="btn-send" id="btnSend" title="Bescheinigung mit Signatur speichern" onclick="sendBescheinigung()">📤 Abschicken</button>
 </div>
 <div id="statusArea" class="no-print"></div>
@@ -7718,6 +7915,7 @@ ${notenHtml}
     </div>
     <div class="sig-line">Lehrgangsleiter</div>
   </div>
+  <div class="stempel-slot" id="stempelSlot"></div>
   <div class="sig-block"><div class="sig-space"></div><div class="sig-line">Ausbilder (Meister)</div></div>
 </div>
 <div class="hinweis-row">
@@ -7800,8 +7998,46 @@ function clearSig(){
   document.getElementById('sigWrap')?.classList.remove('signed');
 }
 function getSignatureData(){
+  if(window._loadedSig) return window._loadedSig;
   if(!canvas||!hasSig)return null;
   return canvas.toDataURL('image/png');
+}
+async function insertDefaultSigStempel(){
+  if(!window.opener||!window.opener._getDefaultSigStempel){
+    alert('Bitte AusbilderPro im Hauptfenster geöffnet halten.');
+    return;
+  }
+  // PIN aus Cache versuchen
+  let pin=(window.opener._getCachedSigStempelPin&&window.opener._getCachedSigStempelPin())||'';
+  if(!pin){
+    pin=prompt('PIN eingeben (4-stellig):');
+    if(!pin) return;
+    pin=String(pin).trim();
+  }
+  const result=await window.opener._getDefaultSigStempel(pin);
+  if(result.error){
+    if(result.error==='no-data'){
+      alert('Keine Signatur/Stempel im Profil hinterlegt. Bitte erst im Profil-Modal anlegen.');
+    } else {
+      alert('Falsche PIN.');
+    }
+    return;
+  }
+  // Sig einfuegen
+  if(result.sig){
+    hasSig=true;
+    const area=document.getElementById('sigArea');
+    if(area) area.innerHTML='<div class="sig-canvas-wrap signed"><img src="'+result.sig+'" class="sig-img"></div>';
+    // _defaultSig fuer sendBescheinigung verfuegbar machen
+    window._loadedSig=result.sig;
+  }
+  // Stempel einfuegen
+  if(result.stempel){
+    const slot=document.getElementById('stempelSlot');
+    if(slot) slot.innerHTML='<img src="'+result.stempel+'">';
+    window._loadedStempel=result.stempel;
+  }
+  document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#f3e8ff;color:#7c3aed">✅ Standard-Signatur und -Stempel eingefügt</div>';
 }
 async function sendBescheinigung(){
   // Pruefen ob E-Mail vorhanden
