@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.6.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.6.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6245,18 +6245,32 @@ function saveAusbilderProfil(){
   const data={name,telefon,email};
   // Sofort localStorage (schneller Cache) + Firestore (persistent)
   localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(data));
+  // Vorname/Nachname aus name ableiten (Split beim ersten Space)
+  const nameParts=name.split(/\s+/);
+  const vorname=nameParts[0]||'';
+  const nachname=nameParts.slice(1).join(' ')||'';
+  // _chatUsers Cache sofort updaten damit es im Chat sichtbar wird
+  if(_fbUid && _chatUsers[_fbUid]){
+    _chatUsers[_fbUid].name=name;
+    _chatUsers[_fbUid].email=email||_chatUsers[_fbUid].email;
+  } else if(_fbUid){
+    _chatUsers[_fbUid]={name:name,email:email,berufGruppeId:'',photoUrl:''};
+  }
+  // Stammdaten-Cache invalidieren damit andere Ausbilder beim Refresh neu laden
+  _ausbStammCache=null;
   if(_fbUid && _db){
-    _db.collection('users').doc(_fbUid).collection('data').doc('profil')
-      .set(data,{merge:true})
-      .then(()=>{
-        toast('Profil gespeichert ✓');
-        // Bestehende Kurse mit fehlendem Telefon/Email/Namen nachtraeglich befuellen.
-        // Use Case: Profil wurde NACH Kursanlage erstellt -> in Kurs-Docs fehlen Werte.
-        backfillCourseAusbilderData(data);
-      })
-      .catch(err=>{
-        toast('Cloud-Fehler: '+err.message,'bad');
-      });
+    Promise.all([
+      _db.collection('users').doc(_fbUid).collection('data').doc('profil').set(data,{merge:true}),
+      // Auch in Stammdaten schreiben damit andere Ausbilder den Namen sehen
+      email?_db.collection('shared').doc('kursSettings').collection('ausbilder').doc(email.toLowerCase()).set({
+        name,vorname,nachname,email:email.toLowerCase(),telefon
+      },{merge:true}):Promise.resolve()
+    ]).then(()=>{
+      toast('Profil gespeichert ✓');
+      backfillCourseAusbilderData(data);
+    }).catch(err=>{
+      toast('Cloud-Fehler: '+err.message,'bad');
+    });
   } else {
     toast('Profil lokal gespeichert ✓');
   }
