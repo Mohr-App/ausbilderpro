@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.10.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.10.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -4154,9 +4154,14 @@ function mkSeat(id,seats){
     if(d.mitarbeit) g+='<span class="gb '+gradeClass(d.mitarbeit)+'" title="Mitarbeit: Note '+d.mitarbeit+'">M:'+d.mitarbeit+'</span>';
     if(d.praxis)    g+='<span class="gb '+gradeClass(d.praxis)+'" title="Praxis: Note '+d.praxis+'">P:'+d.praxis+'</span>';
     const inst2=curInst();
-    (inst2&&inst2.customGrades||[]).forEach(cg=>{
-      const v=(d.extraGrades||{})[cg.id];
-      if(v) g+='<span class="gb '+gradeClass(v)+'" title="'+esc(cg.label)+': Note '+v+'" style="border:1px solid rgba(167,139,250,.3)">'+esc(cg.label.substring(0,4))+':'+v+'</span>';
+    const customDefs=(inst2&&inst2.customGrades)||[];
+    // Render ALLE extraGrades-Werte, nicht nur die mit existierender Definition
+    Object.entries(d.extraGrades||{}).forEach(([gid,val])=>{
+      if(!val) return;
+      const cg=customDefs.find(c=>c.id===gid);
+      const label=cg?cg.label:gid;
+      const short=esc(String(label).substring(0,4));
+      g+='<span class="gb '+gradeClass(val)+'" title="'+esc(label)+': Note '+val+'" style="border:1px solid rgba(167,139,250,.3)">'+short+':'+esc(val)+'</span>';
     });
     // att summary
     const pCnt=att.filter(a=>a.type==='present'&&!a.lateMins&&!a.earlyMins).length;
