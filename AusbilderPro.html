@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.7.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.7.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -7909,6 +7909,11 @@ body.pdf-mode .resize-ctrl{display:none !important;}
 #sigResizeCtrl{left:5%;bottom:-30px;}
 #stempelResizeCtrl{left:50%;transform:translateX(-50%);bottom:-30px;}
 .stempel-slot img{max-width:100%;max-height:100%;object-fit:contain;opacity:.85;}
+/* Loeschen-Overlay fuer Sig + Stempel im Bescheinigungs-Tab */
+.btn-remove-overlay{position:absolute;top:-10px;right:-10px;width:24px;height:24px;border-radius:50%;background:#ef4444;color:#fff;border:2px solid #fff;font-size:13px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:20;box-shadow:0 2px 6px rgba(0,0,0,.25);line-height:1;padding:0;pointer-events:auto;}
+.btn-remove-overlay:hover{background:#dc2626;transform:scale(1.1);}
+body.pdf-mode .btn-remove-overlay{display:none !important;}
+@media print{.btn-remove-overlay{display:none !important;}}
 .hinweis-row{display:flex;justify-content:space-between;align-items:center;margin:6mm 0;gap:10mm;}
 .hinweis{flex:1;font-size:10.5pt;line-height:1.4;}
 .handwerk-logo{flex-shrink:0;font-size:11pt;font-weight:bold;letter-spacing:1px;color:#d97706;border:2pt solid #d97706;padding:3mm 6mm;background:#fff;}
@@ -7942,7 +7947,7 @@ body.pdf-mode .stempel-slot,body.pdf-mode .sig-canvas-wrap{cursor:default !impor
 </style></head><body>
 <div class="action-bar no-print">
   <button class="btn-print" onclick="window.print()" title="Drucken">🖨 Drucken</button>
-  <button class="btn-default" id="btnInsertDefault" title="Hinterlegten Stempel und Signatur einfuegen" onclick="insertDefaultSigStempel()">📝 Standard einfügen</button>
+  <button class="btn-default" id="btnInsertDefault" title="Hinterlegte Unterschrift und Stempel einfügen" onclick="insertDefaultSigStempel()">📝 Unterschrift & Stempel</button>
   <button class="btn-send" id="btnSend" title="Bescheinigung mit Signatur speichern" onclick="sendBescheinigung()">📤 Abschicken</button>
 </div>
 <div id="statusArea" class="no-print"></div>
@@ -7976,7 +7981,7 @@ ${notenHtml}
   <div class="sig-block">
     <div id="sigArea">
       ${existingSig
-        ?'<div class="sig-canvas-wrap signed" id="sigWrap"><img src="'+existingSig+'" class="sig-img"></div>'
+        ?'<div class="sig-canvas-wrap signed" id="sigWrap"><img src="'+existingSig+'" class="sig-img"><button class="btn-remove-overlay no-print" onclick="removeLoadedSig(event)" title="Unterschrift entfernen">✕</button></div>'
         :'<div class="sig-canvas-wrap" id="sigWrap"><canvas class="sig" id="sigCanvas"></canvas></div><button class="btn-clear-sig no-print" title="↺ Neu" onclick="clearSig()">↺ Neu</button>'}
     </div>
     <div class="resize-ctrl no-print" id="sigResizeCtrl" style="display:none">📏 <input type="range" min="10" max="30" value="16" id="sigSizeSlider" oninput="resizeSig(this.value)"><span id="sigSizeLabel">16mm</span></div>
@@ -8113,6 +8118,7 @@ const canvas=document.getElementById('sigCanvas');
 let ctx,drawing=false,hasSig=${existingSig?'true':'false'};
 // Wenn schon existierende Sig: Slider sichtbar machen + draggable
 if(${existingSig?'true':'false'}){
+  window._loadedSig=${JSON.stringify(existingSig||'')};
   setTimeout(()=>{
     const el=document.getElementById('sigResizeCtrl');if(el)el.style.display='flex';
     const wrap=document.getElementById('sigWrap');
@@ -8172,7 +8178,7 @@ async function insertDefaultSigStempel(){
   if(result.sig){
     hasSig=true;
     const area=document.getElementById('sigArea');
-    if(area) area.innerHTML='<div class="sig-canvas-wrap signed" id="sigWrap"><img src="'+result.sig+'" class="sig-img"></div>';
+    if(area) area.innerHTML='<div class="sig-canvas-wrap signed" id="sigWrap"><img src="'+result.sig+'" class="sig-img"><button class="btn-remove-overlay no-print" onclick="removeLoadedSig(event)" title="Unterschrift entfernen">✕</button></div>';
     window._loadedSig=result.sig;
     document.getElementById('sigResizeCtrl').style.display='flex';
     _applySigPos();
@@ -8180,13 +8186,31 @@ async function insertDefaultSigStempel(){
   }
   if(result.stempel){
     const slot=document.getElementById('stempelSlot');
-    if(slot) slot.innerHTML='<img src="'+result.stempel+'">';
+    if(slot) slot.innerHTML='<img src="'+result.stempel+'"><button class="btn-remove-overlay no-print" onclick="removeLoadedStempel(event)" title="Stempel entfernen">✕</button>';
     window._loadedStempel=result.stempel;
     document.getElementById('stempelResizeCtrl').style.display='flex';
     _applyStempelPos();
     _makeDraggable(slot,_stempelPos,_applyStempelPos);
   }
-  document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#f3e8ff;color:#7c3aed">✅ Standard-Signatur und -Stempel eingefügt — Position per Drag verschiebbar, Größe per Slider</div>';
+  document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#f3e8ff;color:#7c3aed">✅ Unterschrift und Stempel eingefügt — per Drag verschieben, Slider für Größe, ✕ zum Entfernen</div>';
+}
+function removeLoadedStempel(ev){
+  if(ev){ev.preventDefault();ev.stopPropagation();}
+  const slot=document.getElementById('stempelSlot');
+  if(slot) slot.innerHTML='';
+  window._loadedStempel=null;
+  document.getElementById('stempelResizeCtrl').style.display='none';
+  document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#fef3c7;color:#92400e">Stempel entfernt — über „Unterschrift & Stempel" wieder einfügen</div>';
+}
+function removeLoadedSig(ev){
+  if(ev){ev.preventDefault();ev.stopPropagation();}
+  if(!confirm('Eingefügte Unterschrift wirklich entfernen?')) return;
+  hasSig=false;
+  window._loadedSig=null;
+  const area=document.getElementById('sigArea');
+  if(area) area.innerHTML='<div class="sig-canvas-wrap" id="sigWrap" style="background:#fafafa"><div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-size:10px">— Unterschrift fehlt —</div></div>';
+  document.getElementById('sigResizeCtrl').style.display='none';
+  document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#fef3c7;color:#92400e">Unterschrift entfernt — über „Unterschrift & Stempel" wieder einfügen</div>';
 }
 function resizeSig(mm){
   _sigPos.size=Number(mm);
