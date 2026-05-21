@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.6.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.6.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6046,7 +6046,25 @@ let _apSigDataUrl='';
 let _apStempelDataUrl='';
 let _apSigPinSession='';
 function _getSigStempelStore(){try{return JSON.parse(localStorage.getItem(_lsKey('sigStempel'))||'{}');}catch(e){return{};}}
-function _setSigStempelStore(obj){localStorage.setItem(_lsKey('sigStempel'),JSON.stringify(obj));}
+function _setSigStempelStoreLocalOnly(obj){localStorage.setItem(_lsKey('sigStempel'),JSON.stringify(obj));}
+function _setSigStempelStore(obj){
+  // Lokal sofort + Cloud (fire-and-forget) damit es auf allen Geraeten verfuegbar ist
+  _setSigStempelStoreLocalOnly(obj);
+  if(_db && _fbUid){
+    _db.collection('users').doc(_fbUid).collection('data').doc('sigStempel')
+      .set(obj).catch(err=>console.warn('Sig/Stempel Cloud-Save:',err));
+  }
+}
+// Aus Cloud nachladen falls lokal leer (cross-device). Cloud ist Source of Truth.
+async function _loadSigStempelFromCloud(){
+  if(!_db||!_fbUid) return;
+  try{
+    const doc=await _db.collection('users').doc(_fbUid).collection('data').doc('sigStempel').get();
+    if(doc.exists){
+      _setSigStempelStoreLocalOnly(doc.data()||{});
+    }
+  }catch(e){console.warn('Sig/Stempel Cloud-Load:',e);}
+}
 function _updateSigStempelUI(){
   const store=_getSigStempelStore();
   const hasEnc=!!(store.encSig||store.encStempel);
@@ -6134,7 +6152,12 @@ async function saveAusbilderSigStempel(){
   } catch(e){errEl.textContent='Fehler beim Verschlüsseln: '+(e.message||e);errEl.style.display='block';}
 }
 window._getDefaultSigStempel=async function(pin){
-  const store=_getSigStempelStore();
+  let store=_getSigStempelStore();
+  // Falls lokal leer aber Cloud verfuegbar: nachladen
+  if((!store.encSig && !store.encStempel) && _db && _fbUid){
+    await _loadSigStempelFromCloud();
+    store=_getSigStempelStore();
+  }
   if(!store.encSig && !store.encStempel) return {error:'no-data',msg:'Keine Signatur/Stempel hinterlegt'};
   try {
     const result={};
@@ -6156,6 +6179,8 @@ function openAusbilderProfil(){
   // Sig+Stempel UI initialisieren
   _apSigDataUrl='';_apStempelDataUrl='';
   _updateSigStempelUI();
+  // Cloud-Sync im Hintergrund: lade Sig/Stempel von anderen Geraeten
+  _loadSigStempelFromCloud().then(()=>_updateSigStempelUI());
   // Nach Anzeigen: frische Firestore-Daten nachladen (overwrite falls neuer)
   if(_fbUid && _db){
     _db.collection('users').doc(_fbUid).collection('data').doc('profil').get().then(doc=>{
