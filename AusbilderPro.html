@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.10.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.11.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -11078,12 +11078,67 @@ window._fbSaveHook = fbSave;
 
 init();
 
-// PWA Service Worker
+// PWA Service Worker mit AUTO-UPDATE
 if('serviceWorker' in navigator){
+  let _swRefreshing=false;
+  // Wenn ein neuer SW aktiv wird, reload (genau 1x)
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(_swRefreshing) return;
+    _swRefreshing=true;
+    console.log('[SW] Neuer SW aktiv – lade neu');
+    setTimeout(()=>location.reload(), 200);
+  });
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('./sw.js')
-      .then(()=>console.log('SW registriert'))
+      .then(reg=>{
+        console.log('SW registriert');
+        // Bei Update gefunden: zeige optional Banner (Auto-Reload erfolgt via controllerchange)
+        reg.addEventListener('updatefound', ()=>{
+          const newWorker=reg.installing;
+          if(!newWorker) return;
+          newWorker.addEventListener('statechange', ()=>{
+            if(newWorker.state==='installed' && navigator.serviceWorker.controller){
+              // Neue Version verfuegbar - banner zeigen
+              _showUpdateBanner();
+            }
+          });
+        });
+        // Sofort einen Update-Check beim Start
+        try{ reg.update(); }catch(e){}
+        // Periodischer Update-Check alle 10 Minuten
+        setInterval(()=>{ try{reg.update();}catch(e){} }, 10*60*1000);
+      })
       .catch(e=>console.warn('SW Fehler:',e));
+  });
+  // Auch bei Tab-Wechsel zurueck-Sichtbar: Update-Check
+  document.addEventListener('visibilitychange', ()=>{
+    if(!document.hidden && navigator.serviceWorker.controller){
+      navigator.serviceWorker.getRegistration().then(reg=>{
+        if(reg) try{reg.update();}catch(e){}
+      });
+    }
+  });
+}
+
+function _showUpdateBanner(){
+  if(document.getElementById('updateBanner')) return; // schon da
+  const b=document.createElement('div');
+  b.id='updateBanner';
+  b.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#2563eb,#059669);color:#fff;padding:12px 20px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.3);z-index:99999;display:flex;align-items:center;gap:14px;font-family:Sora,sans-serif;font-weight:600;font-size:.85rem;animation:updateBannerIn .4s ease';
+  b.innerHTML='✨ Neue Version verfügbar <button onclick="_applyUpdate()" style="background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.4);color:#fff;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit">Jetzt aktualisieren</button>';
+  const st=document.createElement('style');
+  st.textContent='@keyframes updateBannerIn{from{opacity:0;transform:translate(-50%,30px)}to{opacity:1;transform:translate(-50%,0)}}';
+  document.head.appendChild(st);
+  document.body.appendChild(b);
+}
+function _applyUpdate(){
+  navigator.serviceWorker.getRegistration().then(reg=>{
+    if(reg && reg.waiting){
+      // Sage dem wartenden SW dass er aktiv werden soll
+      reg.waiting.postMessage({type:'SKIP_WAITING'});
+    } else {
+      location.reload();
+    }
   });
 }
 

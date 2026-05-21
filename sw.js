@@ -1,4 +1,4 @@
-const CACHE = 'ausbilderpro-v531';
+const CACHE = 'ausbilderpro-v532';
 const ASSETS = [
   './AusbilderPro.html',
   './manifest.json',
@@ -18,7 +18,15 @@ self.addEventListener('install', e => {
       .then(c => c.addAll(ASSETS.map(u => new Request(u, {mode: 'no-cors'}))))
       .catch(() => {})
   );
-  self.skipWaiting();
+  // Standardmaessig NICHT sofort skipWaiting - damit der Client das Banner sehen kann.
+  // Client kann via postMessage('SKIP_WAITING') triggern.
+});
+
+// Message-Handler: Client kann den wartenden SW aktivieren
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Activate: alte Caches löschen
