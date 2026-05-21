@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.9.9 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.10.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2337,6 +2337,46 @@ function selInst(katId,instId){
   // Nur die Kat des aktuellen Lehrgangs offen halten, alle anderen zuklappen
   Object.keys(S.kats).forEach(k=>{ S.kats[k].open=(k===katId); });
   persist();renderAll();
+  // Cross-Ausbilder Noten-Sync: lade Noten anderer Ausbilder fuer diesen Kurs aus Firestore
+  setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 150);
+}
+// Cross-Ausbilder Noten-Sync - laedt Noten/Werkzeug/Bemerkung aus Firestore zurueck in lokale seats
+async function syncSeatGradesFromFirestore(){
+  if(!_db||_demoMode||!_fbUid) return;
+  const inst=curInst();
+  if(!inst||!inst.sharedKursId) return;
+  const kursId=inst.sharedKursId;
+  let anyChanged=false;
+  const tasks=Object.entries(inst.seats||{})
+    .filter(([sid,d])=>d&&d.poolTnId)
+    .map(([sid,d])=>
+      _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('teilnehmer').doc(d.poolTnId).get()
+        .then(snap=>{
+          if(!snap.exists) return;
+          const sync=snap.data()||{};
+          const seat=inst.seats[sid];
+          if(!seat) return;
+          let changed=false;
+          if(sync.noten_fuehrung && seat.fuehrung!==sync.noten_fuehrung){seat.fuehrung=sync.noten_fuehrung;changed=true;}
+          if(sync.noten_mitarbeit && seat.mitarbeit!==sync.noten_mitarbeit){seat.mitarbeit=sync.noten_mitarbeit;changed=true;}
+          if(sync.noten_praxis && seat.praxis!==sync.noten_praxis){seat.praxis=sync.noten_praxis;changed=true;}
+          if(sync.noten_extra && typeof sync.noten_extra==='object'){
+            const merged={...(seat.extraGrades||{}),...sync.noten_extra};
+            if(JSON.stringify(seat.extraGrades||{})!==JSON.stringify(merged)){seat.extraGrades=merged;changed=true;}
+          }
+          if(sync.werkzeugStatus && seat.werkzeugStatus!==sync.werkzeugStatus){seat.werkzeugStatus=sync.werkzeugStatus;changed=true;}
+          if(sync.werkzeugFehlt && seat.werkzeugFehlt!==sync.werkzeugFehlt){seat.werkzeugFehlt=sync.werkzeugFehlt;changed=true;}
+          if(sync.bemerkung && seat.bemerkung!==sync.bemerkung){seat.bemerkung=sync.bemerkung;changed=true;}
+          if(changed) anyChanged=true;
+        })
+        .catch(()=>{})
+    );
+  await Promise.all(tasks);
+  if(anyChanged){
+    persist();
+    if(typeof renderSeats==='function') renderSeats();
+  }
 }
 
 function moveKat(id,dir,e){
@@ -10553,6 +10593,8 @@ try{
     _dataOwner=null; // Reset bis Daten geladen sind
     // Sig+Stempel: auto-sync local nach cloud falls noch nicht geschehen
     setTimeout(()=>{try{_ensureSigStempelCloudSync();}catch(e){}}, 2000);
+    // Cross-Ausbilder Noten-Sync nach Initialdaten-Load (3s damit Firestore Subscription Time hat)
+    setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 3000);
     // App-Launcher-Check: Admin?
     _checkAdminShowLauncher(user.uid);
     // View-As Button sichtbar wenn Stefan
