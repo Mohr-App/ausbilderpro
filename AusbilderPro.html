@@ -878,6 +878,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="openAusbilderProfil();closeHdrMenu()" style="width:100%;text-align:left" title="Name, Telefon, E-Mail für Azubis hinterlegen">👤 Mein Profil</button>
         <button class="tbtn" onclick="openTrennlinienModal();closeHdrMenu()" style="width:100%;text-align:left" title="Sitzplan-Trennlinien konfigurieren">📐 Trennlinien</button>
         <button class="tbtn" onclick="openTrash();closeHdrMenu()" style="width:100%;text-align:left" title="Gelöschte Lehrgänge wiederherstellen (30 Tage)">🗑 Papierkorb</button>
+        <button class="tbtn" onclick="showDiagnose();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(59,130,246,.06);border-color:rgba(59,130,246,.2);color:#1e40af" title="Diagnose-Informationen anzeigen (bei Problemen)">🔍 Diagnose</button>
         <button class="tbtn" onclick="appReset();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#991b1b" title="App-Cache und alte lokale Dateien zurücksetzen (bei Problemen)">🔄 App zurücksetzen</button>
         <button class="tbtn" id="hdrChatSweepBtn" onclick="openChatSweep();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:#6d28d9;display:none" title="Alte Chat-Nachrichten manuell entfernen (Admin/DSGVO)">🧹 Chat-Bereinigung</button>
         <button class="tbtn" onclick="recoverOrphanSeats();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.2);color:#4338ca" title="TN, die direkt am Sitzplatz eingegeben wurden (statt über +TN), nachträglich in globalTN + Kurs-Liste anlegen">🔗 Verwaiste Sitze nachtragen</button>
@@ -1059,7 +1060,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.11.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.11.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6501,6 +6502,113 @@ function backfillCourseAusbilderData(profil){
 
 // ─── APP-RESET / DIAGNOSE: einfaches Self-Service-Tool fuer Kollegen ───
 // Erneuert Service-Worker, gibt Diagnose aus und reloadet.
+function showDiagnose(){
+  const lines=[];
+  // App-Version
+  const verEl=document.querySelector('[data-version]')||document.body;
+  const apVer=document.body.dataset.apVersion||'unbekannt';
+  lines.push('=== APP-DIAGNOSE ===\n');
+  lines.push('Zeit: '+new Date().toLocaleString('de-DE'));
+  // User
+  const user=_auth&&_auth.currentUser;
+  lines.push('User: '+(user?user.email:'NICHT EINGELOGGT'));
+  lines.push('UID: '+(user?user.uid.substring(0,12)+'…':'-'));
+  lines.push('');
+  // App-Daten
+  const katCount=Object.keys(S.kats||{}).length;
+  let instCount=0,seatCount=0,seatWithGrades=0;
+  Object.values(S.kats||{}).forEach(k=>{
+    Object.values(k.instances||{}).forEach(i=>{
+      instCount++;
+      Object.values(i.seats||{}).forEach(s=>{
+        if(s&&s.name) seatCount++;
+        if(s&&(s.fuehrung||s.mitarbeit||s.praxis||(s.extraGrades&&Object.values(s.extraGrades).some(v=>v)))) seatWithGrades++;
+      });
+    });
+  });
+  lines.push('Kategorien: '+katCount);
+  lines.push('Kurse: '+instCount);
+  lines.push('Belegte Sitzplaetze: '+seatCount);
+  lines.push('Sitze mit Noten: '+seatWithGrades);
+  lines.push('');
+  // Aktueller Kurs
+  const inst=curInst();
+  if(inst){
+    lines.push('--- AKTUELLER KURS ---');
+    lines.push('Name: '+(inst.label||'-'));
+    lines.push('Lehrgangsart: '+(inst.lehrgangsart||'-'));
+    lines.push('Cloud-Kurs ID: '+(inst.sharedKursId||'NICHT IN CLOUD'));
+    lines.push('Custom-Noten-Defs: '+((inst.customGrades||[]).map(g=>g.id+'='+g.label).join(', ')||'keine'));
+    lines.push('Geloeschte Std-Noten: '+((inst.deletedFixedGrades||[]).join(',')||'keine'));
+    lines.push('');
+    lines.push('--- SITZE MIT NOTEN ---');
+    const seatsWithGrades=Object.entries(inst.seats||{}).filter(([id,s])=>s&&s.name&&(s.fuehrung||s.mitarbeit||s.praxis||(s.extraGrades&&Object.values(s.extraGrades).some(v=>v))));
+    if(!seatsWithGrades.length){
+      lines.push('(keine Sitze mit eingetragenen Noten)');
+    } else {
+      seatsWithGrades.slice(0,10).forEach(([id,s])=>{
+        const parts=[];
+        if(s.fuehrung) parts.push('F='+s.fuehrung);
+        if(s.mitarbeit) parts.push('M='+s.mitarbeit);
+        if(s.praxis) parts.push('P='+s.praxis);
+        if(s.extraGrades) Object.entries(s.extraGrades).forEach(([k,v])=>{ if(v) parts.push(k+'='+v); });
+        lines.push('• '+s.name+': '+(parts.join(', ')||'(leer)'));
+      });
+      if(seatsWithGrades.length>10) lines.push('… und '+(seatsWithGrades.length-10)+' weitere');
+    }
+  } else {
+    lines.push('(kein Kurs aktiv)');
+  }
+  lines.push('');
+  // localStorage Größe
+  let lsSize=0;
+  try{
+    for(let k in localStorage){
+      if(localStorage.hasOwnProperty(k)) lsSize+=(localStorage[k]||'').length+k.length;
+    }
+  }catch(e){}
+  lines.push('localStorage: '+Math.round(lsSize/1024)+' KB');
+  // SW-Status
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistrations().then(regs=>{
+      lines.push('Service Worker: '+regs.length+' registriert');
+      _showDiagnoseModal(lines.join('\n'));
+    }).catch(()=>{
+      lines.push('Service Worker: Check fehlgeschlagen');
+      _showDiagnoseModal(lines.join('\n'));
+    });
+  } else {
+    _showDiagnoseModal(lines.join('\n'));
+  }
+}
+
+function _showDiagnoseModal(text){
+  // Bestehendes ggf. entfernen
+  const old=document.getElementById('diagnoseModal');
+  if(old) old.remove();
+  const ov=document.createElement('div');
+  ov.id='diagnoseModal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,18,25,.85);z-index:99998;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.onclick=ev=>{if(ev.target===ov)ov.remove();};
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;max-width:700px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.4)">'
+    +'<div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between"><div style="font-weight:800;color:#0f172a">🔍 Diagnose-Bericht</div><button onclick="this.closest(\'#diagnoseModal\').remove()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#64748b">&times;</button></div>'
+    +'<textarea id="diagText" readonly style="flex:1;padding:14px;font-family:Menlo,monospace;font-size:.7rem;color:#1f2937;border:none;outline:none;resize:none;min-height:300px;background:#f8fafc"></textarea>'
+    +'<div style="padding:12px 20px;border-top:1px solid #e2e8f0;display:flex;gap:10px;justify-content:flex-end">'
+    +'<button onclick="_copyDiagnose()" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">📋 Kopieren</button>'
+    +'<button onclick="this.closest(\'#diagnoseModal\').remove()" style="padding:8px 16px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;cursor:pointer">Schliessen</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  document.getElementById('diagText').value=text;
+}
+function _copyDiagnose(){
+  const t=document.getElementById('diagText');
+  if(!t) return;
+  t.select();
+  try{
+    navigator.clipboard.writeText(t.value).then(()=>{toast('In Zwischenablage kopiert ✓','ok');}).catch(()=>{document.execCommand('copy');toast('Kopiert ✓','ok');});
+  }catch(e){document.execCommand('copy');toast('Kopiert ✓','ok');}
+}
+
 async function appReset(){
   let report=[];
   report.push('🔍 Diagnose vor Reset:\n');  // Service-Worker?
