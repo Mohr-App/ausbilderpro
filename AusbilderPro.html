@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.9.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.9.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5885,19 +5885,24 @@ h1{text-align:center;font-size:22pt;font-weight:bold;font-style:italic;margin:4m
 .note-line-half{flex:1;min-width:30mm;}
 .note-line-short{flex:1;min-width:25mm;max-width:35mm;}
 .note-line-long{flex:1;min-width:80mm;font-size:12pt;font-weight:normal;}
+.noten-block.noten-sm .note-row{margin:1.5mm 0;}
+.noten-block.noten-sm .note-line{font-size:13pt;min-height:11pt;}
+.noten-block.noten-xs .note-row{margin:1mm 0;font-size:11pt;}
+.noten-block.noten-xs .note-line{font-size:12pt;min-height:9pt;padding:0 1.5mm;}
+.noten-block.noten-xs .note-label{min-width:50mm;}
 
 /* Ausbildungsnachweis */
-.ausbildungsnachweis{margin:4mm 0 2mm 0;font-size:12pt;line-height:1.4;}
+.ausbildungsnachweis{margin:3mm 0 1mm 0;font-size:12pt;line-height:1.35;}
 .radio{display:inline-block;width:12pt;height:12pt;border:1pt solid #000;border-radius:50%;vertical-align:middle;margin:0 2pt;cursor:pointer;position:relative;}
 .radio.checked::after{content:'';position:absolute;top:2pt;left:2pt;width:6pt;height:6pt;background:#000;border-radius:50%;}
 .radio:hover{background:rgba(0,0,0,.08);}
 @media print{.radio{cursor:default;}.radio:hover{background:transparent;}}
 
 /* Datum */
-.datum-zeile{margin:3mm 0 4mm 0;font-size:12pt;}
+.datum-zeile{margin:2mm 0 2mm 0;font-size:12pt;}
 
 /* Unterschriften */
-.sig-row{display:flex;justify-content:space-between;margin:4mm 0;gap:15mm;}
+.sig-row{display:flex;justify-content:space-between;margin:1mm 0 3mm 0;gap:15mm;}
 .sig-block{flex:1;text-align:center;}
 .sig-space{height:12mm;}
 .sig-line{border-top:1pt dotted #000;padding-top:1mm;font-size:11pt;}
@@ -7884,13 +7889,18 @@ h1{text-align:center;font-size:22pt;font-weight:bold;font-style:italic;margin:4m
 .note-line-half{flex:1;min-width:30mm;}
 .note-line-short{flex:1;min-width:25mm;max-width:35mm;}
 .note-line-long{flex:1;min-width:80mm;font-size:12pt;font-weight:normal;}
-.ausbildungsnachweis{margin:4mm 0 2mm 0;font-size:12pt;line-height:1.4;}
+.noten-block.noten-sm .note-row{margin:1.5mm 0;}
+.noten-block.noten-sm .note-line{font-size:13pt;min-height:11pt;}
+.noten-block.noten-xs .note-row{margin:1mm 0;font-size:11pt;}
+.noten-block.noten-xs .note-line{font-size:12pt;min-height:9pt;padding:0 1.5mm;}
+.noten-block.noten-xs .note-label{min-width:50mm;}
+.ausbildungsnachweis{margin:3mm 0 1mm 0;font-size:12pt;line-height:1.35;}
 .radio{display:inline-block;width:12pt;height:12pt;border:1pt solid #000;border-radius:50%;vertical-align:middle;margin:0 2pt;cursor:pointer;position:relative;}
 .radio.checked::after{content:'';position:absolute;top:2pt;left:2pt;width:6pt;height:6pt;background:#000;border-radius:50%;}
 .radio:hover{background:rgba(0,0,0,.08);}
 @media print{.radio{cursor:default;}.radio:hover{background:transparent;}}
-.datum-zeile{margin:3mm 0 4mm 0;font-size:12pt;}
-.sig-row{display:flex;justify-content:space-between;margin:4mm 0;gap:15mm;position:relative;align-items:flex-end;}
+.datum-zeile{margin:2mm 0 2mm 0;font-size:12pt;}
+.sig-row{display:flex;justify-content:space-between;margin:1mm 0 3mm 0;gap:15mm;position:relative;align-items:flex-end;}
 .sig-block{flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;}
 .sig-space{height:16mm;}
 .sig-line{border-top:1pt dotted #000;padding-top:1mm;font-size:11pt;width:100%;}
@@ -8092,6 +8102,14 @@ async function _loadPositions(){
 }
 // Position laden bei Tab-Start
 setTimeout(_loadPositions,100);
+// Auto-Compact Noten wenn zu viele Eintraege
+setTimeout(()=>{
+  const block=document.querySelector('.noten-block');
+  if(!block) return;
+  const rows=block.querySelectorAll('.note-row').length;
+  if(rows>=7) block.classList.add('noten-xs');
+  else if(rows>=5) block.classList.add('noten-sm');
+},50);
 function toggleStandort(ort){
   var bonn=document.querySelector('.cb-bonn');
   var sieg=document.querySelector('.cb-sieg');
