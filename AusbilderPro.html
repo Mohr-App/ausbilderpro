@@ -1059,7 +1059,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.7.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.7.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6062,8 +6062,25 @@ async function _loadSigStempelFromCloud(){
     const doc=await _db.collection('users').doc(_fbUid).collection('data').doc('sigStempel').get();
     if(doc.exists){
       _setSigStempelStoreLocalOnly(doc.data()||{});
+      console.log('[Sig/Stempel] Aus Cloud geladen');
     }
-  }catch(e){console.warn('Sig/Stempel Cloud-Load:',e);}
+  }catch(e){console.warn('[Sig/Stempel] Cloud-Load-Fehler:',e);}
+}
+// Auto-Sync: wenn local Daten hat aber Cloud leer ist, push to Cloud
+async function _ensureSigStempelCloudSync(){
+  if(!_db||!_fbUid) return;
+  const local=_getSigStempelStore();
+  const hasLocal=!!(local.encSig||local.encStempel);
+  if(!hasLocal) return;
+  try{
+    const doc=await _db.collection('users').doc(_fbUid).collection('data').doc('sigStempel').get();
+    const cloud=doc.exists?(doc.data()||{}):{};
+    const hasCloud=!!(cloud.encSig||cloud.encStempel);
+    if(hasCloud) return; // Cloud hat schon was - nicht ueberschreiben
+    // Local hat, Cloud leer -> push
+    await _db.collection('users').doc(_fbUid).collection('data').doc('sigStempel').set(local);
+    console.log('[Sig/Stempel] Lokal -> Cloud synchronisiert');
+  }catch(e){console.warn('[Sig/Stempel] Auto-Sync-Fehler:',e);}
 }
 function _updateSigStempelUI(){
   const store=_getSigStempelStore();
@@ -10481,6 +10498,8 @@ try{
   if(user){
     _fbUid=user.uid;
     _dataOwner=null; // Reset bis Daten geladen sind
+    // Sig+Stempel: auto-sync local nach cloud falls noch nicht geschehen
+    setTimeout(()=>{try{_ensureSigStempelCloudSync();}catch(e){}}, 2000);
     // App-Launcher-Check: Admin?
     _checkAdminShowLauncher(user.uid);
     // View-As Button sichtbar wenn Stefan
