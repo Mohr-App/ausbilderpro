@@ -1063,7 +1063,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.12.6 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.13.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2343,6 +2343,38 @@ function selInst(katId,instId){
   persist();renderAll();
   // Cross-Ausbilder Noten-Sync: lade Noten anderer Ausbilder fuer diesen Kurs aus Firestore
   setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 150);
+  // Self-Heal: Lehrgangsart in Cloud synchronisieren (falls Umbenennung nicht durchgekommen ist)
+  setTimeout(()=>{try{syncKatLehrgangsartToCloud(S.curKat);}catch(e){}}, 250);
+}
+// Self-Heal: lokales kat.label nach Firestore (shared/kurse/list/{kursId}) syncen
+// Wird nach Kurs-Switch + bei Login fuer alle Kats aufgerufen
+async function syncKatLehrgangsartToCloud(katId){
+  if(!_db||_demoMode||!_fbUid) return;
+  const kat=katId?S.kats[katId]:null;
+  if(!kat||!kat.label) return;
+  const targetLabel=kat.label;
+  const tasks=Object.values(kat.instances||{})
+    .filter(inst=>inst&&inst.sharedKursId)
+    .map(inst=>
+      _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
+        .get()
+        .then(snap=>{
+          if(!snap.exists) return;
+          const d=snap.data()||{};
+          if(d.lehrgangsart===targetLabel) return; // schon synced
+          return _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
+            .update({name:targetLabel,lehrgangsart:targetLabel});
+        })
+        .catch(()=>{})
+    );
+  await Promise.all(tasks);
+}
+async function syncAllKatsLehrgangsartToCloud(){
+  if(!_db||_demoMode||!_fbUid) return;
+  const katIds=Object.keys(S.kats||{});
+  for(const kid of katIds){
+    try{ await syncKatLehrgangsartToCloud(kid); }catch(e){}
+  }
 }
 // Cross-Ausbilder Noten-Sync - laedt Noten/Werkzeug/Bemerkung aus Firestore zurueck in lokale seats
 async function syncSeatGradesFromFirestore(){
@@ -10802,6 +10834,8 @@ try{
     setTimeout(()=>{try{_ensureSigStempelCloudSync();}catch(e){}}, 2000);
     // Cross-Ausbilder Noten-Sync nach Initialdaten-Load (3s damit Firestore Subscription Time hat)
     setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 3000);
+    // Self-Heal: Lehrgangsart-Sync fuer ALLE Kategorien (falls Umbenennungen in Vergangenheit nicht gesynct)
+    setTimeout(()=>{try{syncAllKatsLehrgangsartToCloud();}catch(e){}}, 4000);
     // App-Launcher-Check: Admin?
     _checkAdminShowLauncher(user.uid);
     // View-As Button sichtbar wenn Stefan
