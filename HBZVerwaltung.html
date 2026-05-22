@@ -4613,7 +4613,7 @@ function handleStatusCardClick(event, cardEl){
 // Eigener Bestätigungs-Dialog (statt confirm() das im PWA blockiert sein kann)
 function openRemoveStatusDialog(tnId, type){
   const tn = _globalTN.find(t=>t.id===tnId);
-  if(!tn){ if(typeof toast==='function') toast('TN nicht gefunden','bad'); return; }
+  if(!tn){ if(typeof toast==='function') toast('TN nicht gefunden im Pool','bad'); return; }
   const name = ((tn.vorname||'')+' '+(tn.nachname||'')).trim() || 'TN';
   const lbl = type==='absent' ? '„Nicht angetreten"' : '„Kurs wiederholen"';
   const old = document.getElementById('rmStatusDialog');
@@ -4625,35 +4625,48 @@ function openRemoveStatusDialog(tnId, type){
     +'<div style="font-size:1.05rem;font-weight:800;color:#0f172a;margin-bottom:10px">'+esc(name)+' aus '+lbl+' entfernen?</div>'
     +'<div style="font-size:.82rem;color:#475569;line-height:1.5;margin-bottom:18px">Stammdaten und Kurs-Verlauf bleiben erhalten — der Teilnehmer wird nur aus diesem Container entfernt.</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end">'
-    +'<button onclick="document.getElementById(\'rmStatusDialog\').remove()" style="padding:8px 16px;border:1px solid #cbd5e1;background:#f1f5f9;color:#475569;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Abbrechen</button>'
-    +'<button onclick="confirmRemoveStatus(\''+tnId+'\',\''+type+'\')" style="padding:8px 16px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Entfernen</button>'
+    +'<button id="rmStatusCancel" style="padding:8px 16px;border:1px solid #cbd5e1;background:#f1f5f9;color:#475569;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Abbrechen</button>'
+    +'<button id="rmStatusConfirm" style="padding:8px 16px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Entfernen</button>'
     +'</div></div>';
   document.body.appendChild(ov);
+  // Listener programmatisch (nicht inline)
+  document.getElementById('rmStatusCancel').addEventListener('click', ()=>ov.remove());
+  document.getElementById('rmStatusConfirm').addEventListener('click', async ()=>{
+    if(typeof toast==='function') toast('Sende Update an Server...','ok');
+    ov.remove();
+    await doRemoveStatusServer(tnId, type, name);
+  });
 }
 
-async function confirmRemoveStatus(tnId, type){
-  const dlg = document.getElementById('rmStatusDialog');
-  if(dlg) dlg.remove();
-  if(!_db){ if(typeof toast==='function') toast('Keine Datenbank-Verbindung','bad'); return; }
-  const tn = _globalTN.find(t=>t.id===tnId);
-  if(!tn){ if(typeof toast==='function') toast('TN nicht gefunden','bad'); return; }
-  const name = ((tn.vorname||'')+' '+(tn.nachname||'')).trim() || 'TN';
+async function doRemoveStatusServer(tnId, type, name){
+  if(!_db){ if(typeof toast==='function') toast('Keine DB-Verbindung','bad'); return; }
   try {
     const patch = {};
     if(type==='absent'){ patch.status=''; }
     if(type==='wdh'){ patch.wiederholer=false; patch.wdhGrund=''; }
     await _db.collection('globalTN').doc(tnId).update(patch);
-    Object.assign(tn, patch);
-    if(typeof toast==='function') toast(name+' entfernt','ok');
+    const tn = _globalTN.find(t=>t.id===tnId);
+    if(tn) Object.assign(tn, patch);
+    if(typeof toast==='function') toast(name+' wurde entfernt','ok');
     if(typeof loadDashboard==='function') loadDashboard();
   } catch(e){
-    console.error('removeStatus failed:',e);
-    if(typeof toast==='function') toast('Fehler: '+(e.message||e),'bad');
-    else alert('Fehler: '+(e.message||e));
+    console.error('removeStatus failed:', e);
+    const errMsg = e.message || e.code || String(e) || 'unbekannt';
+    if(typeof toast==='function') toast('Fehler beim Speichern: '+errMsg,'bad');
+    // Zusätzlich auch als alert damit Stefan es sieht
+    alert('Fehler beim Entfernen:\n'+errMsg+'\n\nMöglicherweise Firestore-Permission. Bitte Screenshot senden.');
   }
 }
 
-// Alter Wrapper bleibt als Alias
+async function confirmRemoveStatus(tnId, type){
+  // Backward-Compat falls noch alte inline-handler existieren
+  const tn = _globalTN.find(t=>t.id===tnId);
+  const name = tn ? (((tn.vorname||'')+' '+(tn.nachname||'')).trim()||'TN') : 'TN';
+  const dlg = document.getElementById('rmStatusDialog');
+  if(dlg) dlg.remove();
+  await doRemoveStatusServer(tnId, type, name);
+}
+
 async function removeFromStatus(tnId, type){
   openRemoveStatusDialog(tnId, type);
 }
@@ -9544,7 +9557,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.3.3 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.3.4 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
