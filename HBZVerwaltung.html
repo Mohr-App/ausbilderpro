@@ -4597,37 +4597,65 @@ let _kdUnsubTN=null, _kdUnsubKurs=null;
 // Klick auf Status-Card im Dashboard - entscheidet: x-Button (entfernen) oder Card (Kursdetail)
 function handleStatusCardClick(event, cardEl){
   event.stopPropagation();
-  if(event.target.classList && event.target.classList.contains('sa-del')){
-    // x-Button geklickt
+  const isDel = event.target.classList && event.target.classList.contains('sa-del');
+  if(isDel){
     const tnId = cardEl.getAttribute('data-tn-id');
     const type = cardEl.getAttribute('data-status-type');
-    removeFromStatus(tnId, type);
+    // Sofortiges visuelles Feedback dass Click erkannt wurde
+    if(typeof toast==='function') toast('Click erkannt...','ok');
+    openRemoveStatusDialog(tnId, type);
     return;
   }
-  // Sonst: Kursdetail öffnen
   const kursId = cardEl.getAttribute('data-kurs-id');
   if(kursId && typeof showKursDetail==='function') showKursDetail(kursId);
 }
-// Status aus Dashboard-Karten entfernen (TN wird aus Nicht-angetreten- oder Wiederholer-Container raus)
-async function removeFromStatus(tnId, type){
-  if(!_db) return;
+
+// Eigener Bestätigungs-Dialog (statt confirm() das im PWA blockiert sein kann)
+function openRemoveStatusDialog(tnId, type){
   const tn = _globalTN.find(t=>t.id===tnId);
-  if(!tn) return;
+  if(!tn){ if(typeof toast==='function') toast('TN nicht gefunden','bad'); return; }
   const name = ((tn.vorname||'')+' '+(tn.nachname||'')).trim() || 'TN';
   const lbl = type==='absent' ? '„Nicht angetreten"' : '„Kurs wiederholen"';
-  if(!confirm(name+' aus '+lbl+' entfernen?\n\nStammdaten und Kurs-Verlauf bleiben erhalten - der Teilnehmer wird nur aus diesem Container entfernt.')) return;
+  const old = document.getElementById('rmStatusDialog');
+  if(old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'rmStatusDialog';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,18,25,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:22px;box-shadow:0 24px 64px rgba(0,0,0,.4)">'
+    +'<div style="font-size:1.05rem;font-weight:800;color:#0f172a;margin-bottom:10px">'+esc(name)+' aus '+lbl+' entfernen?</div>'
+    +'<div style="font-size:.82rem;color:#475569;line-height:1.5;margin-bottom:18px">Stammdaten und Kurs-Verlauf bleiben erhalten — der Teilnehmer wird nur aus diesem Container entfernt.</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +'<button onclick="document.getElementById(\'rmStatusDialog\').remove()" style="padding:8px 16px;border:1px solid #cbd5e1;background:#f1f5f9;color:#475569;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Abbrechen</button>'
+    +'<button onclick="confirmRemoveStatus(\''+tnId+'\',\''+type+'\')" style="padding:8px 16px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Entfernen</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+}
+
+async function confirmRemoveStatus(tnId, type){
+  const dlg = document.getElementById('rmStatusDialog');
+  if(dlg) dlg.remove();
+  if(!_db){ if(typeof toast==='function') toast('Keine Datenbank-Verbindung','bad'); return; }
+  const tn = _globalTN.find(t=>t.id===tnId);
+  if(!tn){ if(typeof toast==='function') toast('TN nicht gefunden','bad'); return; }
+  const name = ((tn.vorname||'')+' '+(tn.nachname||'')).trim() || 'TN';
   try {
     const patch = {};
     if(type==='absent'){ patch.status=''; }
     if(type==='wdh'){ patch.wiederholer=false; patch.wdhGrund=''; }
     await _db.collection('globalTN').doc(tnId).update(patch);
     Object.assign(tn, patch);
-    toast(name+' entfernt','ok');
+    if(typeof toast==='function') toast(name+' entfernt','ok');
     if(typeof loadDashboard==='function') loadDashboard();
-    else if(typeof renderDashboard==='function') renderDashboard();
   } catch(e){
-    toast('Fehler: '+e.message,'bad');
+    console.error('removeStatus failed:',e);
+    if(typeof toast==='function') toast('Fehler: '+(e.message||e),'bad');
+    else alert('Fehler: '+(e.message||e));
   }
+}
+
+// Alter Wrapper bleibt als Alias
+async function removeFromStatus(tnId, type){
+  openRemoveStatusDialog(tnId, type);
 }
 
 // Archivieren - TN bleibt erhalten aber wird aus aktiven Listen ausgeblendet
@@ -9516,7 +9544,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.3.2 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.3.3 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
