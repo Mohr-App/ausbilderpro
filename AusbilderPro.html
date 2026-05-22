@@ -1063,7 +1063,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.13.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.14.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5942,8 +5942,12 @@ ${notenHtml}
 <div class="ausbildungsnachweis"><b>Ausbildungsnachweis wurde für den Zeitraum der überbetrieblichen<br>Unterweisung geführt:</b> &nbsp;&nbsp;<span class="radio rb-yes ${initYesChecked?'checked':''}" data-tn="${tnId}" onclick="toggleNachweis('${tnId}','yes')"><span class="radio-dot"></span></span> ja &nbsp;&nbsp;&nbsp;<span class="radio rb-no ${initNoChecked?'checked':''}" data-tn="${tnId}" onclick="toggleNachweis('${tnId}','no')"><span class="radio-dot"></span></span> nein</div>
 <div class="datum-zeile"><b>Siegburg, den ${heute}</b></div>
 <div class="sig-row">
-  <div class="sig-block"><div class="sig-space"></div><div class="sig-line">Lehrgangsleiter</div></div>
-  <div class="sig-block">${sigData?'<img src="'+sigData+'" class="sig-img">':'<div class="sig-space"></div>'}<div class="sig-line">Ausbilder (Meister)</div></div>
+  <div class="sig-block">
+    <div class="sig-area" id="sigArea-${tnId}">${sigData?'<div class="sig-canvas-wrap signed"><img src="'+sigData+'" class="sig-img"><button class="btn-remove-overlay no-print" onclick="removeSigBulk(\''+tnId+'\')" title="Unterschrift entfernen">✕</button></div>':'<div class="sig-canvas-wrap-empty"></div>'}</div>
+    <div class="sig-line">Lehrgangsleiter</div>
+  </div>
+  <div class="stempel-slot" id="stempelSlot-${tnId}"></div>
+  <div class="sig-block"><div class="sig-space"></div><div class="sig-line">Ausbilder (Meister)</div></div>
 </div>
 <div class="hinweis-row">
   <div class="hinweis"><b>Diese Bescheinigung ist nach Beendigung des Lehrgangs dem Meister zur Unterschrift vorzulegen und später mit den Anmeldeunterlagen zur Gesellenprüfung einzureichen.</b></div>
@@ -6066,7 +6070,23 @@ h1{text-align:center;font-size:22pt;font-weight:bold;font-style:italic;margin:4m
 .bulk-btn-standort:hover{background:#1d4ed8;}
 .bulk-btn-reset{background:#64748b;}
 .bulk-btn-reset:hover{background:#475569;}
+.bulk-btn-sig{background:#7c3aed;}
+.bulk-btn-sig:hover{background:#6d28d9;}
 .print-hint{font-size:11px;color:#475569;margin:6px 0;line-height:1.5;font-family:'Segoe UI',Arial,sans-serif;}
+
+/* Sig + Stempel (wie in Einzel-Bescheinigung) */
+.sig-canvas-wrap{border:2px dashed #999;border-radius:8px;padding:4px;margin-bottom:4px;background:#fafafa;position:relative;height:16mm;width:80%;}
+.sig-canvas-wrap.signed{border-color:#22c55e;border-style:dashed;background:transparent;}
+.sig-canvas-wrap-empty{height:16mm;width:80%;}
+@media print{.sig-canvas-wrap,.sig-canvas-wrap.signed{border:none !important;background:none !important;padding:0 !important;}.sig-canvas-wrap-empty{display:none;}}
+body.pdf-mode .sig-canvas-wrap{border:none !important;background:transparent !important;padding:0 !important;}
+body.pdf-mode .sig-canvas-wrap-empty{display:none;}
+.sig-img{max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;}
+.stempel-slot{position:absolute;top:-30mm;left:50%;transform:translateX(-50%);width:38mm;height:38mm;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.stempel-slot img{max-width:100%;max-height:100%;object-fit:contain;opacity:.85;}
+.btn-remove-overlay{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:#ef4444;color:#fff;cursor:pointer;font-weight:900;font-size:.7rem;box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:10;line-height:0;display:flex;align-items:center;justify-content:center;}
+@media print{.no-print,.btn-remove-overlay{display:none !important;}}
+body.pdf-mode .btn-remove-overlay{display:none !important;}
 </style></head><body>
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="window.print()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
@@ -6079,6 +6099,9 @@ h1{text-align:center;font-size:22pt;font-weight:bold;font-style:italic;margin:4m
     <button class="bulk-btn" onclick="setAllNachweis('yes')">Alle „ja" ✓</button>
     <button class="bulk-btn" onclick="setAllNachweis('no')">Alle „nein" ✓</button>
     <button class="bulk-btn bulk-btn-reset" onclick="setAllNachweis('reset')">Reset</button>
+    <span style="width:8px"></span>
+    <button class="bulk-btn bulk-btn-sig" onclick="insertSigStempelBulk()">📝 Unterschrift & Stempel (alle)</button>
+    <button class="bulk-btn bulk-btn-reset" onclick="removeAllSigStempelBulk()">Alle entfernen</button>
   </div>
   <div class="print-hint">${seats.length} Teilnehmer · ${sigCount} unterschrieben · ${seats.length-sigCount} offen<br><b>Tipp:</b> Im Druck-Dialog unter „Weitere Einstellungen" → „Kopf- und Fußzeilen" deaktivieren (entfernt Datum, URL und Seitenzahl)</div>
 </div>
@@ -6139,6 +6162,68 @@ function setAllStandort(ort){
   if(window.opener&&window.opener._saveBescheinigungDataBulk){
     window.opener._saveBescheinigungDataBulk(window._kursId,tnIds,'bescheinigungStandort',ort);
   }
+}
+// Sig + Stempel fuer ALLE TN aus encrypted store einfuegen
+async function insertSigStempelBulk(){
+  if(!window.opener||!window.opener._getDefaultSigStempel){
+    alert('Bitte vorher in der App unter „Mehr → Profil" Unterschrift+Stempel hinterlegen.');
+    return;
+  }
+  var pin=window.opener._getCachedSigStempelPin?window.opener._getCachedSigStempelPin():null;
+  if(!pin){
+    pin=prompt('4-stellige PIN zum Entsperren von Unterschrift & Stempel:');
+    if(!pin||pin.length!==4)return;
+  }
+  var result;
+  try{ result=await window.opener._getDefaultSigStempel(pin); }
+  catch(e){ alert('Fehler: '+e.message); return; }
+  if(!result||result.error==='no-data'){
+    alert('Keine hinterlegte Unterschrift/Stempel gefunden.\\nIn der Haupt-App unter „Mehr → Profil → Unterschrift & Stempel" anlegen.');
+    return;
+  }
+  if(result.error==='bad-pin'){ alert('Falsche PIN.'); return; }
+  // Iteriere alle TN-pages
+  var sigAreas=document.querySelectorAll('[id^="sigArea-"]');
+  var stempelSlots=document.querySelectorAll('[id^="stempelSlot-"]');
+  sigAreas.forEach(function(area){
+    var tnId=area.id.replace('sigArea-','');
+    if(result.sig){
+      area.innerHTML='<div class="sig-canvas-wrap signed"><img src="'+result.sig+'" class="sig-img"><button class="btn-remove-overlay no-print" onclick="removeSigBulk(\\''+tnId+'\\')" title="Unterschrift entfernen">✕</button></div>';
+      // Sig in Firestore speichern
+      if(window.opener&&window.opener._saveBescheinigungSignature){
+        window.opener._saveBescheinigungSignature(window._kursId,tnId,result.sig);
+      }
+    }
+  });
+  stempelSlots.forEach(function(slot){
+    if(result.stempel){
+      var tnId=slot.id.replace('stempelSlot-','');
+      slot.innerHTML='<img src="'+result.stempel+'" alt="Stempel"><button class="btn-remove-overlay no-print" onclick="removeStempelBulk(\\''+tnId+'\\')" title="Stempel entfernen" style="pointer-events:auto">✕</button>';
+      slot.style.pointerEvents='auto';
+    }
+  });
+}
+function removeSigBulk(tnId){
+  var area=document.getElementById('sigArea-'+tnId);
+  if(area) area.innerHTML='<div class="sig-canvas-wrap-empty"></div>';
+  if(window.opener&&window.opener._saveBescheinigungSignature){
+    window.opener._saveBescheinigungSignature(window._kursId,tnId,null);
+  }
+}
+function removeStempelBulk(tnId){
+  var slot=document.getElementById('stempelSlot-'+tnId);
+  if(slot){slot.innerHTML='';slot.style.pointerEvents='none';}
+}
+function removeAllSigStempelBulk(){
+  if(!confirm('Unterschrift und Stempel von ALLEN '+document.querySelectorAll('[id^="sigArea-"]').length+' Bescheinigungen entfernen?'))return;
+  document.querySelectorAll('[id^="sigArea-"]').forEach(function(area){
+    var tnId=area.id.replace('sigArea-','');
+    area.innerHTML='<div class="sig-canvas-wrap-empty"></div>';
+    if(window.opener&&window.opener._saveBescheinigungSignature){
+      window.opener._saveBescheinigungSignature(window._kursId,tnId,null);
+    }
+  });
+  document.querySelectorAll('[id^="stempelSlot-"]').forEach(function(slot){slot.innerHTML='';slot.style.pointerEvents='none';});
 }
 <\/script>
 </body></html>`);
