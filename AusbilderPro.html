@@ -1063,7 +1063,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.14.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.14.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6041,11 +6041,11 @@ h1{text-align:center;font-size:22pt;font-weight:bold;font-style:italic;margin:4m
 .datum-zeile{margin:2mm 0 2mm 0;font-size:12pt;}
 
 /* Unterschriften */
-.sig-row{display:flex;justify-content:space-between;margin:1mm 0 3mm 0;gap:15mm;}
-.sig-block{flex:1;text-align:center;}
-.sig-space{height:12mm;}
-.sig-line{border-top:1pt dotted #000;padding-top:1mm;font-size:11pt;}
-.sig-img{max-width:100%;max-height:12mm;object-fit:contain;}
+.sig-row{display:flex;justify-content:space-between;margin:1mm 0 3mm 0;gap:15mm;position:relative;align-items:flex-end;}
+.sig-block{flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;}
+.sig-space{height:16mm;}
+.sig-line{border-top:1pt dotted #000;padding-top:1mm;font-size:11pt;width:100%;}
+.sig-img{max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;}
 
 /* Hinweis + Handwerk Logo */
 .hinweis-row{display:flex;justify-content:space-between;align-items:center;margin:4mm 0;gap:10mm;}
@@ -6084,6 +6084,12 @@ body.pdf-mode .sig-canvas-wrap-empty{display:none;}
 .sig-img{max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;}
 .stempel-slot{position:absolute;top:-30mm;left:50%;transform:translateX(-50%);width:38mm;height:38mm;display:flex;align-items:center;justify-content:center;pointer-events:none;}
 .stempel-slot img{max-width:100%;max-height:100%;object-fit:contain;opacity:.85;}
+.stempel-slot.draggable{cursor:grab;pointer-events:auto;touch-action:none;}
+.stempel-slot.draggable:active{cursor:grabbing;}
+.sig-canvas-wrap.draggable{cursor:grab;touch-action:none;}
+.sig-canvas-wrap.draggable:active{cursor:grabbing;}
+@media print{.stempel-slot,.sig-canvas-wrap{cursor:default !important;}}
+body.pdf-mode .stempel-slot,body.pdf-mode .sig-canvas-wrap{cursor:default !important;}
 .btn-remove-overlay{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:#ef4444;color:#fff;cursor:pointer;font-weight:900;font-size:.7rem;box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:10;line-height:0;display:flex;align-items:center;justify-content:center;}
 @media print{.no-print,.btn-remove-overlay{display:none !important;}}
 body.pdf-mode .btn-remove-overlay{display:none !important;}
@@ -6163,6 +6169,76 @@ function setAllStandort(ort){
     window.opener._saveBescheinigungDataBulk(window._kursId,tnIds,'bescheinigungStandort',ort);
   }
 }
+// ── Globale Position fuer Sig+Stempel (gilt fuer alle TN-pages im Bulk) ──
+let _sigPos={x:0,y:0,size:16};
+let _stempelPos={x:0,y:-30,size:38};
+let _savePosTimer=null;
+const _MM_PER_PX=1/3.78;
+function _applySigPosAll(){
+  document.querySelectorAll('.sig-canvas-wrap').forEach(function(wrap){
+    wrap.style.transform='translate('+_sigPos.x+'mm,'+_sigPos.y+'mm)';
+    wrap.style.height=_sigPos.size+'mm';
+  });
+}
+function _applyStempelPosAll(){
+  document.querySelectorAll('.stempel-slot').forEach(function(slot){
+    slot.style.left='calc(50% + '+_stempelPos.x+'mm)';
+    slot.style.top=_stempelPos.y+'mm';
+    slot.style.width=_stempelPos.size+'mm';
+    slot.style.height=_stempelPos.size+'mm';
+  });
+}
+function _saveSigStempelPosBulk(){
+  clearTimeout(_savePosTimer);
+  _savePosTimer=setTimeout(function(){
+    if(window.opener&&window.opener._saveSigStempelPositions){
+      window.opener._saveSigStempelPositions(_sigPos,_stempelPos).catch(function(){});
+    }
+  },600);
+}
+function _makeDraggableBulk(el,posObj,applyAllFn){
+  if(!el||el._dragInit) return;
+  el._dragInit=true;
+  el.classList.add('draggable');
+  var baseX,baseY,startX,startY,dragging=false;
+  el.addEventListener('pointerdown',function(e){
+    if(e.target.classList.contains('btn-remove-overlay'))return;
+    dragging=true;startX=e.clientX;startY=e.clientY;
+    baseX=posObj.x;baseY=posObj.y;
+    el.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove',function(e){
+    if(!dragging)return;
+    posObj.x=baseX+(e.clientX-startX)*_MM_PER_PX;
+    posObj.y=baseY+(e.clientY-startY)*_MM_PER_PX;
+    applyAllFn();
+  });
+  el.addEventListener('pointerup',function(){
+    if(!dragging)return;
+    dragging=false;
+    _saveSigStempelPosBulk();
+  });
+  el.addEventListener('pointercancel',function(){dragging=false;});
+}
+function _attachDragToAll(){
+  document.querySelectorAll('.sig-canvas-wrap.signed').forEach(function(w){_makeDraggableBulk(w,_sigPos,_applySigPosAll);});
+  document.querySelectorAll('.stempel-slot').forEach(function(s){
+    if(s.querySelector('img')) _makeDraggableBulk(s,_stempelPos,_applyStempelPosAll);
+  });
+}
+async function _loadPositionsBulk(){
+  if(!window.opener||!window.opener._getSigStempelPositions) return;
+  try{
+    var pos=await window.opener._getSigStempelPositions();
+    if(pos.sigPos) _sigPos=Object.assign({x:0,y:0,size:16},pos.sigPos);
+    if(pos.stempelPos) _stempelPos=Object.assign({x:0,y:-30,size:38},pos.stempelPos);
+    _applySigPosAll();_applyStempelPosAll();
+    _attachDragToAll();
+  }catch(e){}
+}
+setTimeout(_loadPositionsBulk,200);
+
 // Sig + Stempel fuer ALLE TN aus encrypted store einfuegen
 async function insertSigStempelBulk(){
   if(!window.opener||!window.opener._getDefaultSigStempel){
@@ -6189,7 +6265,6 @@ async function insertSigStempelBulk(){
     var tnId=area.id.replace('sigArea-','');
     if(result.sig){
       area.innerHTML='<div class="sig-canvas-wrap signed"><img src="'+result.sig+'" class="sig-img"><button class="btn-remove-overlay no-print" onclick="removeSigBulk(\\''+tnId+'\\')" title="Unterschrift entfernen">✕</button></div>';
-      // Sig in Firestore speichern
       if(window.opener&&window.opener._saveBescheinigungSignature){
         window.opener._saveBescheinigungSignature(window._kursId,tnId,result.sig);
       }
@@ -6199,9 +6274,12 @@ async function insertSigStempelBulk(){
     if(result.stempel){
       var tnId=slot.id.replace('stempelSlot-','');
       slot.innerHTML='<img src="'+result.stempel+'" alt="Stempel"><button class="btn-remove-overlay no-print" onclick="removeStempelBulk(\\''+tnId+'\\')" title="Stempel entfernen" style="pointer-events:auto">✕</button>';
-      slot.style.pointerEvents='auto';
     }
   });
+  // Globale Position auf alle anwenden + Drag aktivieren
+  _applySigPosAll();
+  _applyStempelPosAll();
+  _attachDragToAll();
 }
 function removeSigBulk(tnId){
   var area=document.getElementById('sigArea-'+tnId);
@@ -6212,7 +6290,7 @@ function removeSigBulk(tnId){
 }
 function removeStempelBulk(tnId){
   var slot=document.getElementById('stempelSlot-'+tnId);
-  if(slot){slot.innerHTML='';slot.style.pointerEvents='none';}
+  if(slot){slot.innerHTML='';slot.classList.remove('draggable');}
 }
 function removeAllSigStempelBulk(){
   if(!confirm('Unterschrift und Stempel von ALLEN '+document.querySelectorAll('[id^="sigArea-"]').length+' Bescheinigungen entfernen?'))return;
@@ -6223,7 +6301,7 @@ function removeAllSigStempelBulk(){
       window.opener._saveBescheinigungSignature(window._kursId,tnId,null);
     }
   });
-  document.querySelectorAll('[id^="stempelSlot-"]').forEach(function(slot){slot.innerHTML='';slot.style.pointerEvents='none';});
+  document.querySelectorAll('[id^="stempelSlot-"]').forEach(function(slot){slot.innerHTML='';slot.classList.remove('draggable');});
 }
 <\/script>
 </body></html>`);
