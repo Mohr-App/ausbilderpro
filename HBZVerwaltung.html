@@ -4639,22 +4639,36 @@ function openRemoveStatusDialog(tnId, type){
 }
 
 async function doRemoveStatusServer(tnId, type, name){
-  if(!_db){ if(typeof toast==='function') toast('Keine DB-Verbindung','bad'); return; }
+  let stage = 'start';
   try {
+    stage = 'check_db';
+    if(!_db) throw new Error('Keine Datenbank-Verbindung');
+    stage = 'build_patch';
     const patch = {};
-    if(type==='absent'){ patch.status=''; }
+    if(type==='absent') patch.status='';
     if(type==='wdh'){ patch.wiederholer=false; patch.wdhGrund=''; }
-    await _db.collection('globalTN').doc(tnId).update(patch);
+    stage = 'check_tn_doc';
+    // Prüfe erst ob das Doc überhaupt existiert
+    const docRef = _db.collection('globalTN').doc(tnId);
+    const snapPromise = docRef.get();
+    const snapTo = new Promise((_, rej)=>setTimeout(()=>rej(new Error('Timeout 5s beim Doc-Lesen')), 5000));
+    const snap = await Promise.race([snapPromise, snapTo]);
+    if(!snap.exists) throw new Error('TN-Doc existiert nicht in Firestore: '+tnId);
+    stage = 'firestore_update';
+    const upd = docRef.update(patch);
+    const to = new Promise((_, rej)=>setTimeout(()=>rej(new Error('Timeout 8s beim Update')), 8000));
+    await Promise.race([upd, to]);
+    stage = 'local_assign';
     const tn = _globalTN.find(t=>t.id===tnId);
     if(tn) Object.assign(tn, patch);
+    stage = 'render';
     if(typeof toast==='function') toast(name+' wurde entfernt','ok');
     if(typeof loadDashboard==='function') loadDashboard();
   } catch(e){
-    console.error('removeStatus failed:', e);
-    const errMsg = e.message || e.code || String(e) || 'unbekannt';
-    if(typeof toast==='function') toast('Fehler beim Speichern: '+errMsg,'bad');
-    // Zusätzlich auch als alert damit Stefan es sieht
-    alert('Fehler beim Entfernen:\n'+errMsg+'\n\nMöglicherweise Firestore-Permission. Bitte Screenshot senden.');
+    console.error('removeStatus failed at '+stage+':', e);
+    const msg = 'STAGE: '+stage+'\nERROR: '+(e.message||e.code||String(e))+'\nTN-ID: '+tnId+'\nType: '+type;
+    if(typeof toast==='function') toast('Fehler: '+stage+' - '+(e.message||e.code||e),'bad');
+    alert('🐛 Fehler beim Entfernen\n\n'+msg+'\n\nBitte Screenshot senden.');
   }
 }
 
@@ -9557,7 +9571,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.3.4 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.3.5 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
