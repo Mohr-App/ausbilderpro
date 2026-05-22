@@ -1060,7 +1060,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.11.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.12.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2890,7 +2890,10 @@ function linkHBZKurs(kursId, kursData, targetKatId){
     rows, seatCnt:13, seats:{}, nextSeatNum:13, seatLabels:{},
     sharedKursId: kursId,
     werkzeug: kursData.werkzeug||[],
-    berufsschultage: kursData.berufsschultage||[]
+    berufsschultage: kursData.berufsschultage||[],
+    // KEINE Standardnoten als Default - Ausbilder muss eigene anlegen
+    deletedFixedGrades:['fuehrung','mitarbeit','praxis'],
+    customGrades:[]
   };
   S.curKat=targetKatId;
   S.curInst=instId;
@@ -4921,6 +4924,18 @@ function renderGradesTab(d){
   const deleted=inst.deletedFixedGrades||[];
   const all=[...FIXED_GRADES.filter(g=>!deleted.includes(g.id)),...inst.customGrades];
   const fields=document.getElementById('gradesFields');
+  if(all.length===0){
+    fields.innerHTML='<div style="padding:24px 16px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1.5px dashed #93c5fd;border-radius:12px;text-align:center;color:#1e40af">'
+      +'<div style="font-size:1.4rem;margin-bottom:6px">📝</div>'
+      +'<div style="font-weight:700;font-size:.85rem;margin-bottom:4px">Noch keine Notenkategorien angelegt</div>'
+      +'<div style="font-size:.72rem;color:#3b82f6;margin-bottom:12px">Lege eigene Notenkategorien für diesen Kurs an (z.B. Führung, Mitarbeit, Praxis, Theorie, …).</div>'
+      +'<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">'
+      +'<input type="text" id="newGradeName" placeholder="z.B. Führung" maxlength="20" style="padding:7px 10px;border:1px solid #93c5fd;border-radius:6px;font-size:.78rem;background:#fff;font-family:inherit;width:160px" onkeydown="if(event.key===\'Enter\'){addCustomGrade();}">'
+      +'<button onclick="addCustomGrade()" style="padding:7px 14px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit">+ Anlegen</button>'
+      +'</div></div>';
+    updGrades();
+    return;
+  }
   fields.innerHTML='<div class="gr3" style="flex-wrap:wrap;">'
     +all.map(g=>{
       const val=(g.fixed===false)?(d.extraGrades||{})[g.id]||'':(d[g.id]||'');
