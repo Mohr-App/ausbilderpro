@@ -387,6 +387,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .sa-absent{background:rgba(239,68,68,.06);border:2px solid rgba(239,68,68,.25);}
 .sa-wdh{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);}
 .sa-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0;}
+.sa-del{margin-left:auto;background:transparent;border:none;width:22px;height:22px;border-radius:50%;font-size:1rem;line-height:1;color:#94a3b8;cursor:pointer;font-weight:700;transition:all .15s;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;}
+.sa-del:hover{background:rgba(239,68,68,.12);color:#ef4444;}
 .sa-absent .sa-avatar{background:rgba(239,68,68,.15);color:#ef4444;}
 .sa-wdh .sa-avatar{background:rgba(245,158,11,.15);color:#d97706;}
 .sa-info{flex:1;min-width:0;}
@@ -775,7 +777,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <!-- Status Alerts -->
         <div id="dashStatusGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
           <div class="card" style="display:flex;flex-direction:column;margin:0">
-            <div class="card-title"><span class="card-icon red" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span><span style="color:#ef4444">Nicht erschienen</span></div>
+            <div class="card-title"><span class="card-icon red" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span><span style="color:#ef4444">Nicht angetreten</span></div>
             <div id="dashAbsent" class="dash-status-body" style="flex:1;overflow-y:auto"><div class="empty">Lädt…</div></div>
           </div>
           <div class="card" style="display:flex;flex-direction:column;margin:0">
@@ -2694,7 +2696,8 @@ function loadDashboard(){
           title="Kursdetails öffnen" onclick="event.stopPropagation();showKursDetail('${x.kursId}')">
           <div class="sa-avatar">${init}</div>
           <div class="sa-info"><div class="sa-name">${esc(x.name.trim())}</div><div class="sa-meta">${x.meta}</div></div>
-          <div style="margin-left:auto;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">⠿ ziehen</div>
+          <button class="sa-del" title="Aus 'Nicht angetreten' entfernen" onclick="event.stopPropagation();removeFromStatus('${x.tnId}','absent')">×</button>
+          <div style="margin-left:4px;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">⠿ ziehen</div>
         </div>`;
       } else {
         return `<div class="status-alert sa-wdh" draggable="true"
@@ -2703,7 +2706,8 @@ function loadDashboard(){
           title="Kursdetails öffnen" onclick="event.stopPropagation();showKursDetail('${x.kursId}')">
           <div class="sa-avatar">${init}</div>
           <div class="sa-info"><div class="sa-name">${esc(x.name.trim())}</div><div class="sa-meta">${x.meta}</div>${x.grund?'<div style="font-size:.6rem;color:#d97706;font-weight:700;margin-top:2px">Grund: '+esc(x.grund)+'</div>':''}</div>
-          <div style="margin-left:auto;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">⠿ ziehen</div>
+          <button class="sa-del" title="Aus 'Kurs wiederholen' entfernen" onclick="event.stopPropagation();removeFromStatus('${x.tnId}','wdh')">×</button>
+          <div style="margin-left:4px;font-size:.55rem;color:var(--mu);font-family:'JetBrains Mono',monospace">⠿ ziehen</div>
         </div>`;
       }
     }).join('');
@@ -4575,6 +4579,28 @@ function renderSbKurseTree(){
 
 let _kdUnsubTN=null, _kdUnsubKurs=null;
 
+// Status aus Dashboard-Karten entfernen (TN wird aus Nicht-angetreten- oder Wiederholer-Container raus)
+async function removeFromStatus(tnId, type){
+  if(!_db) return;
+  const tn = _globalTN.find(t=>t.id===tnId);
+  if(!tn) return;
+  const name = ((tn.vorname||'')+' '+(tn.nachname||'')).trim() || 'TN';
+  const lbl = type==='absent' ? '„Nicht angetreten"' : '„Kurs wiederholen"';
+  if(!confirm(name+' aus '+lbl+' entfernen?\n\nStammdaten und Kurs-Verlauf bleiben erhalten - der Teilnehmer wird nur aus diesem Container entfernt.')) return;
+  try {
+    const patch = {};
+    if(type==='absent'){ patch.status=''; }
+    if(type==='wdh'){ patch.wiederholer=false; patch.wdhGrund=''; }
+    await _db.collection('globalTN').doc(tnId).update(patch);
+    Object.assign(tn, patch);
+    toast(name+' entfernt','ok');
+    if(typeof loadDashboard==='function') loadDashboard();
+    else if(typeof renderDashboard==='function') renderDashboard();
+  } catch(e){
+    toast('Fehler: '+e.message,'bad');
+  }
+}
+
 function showKursDetail(kursId){
   // Alte Listener abmelden
   if(_kdUnsubTN){ _kdUnsubTN(); _kdUnsubTN=null; }
@@ -4668,7 +4694,7 @@ function showKursDetail(kursId){
       const init=((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
       const vtag=t.verkuerzer?' <span class="gtn-badge" style="background:rgba(99,102,241,.12);color:#6366f1">Verk.</span>':'';
       const wtag=t.wiederholer?' <span class="gtn-badge" style="background:rgba(245,158,11,.12);color:#d97706">Wdh.'+(t.wdhGrund?' – '+esc(t.wdhGrund):'')+'</span>':'';
-      const abstag=(t.status==='absent'||statusMap[t.id]==='absent')?' <span class="gtn-badge" style="background:rgba(239,68,68,.12);color:#ef4444">✗ Nicht erschienen</span>':'';
+      const abstag=(t.status==='absent'||statusMap[t.id]==='absent')?' <span class="gtn-badge" style="background:rgba(239,68,68,.12);color:#ef4444">✗ Nicht angetreten</span>':'';
       const conf=confirmMap[t.id];
       const att=attMap[t.id];
       const hasAttendance=att&&att.attTotal>0;
@@ -6250,7 +6276,7 @@ function openTNProfile(tnId){
     if(i===0&&t.aktiverKursId===h.kursId&&!isInactive) badges+='<span style="float:right;font-size:.65rem;color:#22c55e">Aktuell</span>';
     if(isAbgebr) badges+='<span style="float:right;font-size:.55rem;color:#ef4444;background:rgba(239,68,68,.1);padding:1px 6px;border-radius:4px;font-weight:700">Abgebrochen</span>';
     if(isEntfernt) badges+='<span style="float:right;font-size:.55rem;color:#f59e0b;background:rgba(245,158,11,.1);padding:1px 6px;border-radius:4px;font-weight:700">Entfernt</span>';
-    if(isNichtErsch) badges+='<span style="float:right;font-size:.55rem;color:#ef4444;background:rgba(239,68,68,.1);padding:1px 6px;border-radius:4px;font-weight:700">Nicht erschienen</span>';
+    if(isNichtErsch) badges+='<span style="float:right;font-size:.55rem;color:#ef4444;background:rgba(239,68,68,.1);padding:1px 6px;border-radius:4px;font-weight:700">Nicht angetreten</span>';
     if(isManual&&!isInactive) badges+='<span style="float:right;font-size:.55rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">manuell</span>';
     return '<div class="history-item" style="position:relative;'+(isInactive?'opacity:.5;':'')+'">'+badges
     +'<div class="hi-name">'+esc(h.kursName||h.kursId)+'</div>'
@@ -7663,7 +7689,7 @@ function renderBldSuggestPanel(maxTN){
     g+='</div>';
     return g;
   }
-  h+=renderGroup('⚠ VORRANG (Wiederholer / Nicht erschienen)',vorrang,true,'color:#d97706');
+  h+=renderGroup('⚠ VORRANG (Wiederholer / Nicht angetreten)',vorrang,true,'color:#d97706');
   h+=renderGroup('VERFÜGBAR (kein aktiver Kurs)',verfuegbar,true,'');
   h+=renderGroup('IN ANDEREM KURS (aktuell belegt)',belegt,false,'opacity:.6');
 
@@ -7878,7 +7904,7 @@ function renderBldTNList(){
         '<div class="gtn-name" style="font-size:.78rem">'+esc(name.trim())+'</div>'+
         '<div class="gtn-sub">'+(t.beruf||'')+(t.firma?' · '+esc(t.firma):'')+'</div>'+
         (t.wiederholer?'<div style="font-size:.55rem;color:#d97706;font-weight:700;margin-top:2px">↻ Wiederholer'+(t.wdhGrund?' – '+esc(t.wdhGrund):'')+'</div>':'')+
-        (t.status==='absent'?'<div style="font-size:.55rem;color:#dc2626;font-weight:700;margin-top:2px">✗ Nicht erschienen</div>':'')+
+        (t.status==='absent'?'<div style="font-size:.55rem;color:#dc2626;font-weight:700;margin-top:2px">✗ Nicht angetreten</div>':'')+
         (conflict?'<div style="font-size:.6rem;color:#f59e0b;font-weight:700;margin-top:2px">🏖 Urlaub '+fmtDE(conflict.von)+'–'+fmtDE(conflict.bis)+'</div>':'')+
       '</div>'+
       '<button class="bld-tn-rm" onclick="bldRemoveTN(\''+id+'\')" title="Entfernen">&times;</button>';
@@ -9384,7 +9410,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.1.2 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.2.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
