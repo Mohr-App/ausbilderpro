@@ -1060,7 +1060,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.11.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.11.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -4149,20 +4149,31 @@ function mkSeat(id,seats){
     att.forEach(a=>{ if(a.date) dayMap.set(a.date,attCfg(a).dot); });
     const dotsHtml=[...dayMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).slice(-14).map(([date,cls])=>'<div class="sdot '+cls+'" title="'+fmtD(date)+'"></div>').join('');
     if(dotsHtml) el.innerHTML+='<div class="sdots-row">'+dotsHtml+'</div>';
-    // grades
+    // grades - Reihenfolge identisch zum Noten-Reiter (FIXED nicht-geloeschte zuerst, dann custom in Definitions-Reihenfolge)
     let g='';
-    if(d.fuehrung)  g+='<span class="gb '+gradeClass(d.fuehrung)+'" title="Führung: Note '+d.fuehrung+'">F:'+d.fuehrung+'</span>';
-    if(d.mitarbeit) g+='<span class="gb '+gradeClass(d.mitarbeit)+'" title="Mitarbeit: Note '+d.mitarbeit+'">M:'+d.mitarbeit+'</span>';
-    if(d.praxis)    g+='<span class="gb '+gradeClass(d.praxis)+'" title="Praxis: Note '+d.praxis+'">P:'+d.praxis+'</span>';
     const inst2=curInst();
+    const deletedFixed=(inst2&&inst2.deletedFixedGrades)||[];
     const customDefs=(inst2&&inst2.customGrades)||[];
-    // Render ALLE extraGrades-Werte, nicht nur die mit existierender Definition
-    Object.entries(d.extraGrades||{}).forEach(([gid,val])=>{
+    const allGradeDefs=[...FIXED_GRADES.filter(fg=>!deletedFixed.includes(fg.id)),...customDefs];
+    const renderedIds=new Set();
+    allGradeDefs.forEach(gd=>{
+      const isFixed=FIXED_GRADES.find(f=>f.id===gd.id);
+      const val=isFixed?d[gd.id]:(d.extraGrades||{})[gd.id];
       if(!val) return;
-      const cg=customDefs.find(c=>c.id===gid);
-      const label=cg?cg.label:gid;
-      const short=esc(String(label).substring(0,4));
-      g+='<span class="gb '+gradeClass(val)+'" title="'+esc(label)+': Note '+val+'" style="border:1px solid rgba(167,139,250,.3)">'+short+':'+esc(val)+'</span>';
+      renderedIds.add(gd.id);
+      let short,title;
+      if(gd.id==='fuehrung'){short='F';title='Führung';}
+      else if(gd.id==='mitarbeit'){short='M';title='Mitarbeit';}
+      else if(gd.id==='praxis'){short='P';title='Praxis';}
+      else{short=esc(String(gd.label||gd.id).substring(0,4));title=esc(gd.label||gd.id);}
+      const styleAttr=isFixed?'':' style="border:1px solid rgba(167,139,250,.3)"';
+      g+='<span class="gb '+gradeClass(val)+'" title="'+title+': Note '+val+'"'+styleAttr+'>'+short+':'+esc(val)+'</span>';
+    });
+    // Safety-Net: orphan extraGrades (Wert vorhanden aber keine Definition mehr) ans Ende
+    Object.entries(d.extraGrades||{}).forEach(([gid,val])=>{
+      if(!val||renderedIds.has(gid)) return;
+      const short=esc(String(gid).substring(0,4));
+      g+='<span class="gb '+gradeClass(val)+'" title="(verwaiste Note '+esc(gid)+'): '+esc(val)+'" style="border:1px dashed #94a3b8;opacity:.7">'+short+':'+esc(val)+'</span>';
     });
     // att summary
     const pCnt=att.filter(a=>a.type==='present'&&!a.lateMins&&!a.earlyMins).length;
