@@ -4642,14 +4642,14 @@ async function doRemoveStatusServer(tnId, type, name){
   let stage = 'start';
   try {
     stage = 'check_db';
-    if(!_db) throw new Error('Keine Datenbank-Verbindung');
+    if(!db) throw new Error('Keine Datenbank-Verbindung');
     stage = 'build_patch';
     const patch = {};
     if(type==='absent') patch.status='';
     if(type==='wdh'){ patch.wiederholer=false; patch.wdhGrund=''; }
     stage = 'check_tn_doc';
     // Prüfe erst ob das Doc überhaupt existiert
-    const docRef = _db.collection('globalTN').doc(tnId);
+    const docRef = db.collection('globalTN').doc(tnId);
     const snapPromise = docRef.get();
     const snapTo = new Promise((_, rej)=>setTimeout(()=>rej(new Error('Timeout 5s beim Doc-Lesen')), 5000));
     const snap = await Promise.race([snapPromise, snapTo]);
@@ -4687,14 +4687,14 @@ async function removeFromStatus(tnId, type){
 
 // Archivieren - TN bleibt erhalten aber wird aus aktiven Listen ausgeblendet
 async function archiveGlobalTN(tnId){
-  if(!_db) return;
+  if(!db) return;
   const tn = _globalTN.find(t=>t.id===tnId);
   if(!tn) return;
   const name = ((tn.vorname||'')+' '+(tn.nachname||'')).trim() || 'TN';
   if(!confirm(name+' archivieren?\n\nTN wird aus aktiven Listen ausgeblendet (Dashboard, Vorrang, Container).\nStammdaten + Kurs-Verlauf bleiben erhalten.\nReaktivieren jederzeit möglich.')) return;
   try {
     const patch = {archived:true, archivedAt:Date.now(), status:'', wiederholer:false, wdhGrund:''};
-    await _db.collection('globalTN').doc(tnId).update(patch);
+    await db.collection('globalTN').doc(tnId).update(patch);
     Object.assign(tn, patch);
     toast(name+' archiviert','ok');
     closeTNModal();
@@ -4702,14 +4702,14 @@ async function archiveGlobalTN(tnId){
   } catch(e){ toast('Fehler: '+e.message,'bad'); }
 }
 async function unarchiveGlobalTN(tnId){
-  if(!_db) return;
+  if(!db) return;
   const tn = _globalTN.find(t=>t.id===tnId);
   if(!tn) return;
   const name = ((tn.vorname||'')+' '+(tn.nachname||'')).trim() || 'TN';
   if(!confirm(name+' reaktivieren?\n\nTN erscheint wieder in den aktiven Listen.')) return;
   try {
     const patch = {archived:false, archivedAt:null};
-    await _db.collection('globalTN').doc(tnId).update(patch);
+    await db.collection('globalTN').doc(tnId).update(patch);
     Object.assign(tn, patch);
     toast(name+' reaktiviert','ok');
     closeTNModal();
@@ -9571,7 +9571,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.3.5 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.3.6 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
