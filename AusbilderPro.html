@@ -1060,7 +1060,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.12.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.12.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6610,6 +6610,23 @@ function showDiagnose(){
         lines.push('• '+s.name+': '+(parts.join(', ')||'(leer)'));
       });
       if(seatsWithGrades.length>10) lines.push('… und '+(seatsWithGrades.length-10)+' weitere');
+    }
+    // DOM-Check: was wurde tatsaechlich im Browser fuer den ersten Sitz gerendert?
+    if(seatsWithGrades.length){
+      const [firstSid,firstSeat]=seatsWithGrades[0];
+      lines.push('\n--- DOM-CHECK ---');
+      lines.push('Erster Sitz mit Noten: '+firstSeat.name+' (seatId: '+firstSid+')');
+      const seatEl=document.getElementById('seat-'+firstSid);
+      if(!seatEl) lines.push('⚠ Sitzplatz-Element NICHT im DOM (vielleicht nicht sichtbar?)');
+      else {
+        const sgrEl=seatEl.querySelector('.sgr');
+        if(!sgrEl) lines.push('⚠ KEIN .sgr Container im Sitzplatz - Render-Code legt ihn nicht an!');
+        else {
+          const badges=sgrEl.querySelectorAll('.gb');
+          lines.push('Badge-Container .sgr vorhanden: '+badges.length+' Badges');
+          badges.forEach((b,i)=>lines.push('  Badge '+(i+1)+': "'+b.textContent.trim()+'" classes="'+b.className+'"'));
+        }
+      }
     }
   } else {
     lines.push('(kein Kurs aktiv)');
