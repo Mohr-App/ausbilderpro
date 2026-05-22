@@ -1063,7 +1063,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.15.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.15.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -8112,7 +8112,14 @@ function generateTNListeAusbilder(){
 function openTNListeWindowAusbilder(kurs, tns){
   const von=kurs.von; const bis=kurs.bis;
   if(!von||!bis){toast('Kurs hat kein Start/Enddatum','bad');return;}
-  const _localKatLabel=S.kats[S.curKat]?.label||''; const kursName=kurs.lehrgangsart||_localKatLabel||(kurs.name||'');
+  const _localKatLabel=S.kats[S.curKat]?.label||''; const _fullKursName=kurs.lehrgangsart||_localKatLabel||(kurs.name||'');
+  // Nur den Kuerzel-Teil extrahieren - alles bis zum ersten Wort mit Kleinbuchstaben verwerfen
+  // Beispiel: "ETE3/22 Zeitgem." -> "ETE3/22"  /  "BAE 2-18 Zeitgem." -> "BAE 2-18"
+  let kursName=_fullKursName;
+  const _tokens=_fullKursName.split(/\s+/);
+  const _matched=[];
+  for(const t of _tokens){ if(/^[A-ZÄÖÜ0-9\/\-\.]+$/.test(t)) _matched.push(t); else break; }
+  if(_matched.length) kursName=_matched.join(' ');
   const standort='Kreishandwerkerschaft Bonn-Rhein-Sieg - Siegburg';
   const dauer=fmtDE(von)+' - '+fmtDE(bis);
   const ausbName=_auth?.currentUser?.displayName||(getAusbilderProfil().vorname?(getAusbilderProfil().vorname+' '+(getAusbilderProfil().nachname||'')).trim():'')||'';
@@ -8159,7 +8166,12 @@ function openTNListeWindowAusbilder(kurs, tns){
     pages+=`<div class="page" style="${pb}">
 <div class="header-logos"><img src="${LOGO_HEADER}" alt="Logos"></div>
 <div class="header-sa">SA 181, NRW, Seite 3</div>
-<div class="kurs-titel">${esc(kursName)}</div>
+<div class="meta-row">
+  <div class="meta-cell mc1"><div class="meta-val">&nbsp;</div><div class="meta-label">Beleg-Nr.</div></div>
+  <div class="meta-cell mc2"><div class="meta-val">${esc(standort)}</div><div class="meta-label">Lehrgangsort</div></div>
+  <div class="meta-cell mc3"><div class="meta-val"><b>${esc(kursName)}</b></div><div class="meta-label">Lehrgangsbezeichnung</div></div>
+  <div class="meta-cell mc4"><div class="meta-val"><b>${dauer}</b></div><div class="meta-label">Lehrgangsdauer</div></div>
+</div>
 <h1>Teilnehmendenliste</h1>
 <div class="info-text">Ich wurde darüber informiert, dass die überbetriebliche Unterweisung mit Mitteln des Landes Nordrhein-Westfalen, des Bundes (bei Fachstufenlehrgängen) und der Europäischen Union gefördert wird.</div>
 <table>
@@ -8232,8 +8244,15 @@ body{padding:5mm 7mm;}
 .header-logos{width:100%;margin-bottom:1mm;}
 .header-logos img{display:block;width:100%;max-height:20mm;object-fit:contain;object-position:left center;}
 .header-sa{position:absolute;top:6mm;right:0;font-size:8pt;color:#000;}
-.kurs-titel{text-align:center;font-size:11pt;font-weight:bold;margin-top:2mm;color:#000;}
-h1{text-align:center;font-size:13pt;font-weight:bold;margin:1mm 0 2mm;}
+.meta-row{display:flex;margin-top:2mm;align-items:flex-end;}
+.meta-cell{padding:0 3mm;text-align:center;}
+.mc1{width:15%;}
+.mc2{width:35%;}
+.mc3{width:20%;}
+.mc4{width:30%;margin-left:5mm;}
+.meta-val{font-size:9pt;min-height:5mm;padding-top:1mm;padding-bottom:1px;border-bottom:0.5px solid #777;}
+.meta-label{font-size:7pt;color:#444;padding-top:1px;margin-top:0;}
+h1{text-align:center;font-size:13pt;font-weight:bold;margin:2mm 0 1mm;}
 .info-text{font-size:7.5pt;margin-bottom:1.5mm;line-height:1.3;}
 table{width:100%;border-collapse:collapse;font-size:8.5pt;table-layout:fixed;}
 th,td{border:0.5px solid #999;padding:1px 3px;text-align:center;vertical-align:middle;}
