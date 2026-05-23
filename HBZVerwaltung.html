@@ -2329,7 +2329,8 @@ function renderSbTnTree(){
         const isWdh = !!t.wiederholer;
         const isAbsent = t.status==='absent';
         // histCount: nur Kurse die tatsächlich besucht wurden (nicht abgebrochen, nicht entfernt, nicht absent)
-        const histCount = (t.kursHistory||[]).filter(h=>!h.abgebrochen&&!h.entfernt&&!h.nichtErschienen).length + (aktKurs && !isAbsent && !(t.kursHistory||[]).some(h=>h.kursId===t.aktiverKursId) ? 1 : 0);
+        const histRaw=(t.kursHistory||[]).slice().sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
+        const histCount = histRaw.filter(h=>!h.abgebrochen&&!h.entfernt&&!h.nichtErschienen).length + (aktKurs && !isAbsent && !histRaw.some(h=>h.kursId===t.aktiverKursId) ? 1 : 0);
         const cntTag = histCount ? '<span style="font-size:.5rem;font-weight:800;color:'+(histCount>=3?'#22c55e':histCount>=2?'#f59e0b':'var(--mu)')+';flex-shrink:0;font-family:\'JetBrains Mono\',monospace">'+histCount+'×</span>' : '';
         let statusBadge='';
         if(t.ausgelernt) statusBadge='<span class="tn-inkurs" style="color:#16a34a">Ausgelernt</span>';
@@ -2340,14 +2341,23 @@ function renderSbTnTree(){
         else if(kursGeplant) statusBadge='<span class="tn-inkurs" style="color:#3b82f6">◐ Geplant</span>';
         else if(kursVorbei) statusBadge='<span class="tn-inkurs" style="color:#9ca3af">○ Beendet</span>';
         else if(t.aktiverKursId) statusBadge='<span class="tn-inkurs" style="color:#9ca3af">○ Kurs</span>';
+        // Wrapper-Container für TN + Historie (Toggle)
+        const tnWrap = document.createElement('div');
+        tnWrap.className = 'sb-tn-wrap';
         const el = document.createElement('div');
         el.className = 'sb-tn-drag';
         if(t.ausgelernt) el.style.opacity='.45';
         el.draggable = true;
         el.dataset.tnId = t.id;
+        const hasHist = histRaw.length > 0;
+        // Toggle-Pfeil nur wenn Historie vorhanden
+        const arrowHtml = hasHist
+          ? '<span class="sb-tn-arrow" style="cursor:pointer;color:var(--mu);font-size:.55rem;flex-shrink:0;width:10px;text-align:center" title="Historie ein/ausklappen">▶</span>'
+          : '<span style="width:10px;flex-shrink:0"></span>';
         el.innerHTML =
           '<span class="drag-handle">⠿</span>' +
-          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(name) + '</span>' +
+          arrowHtml +
+          '<span class="sb-tn-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(name) + '</span>' +
           '<span style="display:flex;gap:4px;align-items:center;margin-left:auto;flex-shrink:0">' + cntTag + '</span>' +
           statusBadge;
         el.title = (t.vorname||'') + ' ' + (t.nachname||'') + (t.firma ? ' – ' + t.firma : '') + ' · ' + histCount + ' Lehrgang' + (histCount!==1?'e':'') + (kursLaeuft ? ' (aktiv)' : kursGeplant ? ' (geplant)' : kursVorbei ? ' (beendet)' : '');
@@ -2357,11 +2367,61 @@ function renderSbTnTree(){
           this.style.opacity = '.4';
         };
         el.ondragend = function(){ this.style.opacity = ''; };
+        // Click - aber wenn auf Pfeil: nur toggle, sonst Profil
         el.onclick = function(e){
           if(e.defaultPrevented) return;
+          if(e.target.classList && e.target.classList.contains('sb-tn-arrow')){
+            e.stopPropagation();
+            const arrow = e.target;
+            const histBox = tnWrap.querySelector('.sb-tn-hist');
+            if(histBox){
+              const isOpen = histBox.style.display !== 'none';
+              histBox.style.display = isOpen ? 'none' : 'block';
+              arrow.textContent = isOpen ? '▶' : '▼';
+            }
+            return;
+          }
           openTNProfile(t.id);
         };
-        ljBody.appendChild(el);
+        tnWrap.appendChild(el);
+        // Historie inline (initially hidden)
+        if(hasHist){
+          const histBox = document.createElement('div');
+          histBox.className = 'sb-tn-hist';
+          histBox.style.cssText = 'display:none;padding:3px 6px 6px 32px;background:rgba(0,0,0,.02)';
+          const histHtml = histRaw.map(h=>{
+            const isAbgebr = !!h.abgebrochen;
+            const isEntfernt = !!h.entfernt;
+            const isNichtErsch = !!h.nichtErschienen;
+            const isActive = t.aktiverKursId === h.kursId;
+            let statusCol = 'var(--mu)';
+            let statusIcon = '○';
+            if(isActive){ statusCol='#22c55e'; statusIcon='●'; }
+            else if(isAbgebr){ statusCol='#ef4444'; statusIcon='✗'; }
+            else if(isEntfernt){ statusCol='#f59e0b'; statusIcon='⤴'; }
+            else if(isNichtErsch){ statusCol='#ef4444'; statusIcon='✗'; }
+            else { statusCol='#9ca3af'; statusIcon='✓'; }
+            const kursName = h.kursName || h.kursId || '?';
+            const von = h.von ? fmtDE(h.von) : '';
+            const bis = h.bis ? fmtDE(h.bis) : '';
+            const dat = von && bis ? von+' – '+bis : (von||bis||'');
+            return '<div class="sb-tn-hist-item" data-kurs-id="'+esc(h.kursId||'')+'" style="display:flex;align-items:center;gap:5px;font-size:.62rem;line-height:1.3;padding:2px 0;cursor:pointer" title="Kurs öffnen">'
+              +'<span style="color:'+statusCol+';flex-shrink:0;width:9px;text-align:center">'+statusIcon+'</span>'
+              +'<span style="flex:1;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="color:#1e293b">'+esc(kursName.length>22?kursName.substring(0,22)+'…':kursName)+'</b>'+(dat?' <span style="color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+dat+'</span>':'')+'</span>'
+              +'</div>';
+          }).join('');
+          histBox.innerHTML = histHtml || '<div style="font-size:.6rem;color:var(--mu);font-style:italic">Keine Einträge</div>';
+          // Click auf Hist-Item öffnet den Kurs (nicht TN-Profil)
+          histBox.querySelectorAll('.sb-tn-hist-item').forEach(item => {
+            item.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              const kid = item.getAttribute('data-kurs-id');
+              if(kid) showKursDetail(kid);
+            });
+          });
+          tnWrap.appendChild(histBox);
+        }
+        ljBody.appendChild(tnWrap);
         });
 
         body.appendChild(ljHdr);
@@ -9579,7 +9639,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.4.1 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.5.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
