@@ -775,7 +775,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div id="urlaubBadge" style="display:none;padding:10px 14px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;margin-bottom:14px;font-size:.78rem;font-weight:600;color:#f59e0b;cursor:pointer" onclick="showUrlaubOverview()"></div>
 
         <!-- Archiv-Toggle -->
-        <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+          <div id="shareStatsBadge" style="display:none;padding:5px 12px;background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(5,150,105,.08));border:1px solid rgba(37,99,235,.2);border-radius:8px;font-size:.7rem;font-weight:700;color:#2563eb;cursor:pointer" onclick="openShareStatsModal()" title="AG-Empfehlungen Details ansehen">📤 <span id="shareStatsCount">0</span> AG-Empfehlungen</div>
+          <div style="margin-left:auto"></div>
           <button onclick="openArchiveModal()" class="btn-sm" style="background:rgba(100,116,139,.08);color:#475569;border:1px solid rgba(100,116,139,.2);font-size:.7rem;padding:5px 12px;display:flex;align-items:center;gap:5px" title="Archivierte Teilnehmer anzeigen">📦 Archiv <span id="archiveCount" style="background:rgba(100,116,139,.2);padding:1px 7px;border-radius:8px;font-size:.6rem;font-weight:800;display:none">0</span></button>
         </div>
 
@@ -1746,6 +1748,8 @@ function grantAccess(u, role){
   if(!window._heartbeat) window._heartbeat=setInterval(()=>{
     if(_uid) db.collection('users').doc(_uid).set({lastActive:Date.now()},{merge:true}).catch(()=>{});
   },60000);
+  // Share-Stats Live-Subscription starten
+  setTimeout(()=>{try{subscribeShareStats();}catch(e){}}, 1000);
   // Badge zeigt Rolle
   const badge = document.getElementById('hdrBadge');
   if(badge) badge.textContent = role==='admin' ? 'ADMIN' : 'VERWALTUNG';
@@ -4743,6 +4747,71 @@ async function confirmRemoveStatus(tnId, type){
 
 async function removeFromStatus(tnId, type){
   openRemoveStatusDialog(tnId, type);
+}
+
+// Live-Subscription auf AG-Empfehlungs-Counter
+let _shareStatsUnsub=null;
+function subscribeShareStats(){
+  if(_shareStatsUnsub){ try{_shareStatsUnsub();}catch(e){} _shareStatsUnsub=null; }
+  if(!db) return;
+  _shareStatsUnsub = db.collection('shared').doc('stats').collection('agShare').doc('counter')
+    .onSnapshot(snap=>{
+      const badge = document.getElementById('shareStatsBadge');
+      const cntEl = document.getElementById('shareStatsCount');
+      if(!badge||!cntEl) return;
+      if(!snap.exists){ badge.style.display='none'; return; }
+      const d = snap.data()||{};
+      const count = d.count||0;
+      if(count>0){
+        badge.style.display='';
+        cntEl.textContent = count;
+      } else {
+        badge.style.display='none';
+      }
+    }, err=>console.warn('Share-Stats Subscription:',err));
+}
+function openShareStatsModal(){
+  if(!db) return;
+  db.collection('shared').doc('stats').collection('agShare').doc('counter').get().then(snap=>{
+    const d = snap.exists ? snap.data() : {};
+    const count = d.count||0;
+    const byMethod = d.byMethod||{};
+    const shareCount = byMethod.share||0;
+    const copyCount = byMethod.copy||0;
+    const lastAt = d.lastAt && d.lastAt.toDate ? d.lastAt.toDate() : null;
+    const lastFrom = d.lastFromName||'';
+    const lastMethod = d.lastMethod==='copy' ? 'Kopiert' : d.lastMethod==='share' ? 'Geteilt' : '';
+    const old = document.getElementById('shareStatsModal');
+    if(old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'shareStatsModal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,18,25,.85);z-index:99998;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.onclick = e => { if(e.target===ov) ov.remove(); };
+    const lastInfo = lastAt
+      ? '<div style="font-size:.72rem;color:#475569;margin-top:14px;padding:10px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">'
+        +'<div style="font-weight:700;color:#0f172a;margin-bottom:4px">Letzte Aktion</div>'
+        +'<div>'+lastAt.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+(lastMethod?' · '+esc(lastMethod):'')+(lastFrom?' · '+esc(lastFrom):'')+'</div>'
+        +'</div>'
+      : '';
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:480px;width:100%;padding:22px;box-shadow:0 24px 64px rgba(0,0,0,.4)">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div style="font-weight:800;font-size:1.05rem">📤 AG-Empfehlungen</div><button onclick="document.getElementById(\'shareStatsModal\').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#64748b">&times;</button></div>'
+      +'<div style="text-align:center;padding:16px 0;background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(5,150,105,.05));border-radius:10px;border:1px solid rgba(37,99,235,.15);margin-bottom:14px">'
+      +'<div style="font-size:2.2rem;font-weight:800;color:#2563eb;line-height:1">'+count+'</div>'
+      +'<div style="font-size:.72rem;color:#475569;font-weight:600;margin-top:4px">Mal von Azubis empfohlen</div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      +'<div style="padding:10px;background:#f1f5f9;border-radius:8px;text-align:center">'
+      +'<div style="font-size:.6rem;color:#64748b;font-weight:700;letter-spacing:.04em">Über Teilen-Dialog</div>'
+      +'<div style="font-size:1.3rem;font-weight:800;color:#1e293b;margin-top:2px">'+shareCount+'</div></div>'
+      +'<div style="padding:10px;background:#f1f5f9;border-radius:8px;text-align:center">'
+      +'<div style="font-size:.6rem;color:#64748b;font-weight:700;letter-spacing:.04em">Link kopiert</div>'
+      +'<div style="font-size:1.3rem;font-weight:800;color:#1e293b;margin-top:2px">'+copyCount+'</div></div>'
+      +'</div>'
+      +lastInfo
+      +'<div style="font-size:.65rem;color:var(--mu);margin-top:14px;line-height:1.45">Azubis können in der App ihren Arbeitgeber zu ArbeitgeberPro einladen. Zählt Klicks auf die Buttons „Teilen" und „Kopieren".</div>'
+      +'</div>';
+    document.body.appendChild(ov);
+  });
 }
 
 // Archivieren - TN bleibt erhalten aber wird aus aktiven Listen ausgeblendet
@@ -9639,7 +9708,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.5.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.6.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
