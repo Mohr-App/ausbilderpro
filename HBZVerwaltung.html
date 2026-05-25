@@ -4749,11 +4749,12 @@ async function removeFromStatus(tnId, type){
   openRemoveStatusDialog(tnId, type);
 }
 
-// Live-Subscription auf AG-Empfehlungs-Counter
+// Live-Subscription auf AG-Empfehlungs-Counter (nur Admin)
 let _shareStatsUnsub=null;
 function subscribeShareStats(){
   if(_shareStatsUnsub){ try{_shareStatsUnsub();}catch(e){} _shareStatsUnsub=null; }
   if(!db) return;
+  if(_userRole !== 'admin') return;  // Nur Admin sieht AG-Empfehlungs-Stats
   _shareStatsUnsub = db.collection('shared').doc('stats').collection('agShare').doc('counter')
     .onSnapshot(snap=>{
       const badge = document.getElementById('shareStatsBadge');
@@ -4771,6 +4772,7 @@ function subscribeShareStats(){
     }, err=>console.warn('Share-Stats Subscription:',err));
 }
 function openShareStatsModal(){
+  if(_userRole !== 'admin') return;  // Nur Admin
   if(!db) return;
   db.collection('shared').doc('stats').collection('agShare').doc('counter').get().then(snap=>{
     const d = snap.exists ? snap.data() : {};
@@ -9708,7 +9710,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.6.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.6.1 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
