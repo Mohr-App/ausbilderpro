@@ -1751,6 +1751,13 @@ function grantAccess(u, role){
   },60000);
   // Share-Stats Live-Subscription starten
   setTimeout(()=>{try{subscribeShareStats();}catch(e){}}, 1000);
+  // Globaler Auto-Heal Custom-Grade-Labels: einmal nach Login (10s) und dann alle 5min
+  setTimeout(()=>{try{autoHealAllCoursesCustomGrades();}catch(e){}}, 10*1000);
+  if(!window._autoHealTimer){
+    window._autoHealTimer = setInterval(()=>{
+      try{autoHealAllCoursesCustomGrades();}catch(e){}
+    }, 5*60*1000);
+  }
   // Badge zeigt Rolle
   const badge = document.getElementById('hdrBadge');
   if(badge) badge.textContent = role==='admin' ? 'ADMIN' : 'VERWALTUNG';
@@ -4748,6 +4755,41 @@ async function confirmRemoveStatus(tnId, type){
 
 async function removeFromStatus(tnId, type){
   openRemoveStatusDialog(tnId, type);
+}
+
+// Globaler Auto-Heal Scanner für ALLE Kurse - läuft periodisch
+let _autoHealLastRun = 0;
+async function autoHealAllCoursesCustomGrades(){
+  if(!db) return;
+  if(Date.now() - _autoHealLastRun < 60*1000) return;
+  _autoHealLastRun = Date.now();
+  if(_userRole !== 'admin' && _userRole !== 'verwaltung') return;
+  try {
+    const aktivKurse = (_kurse||[]).filter(k => !k.archiviert && !k.entwurf);
+    for(const kurs of aktivKurse){
+      try {
+        const tnSnap = await db.collection('shared').doc('kurse').collection('list').doc(kurs.id).collection('teilnehmer').get();
+        const aggregatedLabels = {};
+        tnSnap.docs.forEach(doc => {
+          const d = doc.data() || {};
+          Object.entries(d.noten_extra_labels || {}).forEach(([cid, lbl]) => {
+            if(lbl && !aggregatedLabels[cid]) aggregatedLabels[cid] = lbl;
+          });
+        });
+        if(!Object.keys(aggregatedLabels).length) continue;
+        const existing = kurs.customGrades || {};
+        const merged = {...existing};
+        let anyNew = false;
+        Object.entries(aggregatedLabels).forEach(([cid, lbl]) => {
+          if(!merged[cid]) { merged[cid] = lbl; anyNew = true; }
+        });
+        if(anyNew) {
+          await db.collection('shared').doc('kurse').collection('list').doc(kurs.id).update({customGrades: merged});
+          console.log('[AutoHeal] Labels für', kurs.name||kurs.id, ':', Object.keys(aggregatedLabels).length);
+        }
+      } catch(e){}
+    }
+  } catch(e){ console.warn('AutoHeal failed:', e); }
 }
 
 // Manueller Custom-Noten Label-Editor (Notlösung wenn AP-Sync nicht durchkommt)
@@ -9806,7 +9848,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.7.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.8.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
