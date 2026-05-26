@@ -1063,7 +1063,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.16.9 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.17.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2426,6 +2426,31 @@ async function syncSeatGradesFromFirestore(){
   if(!inst||!inst.sharedKursId) return;
   const kursId=inst.sharedKursId;
   let anyChanged=false;
+  // Erst Kurs-Doc holen damit wir customGrades nachziehen können falls lokal leer
+  try {
+    const kursSnap = await _db.collection('shared').doc('kurse').collection('list').doc(kursId).get();
+    if(kursSnap.exists){
+      const kd = kursSnap.data()||{};
+      const cloudGrades = kd.customGrades||{};
+      const localGrades = inst.customGrades||[];
+      // Wenn Cloud customGrades hat aber lokal leer/unvollständig: importieren
+      if(Object.keys(cloudGrades).length){
+        const localIds = new Set(localGrades.map(g=>g.id));
+        let imported=false;
+        Object.entries(cloudGrades).forEach(([cid,lbl])=>{
+          if(!localIds.has(cid) && lbl){
+            localGrades.push({id:cid,label:lbl,color:'#a78bfa',fixed:false});
+            imported=true;
+          }
+        });
+        if(imported){
+          inst.customGrades = localGrades;
+          _setAusbilderDefaultGrades(inst.customGrades);
+          anyChanged=true;
+        }
+      }
+    }
+  } catch(e){}
   const tasks=Object.entries(inst.seats||{})
     .filter(([sid,d])=>d&&d.poolTnId)
     .map(([sid,d])=>
@@ -2443,6 +2468,24 @@ async function syncSeatGradesFromFirestore(){
           if(sync.noten_extra && typeof sync.noten_extra==='object'){
             const merged={...(seat.extraGrades||{}),...sync.noten_extra};
             if(JSON.stringify(seat.extraGrades||{})!==JSON.stringify(merged)){seat.extraGrades=merged;changed=true;}
+          }
+          // Cross-Sync: noten_extra_labels vom TN-Doc verwenden um lokale customGrades zu vervollstaendigen
+          if(sync.noten_extra_labels && typeof sync.noten_extra_labels==='object'){
+            const localGrades = inst.customGrades||[];
+            const localIds = new Set(localGrades.map(g=>g.id));
+            let imported=false;
+            Object.entries(sync.noten_extra_labels).forEach(([cid,lbl])=>{
+              if(!localIds.has(cid) && lbl){
+                localGrades.push({id:cid,label:lbl,color:'#a78bfa',fixed:false});
+                localIds.add(cid);
+                imported=true;
+              }
+            });
+            if(imported){
+              inst.customGrades = localGrades;
+              _setAusbilderDefaultGrades(inst.customGrades);
+              changed=true;
+            }
           }
           if(sync.werkzeugStatus && seat.werkzeugStatus!==sync.werkzeugStatus){seat.werkzeugStatus=sync.werkzeugStatus;changed=true;}
           if(sync.werkzeugFehlt && seat.werkzeugFehlt!==sync.werkzeugFehlt){seat.werkzeugFehlt=sync.werkzeugFehlt;changed=true;}
@@ -5722,6 +5765,8 @@ function syncAttendanceToFirestore(seatId){
   }
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(tnId).set(syncData,{merge:true}).catch(err=>console.warn('Sync error:',err));
+  // Bei jedem TN-Save auch die Custom-Grade-Labels ans Kurs-Doc syncen (falls noch nicht passiert)
+  try{ syncCustomGradesToCloud(); }catch(e){}
 }
 function updateWzLabel(){
   const ok=document.getElementById('wzOk');
@@ -11112,6 +11157,13 @@ try{
     // Self-Heal: Lehrgangsart-Sync fuer ALLE Kategorien (falls Umbenennungen in Vergangenheit nicht gesynct)
     setTimeout(()=>{try{syncAllKatsLehrgangsartToCloud();}catch(e){}}, 4000);
     setTimeout(()=>{try{syncAllCustomGradesToCloud();}catch(e){}}, 5000);
+    // Periodischer Hintergrund-Sync alle 60s damit Defs immer aktuell sind
+    if(!window._bgCustomGradeSyncTimer){
+      window._bgCustomGradeSyncTimer = setInterval(()=>{
+        try{ syncAllCustomGradesToCloud(); }catch(e){}
+        try{ if(curInst()) syncSeatGradesFromFirestore(); }catch(e){}
+      }, 60*1000);
+    }
     // App-Launcher-Check: Admin?
     _checkAdminShowLauncher(user.uid);
     // View-As Button sichtbar wenn Stefan
