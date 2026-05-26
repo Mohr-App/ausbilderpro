@@ -1063,7 +1063,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.16.6 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.16.7 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -11590,7 +11590,7 @@ window._fbSaveHook = fbSave;
 
 init();
 
-// PWA Service Worker mit AUTO-UPDATE
+// PWA Service Worker mit AUTO-UPDATE (ohne nervigen Banner)
 if('serviceWorker' in navigator){
   let _swRefreshing=false;
   // Wenn ein neuer SW aktiv wird, reload (genau 1x)
@@ -11604,14 +11604,14 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js')
       .then(reg=>{
         console.log('SW registriert');
-        // Bei Update gefunden: zeige optional Banner (Auto-Reload erfolgt via controllerchange)
+        // Bei Update gefunden: still im Hintergrund anwenden
         reg.addEventListener('updatefound', ()=>{
           const newWorker=reg.installing;
           if(!newWorker) return;
           newWorker.addEventListener('statechange', ()=>{
             if(newWorker.state==='installed' && navigator.serviceWorker.controller){
-              // Neue Version verfuegbar - banner zeigen
-              _showUpdateBanner();
+              // Neue Version verfügbar - auto applicieren wenn User idle
+              _autoApplyUpdate();
             }
           });
         });
@@ -11630,6 +11630,32 @@ if('serviceWorker' in navigator){
       });
     }
   });
+}
+// Automatisches Anwenden eines verfuegbaren Updates - aber NUR wenn User idle
+let _autoUpdatePending=false;
+function _autoApplyUpdate(){
+  if(_autoUpdatePending) return;
+  _autoUpdatePending=true;
+  function tryNow(){
+    // Pruefe ob User gerade tippt
+    const active=document.activeElement;
+    const isTyping=active && (active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.isContentEditable);
+    // Pruefe ob ein Modal/Dialog offen ist (verschiedene Modal-Klassen)
+    const hasModal=document.querySelector('.mod.show, .modal.show, .ov.show, [id$="Modal"][style*="display:flex"], [id$="Dialog"][style*="display:flex"]');
+    if(isTyping||hasModal){
+      // 30s warten, dann nochmal
+      setTimeout(tryNow, 30*1000);
+      return;
+    }
+    // Sicher: SKIP_WAITING sendet, dann controllerchange → reload
+    navigator.serviceWorker.getRegistration().then(reg=>{
+      if(reg && reg.waiting){
+        reg.waiting.postMessage({type:'SKIP_WAITING'});
+      }
+    }).catch(()=>{});
+  }
+  // Erste Probe direkt nach kurzer Verzoegerung (User soll sich nicht erschrecken)
+  setTimeout(tryNow, 2000);
 }
 
 function _showUpdateBanner(){
