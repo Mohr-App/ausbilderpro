@@ -907,6 +907,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <button class="btn-sm" title="🏢 Betriebsliste" onclick="generateBetriebsliste()" style="font-size:.72rem;padding:6px 10px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">🏢 Betriebsliste</button>
           <button class="btn-sm" title="Alle Bescheinigungen als PDF" onclick="generateAlleBescheinigungen()" style="font-size:.72rem;padding:6px 10px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">📄 Bescheinigungen</button>
           <button class="btn-sm" title="Kurs heute als ausgefallen markieren" onclick="kursAusfallVerwaltung()" style="font-size:.72rem;padding:6px 10px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#ef4444">Ausfall</button>
+          <button class="btn-sm" id="kdLabelsBtn" title="Custom-Noten-Labels manuell setzen (nur wenn Dahm/Ausbilder noch nicht gesynct hat)" onclick="openLabelEditor()" style="font-size:.72rem;padding:6px 10px;background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25);color:#d97706;display:none">✏ Labels</button>
           <button class="btn-sm" id="kdArchiveBtn" title="📦 Archivieren" onclick="toggleArchiveKurs()" style="font-size:.72rem;padding:6px 10px">📦 Archivieren</button>
           <button class="btn-sm btn-bad" title="🗑 Löschen" onclick="deleteSelectedKurs()" style="font-size:.72rem;padding:6px 10px">🗑 Löschen</button>
         </div>
@@ -4749,6 +4750,63 @@ async function removeFromStatus(tnId, type){
   openRemoveStatusDialog(tnId, type);
 }
 
+// Manueller Custom-Noten Label-Editor (Notlösung wenn AP-Sync nicht durchkommt)
+function openLabelEditor(){
+  const btn = document.getElementById('kdLabelsBtn');
+  if(!btn) return;
+  let allIds=[], curLabels={}, kursId='';
+  try{ allIds = JSON.parse(btn.dataset.allIds||'[]'); }catch(e){}
+  try{ curLabels = JSON.parse(btn.dataset.curLabels||'{}'); }catch(e){}
+  kursId = btn.dataset.kursId || '';
+  if(!allIds.length){ toast('Keine Custom-Noten in diesem Kurs','bad'); return; }
+  if(!kursId){ toast('Kurs-ID fehlt','bad'); return; }
+  const old=document.getElementById('labelEditorModal');
+  if(old) old.remove();
+  const ov=document.createElement('div');
+  ov.id='labelEditorModal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,18,25,.85);z-index:99998;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  const rows = allIds.map(cid=>{
+    const lbl = curLabels[cid]||'';
+    const isFallback = /^N\d+$/.test(lbl);
+    return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'
+      +'<div style="flex:0 0 70px;font-size:.6rem;font-family:\'JetBrains Mono\',monospace;color:#64748b" title="'+esc(cid)+'">'+esc(cid.substring(0,9))+'…</div>'
+      +'<input type="text" data-cid="'+esc(cid)+'" value="'+esc(isFallback?'':lbl)+'" placeholder="z.B. Führung" maxlength="20" style="flex:1;padding:8px 10px;border:1.5px solid '+(isFallback?'#f59e0b':'#cbd5e1')+';border-radius:8px;font-size:.85rem;font-family:inherit">'
+      +'</div>';
+  }).join('');
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;max-width:520px;width:100%;padding:22px;box-shadow:0 24px 64px rgba(0,0,0,.4);max-height:85vh;overflow:auto">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div style="font-weight:800;font-size:1.05rem">✏ Custom-Noten Labels</div><button onclick="document.getElementById(\'labelEditorModal\').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#64748b">&times;</button></div>'
+    +'<div style="font-size:.72rem;color:#475569;margin-bottom:14px;line-height:1.5">Setze die Bezeichnungen für jede Custom-Note. Gelb = noch nicht gesetzt (zeigt N1/N2 als Fallback). Diese Labels gelten für den ganzen Kurs.</div>'
+    +rows
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    +'<button onclick="document.getElementById(\'labelEditorModal\').remove()" style="padding:8px 16px;border:1px solid #cbd5e1;background:#f1f5f9;color:#475569;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Abbrechen</button>'
+    +'<button id="labelEditorSaveBtn" style="padding:8px 18px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Speichern</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  document.getElementById('labelEditorSaveBtn').addEventListener('click',()=>saveLabelEditor(kursId));
+}
+async function saveLabelEditor(kursId){
+  const ov=document.getElementById('labelEditorModal');
+  if(!ov) return;
+  const inputs = ov.querySelectorAll('input[data-cid]');
+  const newLabels={};
+  inputs.forEach(inp=>{
+    const cid = inp.getAttribute('data-cid');
+    const val = (inp.value||'').trim();
+    if(cid && val) newLabels[cid] = val;
+  });
+  if(!Object.keys(newLabels).length){ toast('Keine Labels zum Speichern eingegeben','bad'); return; }
+  if(!db){ toast('Keine DB-Verbindung','bad'); return; }
+  try {
+    await db.collection('shared').doc('kurse').collection('list').doc(kursId).update({customGrades:newLabels});
+    toast('Labels gespeichert','ok');
+    ov.remove();
+  } catch(e){
+    console.error('Label-Save fehlgeschlagen:',e);
+    toast('Fehler: '+(e.message||e),'bad');
+  }
+}
+
 // Live-Subscription auf AG-Empfehlungs-Counter (nur Admin)
 let _shareStatsUnsub=null;
 function subscribeShareStats(){
@@ -4979,6 +5037,15 @@ function showKursDetail(kursId){
         const merged = Object.assign({}, _kursLabels, _aggregatedLabels);
         db.collection('shared').doc('kurse').collection('list').doc(k.id).update({customGrades:merged}).catch(()=>{});
       }
+    }
+    // "Labels"-Button anzeigen wenn Custom-IDs existieren - egal ob mit oder ohne Labels (Editor immer aufrufbar)
+    const labelsBtn=document.getElementById('kdLabelsBtn');
+    if(labelsBtn){
+      // Stefan kann den Editor auch aufrufen wenn schon Labels gesetzt sind (Korrektur)
+      labelsBtn.style.display = _allCustomIds.length ? '' : 'none';
+      labelsBtn.dataset.allIds = JSON.stringify(_allCustomIds);
+      labelsBtn.dataset.curLabels = JSON.stringify(Object.assign({}, _numericFallback, _kursLabels, _aggregatedLabels));
+      labelsBtn.dataset.kursId = k && k.id || '';
     }
     tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||''));
     if(!tns.length){
@@ -9739,7 +9806,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.6.2 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.7.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
