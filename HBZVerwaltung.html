@@ -4939,18 +4939,47 @@ function showKursDetail(kursId){
     if(!gtnData||!kursSubData) return;
     const tns=[...gtnData];
     const attMap={}, confirmMap={}, gradeMap={}, statusMap={};
+    // Sammle alle distinct cg_i Custom-Grade-IDs in Reihenfolge des ersten Vorkommens
+    const _allCustomIds=[];
+    // Sammle Labels aus allen TN-Docs - falls einer Labels hat aber andere nicht
+    const _aggregatedLabels={};
     kursSubData.forEach(d=>{
       if(d.attTotal) attMap[d.id]=d;
       if(d.bestaetigtAm) confirmMap[d.id]={am:d.bestaetigtAm,von:d.bestaetigtVon||''};
       if(d.status) statusMap[d.id]=d.status;
+      // Sammele Custom-IDs
+      Object.keys(d.noten_extra||{}).forEach(cid=>{
+        if(!_allCustomIds.includes(cid)) _allCustomIds.push(cid);
+      });
+      // Sammele Labels (mergen über alle TN-Docs)
+      Object.entries(d.noten_extra_labels||{}).forEach(([cid,lbl])=>{
+        if(lbl && !_aggregatedLabels[cid]) _aggregatedLabels[cid]=lbl;
+      });
+    });
+    // Numerische Fallback-Labels (N1, N2, N3...) falls absolut keine Labels da sind
+    const _numericFallback={};
+    _allCustomIds.forEach((cid,i)=>{ _numericFallback[cid]='N'+(i+1); });
+    // Quelle-Reihenfolge: TN-Doc-Labels > Kurs-Doc-Labels > aggregierte Labels > numerisch
+    const _kursLabels=(k&&k.customGrades)||{};
+    kursSubData.forEach(d=>{
       if(d.noten_mitarbeit||d.noten_fuehrung||d.noten_praxis||Object.keys(d.noten_extra||{}).length){
-        // Labels: zuerst aus TN-Doc, Fallback auf kurs.customGrades (id->label map)
         const tnLabels=d.noten_extra_labels||{};
-        const kursLabels=(k&&k.customGrades)||{};
-        const mergedLabels=Object.keys(tnLabels).length?tnLabels:kursLabels;
-        gradeMap[d.id]={m:d.noten_mitarbeit||'',f:d.noten_fuehrung||'',p:d.noten_praxis||'',extra:d.noten_extra||{},extraLabels:mergedLabels};
+        // Per ID den besten verfuegbaren Label nehmen
+        const finalLabels={};
+        Object.keys(d.noten_extra||{}).forEach(cid=>{
+          finalLabels[cid] = tnLabels[cid] || _kursLabels[cid] || _aggregatedLabels[cid] || _numericFallback[cid] || cid;
+        });
+        gradeMap[d.id]={m:d.noten_mitarbeit||'',f:d.noten_fuehrung||'',p:d.noten_praxis||'',extra:d.noten_extra||{},extraLabels:finalLabels};
       }
     });
+    // Auto-Heal: wenn aggregierte Labels da sind aber Kurs-Doc hat sie noch nicht - syncen
+    if(Object.keys(_aggregatedLabels).length && k && k.id){
+      const needsSync = Object.keys(_aggregatedLabels).some(cid => _kursLabels[cid] !== _aggregatedLabels[cid]);
+      if(needsSync){
+        const merged = Object.assign({}, _kursLabels, _aggregatedLabels);
+        db.collection('shared').doc('kurse').collection('list').doc(k.id).update({customGrades:merged}).catch(()=>{});
+      }
+    }
     tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||''));
     if(!tns.length){
       wrap.innerHTML='<div class="empty" style="padding:40px;text-align:center">Noch keine Teilnehmer in diesem Kurs<br><br><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.8rem;padding:8px 18px" title="OK">+ Teilnehmer hinzufügen</button></div>';
@@ -9710,7 +9739,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.6.1 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.6.2 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">
