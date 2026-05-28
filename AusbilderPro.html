@@ -1064,7 +1064,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.18.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.18.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6876,6 +6876,38 @@ function showDiagnose(){
   lines.push('Kurse: '+instCount);
   lines.push('Belegte Sitzplaetze: '+seatCount);
   lines.push('Sitze mit Noten: '+seatWithGrades);
+  lines.push('');
+  // === SPEICHER-ANALYSE (wichtig bei Datenverlust) ===
+  lines.push('--- SPEICHER ---');
+  try {
+    const rawJson = JSON.stringify(S);
+    const jsonKB = (rawJson.length/1024).toFixed(0);
+    let compInfo='';
+    if(typeof LZString!=='undefined' && LZString.compressToUTF16){
+      const comp = LZString.compressToUTF16(rawJson);
+      const compKB = (comp.length*2/1024).toFixed(0);
+      const pct = Math.round((1-(comp.length*2)/rawJson.length)*100);
+      compInfo=' → komprimiert '+compKB+' KB ('+pct+'% kleiner)';
+    }
+    lines.push('State-Größe: '+jsonKB+' KB'+compInfo);
+    const limitKB = 1024;
+    const ratio = Math.round((rawJson.length/1024)/limitKB*100);
+    lines.push('Firestore-Limit: 1024 KB (unkomprimiert: '+ratio+'% ausgelastet)');
+    if(rawJson.length/1024 > limitKB) lines.push('⚠⚠ UNKOMPRIMIERT ÜBER LIMIT! (Komprimierung nötig)');
+    // Groesse pro Kategorie - finde den groessten Brocken
+    const katSizes=[];
+    Object.entries(S.kats||{}).forEach(([kid,k])=>{
+      const sz=JSON.stringify(k).length;
+      katSizes.push({label:k.label||kid, kb:(sz/1024).toFixed(1)});
+    });
+    katSizes.sort((a,b)=>parseFloat(b.kb)-parseFloat(a.kb));
+    lines.push('');
+    lines.push('Größte Kategorien:');
+    katSizes.slice(0,5).forEach(ks=>lines.push('  • '+ks.label+': '+ks.kb+' KB'));
+    // Pruefe auf eingebettete Bilder/base64 (haeufigste Ursache fuer Aufblaehung)
+    const b64count=(rawJson.match(/data:image\//g)||[]).length;
+    if(b64count>0) lines.push('⚠ '+b64count+' eingebettete Bilder im State (base64) - blaeht massiv auf!');
+  } catch(e){ lines.push('Speicher-Analyse fehlgeschlagen: '+e.message); }
   lines.push('');
   // Aktueller Kurs
   const inst=curInst();
