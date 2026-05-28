@@ -17,6 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
 <script>
 // Fallback falls Firebase nicht lädt
 window.addEventListener('load', ()=>{
@@ -1063,7 +1064,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.17.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.18.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -11357,14 +11358,54 @@ function fbSave(){
   _syncTimer=setTimeout(()=>{
     const ci=document.getElementById('cloudInd');
     ci.textContent='☁ Speichert…';
+    // State serialisieren + komprimieren (umgeht das 1MB Firestore-Doc-Limit)
+    const rawJson = JSON.stringify(S);
+    let payload = rawJson, compressed = false;
+    try {
+      if(typeof LZString !== 'undefined' && LZString.compressToUTF16){
+        payload = LZString.compressToUTF16(rawJson);
+        compressed = true;
+      }
+    } catch(e){ payload = rawJson; compressed = false; }
+    // Groessen-Check (Firestore-Limit ~1.048.576 Bytes; UTF16 = 2 Byte/Zeichen)
+    const approxBytes = payload.length * 2;
+    if(approxBytes > 1000000){
+      ci.textContent='⚠ Daten zu groß!';
+      ci.style.color='#ef4444';
+      _showStorageWarning(rawJson.length, approxBytes, compressed);
+      return; // Nicht speichern - wuerde eh fehlschlagen
+    }
     _db.collection('users').doc(_fbUid).collection('data').doc('state')
-      .set({s:JSON.stringify(S),ts:firebase.firestore.FieldValue.serverTimestamp()})
+      .set({s:payload, c:compressed, ts:firebase.firestore.FieldValue.serverTimestamp()})
       .then(()=>{
         ci.textContent='☁ Gespeichert ✓';
+        ci.style.color='';
         setTimeout(()=>{ if(_fbUid) ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||''); },3000);
       })
-      .catch(()=>{ ci.textContent='☁ Fehler ✗'; });
+      .catch((err)=>{
+        ci.textContent='☁ Fehler ✗';
+        ci.style.color='#ef4444';
+        console.error('Cloud-Save fehlgeschlagen:', err);
+        // Bei Größen-Fehler: Warnung zeigen
+        if(err && (err.code==='invalid-argument' || /longer than|exceeds|maximum/i.test(err.message||''))){
+          _showStorageWarning(rawJson.length, approxBytes, compressed);
+        }
+      });
   }, 1500);
+}
+// Warnung wenn Daten zu groß fuer Firestore-Doc werden
+function _showStorageWarning(jsonLen, payloadBytes, wasCompressed){
+  if(document.getElementById('storageWarnModal')) return;
+  const ov=document.createElement('div');
+  ov.id='storageWarnModal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,18,25,.85);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;max-width:460px;width:100%;padding:24px;box-shadow:0 24px 64px rgba(0,0,0,.4)">'
+    +'<div style="font-size:1.1rem;font-weight:800;color:#dc2626;margin-bottom:10px">⚠ Speicher-Limit erreicht</div>'
+    +'<div style="font-size:.85rem;color:#334155;line-height:1.55;margin-bottom:14px">Die Datenmenge hat das technische Limit erreicht. Damit keine Noten verloren gehen, sind die Daten aktuell nur lokal gesichert.<br><br>Bitte kontaktiere den Support – das Problem wird behoben.</div>'
+    +'<div style="font-size:.65rem;color:#94a3b8;font-family:\'JetBrains Mono\',monospace;background:#f8fafc;padding:8px 10px;border-radius:8px;margin-bottom:14px">JSON: '+(jsonLen/1024).toFixed(0)+' KB · Übertragung: '+(payloadBytes/1024).toFixed(0)+' KB'+(wasCompressed?' (komprimiert)':'')+'</div>'
+    +'<button onclick="document.getElementById(\'storageWarnModal\').remove()" style="width:100%;padding:10px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Verstanden</button>'
+    +'</div>';
+  document.body.appendChild(ov);
 }
 
 // Cloud Load
@@ -11412,14 +11453,22 @@ function fbLoadData(){
     .then(doc=>{
       if(doc.exists&&doc.data().s){
         try{
-          S=JSON.parse(doc.data().s);
+          const raw = doc.data().s;
+          const isComp = doc.data().c === true;
+          let jsonStr;
+          if(isComp && typeof LZString !== 'undefined' && LZString.decompressFromUTF16){
+            jsonStr = LZString.decompressFromUTF16(raw);
+          } else {
+            jsonStr = raw;
+          }
+          S=JSON.parse(jsonStr);
           if(!S.katOrder)S.katOrder=[];
           Object.keys(S.kats).forEach(id=>{ if(!S.katOrder.includes(id)) S.katOrder.push(id); });
           S.katOrder=S.katOrder.filter(id=>S.kats[id]);
           fixSelection();
           localStorage.setItem(_lsKey('ap_v1'),JSON.stringify(S));
           _dataOwner=_fbUid; // Daten gehören diesem User
-        }catch(e){}
+        }catch(e){ console.error('State-Load fehlgeschlagen:',e); }
       }
       _dataOwner=_fbUid; // Daten (oder leer) gehören diesem User
       renderAll();
