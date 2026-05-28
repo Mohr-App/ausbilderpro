@@ -1064,7 +1064,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.18.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.18.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -11390,25 +11390,19 @@ function fbSave(){
   _syncTimer=setTimeout(()=>{
     const ci=document.getElementById('cloudInd');
     ci.textContent='☁ Speichert…';
-    // State serialisieren + komprimieren (umgeht das 1MB Firestore-Doc-Limit)
+    // Plain JSON speichern (Komprimierung deaktiviert - Abwaerts-Kompatibilitaet
+    // mit aelteren Clients die kein LZString haben. Daten sind klein genug.)
     const rawJson = JSON.stringify(S);
-    let payload = rawJson, compressed = false;
-    try {
-      if(typeof LZString !== 'undefined' && LZString.compressToUTF16){
-        payload = LZString.compressToUTF16(rawJson);
-        compressed = true;
-      }
-    } catch(e){ payload = rawJson; compressed = false; }
-    // Groessen-Check (Firestore-Limit ~1.048.576 Bytes; UTF16 = 2 Byte/Zeichen)
-    const approxBytes = payload.length * 2;
-    if(approxBytes > 1000000){
-      ci.textContent='⚠ Daten zu groß!';
-      ci.style.color='#ef4444';
-      _showStorageWarning(rawJson.length, approxBytes, compressed);
-      return; // Nicht speichern - wuerde eh fehlschlagen
+    const approxBytes = rawJson.length;
+    // Sicherheits-Check: warnen wenn nahe am 1MB-Limit
+    if(approxBytes > 900000){
+      ci.textContent='⚠ Daten groß';
+      ci.style.color='#f59e0b';
+      _showStorageWarning(rawJson.length, approxBytes, false);
+      // trotzdem versuchen zu speichern (vielleicht passt's noch)
     }
     _db.collection('users').doc(_fbUid).collection('data').doc('state')
-      .set({s:payload, c:compressed, ts:firebase.firestore.FieldValue.serverTimestamp()})
+      .set({s:rawJson, c:false, ts:firebase.firestore.FieldValue.serverTimestamp()})
       .then(()=>{
         ci.textContent='☁ Gespeichert ✓';
         ci.style.color='';
@@ -11418,9 +11412,8 @@ function fbSave(){
         ci.textContent='☁ Fehler ✗';
         ci.style.color='#ef4444';
         console.error('Cloud-Save fehlgeschlagen:', err);
-        // Bei Größen-Fehler: Warnung zeigen
         if(err && (err.code==='invalid-argument' || /longer than|exceeds|maximum/i.test(err.message||''))){
-          _showStorageWarning(rawJson.length, approxBytes, compressed);
+          _showStorageWarning(rawJson.length, approxBytes, false);
         }
       });
   }, 1500);
