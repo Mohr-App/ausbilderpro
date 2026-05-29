@@ -1064,7 +1064,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.18.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.19.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -7695,6 +7695,18 @@ function saveManualTN(){
       document.getElementById('manualTNModal').classList.remove('open');
       toast(vorname+' '+nachname+' zum Kurs hinzugefügt ✓');
       loadPool();
+      // E-Mail-Benachrichtigung an Azubi (wenn Email vorhanden)
+      try {
+        _sendNeuerKursMailAP(
+          {vorname, nachname, kontaktEmail},
+          {
+            name: S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs',
+            von: inst.sY+'-'+inst.sM+'-'+inst.sD,
+            bis: inst.eY+'-'+inst.eM+'-'+inst.eD,
+            ausbilderName: (_auth?.currentUser?.displayName)||(_auth?.currentUser?.email?.split('@')[0])||''
+          }
+        );
+      } catch(e){ console.warn('Mail-Trigger fehlgeschlagen:',e); }
     }).catch(err=>toast('Fehler: '+err.message,'bad'));
     return;
   }
@@ -7713,8 +7725,73 @@ function saveManualTN(){
     document.getElementById('manualTNModal').classList.remove('open');
     toast(vorname+' '+nachname+' hinzugefügt ✓');
     loadPool();
+    // E-Mail-Benachrichtigung an Azubi (wenn Email vorhanden)
+    try {
+      _sendNeuerKursMailAP(
+        {vorname, nachname, kontaktEmail},
+        {
+          name: S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs',
+          von: inst.sY+'-'+inst.sM+'-'+inst.sD,
+          bis: inst.eY+'-'+inst.eM+'-'+inst.eD,
+          ausbilderName: (_auth?.currentUser?.displayName)||(_auth?.currentUser?.email?.split('@')[0])||''
+        }
+      );
+    } catch(e){ console.warn('Mail-Trigger fehlgeschlagen:',e); }
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
+
+// E-Mail an Azubi senden wenn er einem neuen Lehrgang zugewiesen wurde.
+// Nutzt Firebase Trigger-Email-Extension (db.collection('mail')).
+// tnInfo enthaelt: vorname, nachname, kontaktEmail
+// kursInfo enthaelt: name, von, bis, ausbilderName (alles strings)
+function _sendNeuerKursMailAP(tnInfo, kursInfo){
+  if(!_db) return;
+  const email = (tnInfo.kontaktEmail||tnInfo.email||'').trim();
+  if(!email) return; // keine Email = nichts zu tun
+  const fullName = ((tnInfo.vorname||'')+' '+(tnInfo.nachname||'')).trim();
+  const greeting = fullName?'Hallo '+fullName:'Hallo';
+  const kursName = kursInfo.name||'Lehrgang';
+  const zeitraum = (kursInfo.von&&kursInfo.bis)?(_fmtDateDE(kursInfo.von)+' – '+_fmtDateDE(kursInfo.bis)):'';
+  const ausbilderName = kursInfo.ausbilderName||'';
+  const appUrl='https://mohr-app.github.io/ausbilderpro/AzubiPro.html';
+  const iconUrl='https://mohr-app.github.io/ausbilderpro/icon-azubi-192.png';
+  const html='<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:20px;background:#f8fafc">'
+    +'<div style="text-align:center;margin-bottom:24px;padding:24px 16px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:14px">'
+    +'<img src="'+iconUrl+'" alt="AzubiPro" style="width:72px;height:72px;border-radius:18px;margin-bottom:10px;background:#fff;padding:6px;box-shadow:0 4px 14px rgba(0,0,0,.15)">'
+    +'<div style="font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:-.02em">Azubi<span style="opacity:.85">Pro</span></div>'
+    +'<div style="font-size:.78rem;color:rgba(255,255,255,.9);margin-top:4px">Neuer Lehrgang zugewiesen</div>'
+    +'</div>'
+    +'<div style="padding:22px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;margin-bottom:18px">'
+    +'<p style="margin:0 0 14px;font-size:1rem;font-weight:700;color:#0f172a">'+_escHtml(greeting)+',</p>'
+    +'<p style="margin:0 0 14px;font-size:.88rem;color:#1e293b;line-height:1.55">du wurdest einem neuen Lehrgang zugewiesen:</p>'
+    +'<div style="padding:14px 16px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:10px;margin-bottom:16px">'
+    +'<div style="font-size:.95rem;font-weight:800;color:#1e40af;margin-bottom:6px">📚 '+_escHtml(kursName)+'</div>'
+    +(zeitraum?'<div style="font-size:.82rem;color:#1e3a8a;margin-bottom:3px">📅 <b>Zeitraum:</b> '+_escHtml(zeitraum)+'</div>':'')
+    +(ausbilderName?'<div style="font-size:.82rem;color:#1e3a8a">👷 <b>Ausbilder:</b> '+_escHtml(ausbilderName)+'</div>':'')
+    +'</div>'
+    +'<p style="margin:0 0 18px;font-size:.85rem;color:#374151;line-height:1.55">Öffne <b>AzubiPro</b>, um den Lehrgang einzusehen und zu bestätigen.</p>'
+    +'<div style="text-align:center;margin-bottom:14px">'
+    +'<a href="'+appUrl+'" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:.92rem;box-shadow:0 4px 14px rgba(37,99,235,.3)">📱 AzubiPro öffnen</a>'
+    +'</div>'
+    +'<p style="margin:0;font-size:.7rem;color:#64748b;text-align:center;font-family:monospace;word-break:break-all">'+appUrl+'</p>'
+    +'</div>'
+    +'<p style="margin:18px 0 0;font-size:.7rem;color:#9ca3af;text-align:center;line-height:1.5">Diese E-Mail wurde automatisch versendet.<br>Bei Fragen wende dich bitte an deinen Ausbildungsbetrieb oder die Verwaltung.</p>'
+    +'</div>';
+  _db.collection('mail').add({
+    to: email,
+    message: {
+      subject: '📚 Neuer Lehrgang: '+kursName+(zeitraum?' ('+zeitraum+')':''),
+      html: html
+    }
+  }).catch(err=>console.warn('Mail-Fehler:',err));
+}
+function _fmtDateDE(s){
+  if(!s) return '';
+  const m = String(s).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(!m) return s;
+  return m[3].padStart(2,'0')+'.'+m[2].padStart(2,'0')+'.'+m[1];
+}
+function _escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // Manuell-Modal: Berufsgruppen-Dropdown befüllen (wird beim Öffnen aufgerufen)
 function mtPopulateBerufe(){
