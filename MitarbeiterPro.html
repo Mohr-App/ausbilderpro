@@ -1449,10 +1449,34 @@ function removeBetriebMeldung(docId, type){
     })
     .catch(err=>toast('Fehler: '+(err.message||err),'bad'));
 }
-function _sendStornoEmailAG(firma, type, name){
+function _autoStornoKrankIfNeeded(){
+  if(!_tnId||!db) return;
+  const today=localDate();
+  db.collection('globalTN').doc(_tnId).collection('betriebMeldungen')
+    .where('type','==','krank').where('datum','==',today).get()
+    .then(snap=>{
+      if(snap.empty) return;
+      const batch=db.batch();
+      snap.forEach(doc=>batch.delete(doc.ref));
+      batch.commit().then(()=>{
+        toast('🤒 Krank-Meldung wurde durchs Einstempeln zurückgenommen');
+        try { loadBetriebMeldungen(); } catch(e){}
+        try {
+          const firma=_tnData?.firma||'';
+          const name=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Mitarbeiter';
+          if(firma) _sendStornoEmailAG(firma, 'krank', name, true);
+        } catch(e){}
+      });
+    }).catch(()=>{});
+}
+function _sendStornoEmailAG(firma, type, name, autoByStempel){
   if(!db||!firma) return;
   const labelMap={'krank':'Krank-Meldung','spaeter':'„Komme später"','frueher':'„Gehe früher"','text':'Nachricht','uebstd':'Überstundenabbau'};
   const label=labelMap[type]||'Meldung';
+  const headline = autoByStempel ? '↩ Krank-Meldung aufgehoben (eingestempelt)' : '↩ Meldung zurückgenommen';
+  const grundLine = autoByStempel
+    ? '<b>'+esc(name)+'</b> hat sich eingestempelt – die zuvor abgegebene Krank-Meldung wurde dadurch automatisch aufgehoben.'
+    : '<b>'+esc(name)+'</b> hat eine Meldung zurückgenommen.';
   db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
     snap.forEach(doc=>{
       const u=doc.data();
@@ -1460,14 +1484,14 @@ function _sendStornoEmailAG(firma, type, name){
       db.collection('mail').add({
         to: u.email,
         message: {
-          subject: '↩ '+label+' zurückgenommen – '+name,
+          subject: (autoByStempel?'↩ Krank-Meldung aufgehoben (eingestempelt) – ':'↩ '+label+' zurückgenommen – ')+name,
           html: '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px">'
             +'<div style="padding:18px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
             +'<div style="padding:12px;background:#f0fdf4;border:2px solid #16a34a;border-radius:10px;margin-bottom:12px">'
-            +'<p style="margin:0;font-size:.95rem;font-weight:800;color:#15803d">↩ Meldung zurückgenommen</p>'
+            +'<p style="margin:0;font-size:.95rem;font-weight:800;color:#15803d">'+esc(headline)+'</p>'
             +'</div>'
-            +'<p style="margin:0 0 8px;font-size:.88rem;color:#1e293b"><b>'+esc(name)+'</b> hat eine Meldung zurückgenommen:</p>'
-            +'<p style="margin:0 0 12px;font-size:.85rem;color:#475569">Typ: <b>'+esc(label)+'</b></p>'
+            +'<p style="margin:0 0 8px;font-size:.88rem;color:#1e293b">'+grundLine+'</p>'
+            +(autoByStempel?'':'<p style="margin:0 0 12px;font-size:.85rem;color:#475569">Typ: <b>'+esc(label)+'</b></p>')
             +'<p style="margin:0;font-size:.75rem;color:#64748b">Im AG-Dashboard wird der Status entsprechend angepasst.</p>'
             +'</div></div>'
         }
@@ -1776,7 +1800,12 @@ function zeitStempeln(){
         bruttoMinuten: firebase.firestore.FieldValue.delete()
       };
       ref.set(data,{merge:true})
-        .then(()=>{loadZeitHeute(); toast(currentArr.length?'▶ Wieder eingestempelt um '+jetzt:'▶ Eingestempelt um '+jetzt);})
+        .then(()=>{
+          loadZeitHeute();
+          toast(currentArr.length?'▶ Wieder eingestempelt um '+jetzt:'▶ Eingestempelt um '+jetzt);
+          // Krank-Meldung von heute automatisch zuruecknehmen
+          if(!currentArr.length) _autoStornoKrankIfNeeded();
+        })
         .catch(()=>{loadZeitHeute(); toast('Fehler beim Stempeln','bad');});
     });
   } else {
