@@ -2063,10 +2063,20 @@ function renderAzubiList(){
     let urlBadge='';
     const aktUrlaub=(a.urlaub||[]).find(u=>u.von<=today&&u.bis>=today);
     if(aktUrlaub) urlBadge='<span class="azubi-badge" style="background:rgba(245,158,11,.08);color:#d97706">🏖 Urlaub</span>';
+    // Aktuelle Heute-Stati aus Cache (krank/urlaub/uebstd via async geladen)
+    const st=a._statusToday||{};
+    let krankBadge='', uebstdBadge='', ausfallBadge='', urlBadge2='';
+    if(st.krank) krankBadge='<span class="azubi-badge kurs-pulse" style="background:#dc2626;color:#fff">🤒 Heute krank</span>';
+    if(st.urlaub && !aktUrlaub) urlBadge2='<span class="azubi-badge" style="background:#f59e0b;color:#fff">🏖 Heute Urlaub</span>';
+    if(st.uebstd) uebstdBadge='<span class="azubi-badge" style="background:#7c3aed;color:#fff">⏰ Überstd.-Abbau</span>';
+    // Kurs-Ausfall heute (synchron aus benachrichtigungen)
+    if((a.benachrichtigungen||[]).some(n=>n.typ==='kurs_ausfall'&&n.datum===today)){
+      ausfallBadge='<span class="azubi-badge kurs-pulse" style="background:#f59e0b;color:#fff">⚠ Lehrgang fällt aus</span>';
+    }
     const card=document.createElement('div');
     card.className='azubi-card';card.dataset.tnId=a.id;
     if(isArchived) card.style.cssText+='opacity:.45;border-style:dashed;';
-    card.innerHTML=(a.photoUrl?'<div class="azubi-av"><img src="'+esc(a.photoUrl)+'"></div>':'<div class="azubi-av">'+esc(init)+'</div>')+'<div class="azubi-info"><div class="azubi-name">'+esc(name)+(isArchived?' <span style="font-size:.55rem;color:var(--mu)">📦 archiviert</span>':'')+'</div><div class="azubi-sub">'+(a.beruf||'')+(a.ausbjahr?' · '+a.ausbjahr+'. Lj':'')+'</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">'+badge+attBadge+wzBadge+urlBadge+'</div></div>';
+    card.innerHTML=(a.photoUrl?'<div class="azubi-av"><img src="'+esc(a.photoUrl)+'"></div>':'<div class="azubi-av">'+esc(init)+'</div>')+'<div class="azubi-info"><div class="azubi-name">'+esc(name)+(isArchived?' <span style="font-size:.55rem;color:var(--mu)">📦 archiviert</span>':'')+'</div><div class="azubi-sub">'+(a.beruf||'')+(a.ausbjahr?' · '+a.ausbjahr+'. Lj':'')+'</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">'+badge+ausfallBadge+krankBadge+urlBadge+urlBadge2+uebstdBadge+attBadge+wzBadge+'</div></div>';
     const detail=document.createElement('div');
     detail.className='azubi-detail';detail.style.display='none';
     if(kurs){
@@ -2679,18 +2689,25 @@ function renderAgAzubiKontakte(){
     ]));
     Promise.all(promises).then(results=>{
       let krank=0, urlaub=0, uebstd=0;
-      results.forEach(([kSnap,uSnap,uebSnap])=>{
-        if(kSnap && !kSnap.empty) krank++;
+      results.forEach(([kSnap,uSnap,uebSnap],idx)=>{
+        const az=azubis[idx];
+        if(!az) return;
+        az._statusToday = az._statusToday || {};
+        if(kSnap && !kSnap.empty){ krank++; az._statusToday.krank=true; } else { az._statusToday.krank=false; }
+        let isUrl=false;
         if(uSnap){
           uSnap.forEach(d=>{
             const u=d.data();
             if(u.firmaUid && u.firmaUid !== _uid) return;
-            if(u.von && u.bis && today>=u.von && today<=u.bis) urlaub++;
+            if(u.von && u.bis && today>=u.von && today<=u.bis){ urlaub++; isUrl=true; }
           });
         }
-        if(uebSnap && !uebSnap.empty) uebstd++;
+        az._statusToday.urlaub=isUrl;
+        if(uebSnap && !uebSnap.empty){ uebstd++; az._statusToday.uebstd=true; } else { az._statusToday.uebstd=false; }
       });
       _renderAzubiStatusBadges({laeuft,geplant,ausfallHeute,abgebrochen,krank,urlaub,uebstd});
+      // Liste neu rendern damit die Card-Badges aktuell sind
+      try{ renderAzubiList(); }catch(e){}
     }).catch(e=>console.warn('Status-Async-Fehler:',e));
   } catch(e){ console.warn('Kurs-Status-Update fehlgeschlagen:',e); }
 }
