@@ -1497,6 +1497,8 @@ function startLiveStatusSubscriptions(){
           map[tnId]=map[tnId]||{};
           if(d.type==='krank') map[tnId].krank=true;
           if(d.type==='uebstd') map[tnId].uebstd=true;
+          if(d.type==='spaeter') map[tnId].spaeter=d.text||true;
+          if(d.type==='frueher') map[tnId].frueher=d.text||true;
         });
         _liveStatusKrankMap=map;
         _applyLiveStatusToList();
@@ -1540,6 +1542,8 @@ function _applyLiveStatusToList(){
     az._statusToday.krank=!!k.krank;
     az._statusToday.uebstd=!!k.uebstd;
     az._statusToday.urlaub=!!u.urlaub;
+    az._statusToday.spaeter=k.spaeter||false;
+    az._statusToday.frueher=k.frueher||false;
   });
   // Nur Karten + Header-Badges aktualisieren, KEIN renderAgAzubiKontakte (sonst Endlosschleife)
   try { _rerenderMaCardsOnly(); } catch(e){}
@@ -1549,9 +1553,21 @@ function _applyLiveStatusToList(){
     const isMa=(t)=>t==='arbeitnehmer'||t==='mitarbeiter';
     const arbeitnehmer=_azubis.filter(a=>isMa(a.typ));
     const azubis=_azubis.filter(a=>!isMa(a.typ));
-    let azK=0,azU=0,azUe=0,anK=0,anU=0,anUe=0;
-    azubis.forEach(a=>{if(a._statusToday?.krank)azK++;if(a._statusToday?.urlaub)azU++;if(a._statusToday?.uebstd)azUe++;});
-    arbeitnehmer.forEach(a=>{if(a._statusToday?.krank)anK++;if(a._statusToday?.urlaub)anU++;if(a._statusToday?.uebstd)anUe++;});
+    let azK=0,azU=0,azUe=0,azS=0,azF=0,anK=0,anU=0,anUe=0,anS=0,anF=0;
+    azubis.forEach(a=>{
+      if(a._statusToday?.krank)azK++;
+      if(a._statusToday?.urlaub)azU++;
+      if(a._statusToday?.uebstd)azUe++;
+      if(a._statusToday?.spaeter)azS++;
+      if(a._statusToday?.frueher)azF++;
+    });
+    arbeitnehmer.forEach(a=>{
+      if(a._statusToday?.krank)anK++;
+      if(a._statusToday?.urlaub)anU++;
+      if(a._statusToday?.uebstd)anUe++;
+      if(a._statusToday?.spaeter)anS++;
+      if(a._statusToday?.frueher)anF++;
+    });
     // Kurs-Stati synchron aus _azubis/_kurse
     const today=localDate();
     let laeuft=0,geplant=0,ausfallHeute=0,abgebrochen=0;
@@ -1564,8 +1580,8 @@ function _applyLiveStatusToList(){
         if((a.kursHistory||[]).some(h=>h.abgebrochen&&h.bis&&h.bis>=today)) abgebrochen++;
       }
     });
-    _renderAzubiStatusBadges({laeuft,geplant,ausfallHeute,abgebrochen,krank:azK,urlaub:azU,uebstd:azUe});
-    _renderMaStatusBadges({krank:anK,urlaub:anU,uebstd:anUe});
+    _renderAzubiStatusBadges({laeuft,geplant,ausfallHeute,abgebrochen,krank:azK,urlaub:azU,uebstd:azUe,spaeter:azS,frueher:azF});
+    _renderMaStatusBadges({krank:anK,urlaub:anU,uebstd:anUe,spaeter:anS,frueher:anF});
   } catch(e){ console.warn('Live-Status-Header-Fehler:',e); }
 }
 
@@ -2162,10 +2178,18 @@ function renderAzubiList(){
     if(aktUrlaub) urlBadge='<span class="azubi-badge" style="background:rgba(245,158,11,.08);color:#d97706">🏖 Urlaub</span>';
     // Aktuelle Heute-Stati aus Cache (krank/urlaub/uebstd via async geladen)
     const st=a._statusToday||{};
-    let krankBadge='', uebstdBadge='', ausfallBadge='', urlBadge2='';
+    let krankBadge='', uebstdBadge='', ausfallBadge='', urlBadge2='', spaeterBadge='', frueherBadge='';
     if(st.krank) krankBadge='<span class="azubi-badge kurs-pulse" style="background:#dc2626;color:#fff">🤒 Heute krank</span>';
     if(st.urlaub && !aktUrlaub) urlBadge2='<span class="azubi-badge" style="background:#f59e0b;color:#fff">🏖 Heute Urlaub</span>';
     if(st.uebstd) uebstdBadge='<span class="azubi-badge" style="background:#7c3aed;color:#fff">⏰ Überstd.-Abbau</span>';
+    if(st.spaeter){
+      const txt = typeof st.spaeter==='string'&&st.spaeter.length<60 ? ' ('+esc(st.spaeter)+')' : '';
+      spaeterBadge='<span class="azubi-badge" style="background:#0ea5e9;color:#fff">🕐 Kommt später'+txt+'</span>';
+    }
+    if(st.frueher){
+      const txt = typeof st.frueher==='string'&&st.frueher.length<60 ? ' ('+esc(st.frueher)+')' : '';
+      frueherBadge='<span class="azubi-badge" style="background:#0ea5e9;color:#fff">🚶 Geht früher'+txt+'</span>';
+    }
     // Kurs-Ausfall heute (synchron aus benachrichtigungen)
     if((a.benachrichtigungen||[]).some(n=>n.typ==='kurs_ausfall'&&n.datum===today)){
       ausfallBadge='<span class="azubi-badge kurs-pulse" style="background:#f59e0b;color:#fff">⚠ Lehrgang fällt aus</span>';
@@ -2173,7 +2197,7 @@ function renderAzubiList(){
     const card=document.createElement('div');
     card.className='azubi-card';card.dataset.tnId=a.id;
     if(isArchived) card.style.cssText+='opacity:.45;border-style:dashed;';
-    card.innerHTML=(a.photoUrl?'<div class="azubi-av"><img src="'+esc(a.photoUrl)+'"></div>':'<div class="azubi-av">'+esc(init)+'</div>')+'<div class="azubi-info"><div class="azubi-name">'+esc(name)+(isArchived?' <span style="font-size:.55rem;color:var(--mu)">📦 archiviert</span>':'')+'</div><div class="azubi-sub">'+(a.beruf||'')+(a.ausbjahr?' · '+a.ausbjahr+'. Lj':'')+'</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">'+badge+ausfallBadge+krankBadge+urlBadge+urlBadge2+uebstdBadge+attBadge+wzBadge+'</div></div>';
+    card.innerHTML=(a.photoUrl?'<div class="azubi-av"><img src="'+esc(a.photoUrl)+'"></div>':'<div class="azubi-av">'+esc(init)+'</div>')+'<div class="azubi-info"><div class="azubi-name">'+esc(name)+(isArchived?' <span style="font-size:.55rem;color:var(--mu)">📦 archiviert</span>':'')+'</div><div class="azubi-sub">'+(a.beruf||'')+(a.ausbjahr?' · '+a.ausbjahr+'. Lj':'')+'</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">'+badge+ausfallBadge+krankBadge+spaeterBadge+frueherBadge+urlBadge+urlBadge2+uebstdBadge+attBadge+wzBadge+'</div></div>';
     const detail=document.createElement('div');
     detail.className='azubi-detail';detail.style.display='none';
     if(kurs){
@@ -2837,6 +2861,8 @@ function _renderMaStatusBadges(s){
   if(s.krank>0)  items.push({t:'🤒 '+s.krank,bg:'#dc2626',pulse:false,title:s.krank+' Mitarbeiter krank gemeldet'});
   if(s.urlaub>0) items.push({t:'🏖 '+s.urlaub,bg:'#f59e0b',pulse:false,title:s.urlaub+' Mitarbeiter im Urlaub'});
   if(s.uebstd>0) items.push({t:'⏰ '+s.uebstd,bg:'#7c3aed',pulse:false,title:s.uebstd+' Mitarbeiter im Überstundenabbau'});
+  if(s.spaeter>0)items.push({t:'🕐 '+s.spaeter,bg:'#0ea5e9',pulse:false,title:s.spaeter+' Mitarbeiter kommen später'});
+  if(s.frueher>0)items.push({t:'🚶 '+s.frueher,bg:'#0ea5e9',pulse:false,title:s.frueher+' Mitarbeiter gehen früher'});
   box.innerHTML = items.map(b=>'<span class="'+(b.pulse?'kurs-pulse':'')+'" title="'+esc(b.title)+'" style="font-size:.6rem;padding:3px 8px;border-radius:8px;font-weight:800;white-space:nowrap;background:'+b.bg+';color:#fff">'+esc(b.t)+'</span>').join('');
 }
 function _renderAzubiStatusBadges(s){
@@ -2850,6 +2876,8 @@ function _renderAzubiStatusBadges(s){
   if(s.krank>0)       items.push({t:'🤒 '+s.krank,bg:'#dc2626',pulse:false,title:s.krank+' Azubi(s) krank gemeldet'});
   if(s.urlaub>0)      items.push({t:'🏖 '+s.urlaub,bg:'#f59e0b',pulse:false,title:s.urlaub+' Azubi(s) im Urlaub'});
   if(s.uebstd>0)      items.push({t:'⏰ '+s.uebstd,bg:'#7c3aed',pulse:false,title:s.uebstd+' Azubi(s) im Überstundenabbau'});
+  if(s.spaeter>0)     items.push({t:'🕐 '+s.spaeter,bg:'#0ea5e9',pulse:false,title:s.spaeter+' Azubi(s) kommen später'});
+  if(s.frueher>0)     items.push({t:'🚶 '+s.frueher,bg:'#0ea5e9',pulse:false,title:s.frueher+' Azubi(s) gehen früher'});
   box.innerHTML = items.map(b=>'<span class="'+(b.pulse?'kurs-pulse':'')+'" title="'+esc(b.title)+'" style="font-size:.6rem;padding:3px 8px;border-radius:8px;font-weight:800;white-space:nowrap;background:'+b.bg+';color:#fff">'+esc(b.t)+'</span>').join('');
 }
 function _renderMaCard(az){
@@ -2872,6 +2900,14 @@ function _renderMaCard(az){
   if(st.krank)  statusBadges+='<span class="kurs-pulse" style="display:inline-block;font-size:.55rem;padding:2px 7px;border-radius:6px;font-weight:800;background:#dc2626;color:#fff;margin-right:4px">🤒 Heute krank</span>';
   if(st.urlaub) statusBadges+='<span style="display:inline-block;font-size:.55rem;padding:2px 7px;border-radius:6px;font-weight:800;background:#f59e0b;color:#fff;margin-right:4px">🏖 Urlaub</span>';
   if(st.uebstd) statusBadges+='<span style="display:inline-block;font-size:.55rem;padding:2px 7px;border-radius:6px;font-weight:800;background:#7c3aed;color:#fff;margin-right:4px">⏰ Überstd.-Abbau</span>';
+  if(st.spaeter){
+    const txt = typeof st.spaeter==='string'&&st.spaeter.length<60 ? ' ('+esc(st.spaeter)+')' : '';
+    statusBadges+='<span style="display:inline-block;font-size:.55rem;padding:2px 7px;border-radius:6px;font-weight:800;background:#0ea5e9;color:#fff;margin-right:4px">🕐 Kommt später'+txt+'</span>';
+  }
+  if(st.frueher){
+    const txt = typeof st.frueher==='string'&&st.frueher.length<60 ? ' ('+esc(st.frueher)+')' : '';
+    statusBadges+='<span style="display:inline-block;font-size:.55rem;padding:2px 7px;border-radius:6px;font-weight:800;background:#0ea5e9;color:#fff;margin-right:4px">🚶 Geht früher'+txt+'</span>';
+  }
   return '<div class="card" onclick="openMaDetails(\''+esc(az.id)+'\')" style="display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:6px;cursor:pointer;transition:all .15s;border:1.5px solid var(--brd)" onmouseover="this.style.background=\'rgba(37,99,235,.04)\';this.style.borderColor=\'rgba(37,99,235,.3)\'" onmouseout="this.style.background=\'\';this.style.borderColor=\'var(--brd)\'">'
     +'<div onclick="event.stopPropagation();openAvaEditModal(\''+esc(az.id)+'\')" title="Profilbild ändern" style="position:relative;width:48px;height:48px;border-radius:50%;background:'+avatarBg+';border:2px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:'+avatarColor+';flex-shrink:0;cursor:pointer;overflow:hidden">'
     +avaInner
