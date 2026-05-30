@@ -98,7 +98,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .copyright{position:fixed;bottom:8px;right:12px;font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--mu);opacity:.3;}
 @media(max-width:600px){.stat-row{grid-template-columns:1fr;}.hdr{padding:0 12px;gap:8px;}.hdr-logo{font-size:.88rem;}.main{padding:14px 10px;}.app-launcher-wrap{display:none !important;}}
 @keyframes pulseRed{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
-.bnav{position:fixed;bottom:0;left:0;right:0;background:#ffffff;border-top:1px solid var(--brd);box-shadow:0 -2px 14px rgba(15,23,42,.06);display:flex;justify-content:space-around;padding:8px 6px calc(env(safe-area-inset-bottom,0px) + 8px);z-index:100;}
+.bnav{position:fixed;bottom:0;left:0;right:0;background:#ffffff;border-top:2px solid rgba(37,99,235,.4);box-shadow:0 -2px 14px rgba(15,23,42,.06);display:flex;justify-content:space-around;padding:8px 6px calc(env(safe-area-inset-bottom,0px) + 8px);z-index:100;transition:transform .25s cubic-bezier(.4,0,.2,1);}
+.bnav.collapsed{transform:translateY(calc(100% - 6px));}
+.bnav-toggle{position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:#fff;border:2px solid rgba(37,99,235,.4);border-bottom:none;border-radius:14px 14px 0 0;width:68px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#2563eb;font-weight:800;padding:0;box-shadow:0 -2px 8px rgba(15,23,42,.04);}
+.bnav-toggle:active{background:#f1f5f9;}
 .bnav-btn{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;color:#475569;font-family:'Sora',sans-serif;font-size:.7rem;font-weight:700;cursor:pointer;padding:4px 6px;border-radius:12px;transition:all .15s;flex:1;min-width:0;}
 .bnav-btn .bi{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:0;}.bnav-btn .bi svg{width:20px;height:20px;stroke:#475569;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .bnav-btn.active{color:var(--acc);}.bnav-btn.active .bi{background:linear-gradient(135deg,#2563eb,#059669);box-shadow:0 3px 10px rgba(37,99,235,.28);}.bnav-btn.active .bi svg{stroke:#fff;stroke-width:2.4}
@@ -787,6 +790,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
   <!-- Bottom Nav: Live / Auswertung / Einstellungen — Reihenfolge personalisierbar -->
   <div class="bnav" id="agBnav">
+    <button class="bnav-toggle" id="agBnavToggle" onclick="toggleAgBnav()" title="Navigation einklappen/ausklappen" aria-label="Navigation umschalten">▼</button>
     <button class="bnav-btn active" data-page="live" id="agnav-live" onclick="showAgPage('live')" title="Live">
       <span class="bi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg></span>Live
     </button>
@@ -2385,6 +2389,29 @@ window.addEventListener('popstate',e=>{
   if(e.state&&e.state.page){_navFromPop=true;showAgPage(e.state.page);}
   else{_navFromPop=true;showAgPage('live');history.replaceState({page:'live'},'');}
 });
+// Bottom-Nav einklappen/ausklappen - mehr Platz fuer Content
+function toggleAgBnav(){
+  const nav=document.getElementById('agBnav');
+  const btn=document.getElementById('agBnavToggle');
+  if(!nav||!btn) return;
+  nav.classList.toggle('collapsed');
+  const isCol=nav.classList.contains('collapsed');
+  btn.textContent=isCol?'▲':'▼';
+  btn.title=isCol?'Navigation einblenden':'Navigation einklappen';
+  try{ localStorage.setItem('agBnavCollapsed', isCol?'1':'0'); }catch(e){}
+}
+// Beim Laden: State wiederherstellen
+window.addEventListener('DOMContentLoaded',()=>{
+  try{
+    if(localStorage.getItem('agBnavCollapsed')==='1'){
+      const nav=document.getElementById('agBnav');
+      const btn=document.getElementById('agBnavToggle');
+      if(nav){ nav.classList.add('collapsed'); }
+      if(btn){ btn.textContent='▲'; btn.title='Navigation einblenden'; }
+    }
+  }catch(e){}
+});
+
 function showAgPage(id){
   // Legacy-IDs auf neue mappen (Back-compat falls irgendwo alter Code ruft)
   const legacyMap={betrieb:'live',azubis:'einstellungen',uebl:'einstellungen',home:'einstellungen'};
