@@ -5509,10 +5509,36 @@ function kursAusfallVerwaltung(){
         let ok=0,fail=0;
         const promises=[];
         snap.forEach(doc=>{
-          const benach=(doc.data().benachrichtigungen||[]);
+          const tnData=doc.data();
+          const benach=(tnData.benachrichtigungen||[]);
           if(benach.some(n=>n.typ==='kurs_ausfall'&&n.datum===today&&n.kursId===kursId))return;
           benach.push(notification);
           promises.push(db.collection('globalTN').doc(doc.id).update({benachrichtigungen:benach}).then(()=>ok++).catch(()=>fail++));
+          // Email an AG (verknuepfter Betrieb des Azubi)
+          const firma=tnData.firma||'';
+          if(firma){
+            const tnName=((tnData.vorname||'')+' '+(tnData.nachname||'')).trim()||'Azubi';
+            db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(uSnap=>{
+              uSnap.forEach(uDoc=>{
+                const u=uDoc.data();
+                if(!u.email) return;
+                db.collection('mail').add({
+                  to: u.email,
+                  message: {
+                    subject: '🚨 Lehrgang "'+kursLabel+'" fällt heute aus – '+tnName,
+                    html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
+                      +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
+                      +'<div style="padding:14px;background:#fef2f2;border:3px solid #ef4444;border-radius:10px;margin-bottom:12px">'
+                      +'<p style="margin:0 0 8px;font-size:1rem;font-weight:800;color:#ef4444">🚨 LEHRGANG FÄLLT HEUTE AUS</p>'
+                      +'<p style="margin:0;font-size:.9rem;color:#1e293b;font-weight:700">'+esc(kursLabel)+' – '+esc(todayDE)+'</p></div>'
+                      +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">Ihr Auszubildender <b>'+esc(tnName)+'</b> ist vom Lehrgangsausfall heute betroffen. Er/Sie wurde gebeten, sofort den Betrieb aufzusuchen.</p>'
+                      +'<p style="margin:0;font-size:.78rem;color:#475569">Mitteilung von der Verwaltung</p>'
+                      +'</div></div>'
+                  }
+                }).catch(e=>console.warn('Mail AG-Fehler:',e));
+              });
+            }).catch(()=>{});
+          }
         });
         return Promise.all(promises).then(()=>{
           if(!fail)toast('⚠️ Ausfall an '+ok+' TN gesendet ✓');

@@ -341,7 +341,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
               <span style="font-size:1.05rem">🎓</span>
               <span>Azubis</span>
               <span id="cntAzubis" style="font-size:.6rem;background:rgba(37,99,235,.12);color:var(--acc);padding:2px 7px;border-radius:8px;font-weight:700">0</span>
-              <span id="azubiKursStatus" style="display:none;font-size:.6rem;padding:3px 9px;border-radius:8px;font-weight:800;white-space:nowrap"></span>
+              <span id="azubiStatusBadges" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center"></span>
             </span>
           </summary>
           <div class="coll-body">
@@ -2651,37 +2651,61 @@ function renderAgAzubiKontakte(){
   const cntAz=document.getElementById('cntAzubis');
   if(cntAn) cntAn.textContent=arbeitnehmer.length;
   if(cntAz) cntAz.textContent=azubis.length;
-  // Lehrgangs-Status: zaehle Azubis mit laufenden bzw. geplanten Kursen
+  // Lehrgangs-Status: laufend, geplant, Ausfall heute, Abbruch
   try {
     const today=localDate();
-    let laeuft=0, geplant=0;
+    let laeuft=0, geplant=0, ausfallHeute=0, abgebrochen=0;
     azubis.forEach(a=>{
-      if(!a.aktiverKursId) return;
-      const k=_kurse[a.aktiverKursId];
-      if(!k||!k.von) return;
-      if(k.bis && today>=k.von && today<=k.bis) laeuft++;
-      else if(today<k.von) geplant++;
-    });
-    const statusEl=document.getElementById('azubiKursStatus');
-    if(statusEl){
-      if(laeuft>0){
-        statusEl.style.display='';
-        statusEl.style.background='#16a34a';
-        statusEl.style.color='#fff';
-        statusEl.className='kurs-pulse';
-        statusEl.textContent='🎓 '+laeuft+(laeuft===1?' auf Lehrgang':' auf Lehrgang');
-      } else if(geplant>0){
-        statusEl.style.display='';
-        statusEl.style.background='#2563eb';
-        statusEl.style.color='#fff';
-        statusEl.className='';
-        statusEl.textContent='📅 '+geplant+(geplant===1?' Lehrgang geplant':' Lehrgänge geplant');
+      if((a.benachrichtigungen||[]).some(n=>n.typ==='kurs_ausfall'&&n.datum===today)) ausfallHeute++;
+      if(a.aktiverKursId){
+        const k=_kurse[a.aktiverKursId];
+        if(k&&k.von){
+          if(k.bis && today>=k.von && today<=k.bis) laeuft++;
+          else if(today<k.von) geplant++;
+        }
       } else {
-        statusEl.style.display='none';
-        statusEl.className='';
+        if((a.kursHistory||[]).some(h=>h.abgebrochen&&h.bis&&h.bis>=today)) abgebrochen++;
       }
-    }
+    });
+    _renderAzubiStatusBadges({laeuft,geplant,ausfallHeute,abgebrochen,krank:0,urlaub:0,uebstd:0});
+    // Async: krank, urlaub, ueberstundenabbau heute
+    const promises=azubis.map(az=>Promise.all([
+      db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+        .where('type','==','krank').where('datum','==',today).limit(1).get().catch(()=>null),
+      db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+        .where('status','==','genehmigt').get().catch(()=>null),
+      db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+        .where('type','==','uebstd').where('datum','==',today).limit(1).get().catch(()=>null)
+    ]));
+    Promise.all(promises).then(results=>{
+      let krank=0, urlaub=0, uebstd=0;
+      results.forEach(([kSnap,uSnap,uebSnap])=>{
+        if(kSnap && !kSnap.empty) krank++;
+        if(uSnap){
+          uSnap.forEach(d=>{
+            const u=d.data();
+            if(u.firmaUid && u.firmaUid !== _uid) return;
+            if(u.von && u.bis && today>=u.von && today<=u.bis) urlaub++;
+          });
+        }
+        if(uebSnap && !uebSnap.empty) uebstd++;
+      });
+      _renderAzubiStatusBadges({laeuft,geplant,ausfallHeute,abgebrochen,krank,urlaub,uebstd});
+    }).catch(e=>console.warn('Status-Async-Fehler:',e));
   } catch(e){ console.warn('Kurs-Status-Update fehlgeschlagen:',e); }
+}
+function _renderAzubiStatusBadges(s){
+  const box=document.getElementById('azubiStatusBadges');
+  if(!box) return;
+  const items=[];
+  if(s.laeuft>0)      items.push({t:'🎓 '+s.laeuft,bg:'#16a34a',pulse:true,title:s.laeuft+' Azubi(s) gerade auf Lehrgang'});
+  if(s.geplant>0)     items.push({t:'📅 '+s.geplant,bg:'#2563eb',pulse:false,title:s.geplant+' Lehrgang/Lehrgänge geplant'});
+  if(s.ausfallHeute>0)items.push({t:'⚠ '+s.ausfallHeute,bg:'#f59e0b',pulse:true,title:s.ausfallHeute+' Lehrgang(e) heute ausgefallen'});
+  if(s.abgebrochen>0) items.push({t:'✗ '+s.abgebrochen,bg:'#dc2626',pulse:false,title:s.abgebrochen+' Lehrgang(e) abgebrochen'});
+  if(s.krank>0)       items.push({t:'🤒 '+s.krank,bg:'#dc2626',pulse:false,title:s.krank+' Azubi(s) krank gemeldet'});
+  if(s.urlaub>0)      items.push({t:'🏖 '+s.urlaub,bg:'#f59e0b',pulse:false,title:s.urlaub+' Azubi(s) im Urlaub'});
+  if(s.uebstd>0)      items.push({t:'⏰ '+s.uebstd,bg:'#7c3aed',pulse:false,title:s.uebstd+' Azubi(s) im Überstundenabbau'});
+  box.innerHTML = items.map(b=>'<span class="'+(b.pulse?'kurs-pulse':'')+'" title="'+esc(b.title)+'" style="font-size:.6rem;padding:3px 8px;border-radius:8px;font-weight:800;white-space:nowrap;background:'+b.bg+';color:#fff">'+esc(b.t)+'</span>').join('');
 }
 function _renderMaCard(az){
   const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
