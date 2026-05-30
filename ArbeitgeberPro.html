@@ -1483,12 +1483,14 @@ function startLiveStatusSubscriptions(){
   stopLiveStatusSubscriptions();
   if(!_uid) return;
   const today=localDate();
-  // 1) Krank + Überstundenabbau heute (alle TN dieser Firma) via CollectionGroup
+  console.log('[Live-Status] Subscriptions starten für firmaUid='+_uid+', today='+today);
+  // 1) Krank + Überstundenabbau + spaeter/frueher heute via CollectionGroup
   try {
     const u1=db.collectionGroup('betriebMeldungen')
       .where('firmaUid','==',_uid)
       .where('datum','==',today)
       .onSnapshot(snap=>{
+        console.log('[Live betriebMeldungen] '+snap.size+' Doc(s) für heute');
         const map={};
         snap.forEach(doc=>{
           const d=doc.data();
@@ -1502,7 +1504,18 @@ function startLiveStatusSubscriptions(){
         });
         _liveStatusKrankMap=map;
         _applyLiveStatusToList();
-      }, e=>console.warn('Live krank/uebstd:',e));
+      }, e=>{
+        console.error('[Live betriebMeldungen] FEHLER:', e.code, e.message);
+        if(e.code==='failed-precondition'){
+          const link = (e.message.match(/https:\/\/console\.firebase[^\s]+/)||[])[0]||'';
+          console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.warn('FIRESTORE-INDEX FEHLT für betriebMeldungen!');
+          console.warn('Erstelle ihn mit einem Klick auf diesen Link:');
+          console.warn(link||'(Link in der vollständigen Fehlermeldung oben)');
+          console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          alert('⚠ Live-Status braucht einen Firestore-Index!\n\nBitte F12 öffnen → Konsole → blauer Link zum Index anklicken.\n\nDanach App neu laden.');
+        }
+      });
     _liveStatusUnsubs.push(u1);
   } catch(e){ console.warn('Live-Subscription krank/uebstd fehlgeschlagen:',e); }
   // 2) Urlaubsantraege genehmigt - Range-Check client-seitig
@@ -1511,6 +1524,7 @@ function startLiveStatusSubscriptions(){
       .where('firmaUid','==',_uid)
       .where('status','==','genehmigt')
       .onSnapshot(snap=>{
+        console.log('[Live urlaubsantraege] '+snap.size+' Doc(s)');
         const map={};
         snap.forEach(doc=>{
           const d=doc.data();
@@ -1523,7 +1537,13 @@ function startLiveStatusSubscriptions(){
         });
         _liveStatusUrlaubMap=map;
         _applyLiveStatusToList();
-      }, e=>console.warn('Live urlaub:',e));
+      }, e=>{
+        console.error('[Live urlaubsantraege] FEHLER:', e.code, e.message);
+        if(e.code==='failed-precondition'){
+          const link = (e.message.match(/https:\/\/console\.firebase[^\s]+/)||[])[0]||'';
+          console.warn('FIRESTORE-INDEX FEHLT für urlaubsantraege! Link:', link);
+        }
+      });
     _liveStatusUnsubs.push(u2);
   } catch(e){ console.warn('Live-Subscription urlaub fehlgeschlagen:',e); }
 }
