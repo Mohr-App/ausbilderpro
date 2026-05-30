@@ -1459,7 +1459,6 @@ auth.onAuthStateChanged(user=>{
       // Freigeschaltet → App laden
       document.getElementById('appWrap').style.display='';
       loadUserData();
-      startLiveStatusSubscriptions();
     });
   } else {
     _uid=null;
@@ -1481,71 +1480,48 @@ let _liveStatusKrankMap={};
 let _liveStatusUrlaubMap={};
 function startLiveStatusSubscriptions(){
   stopLiveStatusSubscriptions();
-  if(!_uid) return;
+  if(!_uid || !Array.isArray(_azubis) || !_azubis.length) return;
   const today=localDate();
-  console.log('[Live-Status] Subscriptions starten für firmaUid='+_uid+', today='+today);
-  // 1) Krank + Überstundenabbau + spaeter/frueher heute via CollectionGroup
-  try {
-    const u1=db.collectionGroup('betriebMeldungen')
-      .where('firmaUid','==',_uid)
-      .where('datum','==',today)
-      .onSnapshot(snap=>{
-        console.log('[Live betriebMeldungen] '+snap.size+' Doc(s) für heute');
-        const map={};
-        snap.forEach(doc=>{
-          const d=doc.data();
-          const tnId=d.tnId||doc.ref.parent.parent?.id;
-          if(!tnId) return;
-          map[tnId]=map[tnId]||{};
-          if(d.type==='krank') map[tnId].krank=true;
-          if(d.type==='uebstd') map[tnId].uebstd=true;
-          if(d.type==='spaeter') map[tnId].spaeter=d.text||true;
-          if(d.type==='frueher') map[tnId].frueher=d.text||true;
-        });
-        _liveStatusKrankMap=map;
-        _applyLiveStatusToList();
-      }, e=>{
-        console.error('[Live betriebMeldungen] FEHLER:', e.code, e.message);
-        if(e.code==='failed-precondition'){
-          const link = (e.message.match(/https:\/\/console\.firebase[^\s]+/)||[])[0]||'';
-          console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.warn('FIRESTORE-INDEX FEHLT für betriebMeldungen!');
-          console.warn('Erstelle ihn mit einem Klick auf diesen Link:');
-          console.warn(link||'(Link in der vollständigen Fehlermeldung oben)');
-          console.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          alert('⚠ Live-Status braucht einen Firestore-Index!\n\nBitte F12 öffnen → Konsole → blauer Link zum Index anklicken.\n\nDanach App neu laden.');
-        }
-      });
-    _liveStatusUnsubs.push(u1);
-  } catch(e){ console.warn('Live-Subscription krank/uebstd fehlgeschlagen:',e); }
-  // 2) Urlaubsantraege genehmigt - Range-Check client-seitig
-  try {
-    const u2=db.collectionGroup('urlaubsantraege')
-      .where('firmaUid','==',_uid)
-      .where('status','==','genehmigt')
-      .onSnapshot(snap=>{
-        console.log('[Live urlaubsantraege] '+snap.size+' Doc(s)');
-        const map={};
-        snap.forEach(doc=>{
-          const d=doc.data();
-          const tnId=doc.ref.parent.parent?.id;
-          if(!tnId||!d.von||!d.bis) return;
-          if(today>=d.von && today<=d.bis){
-            map[tnId]=map[tnId]||{};
-            map[tnId].urlaub=true;
-          }
-        });
-        _liveStatusUrlaubMap=map;
-        _applyLiveStatusToList();
-      }, e=>{
-        console.error('[Live urlaubsantraege] FEHLER:', e.code, e.message);
-        if(e.code==='failed-precondition'){
-          const link = (e.message.match(/https:\/\/console\.firebase[^\s]+/)||[])[0]||'';
-          console.warn('FIRESTORE-INDEX FEHLT für urlaubsantraege! Link:', link);
-        }
-      });
-    _liveStatusUnsubs.push(u2);
-  } catch(e){ console.warn('Live-Subscription urlaub fehlgeschlagen:',e); }
+  console.log('[Live-Status] Per-TN Subscriptions starten für '+_azubis.length+' Mitarbeiter, today='+today);
+  _azubis.forEach(az=>{
+    if(!az.id) return;
+    // Subscription 1: betriebMeldungen heute (krank, uebstd, spaeter, frueher)
+    try {
+      const u1 = db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+        .where('datum','==',today)
+        .onSnapshot(snap=>{
+          const entry = {};
+          snap.forEach(doc=>{
+            const d=doc.data();
+            if(d.type==='krank') entry.krank=true;
+            if(d.type==='uebstd') entry.uebstd=true;
+            if(d.type==='spaeter') entry.spaeter=d.text||true;
+            if(d.type==='frueher') entry.frueher=d.text||true;
+          });
+          if(Object.keys(entry).length) _liveStatusKrankMap[az.id]=entry;
+          else delete _liveStatusKrankMap[az.id];
+          _applyLiveStatusToList();
+        }, e=>console.warn('[Live betriebMeldungen]',az.id,e.code,e.message));
+      _liveStatusUnsubs.push(u1);
+    } catch(e){}
+    // Subscription 2: urlaubsantraege genehmigt
+    try {
+      const u2 = db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+        .where('status','==','genehmigt')
+        .onSnapshot(snap=>{
+          let isUrl=false;
+          snap.forEach(doc=>{
+            const d=doc.data();
+            if(d.firmaUid && d.firmaUid!==_uid) return;
+            if(d.von&&d.bis&&today>=d.von&&today<=d.bis) isUrl=true;
+          });
+          if(isUrl) _liveStatusUrlaubMap[az.id]={urlaub:true};
+          else delete _liveStatusUrlaubMap[az.id];
+          _applyLiveStatusToList();
+        }, e=>console.warn('[Live urlaubsantraege]',az.id,e.code,e.message));
+      _liveStatusUnsubs.push(u2);
+    } catch(e){}
+  });
 }
 function stopLiveStatusSubscriptions(){
   _liveStatusUnsubs.forEach(u=>{try{u();}catch(e){}});
@@ -1654,6 +1630,7 @@ function loadAzubis(){
     renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
     checkAgBadges();
     setupLiveMeldungen();
+    startLiveStatusSubscriptions();
     _showFirmaCodeBanner();
     _renderPendingAntraege();
     // Migration: bestehende Subcollection-Daten ohne firmaUid taggen (einmalig pro MA)
