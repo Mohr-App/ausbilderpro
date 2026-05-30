@@ -320,6 +320,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
               <span style="font-size:1.05rem">👤</span>
               <span>Arbeitnehmer</span>
               <span id="cntArbeitnehmer" style="font-size:.6rem;background:rgba(217,119,6,.12);color:#92400e;padding:2px 7px;border-radius:8px;font-weight:700">0</span>
+              <span id="maStatusBadges" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center"></span>
             </span>
           </summary>
           <div class="coll-body">
@@ -2678,38 +2679,59 @@ function renderAgAzubiKontakte(){
       }
     });
     _renderAzubiStatusBadges({laeuft,geplant,ausfallHeute,abgebrochen,krank:0,urlaub:0,uebstd:0});
-    // Async: krank, urlaub, ueberstundenabbau heute
-    const promises=azubis.map(az=>Promise.all([
-      db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
-        .where('type','==','krank').where('datum','==',today).limit(1).get().catch(()=>null),
-      db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
-        .where('status','==','genehmigt').get().catch(()=>null),
-      db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
-        .where('type','==','uebstd').where('datum','==',today).limit(1).get().catch(()=>null)
-    ]));
-    Promise.all(promises).then(results=>{
-      let krank=0, urlaub=0, uebstd=0;
+    // Async: krank, urlaub, ueberstundenabbau heute - fuer Azubis UND Arbeitnehmer
+    function loadStatusFor(personen){
+      return personen.map(az=>Promise.all([
+        db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+          .where('type','==','krank').where('datum','==',today).limit(1).get().catch(()=>null),
+        db.collection('globalTN').doc(az.id).collection('urlaubsantraege')
+          .where('status','==','genehmigt').get().catch(()=>null),
+        db.collection('globalTN').doc(az.id).collection('betriebMeldungen')
+          .where('type','==','uebstd').where('datum','==',today).limit(1).get().catch(()=>null)
+      ]));
+    }
+    function processStati(personen, results){
+      let k=0, u=0, ue=0;
       results.forEach(([kSnap,uSnap,uebSnap],idx)=>{
-        const az=azubis[idx];
+        const az=personen[idx];
         if(!az) return;
         az._statusToday = az._statusToday || {};
-        if(kSnap && !kSnap.empty){ krank++; az._statusToday.krank=true; } else { az._statusToday.krank=false; }
+        if(kSnap && !kSnap.empty){ k++; az._statusToday.krank=true; } else { az._statusToday.krank=false; }
         let isUrl=false;
         if(uSnap){
           uSnap.forEach(d=>{
-            const u=d.data();
-            if(u.firmaUid && u.firmaUid !== _uid) return;
-            if(u.von && u.bis && today>=u.von && today<=u.bis){ urlaub++; isUrl=true; }
+            const u2=d.data();
+            if(u2.firmaUid && u2.firmaUid !== _uid) return;
+            if(u2.von && u2.bis && today>=u2.von && today<=u2.bis){ u++; isUrl=true; }
           });
         }
         az._statusToday.urlaub=isUrl;
-        if(uebSnap && !uebSnap.empty){ uebstd++; az._statusToday.uebstd=true; } else { az._statusToday.uebstd=false; }
+        if(uebSnap && !uebSnap.empty){ ue++; az._statusToday.uebstd=true; } else { az._statusToday.uebstd=false; }
       });
-      _renderAzubiStatusBadges({laeuft,geplant,ausfallHeute,abgebrochen,krank,urlaub,uebstd});
-      // Liste neu rendern damit die Card-Badges aktuell sind
+      return {krank:k, urlaub:u, uebstd:ue};
+    }
+    Promise.all([
+      Promise.all(loadStatusFor(azubis)),
+      Promise.all(loadStatusFor(arbeitnehmer))
+    ]).then(([azRes, anRes])=>{
+      const azStati = processStati(azubis, azRes);
+      const anStati = processStati(arbeitnehmer, anRes);
+      _renderAzubiStatusBadges({laeuft,geplant,ausfallHeute,abgebrochen,krank:azStati.krank,urlaub:azStati.urlaub,uebstd:azStati.uebstd});
+      _renderMaStatusBadges(anStati);
+      // Listen neu rendern damit die Card-Badges aktuell sind
       try{ renderAzubiList(); }catch(e){}
+      try{ renderAgAzubiKontakte(); }catch(e){}
     }).catch(e=>console.warn('Status-Async-Fehler:',e));
   } catch(e){ console.warn('Kurs-Status-Update fehlgeschlagen:',e); }
+}
+function _renderMaStatusBadges(s){
+  const box=document.getElementById('maStatusBadges');
+  if(!box) return;
+  const items=[];
+  if(s.krank>0)  items.push({t:'🤒 '+s.krank,bg:'#dc2626',pulse:false,title:s.krank+' Mitarbeiter krank gemeldet'});
+  if(s.urlaub>0) items.push({t:'🏖 '+s.urlaub,bg:'#f59e0b',pulse:false,title:s.urlaub+' Mitarbeiter im Urlaub'});
+  if(s.uebstd>0) items.push({t:'⏰ '+s.uebstd,bg:'#7c3aed',pulse:false,title:s.uebstd+' Mitarbeiter im Überstundenabbau'});
+  box.innerHTML = items.map(b=>'<span class="'+(b.pulse?'kurs-pulse':'')+'" title="'+esc(b.title)+'" style="font-size:.6rem;padding:3px 8px;border-radius:8px;font-weight:800;white-space:nowrap;background:'+b.bg+';color:#fff">'+esc(b.t)+'</span>').join('');
 }
 function _renderAzubiStatusBadges(s){
   const box=document.getElementById('azubiStatusBadges');
@@ -2738,6 +2760,12 @@ function _renderMaCard(az){
   const avaInner=az.photoUrl
     ? '<img src="'+esc(az.photoUrl)+'" style="width:100%;height:100%;object-fit:cover">'
     : initials;
+  // Heute-Status-Badges (krank, urlaub, uebstd) aus async geladenem Cache
+  const st=az._statusToday||{};
+  let statusBadges='';
+  if(st.krank)  statusBadges+='<span class="kurs-pulse" style="display:inline-block;font-size:.55rem;padding:2px 7px;border-radius:6px;font-weight:800;background:#dc2626;color:#fff;margin-right:4px">🤒 Heute krank</span>';
+  if(st.urlaub) statusBadges+='<span style="display:inline-block;font-size:.55rem;padding:2px 7px;border-radius:6px;font-weight:800;background:#f59e0b;color:#fff;margin-right:4px">🏖 Urlaub</span>';
+  if(st.uebstd) statusBadges+='<span style="display:inline-block;font-size:.55rem;padding:2px 7px;border-radius:6px;font-weight:800;background:#7c3aed;color:#fff;margin-right:4px">⏰ Überstd.-Abbau</span>';
   return '<div class="card" onclick="openMaDetails(\''+esc(az.id)+'\')" style="display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:6px;cursor:pointer;transition:all .15s;border:1.5px solid var(--brd)" onmouseover="this.style.background=\'rgba(37,99,235,.04)\';this.style.borderColor=\'rgba(37,99,235,.3)\'" onmouseout="this.style.background=\'\';this.style.borderColor=\'var(--brd)\'">'
     +'<div onclick="event.stopPropagation();openAvaEditModal(\''+esc(az.id)+'\')" title="Profilbild ändern" style="position:relative;width:48px;height:48px;border-radius:50%;background:'+avatarBg+';border:2px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:800;color:'+avatarColor+';flex-shrink:0;cursor:pointer;overflow:hidden">'
     +avaInner
@@ -2746,6 +2774,7 @@ function _renderMaCard(az){
     +'<div style="flex:1;min-width:0">'
     +'<div style="font-size:.88rem;font-weight:800">'+esc(name)+'</div>'
     +(beruf||lj?'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">'+esc([beruf,lj].filter(Boolean).join(' · '))+'</div>':'')
+    +(statusBadges?'<div style="margin-top:5px;display:flex;flex-wrap:wrap;align-items:center">'+statusBadges+'</div>':'')
     +(tel?'<a href="tel:'+esc(tel)+'" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:5px 12px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;text-decoration:none;font-size:.7rem;font-weight:700;color:#059669">📞 '+esc(tel)+'</a>':'')
     +(!tel&&!email?'<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Keine Kontaktdaten hinterlegt</div>':'')
     +'</div>'
