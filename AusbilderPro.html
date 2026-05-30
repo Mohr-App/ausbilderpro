@@ -682,7 +682,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .mob-drawer-title{font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:700;color:var(--acc);}
 .mob-drawer-close{background:var(--sur2);border:2px solid #e2e8f0;color:var(--mu);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center;}
 .mob-drawer-scroll{flex:1;overflow-y:auto;}
-.mob-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:var(--sur);border-top:1px solid var(--brd);padding:5px 4px calc(env(safe-area-inset-bottom,0px) + 5px);gap:2px;justify-content:space-around;}
+.mob-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:var(--sur);border-top:2px solid rgba(37,99,235,.4);padding:5px 4px calc(env(safe-area-inset-bottom,0px) + 5px);gap:2px;justify-content:space-around;transition:transform .25s cubic-bezier(.4,0,.2,1);}
+.mob-bottom-nav.collapsed{transform:translateY(calc(100% - 6px));}
+.mob-nav-toggle{position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:#fff;border:2px solid rgba(37,99,235,.4);border-bottom:none;border-radius:14px 14px 0 0;width:68px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#2563eb;font-weight:800;padding:0;box-shadow:0 -2px 8px rgba(15,23,42,.04);}
+.mob-nav-toggle:active{background:#f1f5f9;}
 .mob-nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 10px;border-radius:8px;border:none;background:transparent;color:var(--mu);font-family:'JetBrains Mono',monospace;font-size:.5rem;cursor:pointer;flex:1;max-width:85px;transition:color .12s,background .12s;}
 .mob-nav-btn .mni{font-size:1.15rem;line-height:1;}
 .mob-nav-btn:active{color:var(--acc);background:rgba(59,130,246,.1);}
@@ -1060,11 +1063,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 </div>
 
 <!-- MOBILE BOTTOM NAV -->
-<div class="mob-bottom-nav">
+<div class="mob-bottom-nav" id="mobBottomNav">
+  <button class="mob-nav-toggle" id="mobBnavToggle" onclick="toggleMobBnav()" title="Navigation einklappen/ausklappen" aria-label="Navigation umschalten">▼</button>
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.19.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.19.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -12717,6 +12721,28 @@ async function ensureChatUsersLoaded(){
     })
   ));
 }
+
+// Mobile Bottom-Nav einklappen/ausklappen - mehr Platz fuer Content
+function toggleMobBnav(){
+  const nav=document.getElementById('mobBottomNav');
+  const btn=document.getElementById('mobBnavToggle');
+  if(!nav||!btn) return;
+  nav.classList.toggle('collapsed');
+  const isCol=nav.classList.contains('collapsed');
+  btn.textContent=isCol?'▲':'▼';
+  btn.title=isCol?'Navigation einblenden':'Navigation einklappen';
+  try{ localStorage.setItem('apMobBnavCollapsed', isCol?'1':'0'); }catch(e){}
+}
+window.addEventListener('DOMContentLoaded',()=>{
+  try{
+    if(localStorage.getItem('apMobBnavCollapsed')==='1'){
+      const nav=document.getElementById('mobBottomNav');
+      const btn=document.getElementById('mobBnavToggle');
+      if(nav) nav.classList.add('collapsed');
+      if(btn){ btn.textContent='▲'; btn.title='Navigation einblenden'; }
+    }
+  }catch(e){}
+});
 
 function openChatModal(){
   if(!_fbUid){toast('Bitte zuerst einloggen','bad');return;}
