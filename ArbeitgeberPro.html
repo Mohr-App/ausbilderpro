@@ -1541,9 +1541,32 @@ function _applyLiveStatusToList(){
     az._statusToday.uebstd=!!k.uebstd;
     az._statusToday.urlaub=!!u.urlaub;
   });
-  // Header-Counts neu berechnen + re-render
-  try { renderAgAzubiKontakte(); } catch(e){}
+  // Nur Karten + Header-Badges aktualisieren, KEIN renderAgAzubiKontakte (sonst Endlosschleife)
+  try { _rerenderMaCardsOnly(); } catch(e){}
   try { renderAzubiList(); } catch(e){}
+  // Header-Counts aus den Live-Daten neu berechnen
+  try {
+    const isMa=(t)=>t==='arbeitnehmer'||t==='mitarbeiter';
+    const arbeitnehmer=_azubis.filter(a=>isMa(a.typ));
+    const azubis=_azubis.filter(a=>!isMa(a.typ));
+    let azK=0,azU=0,azUe=0,anK=0,anU=0,anUe=0;
+    azubis.forEach(a=>{if(a._statusToday?.krank)azK++;if(a._statusToday?.urlaub)azU++;if(a._statusToday?.uebstd)azUe++;});
+    arbeitnehmer.forEach(a=>{if(a._statusToday?.krank)anK++;if(a._statusToday?.urlaub)anU++;if(a._statusToday?.uebstd)anUe++;});
+    // Kurs-Stati synchron aus _azubis/_kurse
+    const today=localDate();
+    let laeuft=0,geplant=0,ausfallHeute=0,abgebrochen=0;
+    azubis.forEach(a=>{
+      if((a.benachrichtigungen||[]).some(n=>n.typ==='kurs_ausfall'&&n.datum===today)) ausfallHeute++;
+      if(a.aktiverKursId){
+        const k=_kurse[a.aktiverKursId];
+        if(k&&k.von){ if(k.bis&&today>=k.von&&today<=k.bis) laeuft++; else if(today<k.von) geplant++; }
+      } else {
+        if((a.kursHistory||[]).some(h=>h.abgebrochen&&h.bis&&h.bis>=today)) abgebrochen++;
+      }
+    });
+    _renderAzubiStatusBadges({laeuft,geplant,ausfallHeute,abgebrochen,krank:azK,urlaub:azU,uebstd:azUe});
+    _renderMaStatusBadges({krank:anK,urlaub:anU,uebstd:anUe});
+  } catch(e){ console.warn('Live-Status-Header-Fehler:',e); }
 }
 
 let _firmaCode='';
@@ -2791,11 +2814,21 @@ function renderAgAzubiKontakte(){
       const anStati = processStati(arbeitnehmer, anRes);
       _renderAzubiStatusBadges({laeuft,geplant,ausfallHeute,abgebrochen,krank:azStati.krank,urlaub:azStati.urlaub,uebstd:azStati.uebstd});
       _renderMaStatusBadges(anStati);
-      // Listen neu rendern damit die Card-Badges aktuell sind
+      // Nur die Karten neu rendern - NICHT renderAgAzubiKontakte aufrufen (sonst Endlosschleife)
+      _rerenderMaCardsOnly();
       try{ renderAzubiList(); }catch(e){}
-      try{ renderAgAzubiKontakte(); }catch(e){}
     }).catch(e=>console.warn('Status-Async-Fehler:',e));
   } catch(e){ console.warn('Kurs-Status-Update fehlgeschlagen:',e); }
+}
+// Nur die MA/Azubi-Karten neu rendern, OHNE die async-Logik erneut zu starten
+function _rerenderMaCardsOnly(){
+  const isMa=(t)=>t==='arbeitnehmer'||t==='mitarbeiter';
+  const arbeitnehmer=_azubis.filter(a=>isMa(a.typ));
+  const azubis=_azubis.filter(a=>!isMa(a.typ));
+  const elAn=document.getElementById('agArbeitnehmerListe');
+  const elAz=document.getElementById('agAzubiListe');
+  if(elAn && arbeitnehmer.length) elAn.innerHTML=arbeitnehmer.map(_renderMaCard).join('');
+  if(elAz && azubis.length) elAz.innerHTML=azubis.map(_renderMaCard).join('');
 }
 function _renderMaStatusBadges(s){
   const box=document.getElementById('maStatusBadges');
