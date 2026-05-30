@@ -1459,6 +1459,7 @@ auth.onAuthStateChanged(user=>{
       // Freigeschaltet → App laden
       document.getElementById('appWrap').style.display='';
       loadUserData();
+      startLiveStatusSubscriptions();
     });
   } else {
     _uid=null;
@@ -1470,8 +1471,80 @@ auth.onAuthStateChanged(user=>{
     Object.values(_kursListeners).forEach(u=>u());
     _kursListeners={};
     _meldUnsubs.forEach(u=>u());_meldUnsubs=[];_meldSeen=new Set();
+    stopLiveStatusSubscriptions();
   }
 });
+
+// Live-Subscriptions auf Status-relevante Collections (krank/urlaub/uebstd)
+let _liveStatusUnsubs=[];
+let _liveStatusKrankMap={};
+let _liveStatusUrlaubMap={};
+function startLiveStatusSubscriptions(){
+  stopLiveStatusSubscriptions();
+  if(!_uid) return;
+  const today=localDate();
+  // 1) Krank + Überstundenabbau heute (alle TN dieser Firma) via CollectionGroup
+  try {
+    const u1=db.collectionGroup('betriebMeldungen')
+      .where('firmaUid','==',_uid)
+      .where('datum','==',today)
+      .onSnapshot(snap=>{
+        const map={};
+        snap.forEach(doc=>{
+          const d=doc.data();
+          const tnId=d.tnId||doc.ref.parent.parent?.id;
+          if(!tnId) return;
+          map[tnId]=map[tnId]||{};
+          if(d.type==='krank') map[tnId].krank=true;
+          if(d.type==='uebstd') map[tnId].uebstd=true;
+        });
+        _liveStatusKrankMap=map;
+        _applyLiveStatusToList();
+      }, e=>console.warn('Live krank/uebstd:',e));
+    _liveStatusUnsubs.push(u1);
+  } catch(e){ console.warn('Live-Subscription krank/uebstd fehlgeschlagen:',e); }
+  // 2) Urlaubsantraege genehmigt - Range-Check client-seitig
+  try {
+    const u2=db.collectionGroup('urlaubsantraege')
+      .where('firmaUid','==',_uid)
+      .where('status','==','genehmigt')
+      .onSnapshot(snap=>{
+        const map={};
+        snap.forEach(doc=>{
+          const d=doc.data();
+          const tnId=doc.ref.parent.parent?.id;
+          if(!tnId||!d.von||!d.bis) return;
+          if(today>=d.von && today<=d.bis){
+            map[tnId]=map[tnId]||{};
+            map[tnId].urlaub=true;
+          }
+        });
+        _liveStatusUrlaubMap=map;
+        _applyLiveStatusToList();
+      }, e=>console.warn('Live urlaub:',e));
+    _liveStatusUnsubs.push(u2);
+  } catch(e){ console.warn('Live-Subscription urlaub fehlgeschlagen:',e); }
+}
+function stopLiveStatusSubscriptions(){
+  _liveStatusUnsubs.forEach(u=>{try{u();}catch(e){}});
+  _liveStatusUnsubs=[];
+  _liveStatusKrankMap={};
+  _liveStatusUrlaubMap={};
+}
+function _applyLiveStatusToList(){
+  if(!Array.isArray(_azubis)) return;
+  _azubis.forEach(az=>{
+    az._statusToday=az._statusToday||{};
+    const k=_liveStatusKrankMap[az.id]||{};
+    const u=_liveStatusUrlaubMap[az.id]||{};
+    az._statusToday.krank=!!k.krank;
+    az._statusToday.uebstd=!!k.uebstd;
+    az._statusToday.urlaub=!!u.urlaub;
+  });
+  // Header-Counts neu berechnen + re-render
+  try { renderAgAzubiKontakte(); } catch(e){}
+  try { renderAzubiList(); } catch(e){}
+}
 
 let _firmaCode='';
 function loadUserData(){
