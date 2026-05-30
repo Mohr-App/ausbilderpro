@@ -110,6 +110,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .stab-dd{flex:1 1 0;min-width:0}
 .stab-dd .stab{width:100%}
 .stab.active{background:linear-gradient(135deg,#2563eb,#059669);color:#fff;border-color:transparent;}
+@keyframes kursPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(22,163,74,.45)}50%{transform:scale(1.04);box-shadow:0 0 0 6px rgba(22,163,74,0)}}
+.kurs-pulse{animation:kursPulse 1.8s ease-in-out infinite;}
 .abtab{display:none;}.abtab.active{display:block;}
 .abtab2{display:none;}.abtab2.active{display:block;}
 .ag-badge{position:absolute;top:2px;right:8px;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 2px 6px rgba(239,68,68,.4);animation:pulseRed 1.5s infinite;}
@@ -340,6 +342,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
               <span style="font-size:1.05rem">🎓</span>
               <span>Azubis</span>
               <span id="cntAzubis" style="font-size:.6rem;background:rgba(37,99,235,.12);color:var(--acc);padding:2px 7px;border-radius:8px;font-weight:700">0</span>
+              <span id="azubiKursStatus" style="display:none;font-size:.6rem;padding:3px 9px;border-radius:8px;font-weight:800;white-space:nowrap"></span>
             </span>
           </summary>
           <div class="coll-body">
@@ -2643,6 +2646,37 @@ function renderAgAzubiKontakte(){
   const cntAz=document.getElementById('cntAzubis');
   if(cntAn) cntAn.textContent=arbeitnehmer.length;
   if(cntAz) cntAz.textContent=azubis.length;
+  // Lehrgangs-Status: zaehle Azubis mit laufenden bzw. geplanten Kursen
+  try {
+    const today=localDate();
+    let laeuft=0, geplant=0;
+    azubis.forEach(a=>{
+      if(!a.aktiverKursId) return;
+      const k=_kurse[a.aktiverKursId];
+      if(!k||!k.von) return;
+      if(k.bis && today>=k.von && today<=k.bis) laeuft++;
+      else if(today<k.von) geplant++;
+    });
+    const statusEl=document.getElementById('azubiKursStatus');
+    if(statusEl){
+      if(laeuft>0){
+        statusEl.style.display='';
+        statusEl.style.background='#16a34a';
+        statusEl.style.color='#fff';
+        statusEl.className='kurs-pulse';
+        statusEl.textContent='🎓 '+laeuft+(laeuft===1?' auf Lehrgang':' auf Lehrgang');
+      } else if(geplant>0){
+        statusEl.style.display='';
+        statusEl.style.background='#2563eb';
+        statusEl.style.color='#fff';
+        statusEl.className='';
+        statusEl.textContent='📅 '+geplant+(geplant===1?' Lehrgang geplant':' Lehrgänge geplant');
+      } else {
+        statusEl.style.display='none';
+        statusEl.className='';
+      }
+    }
+  } catch(e){ console.warn('Kurs-Status-Update fehlgeschlagen:',e); }
 }
 function _renderMaCard(az){
   const name=((az.vorname||'')+' '+(az.nachname||'')).trim()||'Mitarbeiter';
