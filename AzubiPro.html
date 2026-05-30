@@ -2005,21 +2005,20 @@ function _meldungSentKey(cat, type, refId){
   const today = new Date().toISOString().slice(0,10);
   return 'azubi-meld-'+cat+'-'+type+'-'+(refId||'_')+'-'+today;
 }
-function _meldungAlreadySent(cat, type, refId){
-  try{ return localStorage.getItem(_meldungSentKey(cat,type,refId))==='1'; }
-  catch(_){ return false; }
-}
-function _markMeldungSent(cat, type, refId){
-  try{ localStorage.setItem(_meldungSentKey(cat,type,refId),'1'); }catch(_){}
-}
+function _meldungAlreadySent(cat, type, refId){ return false; } // deaktiviert
+function _markMeldungSent(cat, type, refId){ /* no-op - mehrfaches Senden ist erlaubt */ }
+// Einmaliger Cleanup beim Laden: alte azubi-meld-* Marker entfernen
+try {
+  const toRemove=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k && k.startsWith('azubi-meld-')) toRemove.push(k);
+  }
+  toRemove.forEach(k=>{try{localStorage.removeItem(k);}catch(_){}});
+} catch(_){}
 
 function sendMeldung(type, kursId){
   if(!_tnId||!kursId) return;
-  // Doppel-Schutz: Wurde diese Meldung heute schon fuer diesen Kurs gesendet?
-  if(type!=='text' && _meldungAlreadySent('kurs', type, kursId)){
-    toast('ℹ Meldung ist heute schon raus','info');
-    return;
-  }
   // Krankmeldung: erst AG-Hinweis anzeigen
   if(type==='krank'){
     _pendingKrankKursId=kursId;
@@ -2325,11 +2324,6 @@ function showBetriebTab(tab){
 
 function sendBetriebMeldung(type){
   if(!_tnId||!db) return;
-  // Doppel-Schutz fuer Betrieb-Meldungen
-  if(type!=='text' && _meldungAlreadySent('betrieb', type, null)){
-    toast('ℹ Meldung ist heute schon raus','info');
-    return;
-  }
   const msgs={'krank':'🤒 Ich bin heute krank','spaeter':'🕐 Ich komme heute später','frueher':'🚶 Ich gehe heute früher'};
   let text=msgs[type]||'';
   if(type==='text'){
