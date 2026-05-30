@@ -2469,6 +2469,8 @@ function removeBetriebMeldung(docId, type){
   db.collection('globalTN').doc(_tnId).collection('betriebMeldungen').doc(docId).delete()
     .then(()=>{
       toast('✓ '+label+' zurückgenommen');
+      // Anti-Doppel-Schutz: LocalStorage-Key fuer diesen type+heute clearen, damit erneut gesendet werden kann
+      _clearMeldungSentKeys(type);
       loadBetriebMeldungen();
       try {
         const firma=_tnData?.firma||'';
@@ -2477,6 +2479,21 @@ function removeBetriebMeldung(docId, type){
       } catch(e){}
     })
     .catch(err=>toast('Fehler: '+(err.message||err),'bad'));
+}
+// Loescht alle gesetzten "Heute schon gesendet"-Marker fuer einen bestimmten type
+function _clearMeldungSentKeys(type){
+  if(!type) return;
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const toRemove = [];
+    for(let i=0; i<localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith('azubi-meld-') && k.endsWith('-'+today) && k.indexOf('-'+type+'-')>=0){
+        toRemove.push(k);
+      }
+    }
+    toRemove.forEach(k=>localStorage.removeItem(k));
+  } catch(e){}
 }
 function _autoStornoKrankIfNeeded(){
   if(!_tnId||!db) return;
@@ -2489,6 +2506,7 @@ function _autoStornoKrankIfNeeded(){
       snap.forEach(doc=>batch.delete(doc.ref));
       batch.commit().then(()=>{
         toast('🤒 Krank-Meldung wurde durchs Einstempeln zurückgenommen');
+        _clearMeldungSentKeys('krank');
         try { loadBetriebMeldungen(); } catch(e){}
         try {
           const firma=_tnData?.firma||'';
