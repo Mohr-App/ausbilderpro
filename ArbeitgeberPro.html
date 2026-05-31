@@ -2031,8 +2031,7 @@ function approveAntrag(tnId){
         +'</div></div>';
       db.collection('mail').add({
         to: azEmail,
-        from: '"'+_firma+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
-        replyTo: _email||undefined,
+        replyTo: _email||'',
         message: { subject: '🎉 Willkommen bei '+_firma+' – Verknüpfung bestätigt', html: html }
       }).then(r=>{
         console.warn('[approveAntrag] ✓ Azubi-Mail-Doc erstellt:',r.id);
@@ -2114,7 +2113,6 @@ function rejectAntrag(tnId){
         +'</div></div>';
       db.collection('mail').add({
         to: p.kontaktEmail||p.email,
-        from: '"'+_firma+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
         replyTo: _email||undefined,
         message: { subject: 'Verknüpfungs-Antrag mit '+_firma+' abgelehnt', html: html }
       }).catch(()=>{});
@@ -3461,7 +3459,6 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
         +'</div></div>';
       db.collection('mail').add({
         to: tnEmail,
-        from: '"'+firmaName+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
         replyTo: _email||undefined,
         message: { subject: '⚠️ Verknüpfung mit '+firmaName+' aufgehoben', html: html }
       }).catch(()=>{});
@@ -3481,7 +3478,6 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
           +'</div></div>';
         db.collection('mail').add({
           to: agEmail,
-          from: '"'+tnName+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
           replyTo: tnEmail||undefined,
           message: { subject: '⚠️ '+tnName+' hat die Verknüpfung aufgehoben', html: html }
         }).catch(()=>{});
@@ -4678,7 +4674,6 @@ function _sendBelegEmail(id,d){
 
   db.collection('mail').add({
     to: d.kunde.email,
-    from: '"'+(firma||'Betrieb')+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
     replyTo: _email||undefined,
     message: { subject, html: htmlBody }
   }).then(()=>{
@@ -5804,7 +5799,6 @@ function sendTerminMailToKunde(a){
     +'</div>';
   db.collection('mail').add({
     to:a.kundeEmail,
-    from: '"'+(firma||'Betrieb')+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
     replyTo:_email||'',
     message:{subject:'Terminbestätigung '+dTag+' · '+firma, html}
   }).catch(e=>console.warn('Mail fehlgeschlagen:',e));
@@ -5840,7 +5834,6 @@ function sendKundenBescheinigungMail(tnId, aufId){
     const html=_kundenBescheinigungHtml(d, firma, maName, dat);
     db.collection('mail').add({
       to:email,
-      from: '"'+(firma||'Betrieb')+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
       replyTo:_email||'',
       message:{subject:'Auftragsbescheinigung '+(d.kunde?'· '+d.kunde:'')+' · '+firma, html}
     }).then(()=>{
