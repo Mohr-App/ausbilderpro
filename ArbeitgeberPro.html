@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest-ag.json">
 <meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="BetriebPro">
 <link rel="apple-touch-icon" href="icon-ag-192.png">
@@ -1483,7 +1484,7 @@ function startLiveStatusSubscriptions(){
   stopLiveStatusSubscriptions();
   if(!_uid || !Array.isArray(_azubis) || !_azubis.length) return;
   const today=localDate();
-  console.log('[Live-Status] Per-TN Subscriptions starten für '+_azubis.length+' Mitarbeiter, today='+today);
+  console.warn('[Live-Status] Per-TN Subscriptions starten für '+_azubis.length+' Mitarbeiter, today='+today);
   _azubis.forEach(az=>{
     if(!az.id) return;
     // Subscription 1: betriebMeldungen heute (krank, uebstd, spaeter, frueher)
@@ -1628,7 +1629,7 @@ function loadAzubis(){
     _azubis=[];
     snap.forEach(doc=>_azubis.push({id:doc.id,...doc.data()}));
     _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
-    console.log('[loadAzubis] '+_azubis.length+' Mitarbeiter geladen, IDs:', _azubis.map(a=>a.id));
+    console.warn('[loadAzubis] '+_azubis.length+' Mitarbeiter geladen, IDs:', _azubis.map(a=>a.id));
     renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
     checkAgBadges();
     setupLiveMeldungen();
@@ -1959,7 +1960,7 @@ function approveAntrag(tnId){
     if(codeDisp) codeDisp.textContent='— (neuen Code generieren)';
     toast('✅ '+name+' verknüpft. Firmencode wurde zurückgesetzt.');
     // DIAG: zeige was wir senden wollen
-    console.log('[approveAntrag] Mail-Daten:', {
+    console.warn('[approveAntrag] Mail-Daten:', {
       tnId, tnName: name,
       p_kontaktEmail: p.kontaktEmail,
       p_email: p.email,
@@ -1970,7 +1971,7 @@ function approveAntrag(tnId){
     // 3a. Willkommens-Mail an Azubi/MA
     const azEmail = p.kontaktEmail || p.email || p.firmaPending?.tnEmail || '';
     if(azEmail){
-      console.log('[approveAntrag] Sende Azubi-Willkommens-Mail an', azEmail);
+      console.warn('[approveAntrag] Sende Azubi-Willkommens-Mail an', azEmail);
       const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
         +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#059669,#10b981);border-radius:12px">'
         +'<div style="font-size:1.3rem;font-weight:800;color:#fff">🎉 Willkommen bei '+esc(_firma)+'</div>'
@@ -1989,7 +1990,7 @@ function approveAntrag(tnId){
         from: '"'+_firma+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
         replyTo: _email||undefined,
         message: { subject: '🎉 Willkommen bei '+_firma+' – Verknüpfung bestätigt', html: html }
-      }).then(r=>console.log('[approveAntrag] ✓ Azubi-Mail-Doc erstellt:',r.id))
+      }).then(r=>console.warn('[approveAntrag] ✓ Azubi-Mail-Doc erstellt:',r.id))
         .catch(e=>console.error('[approveAntrag] ✗ Azubi-Mail-Fehler:',e.code,e.message));
     } else {
       console.warn('[approveAntrag] ⚠ Keine Email für Azubi gefunden – keine Mail gesendet');
@@ -1997,7 +1998,7 @@ function approveAntrag(tnId){
     }
     // 3b. Bestaetigungs-Mail an AG selbst
     if(_email){
-      console.log('[approveAntrag] Sende AG-Bestaetigungs-Mail an', _email);
+      console.warn('[approveAntrag] Sende AG-Bestaetigungs-Mail an', _email);
       const agHtml='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
         +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:12px">'
         +'<div style="font-size:1.3rem;font-weight:800;color:#fff">✓ Neuer Mitarbeiter verknüpft</div>'
@@ -2017,7 +2018,7 @@ function approveAntrag(tnId){
       db.collection('mail').add({
         to: _email,
         message: { subject: '✓ '+name+' wurde mit '+_firma+' verknüpft', html: agHtml }
-      }).then(r=>console.log('[approveAntrag] ✓ AG-Mail-Doc erstellt:',r.id))
+      }).then(r=>console.warn('[approveAntrag] ✓ AG-Mail-Doc erstellt:',r.id))
         .catch(e=>console.error('[approveAntrag] ✗ AG-Mail-Fehler:',e.code,e.message));
     } else {
       console.warn('[approveAntrag] ⚠ _email ist leer – AG-Mail nicht gesendet');
