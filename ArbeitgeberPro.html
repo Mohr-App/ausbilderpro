@@ -1956,9 +1956,19 @@ function approveAntrag(tnId){
     const codeDisp=document.getElementById('firmaCodeDisplay');
     if(codeDisp) codeDisp.textContent='— (neuen Code generieren)';
     toast('✅ '+name+' verknüpft. Firmencode wurde zurückgesetzt.');
+    // DIAG: zeige was wir senden wollen
+    console.log('[approveAntrag] Mail-Daten:', {
+      tnId, tnName: name,
+      p_kontaktEmail: p.kontaktEmail,
+      p_email: p.email,
+      p_firmaPending_tnEmail: p.firmaPending?.tnEmail,
+      ag_email: _email,
+      firma: _firma
+    });
     // 3a. Willkommens-Mail an Azubi/MA
     const azEmail = p.kontaktEmail || p.email || p.firmaPending?.tnEmail || '';
     if(azEmail){
+      console.log('[approveAntrag] Sende Azubi-Willkommens-Mail an', azEmail);
       const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
         +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#059669,#10b981);border-radius:12px">'
         +'<div style="font-size:1.3rem;font-weight:800;color:#fff">🎉 Willkommen bei '+esc(_firma)+'</div>'
@@ -1977,10 +1987,15 @@ function approveAntrag(tnId){
         from: '"'+_firma+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
         replyTo: _email||undefined,
         message: { subject: '🎉 Willkommen bei '+_firma+' – Verknüpfung bestätigt', html: html }
-      }).catch(()=>{});
+      }).then(r=>console.log('[approveAntrag] ✓ Azubi-Mail-Doc erstellt:',r.id))
+        .catch(e=>console.error('[approveAntrag] ✗ Azubi-Mail-Fehler:',e.code,e.message));
+    } else {
+      console.warn('[approveAntrag] ⚠ Keine Email für Azubi gefunden – keine Mail gesendet');
+      toast('⚠ Azubi hat keine Email hinterlegt – keine Willkommens-Mail','warn');
     }
     // 3b. Bestaetigungs-Mail an AG selbst
     if(_email){
+      console.log('[approveAntrag] Sende AG-Bestaetigungs-Mail an', _email);
       const agHtml='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
         +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:12px">'
         +'<div style="font-size:1.3rem;font-weight:800;color:#fff">✓ Neuer Mitarbeiter verknüpft</div>'
@@ -2000,7 +2015,10 @@ function approveAntrag(tnId){
       db.collection('mail').add({
         to: _email,
         message: { subject: '✓ '+name+' wurde mit '+_firma+' verknüpft', html: agHtml }
-      }).catch(()=>{});
+      }).then(r=>console.log('[approveAntrag] ✓ AG-Mail-Doc erstellt:',r.id))
+        .catch(e=>console.error('[approveAntrag] ✗ AG-Mail-Fehler:',e.code,e.message));
+    } else {
+      console.warn('[approveAntrag] ⚠ _email ist leer – AG-Mail nicht gesendet');
     }
     // 4. App-Notif fuer Azubi
     db.collection('globalTN').doc(tnId).get().then(d=>{
