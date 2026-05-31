@@ -2034,8 +2034,13 @@ function approveAntrag(tnId){
         from: '"'+_firma+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
         replyTo: _email||undefined,
         message: { subject: '🎉 Willkommen bei '+_firma+' – Verknüpfung bestätigt', html: html }
-      }).then(r=>console.warn('[approveAntrag] ✓ Azubi-Mail-Doc erstellt:',r.id))
-        .catch(e=>console.error('[approveAntrag] ✗ Azubi-Mail-Fehler:',e.code,e.message));
+      }).then(r=>{
+        console.warn('[approveAntrag] ✓ Azubi-Mail-Doc erstellt:',r.id);
+        toast('✉ Willkommens-Mail an '+azEmail+' verschickt');
+      }).catch(e=>{
+        console.error('[approveAntrag] ✗ Azubi-Mail-Fehler:',e.code,e.message);
+        toast('⚠ Azubi-Mail fehlgeschlagen: '+(e.message||e.code),'bad');
+      });
     } else {
       console.warn('[approveAntrag] ⚠ Keine Email für Azubi gefunden – keine Mail gesendet');
       toast('⚠ Azubi hat keine Email hinterlegt – keine Willkommens-Mail','warn');
@@ -2062,8 +2067,13 @@ function approveAntrag(tnId){
       db.collection('mail').add({
         to: _email,
         message: { subject: '✓ '+name+' wurde mit '+_firma+' verknüpft', html: agHtml }
-      }).then(r=>console.warn('[approveAntrag] ✓ AG-Mail-Doc erstellt:',r.id))
-        .catch(e=>console.error('[approveAntrag] ✗ AG-Mail-Fehler:',e.code,e.message));
+      }).then(r=>{
+        console.warn('[approveAntrag] ✓ AG-Mail-Doc erstellt:',r.id);
+        toast('✉ Bestätigung an '+_email+' verschickt');
+      }).catch(e=>{
+        console.error('[approveAntrag] ✗ AG-Mail-Fehler:',e.code,e.message);
+        toast('⚠ AG-Mail fehlgeschlagen: '+(e.message||e.code),'bad');
+      });
     } else {
       console.warn('[approveAntrag] ⚠ _email ist leer – AG-Mail nicht gesendet');
     }
