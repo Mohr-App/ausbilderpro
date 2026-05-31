@@ -1956,24 +1956,50 @@ function approveAntrag(tnId){
     const codeDisp=document.getElementById('firmaCodeDisplay');
     if(codeDisp) codeDisp.textContent='— (neuen Code generieren)';
     toast('✅ '+name+' verknüpft. Firmencode wurde zurückgesetzt.');
-    // 3. Mail an Azubi
-    if(p.kontaktEmail||p.email){
+    // 3a. Willkommens-Mail an Azubi/MA
+    const azEmail = p.kontaktEmail || p.email || p.firmaPending?.tnEmail || '';
+    if(azEmail){
       const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
         +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#059669,#10b981);border-radius:12px">'
-        +'<div style="font-size:1.3rem;font-weight:800;color:#fff">✅ Verknüpfung bestätigt</div>'
+        +'<div style="font-size:1.3rem;font-weight:800;color:#fff">🎉 Willkommen bei '+esc(_firma)+'</div>'
         +'</div>'
         +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
         +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo '+esc(name)+',</p>'
-        +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">dein Verknüpfungs-Antrag mit <b>'+esc(_firma)+'</b> wurde bestätigt.</p>'
-        +'<div style="padding:12px;background:#ecfdf5;border:2px solid #a7f3d0;border-radius:8px">'
-        +'<p style="margin:0;font-size:.82rem;color:#065f46;font-weight:700">Du kannst jetzt alle Mitarbeiter-Funktionen in AzubiPro nutzen:</p>'
-        +'<ul style="margin:6px 0 0 18px;padding:0;font-size:.78rem;color:#065f46;line-height:1.55"><li>Arbeitszeiten erfassen</li><li>Aufträge sehen</li><li>Urlaub beantragen</li><li>Nachrichten austauschen</li></ul>'
-        +'</div></div></div>';
+        +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">dein Verknüpfungs-Antrag mit <b>'+esc(_firma)+'</b> wurde soeben vom Arbeitgeber bestätigt – herzlich willkommen!</p>'
+        +'<div style="padding:12px;background:#ecfdf5;border:2px solid #a7f3d0;border-radius:8px;margin-bottom:12px">'
+        +'<p style="margin:0 0 6px;font-size:.82rem;color:#065f46;font-weight:700">Du kannst jetzt alle Mitarbeiter-Funktionen in der App nutzen:</p>'
+        +'<ul style="margin:0 0 0 18px;padding:0;font-size:.78rem;color:#065f46;line-height:1.55"><li>Arbeitszeiten erfassen (ein-/ausstempeln)</li><li>Aufträge sehen</li><li>Urlaub beantragen</li><li>Krank-/Spät-/Früher-Meldung an den Betrieb</li><li>Nachrichten austauschen</li></ul>'
+        +'</div>'
+        +'<p style="margin:0;font-size:.75rem;color:#64748b">Bei Fragen wende dich direkt an deinen Ausbilder/Chef.</p>'
+        +'</div></div>';
       db.collection('mail').add({
-        to: p.kontaktEmail||p.email,
+        to: azEmail,
         from: '"'+_firma+' (via App AusbilderPro)" <noreply@ausbilderpro.de>',
         replyTo: _email||undefined,
-        message: { subject: '✅ Verknüpfung mit '+_firma+' bestätigt', html: html }
+        message: { subject: '🎉 Willkommen bei '+_firma+' – Verknüpfung bestätigt', html: html }
+      }).catch(()=>{});
+    }
+    // 3b. Bestaetigungs-Mail an AG selbst
+    if(_email){
+      const agHtml='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+        +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:12px">'
+        +'<div style="font-size:1.3rem;font-weight:800;color:#fff">✓ Neuer Mitarbeiter verknüpft</div>'
+        +'</div>'
+        +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
+        +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo,</p>'
+        +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">der Verknüpfungs-Antrag von <b>'+esc(name)+'</b> wurde erfolgreich bestätigt.</p>'
+        +'<div style="padding:12px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;margin-bottom:12px">'
+        +'<p style="margin:0 0 4px;font-size:.78rem;color:#1e3a8a"><b>Mitarbeiter:</b> '+esc(name)+'</p>'
+        +(azEmail?'<p style="margin:0 0 4px;font-size:.78rem;color:#1e3a8a"><b>E-Mail:</b> '+esc(azEmail)+'</p>':'')
+        +'<p style="margin:0;font-size:.78rem;color:#1e3a8a"><b>Verknüpft am:</b> '+new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+' Uhr</p>'
+        +'</div>'
+        +'<p style="margin:0 0 6px;font-size:.82rem;color:#1e293b;font-weight:700">'+esc(name)+' kann ab sofort:</p>'
+        +'<ul style="margin:0 0 12px 18px;padding:0;font-size:.78rem;color:#475569;line-height:1.55"><li>Arbeitszeiten erfassen</li><li>Aufträge sehen und bearbeiten</li><li>Urlaub beantragen</li></ul>'
+        +'<div style="padding:10px;background:#fef3c7;border:2px solid #fde68a;border-radius:8px"><p style="margin:0;font-size:.75rem;color:#92400e">💡 Der Firmencode wurde zurückgesetzt. Für den nächsten Mitarbeiter bitte einen neuen Code generieren.</p></div>'
+        +'</div></div>';
+      db.collection('mail').add({
+        to: _email,
+        message: { subject: '✓ '+name+' wurde mit '+_firma+' verknüpft', html: agHtml }
       }).catch(()=>{});
     }
     // 4. App-Notif fuer Azubi
