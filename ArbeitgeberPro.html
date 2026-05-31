@@ -1524,12 +1524,54 @@ function startLiveStatusSubscriptions(){
       _liveStatusUnsubs.push(u2);
     } catch(e){}
   });
+  // Initial-Refresh sofort + Polling-Fallback alle 15s (falls onSnapshot nicht zuverlässig feuert)
+  _refreshAllStatusManually();
+  _statusPollingInterval = setInterval(_refreshAllStatusManually, 15000);
+}
+let _statusPollingInterval=null;
+function _refreshAllStatusManually(){
+  if(!_uid || !Array.isArray(_azubis) || !_azubis.length) return;
+  const today=localDate();
+  const promises = _azubis.map(az=>Promise.all([
+    db.collection('globalTN').doc(az.id).collection('betriebMeldungen').where('datum','==',today).get().catch(()=>null),
+    db.collection('globalTN').doc(az.id).collection('urlaubsantraege').where('status','==','genehmigt').get().catch(()=>null)
+  ]));
+  Promise.all(promises).then(results=>{
+    const krankMap={}, urlaubMap={};
+    results.forEach(([bSnap,uSnap],i)=>{
+      const az=_azubis[i]; if(!az) return;
+      const entry={};
+      if(bSnap){
+        bSnap.forEach(doc=>{
+          const d=doc.data();
+          if(d.type==='krank') entry.krank=true;
+          if(d.type==='uebstd') entry.uebstd=true;
+          if(d.type==='spaeter') entry.spaeter=d.text||true;
+          if(d.type==='frueher') entry.frueher=d.text||true;
+        });
+      }
+      if(Object.keys(entry).length) krankMap[az.id]=entry;
+      let isUrl=false;
+      if(uSnap){
+        uSnap.forEach(doc=>{
+          const d=doc.data();
+          if(d.firmaUid && d.firmaUid!==_uid) return;
+          if(d.von&&d.bis&&today>=d.von&&today<=d.bis) isUrl=true;
+        });
+      }
+      if(isUrl) urlaubMap[az.id]={urlaub:true};
+    });
+    _liveStatusKrankMap=krankMap;
+    _liveStatusUrlaubMap=urlaubMap;
+    _applyLiveStatusToList();
+  }).catch(e=>console.warn('Status-Polling Fehler:',e));
 }
 function stopLiveStatusSubscriptions(){
   _liveStatusUnsubs.forEach(u=>{try{u();}catch(e){}});
   _liveStatusUnsubs=[];
   _liveStatusKrankMap={};
   _liveStatusUrlaubMap={};
+  if(_statusPollingInterval){ clearInterval(_statusPollingInterval); _statusPollingInterval=null; }
 }
 function _applyLiveStatusToList(){
   if(!Array.isArray(_azubis)) return;
