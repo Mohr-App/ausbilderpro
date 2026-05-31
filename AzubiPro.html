@@ -2180,6 +2180,69 @@ function joinFromLink(){
   if(!link){document.getElementById('qrJoinErr').textContent='Bitte Link eingeben';return;}
   processJoinUrl(link);
 }
+// Mails an Azubi (Willkommen) + AG (Info) nach Kurs-Beitritt via QR-Code
+function _sendKursBeitrittMails(kd, kursId){
+  if(!db||!_tnData) return;
+  const tnName=((_tnData.vorname||'')+' '+(_tnData.nachname||'')).trim()||'Azubi';
+  const tnEmail=_tnData.kontaktEmail||_tnData.email||'';
+  const firma=_tnData.firma||'';
+  const kursName=kd.name||kd.lehrgangsart||'Lehrgang';
+  const vonDE=_fmtDateDE_(kd.von||'');
+  const bisDE=_fmtDateDE_(kd.bis||'');
+  const zeitraum=(vonDE&&bisDE)?(vonDE+' – '+bisDE):'';
+  // 1. Willkommens-Mail an Azubi
+  if(tnEmail){
+    const azHtml='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+      +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#059669,#10b981);border-radius:12px">'
+      +'<div style="font-size:1.3rem;font-weight:800;color:#fff">📚 Willkommen im Lehrgang</div>'
+      +'</div>'
+      +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
+      +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b">Hallo '+esc(tnName)+',</p>'
+      +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">du bist soeben dem Lehrgang beigetreten:</p>'
+      +'<div style="padding:14px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:10px;margin-bottom:12px">'
+      +'<div style="font-size:.95rem;font-weight:800;color:#1e40af;margin-bottom:6px">📚 '+esc(kursName)+'</div>'
+      +(zeitraum?'<div style="font-size:.82rem;color:#1e3a8a">📅 '+esc(zeitraum)+'</div>':'')
+      +'</div>'
+      +'<p style="margin:0;font-size:.78rem;color:#475569">In AzubiPro siehst du alle Kursdetails und kannst dich bei Bedarf krank/später melden.</p>'
+      +'</div></div>';
+    db.collection('mail').add({
+      to: tnEmail,
+      message: { subject: '📚 Lehrgang beigetreten: '+kursName+(zeitraum?' ('+zeitraum+')':''), html: azHtml }
+    }).catch(()=>{});
+  }
+  // 2. Info-Mail an AG (wenn firma verknüpft)
+  if(firma){
+    db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
+      snap.forEach(doc=>{
+        const u=doc.data();
+        if(!u.email) return;
+        const agHtml='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+          +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:12px">'
+          +'<div style="font-size:1.3rem;font-weight:800;color:#fff">📚 Mitarbeiter im Lehrgang</div>'
+          +'</div>'
+          +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
+          +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b">Hallo,</p>'
+          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">Ihr Mitarbeiter <b>'+esc(tnName)+'</b> ist soeben einem Lehrgang beigetreten:</p>'
+          +'<div style="padding:14px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:10px;margin-bottom:12px">'
+          +'<div style="font-size:.95rem;font-weight:800;color:#1e40af;margin-bottom:6px">📚 '+esc(kursName)+'</div>'
+          +(zeitraum?'<div style="font-size:.82rem;color:#1e3a8a">📅 '+esc(zeitraum)+'</div>':'')
+          +'</div>'
+          +'<p style="margin:0;font-size:.78rem;color:#475569">In diesem Zeitraum ist der Mitarbeiter zur überbetrieblichen Lehrunterweisung freigestellt.</p>'
+          +'</div></div>';
+        db.collection('mail').add({
+          to: u.email,
+          message: { subject: '📚 '+tnName+' ist im Lehrgang: '+kursName+(zeitraum?' ('+zeitraum+')':''), html: agHtml }
+        }).catch(()=>{});
+      });
+    }).catch(()=>{});
+  }
+}
+function _fmtDateDE_(s){
+  if(!s) return '';
+  const m=String(s).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(!m) return s;
+  return m[3].padStart(2,'0')+'.'+m[2].padStart(2,'0')+'.'+m[1];
+}
 function processJoinUrl(url){
   const errEl=document.getElementById('qrJoinErr');
   // join-Parameter extrahieren
@@ -2232,6 +2295,8 @@ function processJoinUrl(url){
       closeQrJoin();
       toast('✓ Lehrgang beigetreten: '+(kd.name||kd.lehrgangsart||'Kurs'));
       loadKurse();
+      // Willkommens-Mail an Azubi + Info-Mail an AG (wie beim Ausbilder-manualTNAdd)
+      _sendKursBeitrittMails(kd, kursId);
     });
   }).catch(err=>{
     errEl.style.color='var(--bad)';
