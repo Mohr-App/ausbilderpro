@@ -1524,9 +1524,13 @@ function startLiveStatusSubscriptions(){
       _liveStatusUnsubs.push(u2);
     } catch(e){}
   });
-  // Initial-Refresh sofort + Polling-Fallback alle 15s (falls onSnapshot nicht zuverlässig feuert)
+  // Initial-Refresh sofort + Polling-Fallback (smart: pausiert wenn Tab nicht sichtbar)
   _refreshAllStatusManually();
-  _statusPollingInterval = setInterval(_refreshAllStatusManually, 15000);
+  _statusPollingInterval = setInterval(()=>{
+    // Polling stoppen wenn Tab nicht sichtbar (Browser minimiert / anderes Tab aktiv)
+    if(document.visibilityState !== 'visible') return;
+    _refreshAllStatusManually();
+  }, 30000);
 }
 let _statusPollingInterval=null;
 function _refreshAllStatusManually(){
@@ -1573,6 +1577,12 @@ function stopLiveStatusSubscriptions(){
   _liveStatusUrlaubMap={};
   if(_statusPollingInterval){ clearInterval(_statusPollingInterval); _statusPollingInterval=null; }
 }
+// Beim Zurueckkehren zum Tab: sofort refreshen (statt auf 30s zu warten)
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && _uid && Array.isArray(_azubis) && _azubis.length){
+    _refreshAllStatusManually();
+  }
+});
 function _applyLiveStatusToList(){
   if(!Array.isArray(_azubis)) return;
   _azubis.forEach(az=>{
