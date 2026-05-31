@@ -1208,6 +1208,7 @@ function submitFirmaCodeHome(){
           +'</div></div>';
         db.collection('mail').add({
           to: agData.email,
+          replyTo: _email||'',
           message: { subject: '🔗 Verknüpfungs-Antrag von '+tnName+' – '+agFirma, html: html }
         }).catch(()=>{});
       }
@@ -1386,6 +1387,7 @@ function _fireMeldMail(email, type, text, name){
   const zeit=new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   db.collection('mail').add({
     to: email,
+    replyTo: _email||'',
     message: {
       subject: subject,
       html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
@@ -1482,6 +1484,7 @@ function _sendStornoEmailAG(firma, type, name, autoByStempel){
       if(!u.email) return;
       db.collection('mail').add({
         to: u.email,
+        replyTo: _email||'',
         message: {
           subject: (autoByStempel?'↩ Krank-Meldung aufgehoben (eingestempelt) – ':'↩ '+label+' zurückgenommen – ')+name,
           html: '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px">'
@@ -1925,7 +1928,8 @@ function sendBescheinigungMail(aufId, email, d){
   const dat=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
   const html=_kundenBescheinigungHtml(d, firma, maName, dat);
   db.collection('mail').add({
-    to:email,
+    to: email,
+    replyTo: _email||'',
     message:{subject:'Auftragsbescheinigung '+(d.kunde?'· '+d.kunde:'')+' · '+firma, html}
   }).then(()=>{
     db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).update({bescheinigungMailAt:Date.now()}).catch(()=>{});
@@ -3681,6 +3685,7 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
           +'</div></div>';
         db.collection('mail').add({
           to: agEmail,
+          replyTo: _email||'',
           message: { subject: '⚠️ '+tnName+' hat die Verknüpfung aufgehoben – '+firmaName, html: html }
         }).catch(()=>{});
       });
@@ -3748,6 +3753,7 @@ function submitFirmaCode(){
           +'</div></div>';
         db.collection('mail').add({
           to: agData.email,
+          replyTo: _email||'',
           message: { subject: '🔗 Verknüpfungs-Antrag von '+tnName+' – '+firma, html: html }
         }).catch(()=>{});
       }

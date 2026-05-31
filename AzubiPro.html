@@ -1556,6 +1556,7 @@ function sendWelcomeEmail(email, name, kursName){
 
   db.collection('mail').add({
     to: email,
+    replyTo: _email||'',
     message: {
       subject: '🎉 Willkommen bei AzubiPro' + (kursName ? ' – '+kursName : ''),
       html: html
@@ -2115,6 +2116,7 @@ function _sendMeldungEmailAusbilder(kursId, type, text, name){
     const zeit=new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
     db.collection('mail').add({
       to: email,
+      replyTo: _email||'',
       message: {
         subject: subject,
         html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
@@ -2207,6 +2209,7 @@ function _sendKursBeitrittMails(kd, kursId){
       +'</div></div>';
     db.collection('mail').add({
       to: tnEmail,
+      replyTo: _email||'',
       message: { subject: '📚 Lehrgang beigetreten: '+kursName+(zeitraum?' ('+zeitraum+')':''), html: azHtml }
     }).catch(()=>{});
   }
@@ -2231,6 +2234,7 @@ function _sendKursBeitrittMails(kd, kursId){
           +'</div></div>';
         db.collection('mail').add({
           to: u.email,
+          replyTo: _email||'',
           message: { subject: '📚 '+tnName+' ist im Lehrgang: '+kursName+(zeitraum?' ('+zeitraum+')':''), html: agHtml }
         }).catch(()=>{});
       });
@@ -2475,6 +2479,7 @@ function _fireMeldMail(email, type, text, name){
   const zeit=new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   db.collection('mail').add({
     to: email,
+    replyTo: _email||'',
     message: {
       subject: subject,
       html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
@@ -2589,6 +2594,7 @@ function _sendStornoEmailAG(firma, type, name, autoByStempel){
       if(!u.email) return;
       db.collection('mail').add({
         to: u.email,
+        replyTo: _email||'',
         message: {
           subject: (autoByStempel?'↩ Krank-Meldung aufgehoben (eingestempelt) – ':'↩ '+label+' zurückgenommen – ')+name,
           html: '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px">'
@@ -3053,7 +3059,8 @@ function sendBescheinigungMail(aufId, email, d){
   const dat=d.erledigtAm?new Date(d.erledigtAm).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
   const html=_kundenBescheinigungHtml(d, firma, maName, dat);
   db.collection('mail').add({
-    to:email,
+    to: email,
+    replyTo: _email||'',
     message:{subject:'Auftragsbescheinigung '+(d.kunde?'· '+d.kunde:'')+' · '+firma, html}
   }).then(()=>{
     db.collection('globalTN').doc(_tnId).collection('auftraege').doc(aufId).update({bescheinigungMailAt:Date.now()}).catch(()=>{});
@@ -4931,6 +4938,7 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
           +'</div></div>';
         db.collection('mail').add({
           to: agEmail,
+          replyTo: _email||'',
           message: { subject: '⚠️ '+tnName+' hat die Verknüpfung aufgehoben – '+firmaName, html: html }
         }).catch(()=>{});
       });
@@ -4949,6 +4957,7 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
           +'</div></div>';
         db.collection('mail').add({
           to: tnEmail,
+          replyTo: _email||'',
           message: { subject: '⚠️ Verknüpfung mit '+firmaName+' aufgehoben', html: html }
         }).catch(()=>{});
       }
@@ -4993,7 +5002,6 @@ function submitFirmaCode(){
   if(!code||code.length<5){err.textContent='Bitte gültigen Code eingeben';return;}
   if(!_tnId){err.textContent='Nicht angemeldet';return;}
   err.style.color='var(--acc)';err.textContent='Wird geprüft…';
-  // Code in users-Collection suchen
   db.collection('users').where('firmaCode','==',code).where('role','==','arbeitgeber').limit(1).get().then(snap=>{
     if(snap.empty){err.style.color='#ef4444';err.textContent='❌ Code nicht gefunden. Bitte prüfen und erneut eingeben.';return;}
     const agDoc=snap.docs[0];
@@ -5002,61 +5010,39 @@ function submitFirmaCode(){
     const firma=agData.firma||'';
     const tnName=((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim()||'Azubi';
     const tnEmail=_tnData?.kontaktEmail||_tnData?.email||'';
-    if(!confirm('Direkt mit „'+firma+'" verknüpfen?\n\nDu hast danach sofort Zugriff auf alle Mitarbeiter-Funktionen.')) {err.textContent='';return;}
-    // DIREKT verknüpfen (kein pending mehr)
+    if(!confirm('Verknüpfungs-Antrag an „'+firma+'" senden?\n\n• Dein Antrag muss vom Arbeitgeber bestätigt werden\n• Bis dahin sind keine Mitarbeiter-Funktionen aktiv\n• Der Arbeitgeber wird per E-Mail informiert')) {err.textContent='';return;}
     db.collection('globalTN').doc(_tnId).update({
-      firma: firma,
-      firmaUid: agUid,
-      firmaPending: firebase.firestore.FieldValue.delete(),
-      _verknuepftSeit: Date.now()
-    }).then(()=>{
-      _tnData.firma=firma;
-      _tnData.firmaUid=agUid;
-      delete _tnData.firmaPending;
-      inp.value='';
-      err.style.color='#059669';err.textContent='✅ Mit '+firma+' verknüpft!';
-      toast('✅ Mit '+firma+' verknüpft');
-      // Firmencode zurücksetzen (best-effort, falls Permission fehlt egal)
-      db.collection('users').doc(agUid).update({
-        firmaCode: firebase.firestore.FieldValue.delete()
-      }).catch(()=>{});
-      // 1. Willkommens-Mail an Azubi
-      if(tnEmail){
-        const azHtml='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
-          +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#059669,#10b981);border-radius:12px">'
-          +'<div style="font-size:1.3rem;font-weight:800;color:#fff">🎉 Willkommen bei '+esc(firma)+'</div>'
-          +'</div>'
-          +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
-          +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo '+esc(tnName)+',</p>'
-          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">du wurdest soeben mit <b>'+esc(firma)+'</b> verknüpft – herzlich willkommen!</p>'
-          +'<div style="padding:12px;background:#ecfdf5;border:2px solid #a7f3d0;border-radius:8px">'
-          +'<p style="margin:0 0 6px;font-size:.82rem;color:#065f46;font-weight:700">Du kannst jetzt alle Mitarbeiter-Funktionen in der App nutzen:</p>'
-          +'<ul style="margin:0 0 0 18px;padding:0;font-size:.78rem;color:#065f46;line-height:1.55"><li>Arbeitszeiten erfassen (ein-/ausstempeln)</li><li>Aufträge sehen</li><li>Urlaub beantragen</li><li>Krank-/Spät-/Früher-Meldung an den Betrieb</li></ul>'
-          +'</div></div></div>';
-        db.collection('mail').add({
-          to: tnEmail,
-          message: { subject: '🎉 Willkommen bei '+firma, html: azHtml }
-        }).catch(()=>{});
+      firmaPending: {
+        firmaUid: agUid,
+        firma: firma,
+        code: code,
+        requestedAt: Date.now(),
+        tnName: tnName,
+        tnEmail: tnEmail
       }
-      // 2. Info-Mail an AG
+    }).then(()=>{
+      _tnData.firmaPending={firmaUid:agUid,firma:firma,code:code,requestedAt:Date.now()};
+      inp.value='';
+      err.style.color='#059669';err.textContent='✅ Antrag gesendet — warten auf Bestätigung';
+      toast('⏳ Antrag an '+firma+' gesendet');
+      // Mail an AG: neuer Antrag wartet
       if(agData.email){
-        const agHtml='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
+        const html='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
           +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:12px">'
-          +'<div style="font-size:1.3rem;font-weight:800;color:#fff">✓ Neuer Mitarbeiter verknüpft</div>'
+          +'<div style="font-size:1.3rem;font-weight:800;color:#fff">🔗 Neuer Verknüpfungs-Antrag</div>'
           +'</div>'
           +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
           +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.55">Hallo,</p>'
-          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55"><b>'+esc(tnName)+'</b> hat sich soeben mit Ihrem Betrieb verknüpft und ist ab sofort in Ihrer ArbeitgeberPro-App sichtbar.</p>'
-          +'<div style="padding:12px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:8px;margin-bottom:12px">'
-          +'<p style="margin:0 0 4px;font-size:.78rem;color:#1e3a8a"><b>Mitarbeiter:</b> '+esc(tnName)+'</p>'
-          +(tnEmail?'<p style="margin:0 0 4px;font-size:.78rem;color:#1e3a8a"><b>E-Mail:</b> '+esc(tnEmail)+'</p>':'')
-          +'<p style="margin:0;font-size:.78rem;color:#1e3a8a"><b>Verknüpft am:</b> '+new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+' Uhr</p>'
-          +'</div>'
-          +'<div style="padding:10px;background:#fef3c7;border:2px solid #fde68a;border-radius:8px"><p style="margin:0;font-size:.75rem;color:#92400e">💡 Der Firmencode wurde zurückgesetzt. Für den nächsten Mitarbeiter bitte einen neuen Code generieren.</p></div>'
+          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55"><b>'+esc(tnName)+'</b> möchte sich mit Ihrem Betrieb <b>'+esc(firma)+'</b> verknüpfen.</p>'
+          +'<div style="padding:12px;background:#fef3c7;border:2px solid #fde68a;border-radius:8px;margin-bottom:12px">'
+          +'<p style="margin:0;font-size:.8rem;color:#92400e;font-weight:700">⏳ Bitte in ArbeitgeberPro bestätigen oder ablehnen.</p></div>'
+          +(tnEmail?'<p style="margin:0 0 8px;font-size:.78rem;color:#475569">Antragsteller-E-Mail: '+esc(tnEmail)+'</p>':'')
+          +'<p style="margin:0;font-size:.75rem;color:#64748b">Eingegebener Code: <code style="font-family:monospace;background:#f1f5f9;padding:2px 6px;border-radius:4px">'+esc(code)+'</code></p>'
           +'</div></div>';
         db.collection('mail').add({
           to: agData.email,
-          message: { subject: '✓ '+tnName+' wurde mit '+firma+' verknüpft', html: agHtml }
+          replyTo: tnEmail||'',
+          message: { subject: '🔗 Verknüpfungs-Antrag von '+tnName+' – '+firma, html: html }
         }).catch(()=>{});
       }
       checkFirmaCodeUI();
