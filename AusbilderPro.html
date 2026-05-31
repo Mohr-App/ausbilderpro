@@ -7704,7 +7704,7 @@ function saveManualTN(){
       // E-Mail-Benachrichtigung an Azubi (wenn Email vorhanden)
       try {
         _sendNeuerKursMailAP(
-          {vorname, nachname, kontaktEmail},
+          {vorname, nachname, kontaktEmail, firma},
           {
             name: S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs',
             von: inst.sY+'-'+inst.sM+'-'+inst.sD,
@@ -7734,7 +7734,7 @@ function saveManualTN(){
     // E-Mail-Benachrichtigung an Azubi (wenn Email vorhanden)
     try {
       _sendNeuerKursMailAP(
-        {vorname, nachname, kontaktEmail},
+        {vorname, nachname, kontaktEmail, firma},
         {
           name: S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs',
           von: inst.sY+'-'+inst.sM+'-'+inst.sD,
@@ -7789,7 +7789,39 @@ function _sendNeuerKursMailAP(tnInfo, kursInfo){
       subject: '📚 Neuer Lehrgang: '+kursName+(zeitraum?' ('+zeitraum+')':''),
       html: html
     }
-  }).catch(err=>console.warn('Mail-Fehler:',err));
+  }).catch(err=>console.warn('Mail-Fehler Azubi:',err));
+  // Zusätzlich: Mail an den Arbeitgeber wenn der TN einer Firma zugeordnet ist
+  const firma = (tnInfo.firma||'').trim();
+  if(firma){
+    _db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
+      if(snap.empty) return;
+      snap.forEach(doc=>{
+        const u=doc.data();
+        if(!u.email) return;
+        const agHtml='<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:20px;background:#f8fafc">'
+          +'<div style="text-align:center;margin-bottom:24px;padding:24px 16px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:14px">'
+          +'<div style="font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:-.02em">📚 Neuer Lehrgang für Ihren Mitarbeiter</div>'
+          +'</div>'
+          +'<div style="padding:22px;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px">'
+          +'<p style="margin:0 0 14px;font-size:.95rem;color:#0f172a">Hallo,</p>'
+          +'<p style="margin:0 0 14px;font-size:.88rem;color:#1e293b;line-height:1.55">Ihr Mitarbeiter <b>'+_escHtml(fullName)+'</b> wurde einem neuen Lehrgang zugewiesen:</p>'
+          +'<div style="padding:14px 16px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:10px;margin-bottom:16px">'
+          +'<div style="font-size:.95rem;font-weight:800;color:#1e40af;margin-bottom:6px">📚 '+_escHtml(kursName)+'</div>'
+          +(zeitraum?'<div style="font-size:.82rem;color:#1e3a8a;margin-bottom:3px">📅 <b>Zeitraum:</b> '+_escHtml(zeitraum)+'</div>':'')
+          +(ausbilderName?'<div style="font-size:.82rem;color:#1e3a8a">👷 <b>Ausbilder:</b> '+_escHtml(ausbilderName)+'</div>':'')
+          +'</div>'
+          +'<p style="margin:0;font-size:.78rem;color:#475569;line-height:1.55">In diesem Zeitraum ist Ihr Mitarbeiter ggf. zur überbetrieblichen Lehrunterweisung freigestellt. Statusinformationen sehen Sie auch live in Ihrer ArbeitgeberPro-App.</p>'
+          +'</div></div>';
+        _db.collection('mail').add({
+          to: u.email,
+          message: {
+            subject: '📚 Lehrgang für '+fullName+': '+kursName+(zeitraum?' ('+zeitraum+')':''),
+            html: agHtml
+          }
+        }).catch(err=>console.warn('Mail-Fehler AG:',err));
+      });
+    }).catch(()=>{});
+  }
 }
 function _fmtDateDE(s){
   if(!s) return '';
