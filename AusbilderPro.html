@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.19.9 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.20.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1372,7 +1372,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div id="apSigDrawOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,18,25,.85);z-index:10000;align-items:center;justify-content:center;padding:16px">
   <div style="background:#fff;border-radius:16px;padding:20px;max-width:500px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.4)">
     <div style="font-size:1rem;font-weight:800;color:#0f172a;margin-bottom:10px">✏️ Signatur zeichnen</div>
-    <div style="font-size:.7rem;color:#64748b;margin-bottom:10px">Mit Maus, Finger oder Stift im Feld unten unterschreiben.</div>
+    <div style="font-size:.7rem;color:#64748b;margin-bottom:10px">Mit Maus, Finger oder Stift im Feld unten unterschreiben. Eine bereits gespeicherte Unterschrift wird geladen — Strichstärke unten jederzeit anpassbar.</div>
     <div style="border:2px solid #cbd5e1;border-radius:10px;background:#f8fafc;padding:6px"><canvas id="apSigDrawCanvas" style="display:block;width:100%;height:160px;cursor:crosshair;touch-action:none;background:#fff;border-radius:6px"></canvas></div>
     <div style="display:flex;align-items:center;gap:10px;margin-top:10px;font-size:.72rem;color:#64748b;font-weight:600">
       <span style="white-space:nowrap">✏️ Strichstärke</span>
@@ -6521,13 +6521,14 @@ function _updateSigStempelUI(){
   }
   const stClr=document.getElementById('apStempelClearBtn');if(stClr) stClr.style.display=(_apStempelDataUrl||store.encStempel)?'inline-block':'none';
 }
-let _apSigDrawCtx=null,_apSigDrawing=false,_apSigDrawHasInk=false,_apSigPenW=2,_apSigStrokes=[],_apSigCur=null,_apSigRedraw=null;
+let _apSigDrawCtx=null,_apSigDrawing=false,_apSigDrawHasInk=false,_apSigPenW=2,_apSigStrokes=[],_apSigCur=null,_apSigRedraw=null,_apSigVec=null,_apSigCanvasCss=null;
 function apSigSetPen(v){_apSigPenW=+v;if(_apSigDrawCtx)_apSigDrawCtx.lineWidth=_apSigPenW;const l=document.getElementById('apSigPenLabel');if(l)l.textContent=(+v)+' px';const p=document.getElementById('apSigPenPrev');if(p)p.style.height=v+'px';if(_apSigRedraw)_apSigRedraw();}
 function apOpenSigDraw(){
   document.getElementById('apSigDrawOverlay').style.display='flex';
-  setTimeout(()=>{
+  setTimeout(async ()=>{
     const c=document.getElementById('apSigDrawCanvas');if(!c)return;
     c.width=c.offsetWidth*2;c.height=c.offsetHeight*2;
+    _apSigCanvasCss={w:c.offsetWidth,h:c.offsetHeight};
     _apSigDrawCtx=c.getContext('2d');
     _apSigDrawCtx.scale(2,2);
     _apSigDrawCtx.strokeStyle='#1a1a2e';_apSigDrawCtx.lineWidth=_apSigPenW;
@@ -6549,6 +6550,26 @@ function apOpenSigDraw(){
     c.onpointermove=e=>{if(!_apSigDrawing||!_apSigCur)return;_apSigCur.push(apPos(e));_apSigRedraw();};
     c.onpointerup=()=>{_apSigDrawing=false;_apSigCur=null;};
     c.onpointerleave=()=>{_apSigDrawing=false;_apSigCur=null;};
+    // Vorhandene Unterschrift als Vektor laden -> Staerke nachregelbar
+    try{
+      const store=_getSigStempelStore();
+      if(store.encSigVec){
+        let pin=(window._getCachedSigStempelPin&&window._getCachedSigStempelPin())||_apSigPinSession||'';
+        if(!pin){const inp=prompt('PIN eingeben, um die vorhandene Unterschrift zu laden und die Stärke anzupassen (Abbrechen = neu zeichnen):');pin=inp?String(inp).trim():'';}
+        if(pin){
+          const vec=JSON.parse(await _decryptString(store.encSigVec,pin));
+          if(vec&&Array.isArray(vec.strokes)&&vec.strokes.length){
+            const W=_apSigCanvasCss.w,H=_apSigCanvasCss.h;
+            _apSigStrokes=vec.strokes.map(st=>st.map(p=>({x:p.x*W,y:p.y*H})));
+            _apSigPenW=+vec.pen||_apSigPenW;_apSigPinSession=pin;
+            const sl=document.getElementById('apSigPenSlider');if(sl)sl.value=_apSigPenW;
+            const lb=document.getElementById('apSigPenLabel');if(lb)lb.textContent=_apSigPenW+' px';
+            const pv=document.getElementById('apSigPenPrev');if(pv)pv.style.height=_apSigPenW+'px';
+            _apSigDrawHasInk=true;_apSigRedraw();
+          }
+        }
+      }
+    }catch(e){console.warn('Vektor-Signatur konnte nicht geladen werden:',e);}
   },50);
 }
 function apSigDrawClear(){const c=document.getElementById('apSigDrawCanvas');_apSigStrokes=[];_apSigCur=null;if(_apSigDrawCtx&&c){_apSigDrawCtx.clearRect(0,0,c.width,c.height);_apSigDrawHasInk=false;}}
@@ -6556,14 +6577,18 @@ function apSigDrawCancel(){document.getElementById('apSigDrawOverlay').style.dis
 function apSigDrawSave(){
   if(!_apSigDrawHasInk){toast('Bitte zuerst zeichnen','bad');return;}
   _apSigDataUrl=document.getElementById('apSigDrawCanvas').toDataURL('image/png');
+  if(_apSigCanvasCss&&_apSigStrokes.length){
+    const W=_apSigCanvasCss.w||1,H=_apSigCanvasCss.h||1;
+    _apSigVec={pen:_apSigPenW,strokes:_apSigStrokes.map(st=>st.map(p=>({x:+(p.x/W).toFixed(4),y:+(p.y/H).toFixed(4)})))};
+  } else { _apSigVec=null; }
   document.getElementById('apSigDrawOverlay').style.display='none';
   _updateSigStempelUI();
   toast('Signatur übernommen — jetzt PIN setzen + Speichern','ok');
 }
 function apClearSig(){
   if(!confirm('Signatur wirklich entfernen?'))return;
-  _apSigDataUrl='';
-  const store=_getSigStempelStore();delete store.encSig;_setSigStempelStore(store);
+  _apSigDataUrl='';_apSigVec=null;
+  const store=_getSigStempelStore();delete store.encSig;delete store.encSigVec;_setSigStempelStore(store);
   _updateSigStempelUI();
 }
 function apOnStempelPicked(ev){
@@ -6592,6 +6617,7 @@ async function saveAusbilderSigStempel(){
   } catch(e){errEl.textContent='Falsche PIN — kann gespeicherte Daten nicht entschlüsseln.';errEl.style.display='block';return;}
   try {
     if(_apSigDataUrl) store.encSig=await _encryptString(_apSigDataUrl,pin);
+    if(_apSigVec) store.encSigVec=await _encryptString(JSON.stringify(_apSigVec),pin);
     if(_apStempelDataUrl) store.encStempel=await _encryptString(_apStempelDataUrl,pin);
     _setSigStempelStore(store);
     _apSigPinSession=pin;
