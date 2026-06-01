@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.19.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.19.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -5748,16 +5748,15 @@ function syncAttendanceToFirestore(seatId){
   // Kurstage aus Instanz (default 5)
   const kurstage=inst.kurstage||5;
   const attPercent=kurstage>0?Math.round((present/kurstage)*100):0;
-  // Custom-Grade Labels mit-schreiben damit VP sie anzeigen kann (id -> label map)
-  const _customLabels={};
-  (inst.customGrades||[]).forEach(g=>{ if(g&&g.id) _customLabels[g.id]=g.label||g.id; });
+  // Custom-Grade Labels werden NICHT pro TN gespeichert sondern zentral am Kurs-Doc
+  // (siehe syncCustomGradesToCloud). Hier nur die Werte, nicht die Labels - damit
+  // Firestore-Rules-Whitelist eingehalten wird (noten_extra_labels ist nicht erlaubt).
   const syncData={
     attLastSync:Date.now(),
     noten_mitarbeit:d.mitarbeit||'',
     noten_fuehrung:d.fuehrung||'',
     noten_praxis:d.praxis||'',
     noten_extra:d.extraGrades||{},
-    noten_extra_labels:_customLabels,
     werkzeugStatus:d.werkzeugStatus||'',
     werkzeugFehlt:d.werkzeugFehlt||'',
     bemerkung:d.bemerkung||'',
@@ -7040,13 +7039,18 @@ function showDiagnose(){
           }
         }
       } catch(e){ lines.push('⚠ Kurs-Doc Lesen fehlgeschlagen: '+e.code+' / '+e.message); }
-      // Live-Test: Test-Schreibe machen
+      // Live-Test: Test-Schreibe machen auf Teilnehmer (erlaubtes Feld)
       try {
-        await _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
-          .set({_permTest:Date.now()},{merge:true});
-        lines.push('✓ Test-Schreibe Kurs-Doc: ERFOLG (Schreibrechte vorhanden)');
+        // Pick einen TN aus dem Kurs für den Test
+        const tnSnap=await _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).collection('teilnehmer').limit(1).get();
+        if(tnSnap.empty){ lines.push('(kein TN im Kurs für Permission-Test)'); }
+        else {
+          const tnRef=tnSnap.docs[0].ref;
+          await tnRef.update({attLastSync:Date.now()});
+          lines.push('✓ Test-Schreibe Teilnehmer-Doc: ERFOLG (Noten-Save funktioniert)');
+        }
       } catch(e){
-        lines.push('✗ Test-Schreibe Kurs-Doc: '+e.code+' / '+e.message);
+        lines.push('✗ Test-Schreibe Teilnehmer-Doc: '+e.code+' / '+e.message);
         lines.push('  → DAS IST DER FEHLER. Cloud-Schreibe ist blockiert.');
       }
     } else {
