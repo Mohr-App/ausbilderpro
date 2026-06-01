@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.19.5 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.19.6 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1376,7 +1376,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div style="border:2px solid #cbd5e1;border-radius:10px;background:#f8fafc;padding:6px"><canvas id="apSigDrawCanvas" style="display:block;width:100%;height:160px;cursor:crosshair;touch-action:none;background:#fff;border-radius:6px"></canvas></div>
     <div style="display:flex;align-items:center;gap:10px;margin-top:10px;font-size:.72rem;color:#64748b;font-weight:600">
       <span style="white-space:nowrap">✏️ Strichstärke</span>
-      <input type="range" min="1" max="6" step="0.5" value="2" id="apSigPenSlider" oninput="apSigSetPen(this.value)" style="flex:1">
+      <input type="range" min="1" max="8" step="0.5" value="2" id="apSigPenSlider" oninput="apSigSetPen(this.value)" style="flex:1">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:46px;height:14px;flex-shrink:0"><span id="apSigPenPrev" style="display:block;width:40px;height:2px;background:#1a1a2e;border-radius:4px"></span></span>
       <span id="apSigPenLabel" style="font-family:'JetBrains Mono',monospace;color:#0f172a;min-width:36px;text-align:right">2 px</span>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
@@ -6519,7 +6520,7 @@ function _updateSigStempelUI(){
   const stClr=document.getElementById('apStempelClearBtn');if(stClr) stClr.style.display=(_apStempelDataUrl||store.encStempel)?'inline-block':'none';
 }
 let _apSigDrawCtx=null,_apSigDrawing=false,_apSigDrawHasInk=false,_apSigPenW=2;
-function apSigSetPen(v){_apSigPenW=+v;if(_apSigDrawCtx)_apSigDrawCtx.lineWidth=_apSigPenW;const l=document.getElementById('apSigPenLabel');if(l)l.textContent=(+v)+' px';}
+function apSigSetPen(v){_apSigPenW=+v;if(_apSigDrawCtx)_apSigDrawCtx.lineWidth=_apSigPenW;const l=document.getElementById('apSigPenLabel');if(l)l.textContent=(+v)+' px';const p=document.getElementById('apSigPenPrev');if(p)p.style.height=v+'px';}
 function apOpenSigDraw(){
   document.getElementById('apSigDrawOverlay').style.display='flex';
   setTimeout(()=>{
@@ -6530,7 +6531,7 @@ function apOpenSigDraw(){
     _apSigDrawCtx.strokeStyle='#1a1a2e';_apSigDrawCtx.lineWidth=_apSigPenW;
     _apSigDrawCtx.lineCap='round';_apSigDrawCtx.lineJoin='round';
     _apSigDrawHasInk=false;
-    c.onpointerdown=e=>{_apSigDrawing=true;const r=c.getBoundingClientRect();_apSigDrawCtx.beginPath();_apSigDrawCtx.moveTo(e.clientX-r.left,e.clientY-r.top);c.setPointerCapture(e.pointerId);};
+    c.onpointerdown=e=>{_apSigDrawing=true;_apSigDrawCtx.lineWidth=_apSigPenW;const r=c.getBoundingClientRect();_apSigDrawCtx.beginPath();_apSigDrawCtx.moveTo(e.clientX-r.left,e.clientY-r.top);c.setPointerCapture(e.pointerId);};
     c.onpointermove=e=>{if(!_apSigDrawing)return;const r=c.getBoundingClientRect();_apSigDrawCtx.lineTo(e.clientX-r.left,e.clientY-r.top);_apSigDrawCtx.stroke();_apSigDrawHasInk=true;};
     c.onpointerup=()=>{_apSigDrawing=false;};
     c.onpointerleave=()=>{_apSigDrawing=false;};
@@ -8838,7 +8839,7 @@ ${notenHtml}
         ?'<div class="sig-canvas-wrap signed" id="sigWrap"><img src="'+existingSig+'" class="sig-img"><button class="btn-remove-overlay no-print" onclick="removeLoadedSig(event)" title="Unterschrift entfernen">✕</button></div>'
         :'<div class="sig-canvas-wrap" id="sigWrap"><canvas class="sig" id="sigCanvas"></canvas></div><button class="btn-clear-sig no-print" title="↺ Neu" onclick="clearSig()">↺ Neu</button>'}
     </div>
-    <div class="no-print" id="sigPenCtrl" style="${existingSig?'display:none':'display:flex'};align-items:center;gap:6px;font-size:10px;color:#64748b;justify-content:center;margin:4px 0">✏️ Strichstärke <input type="range" min="1" max="6" step="0.5" value="2" id="sigPenSlider" oninput="setSigPen(this.value)" style="width:90px"><span id="sigPenLabel" style="font-family:'JetBrains Mono',monospace;color:#0f172a">2 px</span></div>
+    <div class="no-print" id="sigPenCtrl" style="${existingSig?'display:none':'display:flex'};align-items:center;gap:6px;font-size:10px;color:#64748b;justify-content:center;margin:4px 0">✏️ Strichstärke <input type="range" min="1" max="8" step="0.5" value="2" id="sigPenSlider" oninput="setSigPen(this.value)" style="width:90px"><span style="display:inline-flex;align-items:center;width:34px;height:12px"><span id="sigPenPrev" style="display:block;width:30px;height:2px;background:#1a1a2e;border-radius:4px"></span></span><span id="sigPenLabel" style="font-family:'JetBrains Mono',monospace;color:#0f172a">2 px</span></div>
     <div class="resize-ctrl no-print" id="sigResizeCtrl" style="display:none">📏 <input type="range" min="10" max="30" value="16" id="sigSizeSlider" oninput="resizeSig(this.value)"><span id="sigSizeLabel">16mm</span></div>
     <div class="sig-line">Lehrgangsleiter</div>
   </div>
@@ -8980,7 +8981,7 @@ function toggleNachweis(val){
 // Signature Canvas
 const canvas=document.getElementById('sigCanvas');
 let ctx,drawing=false,_sigPenW=2,hasSig=${existingSig?'true':'false'};
-function setSigPen(v){_sigPenW=+v;if(ctx)ctx.lineWidth=_sigPenW;const l=document.getElementById('sigPenLabel');if(l)l.textContent=(+v)+' px';}
+function setSigPen(v){_sigPenW=+v;if(ctx)ctx.lineWidth=_sigPenW;const l=document.getElementById('sigPenLabel');if(l)l.textContent=(+v)+' px';const p=document.getElementById('sigPenPrev');if(p)p.style.height=v+'px';}
 // Wenn schon existierende Sig: Slider sichtbar machen + draggable
 if(${existingSig?'true':'false'}){
   window._loadedSig=${JSON.stringify(existingSig||'')};
@@ -9004,7 +9005,7 @@ if(canvas){
     const t=e.touches?e.touches[0]:e;
     return{x:t.clientX-r.left,y:t.clientY-r.top};
   }
-  canvas.addEventListener('pointerdown',e=>{drawing=true;const p=getPos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);canvas.setPointerCapture(e.pointerId);});
+  canvas.addEventListener('pointerdown',e=>{drawing=true;ctx.lineWidth=_sigPenW;const p=getPos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);canvas.setPointerCapture(e.pointerId);});
   canvas.addEventListener('pointermove',e=>{if(!drawing)return;const p=getPos(e);ctx.lineTo(p.x,p.y);ctx.stroke();hasSig=true;});
   canvas.addEventListener('pointerup',()=>{drawing=false;if(hasSig)document.getElementById('sigWrap').classList.add('signed');});
   canvas.addEventListener('pointerleave',()=>{drawing=false;});
