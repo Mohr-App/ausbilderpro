@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.19.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.19.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2473,7 +2473,13 @@ async function syncSeatGradesFromFirestore(){
           if(sync.noten_mitarbeit && seat.mitarbeit!==sync.noten_mitarbeit){seat.mitarbeit=sync.noten_mitarbeit;changed=true;}
           if(sync.noten_praxis && seat.praxis!==sync.noten_praxis){seat.praxis=sync.noten_praxis;changed=true;}
           if(sync.noten_extra && typeof sync.noten_extra==='object'){
-            const merged={...(seat.extraGrades||{}),...sync.noten_extra};
+            // Filtere verwaiste Grade-IDs: nur welche behalten die noch in customGrades existieren
+            const validIds = new Set((inst.customGrades||[]).map(g=>g.id));
+            const cleanSync = {};
+            Object.entries(sync.noten_extra).forEach(([cid,val])=>{ if(validIds.has(cid) && val) cleanSync[cid]=val; });
+            const merged={...(seat.extraGrades||{}),...cleanSync};
+            // Plus: aus seat.extraGrades auch verwaiste rauswerfen
+            Object.keys(merged).forEach(cid=>{ if(!validIds.has(cid)) delete merged[cid]; });
             if(JSON.stringify(seat.extraGrades||{})!==JSON.stringify(merged)){seat.extraGrades=merged;changed=true;}
           }
           // Cross-Sync: noten_extra_labels vom TN-Doc verwenden um lokale customGrades zu vervollstaendigen
@@ -5751,12 +5757,16 @@ function syncAttendanceToFirestore(seatId){
   // Custom-Grade Labels werden NICHT pro TN gespeichert sondern zentral am Kurs-Doc
   // (siehe syncCustomGradesToCloud). Hier nur die Werte, nicht die Labels - damit
   // Firestore-Rules-Whitelist eingehalten wird (noten_extra_labels ist nicht erlaubt).
+  // Verwaiste Custom-Grade-Eintraege (IDs die nicht mehr in customGrades existieren) explizit aus Firestore loeschen
+  const validGradeIds = new Set((inst.customGrades||[]).map(g=>g.id));
+  const cleanExtra = {};
+  Object.entries(d.extraGrades||{}).forEach(([cid,val])=>{ if(validGradeIds.has(cid) && val) cleanExtra[cid]=val; });
   const syncData={
     attLastSync:Date.now(),
     noten_mitarbeit:d.mitarbeit||'',
     noten_fuehrung:d.fuehrung||'',
     noten_praxis:d.praxis||'',
-    noten_extra:d.extraGrades||{},
+    noten_extra:cleanExtra,
     werkzeugStatus:d.werkzeugStatus||'',
     werkzeugFehlt:d.werkzeugFehlt||'',
     bemerkung:d.bemerkung||'',
