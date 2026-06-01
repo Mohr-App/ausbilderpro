@@ -6807,7 +6807,10 @@ function submitDsgvoConsent(){
 function getAusbilderKursData(){
   const p=getAusbilderProfil();
   const loginEmail=_auth?.currentUser?.email?.toLowerCase()||'';
+  const uid=_auth?.currentUser?.uid||'';
   return {
+    ausbilderUid: uid, // wichtig fuer Firestore-Rules (Permission-Check)
+    ownerUid: uid,     // Alias falls Rules diese Feld-Variante nutzen
     ausbilderLoginEmail: loginEmail,
     ausbilderEmail: p.email||loginEmail,
     ausbilderName: p.name||_auth?.currentUser?.displayName||loginEmail,
@@ -6821,6 +6824,7 @@ function getAusbilderKursData(){
 function backfillCourseAusbilderData(profil){
   if(!_db||!_auth?.currentUser?.email) return;
   const loginEmail=_auth.currentUser.email.toLowerCase();
+  const uid=_auth.currentUser.uid;
   _db.collection('shared').doc('kurse').collection('list')
     .where('ausbilderLoginEmail','==',loginEmail)
     .get()
@@ -6831,9 +6835,12 @@ function backfillCourseAusbilderData(profil){
       snap.forEach(doc=>{
         const d=doc.data();
         const update={};
-        if(profil.telefon && !d.ausbilderTel) update.ausbilderTel=profil.telefon;
-        if(profil.email && !d.ausbilderEmail) update.ausbilderEmail=profil.email;
-        if(profil.name && !d.ausbilderName) update.ausbilderName=profil.name;
+        // Self-Heal: ausbilderUid + ownerUid setzen falls fehlend (Permission-Fix)
+        if(!d.ausbilderUid) update.ausbilderUid=uid;
+        if(!d.ownerUid) update.ownerUid=uid;
+        if(profil && profil.telefon && !d.ausbilderTel) update.ausbilderTel=profil.telefon;
+        if(profil && profil.email && !d.ausbilderEmail) update.ausbilderEmail=profil.email;
+        if(profil && profil.name && !d.ausbilderName) update.ausbilderName=profil.name;
         if(Object.keys(update).length){
           tasks.push(doc.ref.update(update));
           updated++;
@@ -6841,10 +6848,16 @@ function backfillCourseAusbilderData(profil){
       });
       if(tasks.length){
         Promise.all(tasks).then(()=>{
-          if(updated>0) toast(updated+' Kurs(e) mit Profil aktualisiert ✓');
-        }).catch(()=>{});
+          if(updated>0) console.warn('[Self-Heal] '+updated+' Kurs(e) UID/Profil ergänzt');
+        }).catch(e=>console.warn('Backfill-Fehler:',e.code,e.message));
       }
     }).catch(()=>{});
+}
+// Self-Heal beim Login: ALLE Kurse die mir gehören mit ausbilderUid versehen
+function selfHealAusbilderUidOnLogin(){
+  if(!_db||!_auth?.currentUser?.email) return;
+  const profil=getAusbilderProfil();
+  backfillCourseAusbilderData(profil);
 }
 
 // ─── APP-RESET / DIAGNOSE: einfaches Self-Service-Tool fuer Kollegen ───
@@ -11365,6 +11378,8 @@ try{
     // Self-Heal: Lehrgangsart-Sync fuer ALLE Kategorien (falls Umbenennungen in Vergangenheit nicht gesynct)
     setTimeout(()=>{try{syncAllKatsLehrgangsartToCloud();}catch(e){}}, 4000);
     setTimeout(()=>{try{syncAllCustomGradesToCloud();}catch(e){}}, 5000);
+    // Self-Heal: ausbilderUid + ownerUid in alten Kurs-Docs nachziehen (Permission-Fix fuer Dahm und co.)
+    setTimeout(()=>{try{selfHealAusbilderUidOnLogin();}catch(e){}}, 2500);
     // Periodischer Hintergrund-Sync alle 60s damit Defs immer aktuell sind
     if(!window._bgCustomGradeSyncTimer){
       window._bgCustomGradeSyncTimer = setInterval(()=>{
