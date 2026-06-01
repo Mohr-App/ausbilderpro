@@ -6988,17 +6988,70 @@ function showDiagnose(){
     }
   }catch(e){}
   lines.push('localStorage: '+Math.round(lsSize/1024)+' KB');
-  // SW-Status
+  // ── PERMISSION-LIVE-TEST (zeigt ob Cloud-Write fuer Noten funktioniert) ──
+  lines.push('');
+  lines.push('--- PERMISSION-TEST CLOUD ---');
+  const _doPermTest = async ()=>{
+    if(!_db){ lines.push('⚠ Firestore nicht initialisiert'); return; }
+    if(!user){ lines.push('⚠ Nicht eingeloggt'); return; }
+    // User-Doc lesen
+    try {
+      const uSnap=await _db.collection('users').doc(user.uid).get();
+      if(!uSnap.exists){
+        lines.push('⚠ User-Doc EXISTIERT NICHT in users-Collection!');
+        lines.push('   → Das ist vermutlich die Ursache.');
+      } else {
+        const ud=uSnap.data();
+        lines.push('User-Doc gefunden:');
+        lines.push('  role: '+(ud.role||'⚠ FEHLT'));
+        lines.push('  firma: '+(ud.firma||'-'));
+        lines.push('  vorname: '+(ud.vorname||'-'));
+        lines.push('  nachname: '+(ud.nachname||'-'));
+        if(ud.email && ud.email!==user.email) lines.push('  ⚠ Email im Doc ('+ud.email+') ≠ Login-Email ('+user.email+')');
+      }
+    } catch(e){ lines.push('⚠ User-Doc Lesen fehlgeschlagen: '+e.code+' / '+e.message); }
+    // Kurs-Doc lesen
+    if(inst && inst.sharedKursId){
+      try {
+        const kSnap=await _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).get();
+        if(!kSnap.exists){
+          lines.push('⚠ Kurs-Doc in shared/kurse/list/ EXISTIERT NICHT');
+        } else {
+          const kd=kSnap.data();
+          lines.push('Kurs-Doc gefunden:');
+          lines.push('  ownerUid: '+(kd.ownerUid||kd.ausbilderUid||'⚠ FEHLT'));
+          lines.push('  ownerEmail: '+(kd.ownerEmail||kd.ausbilderEmail||'-'));
+          if((kd.ownerUid||kd.ausbilderUid) && (kd.ownerUid||kd.ausbilderUid)!==user.uid){
+            lines.push('  ⚠ DAHM IST NICHT OWNER! Owner='+(kd.ownerUid||kd.ausbilderUid).substring(0,12)+'… Dahm='+user.uid.substring(0,12)+'…');
+            lines.push('  → Das erklärt vermutlich den permission-denied beim Note-Schreiben.');
+          }
+        }
+      } catch(e){ lines.push('⚠ Kurs-Doc Lesen fehlgeschlagen: '+e.code+' / '+e.message); }
+      // Live-Test: Test-Schreibe machen
+      try {
+        await _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
+          .set({_permTest:Date.now()},{merge:true});
+        lines.push('✓ Test-Schreibe Kurs-Doc: ERFOLG (Schreibrechte vorhanden)');
+      } catch(e){
+        lines.push('✗ Test-Schreibe Kurs-Doc: '+e.code+' / '+e.message);
+        lines.push('  → DAS IST DER FEHLER. Cloud-Schreibe ist blockiert.');
+      }
+    } else {
+      lines.push('(kein aktiver Cloud-Kurs - kann Schreibe nicht testen)');
+    }
+  };
+  // SW-Status (existierend) + dann anzeigen
+  const _finish = ()=>{ _showDiagnoseModal(lines.join('\n')); };
   if('serviceWorker' in navigator){
     navigator.serviceWorker.getRegistrations().then(regs=>{
       lines.push('Service Worker: '+regs.length+' registriert');
-      _showDiagnoseModal(lines.join('\n'));
+      _doPermTest().then(_finish).catch(_finish);
     }).catch(()=>{
       lines.push('Service Worker: Check fehlgeschlagen');
-      _showDiagnoseModal(lines.join('\n'));
+      _doPermTest().then(_finish).catch(_finish);
     });
   } else {
-    _showDiagnoseModal(lines.join('\n'));
+    _doPermTest().then(_finish).catch(_finish);
   }
 }
 
