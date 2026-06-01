@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.19.6 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.19.7 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6519,8 +6519,8 @@ function _updateSigStempelUI(){
   }
   const stClr=document.getElementById('apStempelClearBtn');if(stClr) stClr.style.display=(_apStempelDataUrl||store.encStempel)?'inline-block':'none';
 }
-let _apSigDrawCtx=null,_apSigDrawing=false,_apSigDrawHasInk=false,_apSigPenW=2;
-function apSigSetPen(v){_apSigPenW=+v;if(_apSigDrawCtx)_apSigDrawCtx.lineWidth=_apSigPenW;const l=document.getElementById('apSigPenLabel');if(l)l.textContent=(+v)+' px';const p=document.getElementById('apSigPenPrev');if(p)p.style.height=v+'px';}
+let _apSigDrawCtx=null,_apSigDrawing=false,_apSigDrawHasInk=false,_apSigPenW=2,_apSigStrokes=[],_apSigCur=null,_apSigRedraw=null;
+function apSigSetPen(v){_apSigPenW=+v;if(_apSigDrawCtx)_apSigDrawCtx.lineWidth=_apSigPenW;const l=document.getElementById('apSigPenLabel');if(l)l.textContent=(+v)+' px';const p=document.getElementById('apSigPenPrev');if(p)p.style.height=v+'px';if(_apSigRedraw)_apSigRedraw();}
 function apOpenSigDraw(){
   document.getElementById('apSigDrawOverlay').style.display='flex';
   setTimeout(()=>{
@@ -6530,14 +6530,26 @@ function apOpenSigDraw(){
     _apSigDrawCtx.scale(2,2);
     _apSigDrawCtx.strokeStyle='#1a1a2e';_apSigDrawCtx.lineWidth=_apSigPenW;
     _apSigDrawCtx.lineCap='round';_apSigDrawCtx.lineJoin='round';
-    _apSigDrawHasInk=false;
-    c.onpointerdown=e=>{_apSigDrawing=true;_apSigDrawCtx.lineWidth=_apSigPenW;const r=c.getBoundingClientRect();_apSigDrawCtx.beginPath();_apSigDrawCtx.moveTo(e.clientX-r.left,e.clientY-r.top);c.setPointerCapture(e.pointerId);};
-    c.onpointermove=e=>{if(!_apSigDrawing)return;const r=c.getBoundingClientRect();_apSigDrawCtx.lineTo(e.clientX-r.left,e.clientY-r.top);_apSigDrawCtx.stroke();_apSigDrawHasInk=true;};
-    c.onpointerup=()=>{_apSigDrawing=false;};
-    c.onpointerleave=()=>{_apSigDrawing=false;};
+    _apSigDrawHasInk=false;_apSigStrokes=[];_apSigCur=null;
+    const apPos=e=>{const rc=c.getBoundingClientRect();return{x:e.clientX-rc.left,y:e.clientY-rc.top};};
+    _apSigRedraw=()=>{
+      _apSigDrawCtx.clearRect(0,0,c.width,c.height);
+      _apSigDrawCtx.lineWidth=_apSigPenW;
+      for(const st of _apSigStrokes){
+        if(!st.length)continue;
+        _apSigDrawCtx.beginPath();_apSigDrawCtx.moveTo(st[0].x,st[0].y);
+        if(st.length===1){_apSigDrawCtx.lineTo(st[0].x+0.1,st[0].y+0.1);}
+        else{for(let i=1;i<st.length;i++)_apSigDrawCtx.lineTo(st[i].x,st[i].y);}
+        _apSigDrawCtx.stroke();
+      }
+    };
+    c.onpointerdown=e=>{_apSigDrawing=true;_apSigCur=[apPos(e)];_apSigStrokes.push(_apSigCur);c.setPointerCapture(e.pointerId);_apSigDrawHasInk=true;_apSigRedraw();};
+    c.onpointermove=e=>{if(!_apSigDrawing||!_apSigCur)return;_apSigCur.push(apPos(e));_apSigRedraw();};
+    c.onpointerup=()=>{_apSigDrawing=false;_apSigCur=null;};
+    c.onpointerleave=()=>{_apSigDrawing=false;_apSigCur=null;};
   },50);
 }
-function apSigDrawClear(){const c=document.getElementById('apSigDrawCanvas');if(_apSigDrawCtx&&c){_apSigDrawCtx.clearRect(0,0,c.width,c.height);_apSigDrawHasInk=false;}}
+function apSigDrawClear(){const c=document.getElementById('apSigDrawCanvas');_apSigStrokes=[];_apSigCur=null;if(_apSigDrawCtx&&c){_apSigDrawCtx.clearRect(0,0,c.width,c.height);_apSigDrawHasInk=false;}}
 function apSigDrawCancel(){document.getElementById('apSigDrawOverlay').style.display='none';}
 function apSigDrawSave(){
   if(!_apSigDrawHasInk){toast('Bitte zuerst zeichnen','bad');return;}
@@ -8980,8 +8992,8 @@ function toggleNachweis(val){
 }
 // Signature Canvas
 const canvas=document.getElementById('sigCanvas');
-let ctx,drawing=false,_sigPenW=2,hasSig=${existingSig?'true':'false'};
-function setSigPen(v){_sigPenW=+v;if(ctx)ctx.lineWidth=_sigPenW;const l=document.getElementById('sigPenLabel');if(l)l.textContent=(+v)+' px';const p=document.getElementById('sigPenPrev');if(p)p.style.height=v+'px';}
+let ctx,drawing=false,_sigPenW=2,_sigStrokes=[],_sigCur=null,hasSig=${existingSig?'true':'false'};
+function setSigPen(v){_sigPenW=+v;if(ctx)ctx.lineWidth=_sigPenW;const l=document.getElementById('sigPenLabel');if(l)l.textContent=(+v)+' px';const p=document.getElementById('sigPenPrev');if(p)p.style.height=v+'px';if(window._redrawSig)window._redrawSig();}
 // Wenn schon existierende Sig: Slider sichtbar machen + draggable
 if(${existingSig?'true':'false'}){
   window._loadedSig=${JSON.stringify(existingSig||'')};
@@ -9005,13 +9017,26 @@ if(canvas){
     const t=e.touches?e.touches[0]:e;
     return{x:t.clientX-r.left,y:t.clientY-r.top};
   }
-  canvas.addEventListener('pointerdown',e=>{drawing=true;ctx.lineWidth=_sigPenW;const p=getPos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);canvas.setPointerCapture(e.pointerId);});
-  canvas.addEventListener('pointermove',e=>{if(!drawing)return;const p=getPos(e);ctx.lineTo(p.x,p.y);ctx.stroke();hasSig=true;});
-  canvas.addEventListener('pointerup',()=>{drawing=false;if(hasSig)document.getElementById('sigWrap').classList.add('signed');});
-  canvas.addEventListener('pointerleave',()=>{drawing=false;});
+  function redrawSig(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.lineWidth=_sigPenW;
+    for(const st of _sigStrokes){
+      if(!st.length)continue;
+      ctx.beginPath();ctx.moveTo(st[0].x,st[0].y);
+      if(st.length===1){ctx.lineTo(st[0].x+0.1,st[0].y+0.1);}
+      else{for(let i=1;i<st.length;i++)ctx.lineTo(st[i].x,st[i].y);}
+      ctx.stroke();
+    }
+  }
+  window._redrawSig=redrawSig;
+  canvas.addEventListener('pointerdown',e=>{drawing=true;_sigCur=[getPos(e)];_sigStrokes.push(_sigCur);canvas.setPointerCapture(e.pointerId);hasSig=true;document.getElementById('sigWrap').classList.add('signed');redrawSig();});
+  canvas.addEventListener('pointermove',e=>{if(!drawing||!_sigCur)return;_sigCur.push(getPos(e));redrawSig();});
+  canvas.addEventListener('pointerup',()=>{drawing=false;_sigCur=null;});
+  canvas.addEventListener('pointerleave',()=>{drawing=false;_sigCur=null;});
 }
 function clearSig(){
   if(!canvas||!ctx)return;
+  _sigStrokes=[];_sigCur=null;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   hasSig=false;
   document.getElementById('sigWrap')?.classList.remove('signed');
