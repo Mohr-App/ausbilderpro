@@ -892,6 +892,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" id="hdrChatSweepBtn" onclick="openChatSweep();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:#6d28d9;display:none" title="Alte Chat-Nachrichten manuell entfernen (Admin/DSGVO)">🧹 Chat-Bereinigung</button>
         <button class="tbtn" onclick="recoverOrphanSeats();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.2);color:#4338ca" title="TN, die direkt am Sitzplatz eingegeben wurden (statt über +TN), nachträglich in globalTN + Kurs-Liste anlegen">🔗 Verwaiste Sitze nachtragen</button>
         <button class="tbtn" onclick="showHilfeModal();closeHdrMenu()" style="width:100%;text-align:left" title="Anleitungen und Tipps">❓ Brauchst du Hilfe?</button>
+        <div style="border-top:1px solid var(--brd);margin:6px 0 0"></div>
+        <div style="text-align:center;font-size:.6rem;color:var(--mu);padding:8px 4px 4px;font-family:'JetBrains Mono',monospace;line-height:1.5">AusbilderPro <span id="hdrVersionTxt">–</span> · by Stefan Mohr<br><a href="#" onclick="event.preventDefault();closeHdrMenu();showChangelog()" style="color:var(--acc);text-decoration:none">✨ Was ist neu?</a></div>
       </div>
     </div>
   </div>
@@ -1060,6 +1062,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <button class="tbtn" onclick="openTrash();closeMobMoreMenu()" style="width:100%;text-align:left" title="Gelöschte Lehrgänge wiederherstellen (30 Tage)">🗑 Papierkorb</button>
       <button class="tbtn" id="mobChatSweepBtn" onclick="openChatSweep();closeMobMoreMenu()" style="width:100%;text-align:left;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:#6d28d9;display:none" title="Alte Chat-Nachrichten manuell entfernen (Admin/DSGVO)">🧹 Chat-Bereinigung</button>
       <button class="tbtn" onclick="showHilfeModal();closeMobMoreMenu()" style="width:100%;text-align:left" title="Anleitungen und Tipps">❓ Brauchst du Hilfe?</button>
+      <div style="border-top:1px solid var(--brd);margin:8px 0 0"></div>
+      <div style="text-align:center;font-size:.64rem;color:var(--mu);padding-top:10px;font-family:'JetBrains Mono',monospace;line-height:1.5">
+        AusbilderPro <span id="mehrVersionTxt">–</span> · by Stefan Mohr<br>
+        <a href="#" onclick="event.preventDefault();closeMobMoreMenu();showChangelog()" style="color:var(--acc);text-decoration:none">✨ Was ist neu?</a>
+      </div>
     </div>
   </div>
 </div>
@@ -1070,7 +1077,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.24.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.24.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -3708,6 +3715,8 @@ function closeTrennlinienModal(){
 
 // ─── Mobile More Menu (Bottom Sheet, spiegelt Desktop Header-Menü) ───
 function openMobMoreMenu(){
+  const vt=document.getElementById('mehrVersionTxt');
+  if(vt){ const cr=document.querySelector('.copyright'); const m=cr&&cr.textContent.match(/v\d+\.\d+\.\d+/); vt.textContent=m?m[0]:''; }
   document.getElementById('mobMoreMenu').classList.add('open');
 }
 function closeMobMoreMenu(){
@@ -11670,7 +11679,11 @@ function toggleHdrMenu(){
   const m=document.getElementById('hdrMenu');
   const open=m.style.display==='flex';
   m.style.display=open?'none':'flex';
-  if(!open) setTimeout(()=>document.addEventListener('click',closeHdrMenuOutside,{once:true}),0);
+  if(!open){
+    const vt=document.getElementById('hdrVersionTxt');
+    if(vt){ const cr=document.querySelector('.copyright'); const mm=cr&&cr.textContent.match(/v\d+\.\d+\.\d+/); vt.textContent=mm?mm[0]:''; }
+    setTimeout(()=>document.addEventListener('click',closeHdrMenuOutside,{once:true}),0);
+  }
 }
 function closeHdrMenu(){ document.getElementById('hdrMenu').style.display='none'; }
 function closeHdrMenuOutside(e){ if(!document.getElementById('hdrMenuBtn').contains(e.target)) closeHdrMenu(); }
