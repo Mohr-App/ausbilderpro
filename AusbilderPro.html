@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.21.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.22.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2546,7 +2546,7 @@ function renameKat(id,e){
   // KEIN Outside-Click-Close - sonst geht Eingabe verloren. User muss explizit ✕ oder Umbenennen klicken
   ov.innerHTML='<div style="max-width:480px;width:100%;max-height:85vh;overflow-y:auto;background:var(--sur);border:2px solid var(--acc);border-radius:14px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.4)">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
-      +'<div style="font-size:1rem;font-weight:800;color:var(--tx)">✎ Lehrgangsart umbenennen</div>'
+      +'<div style="font-size:1rem;font-weight:800;color:var(--tx)">✎ Lehrgangsart bearbeiten</div>'
       +'<button type="button" onclick="closeRenameKat()" class="xcls" title="Schließen" style="background:#f1f5f9;border:2px solid #e2e8f0;color:#475569;width:26px;height:26px;border-radius:5px;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center">✕</button>'
     +'</div>'
     +'<div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Aktuelle Bezeichnung: <b>'+esc(oldLabel)+'</b></div>'
@@ -2556,12 +2556,19 @@ function renameKat(id,e){
     +'<p style="font-size:.74rem;color:var(--mu);margin-bottom:8px">Oder eigene Bezeichnung eingeben:</p>'
     +'<div style="display:flex;gap:8px">'
       +'<input class="katml-inp" id="renameKatInp" type="text" placeholder="z.B. ET1, Klasse 4a…" style="flex:1" onkeydown="if(event.key===\'Enter\')_doRenameKat(\''+id+'\',this.value)">'
-      +'<button class="katml-add" type="button" onclick="_doRenameKat(\''+id+'\',document.getElementById(\'renameKatInp\').value)">✓ Umbenennen</button>'
+      +'<button class="katml-add" type="button" onclick="_doRenameKat(\''+id+'\',document.getElementById(\'renameKatInp\').value)">✓ Speichern</button>'
     +'</div>'
+    +'<div style="border-top:1px solid var(--brd);margin:16px 0 12px"></div>'
+    +'<label style="font-size:.74rem;color:var(--tx);font-weight:700;display:block;margin-bottom:4px">Beschreibung</label>'
+    +'<div style="font-size:.66rem;color:var(--mu);margin-bottom:7px">Erscheint nur auf der TN-Bescheinigung &amp; in E-Mails (kombiniert als „'+esc(oldLabel)+' + Beschreibung") — <b>nicht</b> in der Seitenleiste.</div>'
+    +'<textarea id="renameKatBeschr" rows="3" placeholder="z.B. Zeitgem. Verfahren zur Herstellung von feinen Backwaren aus Teigen u. Massen sowie kleinen Gerichten u. Speisen" style="width:100%;box-sizing:border-box;border:1.5px solid var(--brd);border-radius:8px;padding:8px;font-family:inherit;font-size:.78rem;line-height:1.45;resize:vertical;background:var(--sur2);color:var(--tx)"></textarea>'
+    +'<button class="katml-add" type="button" style="width:100%;margin-top:10px" onclick="_doRenameKat(\''+id+'\',document.getElementById(\'renameKatInp\').value)">💾 Speichern</button>'
     +'</div>';
   document.body.appendChild(ov);
   const inp=document.getElementById('renameKatInp');
   if(inp){inp.value=oldLabel;inp.focus();inp.select();}
+  const _bt=document.getElementById('renameKatBeschr');
+  if(_bt) _bt.value=kat.beschreibung||'';
   // Vorschläge laden (gleiche Logik wie openKatModal, aber alten Namen NICHT ausfiltern)
   const sugg=document.getElementById('renameKatSugg');
   if(!_db||!_auth||!_auth.currentUser){
@@ -2605,26 +2612,34 @@ function _doRenameKat(id,newLabel){
   const oldLabel=kat.label;
   const trimmed=String(newLabel||'').trim();
   if(!trimmed){toast('Bezeichnung darf nicht leer sein','bad');return;}
-  if(trimmed===oldLabel){closeRenameKat();return;}
-  // Duplikat verhindern
-  const dup=Object.entries(S.kats).find(([kid,k])=>kid!==id&&String(k.label||'').toLowerCase()===trimmed.toLowerCase());
-  if(dup){toast('Lehrgangsart „'+trimmed+'" existiert bereits','bad');return;}
+  const _bt=document.getElementById('renameKatBeschr');
+  const newBeschr=_bt?String(_bt.value||'').trim():(kat.beschreibung||'');
+  const oldBeschr=kat.beschreibung||'';
+  const labelChanged=trimmed!==oldLabel;
+  const beschrChanged=newBeschr!==oldBeschr;
+  if(!labelChanged && !beschrChanged){closeRenameKat();return;}
+  // Duplikat verhindern (nur bei Namensänderung)
+  if(labelChanged){
+    const dup=Object.entries(S.kats).find(([kid,k])=>kid!==id&&String(k.label||'').toLowerCase()===trimmed.toLowerCase());
+    if(dup){toast('Lehrgangsart „'+trimmed+'" existiert bereits','bad');return;}
+  }
   kat.label=trimmed;
-  // Firestore-Sync für alle Cloud-Kurse dieser Lehrgangsart
+  kat.beschreibung=newBeschr;
+  // Firestore-Sync für alle Cloud-Kurse dieser Lehrgangsart (Name + Beschreibung)
   if(_db){
-    _syncLehrgangsartToVP(trimmed);
+    if(labelChanged) _syncLehrgangsartToVP(trimmed);
     const insts=Object.values(kat.instances||{}).filter(i=>i.sharedKursId);
     let _failed=0;
     insts.forEach(inst=>{
       _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
-        .update({name:trimmed,lehrgangsart:trimmed})
-        .catch(err=>{ _failed++; console.warn('Rename-Sync fehlgeschlagen:',inst.sharedKursId,err);
-          if(_failed===1) toast('⚠ Cloud-Umbenennung fehlgeschlagen ('+(err.code||err.message||'unbekannt')+') — Rechte/Rules prüfen','bad'); });
+        .update({name:trimmed,lehrgangsart:trimmed,beschreibung:newBeschr})
+        .catch(err=>{ _failed++; console.warn('Lehrgangsart-Sync fehlgeschlagen:',inst.sharedKursId,err);
+          if(_failed===1) toast('⚠ Cloud-Sync fehlgeschlagen ('+(err.code||err.message||'unbekannt')+') — Rechte/Rules prüfen','bad'); });
     });
   }
   closeRenameKat();
   persist();renderAll();
-  toast('✎ Umbenannt: „'+oldLabel+'" → „'+trimmed+'"');
+  toast(labelChanged?('✎ Umbenannt: „'+oldLabel+'" → „'+trimmed+'"'):'✎ Beschreibung gespeichert ✓');
 }
 function delKat(id,e){
   e.stopPropagation();
@@ -3383,6 +3398,7 @@ function saveNewInst(){
     const kursData={
       name: kursName,
       lehrgangsart: kursName,
+      beschreibung: (S.kats[dpKatId]?.beschreibung||''),
       von: von,
       bis: bis,
       berufsschultage: [],
