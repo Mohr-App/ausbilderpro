@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.22.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.22.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2225,6 +2225,8 @@ function getDateFromSelects(){
 // ISO "2026-03-04" → deutsch "04.03.2026"
 function fmtDE(d){ if(!d||d.length<10) return d||'?'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
 function instLabel(i){ const s=i.sD&&i.sM&&i.sY?String(i.sD).padStart(2,'0')+'.'+String(i.sM).padStart(2,'0')+'.'+i.sY:'?'; const e=i.eD&&i.eM&&i.eY?String(i.eD).padStart(2,'0')+'.'+String(i.eM).padStart(2,'0')+'.'+i.eY:'?'; return s+' – '+e; }
+// Lehrgangsart-Name + Beschreibung (fuer Ausdrucke & Mails; Sidebar nutzt nur .label)
+function katLabelFull(katId){ const k=S.kats[katId]; if(!k) return ''; const b=String(k.beschreibung||'').trim(); return (k.label||'')+(b?' '+b:''); }
 function fillDays(id,val){ const s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">TT</option>';for(let d=1;d<=31;d++){const o=document.createElement('option');o.value=String(d).padStart(2,'0');o.textContent=String(d).padStart(2,'0');s.appendChild(o);}if(val)s.value=val; }
 function fillMonths(id,val){ const s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">MM</option>';MONTHS.forEach((m,i)=>{const o=document.createElement('option');o.value=String(i+1).padStart(2,'0');o.textContent=m;s.appendChild(o);});if(val)s.value=val; }
 function fillYears(id,val){ const s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">JJJJ</option>';const y=new Date().getFullYear();for(let i=y-4;i<=y+10;i++){const o=document.createElement('option');o.value=i;o.textContent=i;s.appendChild(o);}if(val)s.value=val; }
@@ -2753,6 +2755,7 @@ function delInst(katId,instId,e){
     _db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
       const batch=_db.batch();
       const kursLabel=S.kats[katId]?.label||'Kurs';
+      const kursLabelMail=katLabelFull(katId)||kursLabel;
       const vonStr=inst.sD&&inst.sM&&inst.sY?String(inst.sD).padStart(2,'0')+'.'+String(inst.sM).padStart(2,'0')+'.'+inst.sY:'';
       const bisStr=inst.eD&&inst.eM&&inst.eY?String(inst.eD).padStart(2,'0')+'.'+String(inst.eM).padStart(2,'0')+'.'+inst.eY:'';
       const zeitraum=vonStr&&bisStr?vonStr+' – '+bisStr:'';
@@ -2771,17 +2774,17 @@ function delInst(katId,instId,e){
           benachrichtigungen:benach
         });
         // E-Mail an Azubi (parallel zum Batch-Update)
-        sendTnEmail(t, '⚠ Lehrgang "'+kursLabel+'" wurde abgesagt',
-          '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">der Lehrgang <b>"'+kursLabel+'"</b>'+(zeitraum?' (<b>'+zeitraum+'</b>)':'')+' wurde abgesagt.</p>'
+        sendTnEmail(t, '⚠ Lehrgang "'+kursLabelMail+'" wurde abgesagt',
+          '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">der Lehrgang <b>"'+kursLabelMail+'"</b>'+(zeitraum?' (<b>'+zeitraum+'</b>)':'')+' wurde abgesagt.</p>'
           +'<div style="padding:12px;background:#fef2f2;border:2px solid #fecaca;border-radius:8px;margin-bottom:12px">'
           +'<p style="margin:0;font-size:.85rem;color:#991b1b;font-weight:700">Du brauchst zu diesem Lehrgang nicht mehr zu erscheinen.</p></div>'
           +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">📞 Bitte informiere zeitnah deinen Ausbildungsbetrieb. Über einen neuen Termin wirst du separat informiert.</p>'
         );
         // E-Mail an Arbeitgeber
-        sendAgEmail(t, '⚠ Lehrgang "'+kursLabel+'" wurde abgesagt',
+        sendAgEmail(t, '⚠ Lehrgang "'+kursLabelMail+'" wurde abgesagt',
           '<div style="padding:12px;background:#fef2f2;border:2px solid #fecaca;border-radius:8px;margin-bottom:12px">'
           +'<p style="margin:0 0 6px;font-size:.85rem;color:#991b1b;font-weight:700">Lehrgang abgesagt</p>'
-          +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">'+kursLabel+(zeitraum?' ('+zeitraum+')':'')+'</p></div>'
+          +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">'+kursLabelMail+(zeitraum?' ('+zeitraum+')':'')+'</p></div>'
           +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender muss zu diesem Lehrgang nicht mehr erscheinen. Über einen neuen Termin werden Sie separat informiert.</p>'
         );
       });
@@ -7500,6 +7503,7 @@ function deleteTnKomplett(tnId){
   if(!confirm('⚠️ Teilnehmer aus diesem Kurs entfernen?\n\nFolgende Aktionen werden ausgelöst:\n• TN wird aus dem Kurs entfernt\n• App-Benachrichtigung in AzubiPro\n• E-Mail an Azubi (sofern Adresse hinterlegt)\n• E-Mail an Arbeitgeber (sofern hinterlegt)\n\nFortfahren?')) return;
 
   const kursName=S.kats[S.curKat]?.label||'Lehrgang';
+  const kursNameMail=katLabelFull(S.curKat)||kursName;
   const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
 
   // 0. TN-Daten VORHER laden für Mails (sonst sind sie nach delete weg)
@@ -7537,17 +7541,17 @@ function deleteTnKomplett(tnId){
     // 3. Mails verschicken
     if(tnDataForMail){
       // Mail an Azubi
-      sendTnEmail(tnDataForMail, '✕ Aus Lehrgang "'+kursName+'" entfernt',
-        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">du wurdest aus dem Lehrgang <b>"'+kursName+'"</b> entfernt.</p>'
+      sendTnEmail(tnDataForMail, '✕ Aus Lehrgang "'+kursNameMail+'" entfernt',
+        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">du wurdest aus dem Lehrgang <b>"'+kursNameMail+'"</b> entfernt.</p>'
         +'<div style="padding:12px;background:#fef2f2;border:2px solid #fecaca;border-radius:8px;margin-bottom:12px">'
         +'<p style="margin:0;font-size:.85rem;color:#991b1b;font-weight:700">Du brauchst nicht mehr zu den Kursterminen erscheinen.</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">📞 Bei Fragen wende dich bitte an deinen Ausbildungsbetrieb oder die Lehrgangsverwaltung.</p>'
       );
       // Mail an Arbeitgeber
-      sendAgEmail(tnDataForMail, '✕ Auszubildender aus Lehrgang entfernt – '+kursName,
+      sendAgEmail(tnDataForMail, '✕ Auszubildender aus Lehrgang entfernt – '+kursNameMail,
         '<div style="padding:12px;background:#fef2f2;border:2px solid #fecaca;border-radius:8px;margin-bottom:12px">'
         +'<p style="margin:0 0 6px;font-size:.85rem;color:#991b1b;font-weight:700">Aus Lehrgang entfernt</p>'
-        +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursName+'</p>'
+        +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursNameMail+'</p>'
         +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender nimmt nicht mehr am Lehrgang teil. Bei Fragen wenden Sie sich bitte an die Lehrgangsverwaltung.</p>'
       );
@@ -7903,7 +7907,7 @@ function saveManualTN(){
         _sendNeuerKursMailAP(
           {vorname, nachname, kontaktEmail, firma},
           {
-            name: S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs',
+            name: katLabelFull(S.curKat)||'Kurs',
             von: inst.sY+'-'+inst.sM+'-'+inst.sD,
             bis: inst.eY+'-'+inst.eM+'-'+inst.eD,
             ausbilderName: (_auth?.currentUser?.displayName)||(_auth?.currentUser?.email?.split('@')[0])||''
@@ -7933,7 +7937,7 @@ function saveManualTN(){
       _sendNeuerKursMailAP(
         {vorname, nachname, kontaktEmail, firma},
         {
-          name: S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs',
+          name: katLabelFull(S.curKat)||'Kurs',
           von: inst.sY+'-'+inst.sM+'-'+inst.sD,
           bis: inst.eY+'-'+inst.eM+'-'+inst.eD,
           ausbilderName: (_auth?.currentUser?.displayName)||(_auth?.currentUser?.email?.split('@')[0])||''
@@ -8243,7 +8247,7 @@ function kursAusfall(){
   const tnIds=new Set();
   Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
   if(!tnIds.size){toast('Keine verknüpften TN','bad');return;}
-  const kursLabel=S.kats[S.curKat]?.label||'Lehrgang';
+  const kursLabel=katLabelFull(S.curKat)||'Lehrgang';
   // Datums-Modal öffnen
   _openAktionDatumModal({
     typ:'ausfall',
@@ -8363,7 +8367,7 @@ async function showAktionsVerlauf(){
   const inst=curInst();if(!inst)return;
   const kursId=inst.sharedKursId;
   if(!kursId||!_db){toast('Kein verknüpfter Kurs','bad');return;}
-  const kursLabel=S.kats[S.curKat]?.label||'Lehrgang';
+  const kursLabel=katLabelFull(S.curKat)||'Lehrgang';
   const modal=document.getElementById('aktionsVerlaufModal');
   const body=document.getElementById('aktionsVerlaufBody');
   if(!modal||!body){toast('Modal nicht gefunden','bad');return;}
@@ -8456,7 +8460,7 @@ function ausbilderKommtSpaeter(){
   const tnIds=new Set();
   Object.values(inst.seats||{}).forEach(s=>{if(s&&s.poolTnId)tnIds.add(s.poolTnId);});
   if(!tnIds.size){toast('Keine verknüpften TN','bad');return;}
-  const kursLabel=S.kats[S.curKat]?.label||'Lehrgang';
+  const kursLabel=katLabelFull(S.curKat)||'Lehrgang';
   const ausbilderName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
   // Datums-Modal mit Uhrzeit-Feld
   _openAktionDatumModal({
@@ -9760,6 +9764,7 @@ function resetTNStatus(tnId, fromType, tnName){
   if(!confirm('↺ Status für '+displayName+' zurücksetzen?\n\nDer Status "'+fromLabel+'" wird entfernt — der Azubi nimmt wieder normal am Kurs teil.\n\nFolgende Benachrichtigungen werden ausgelöst:\n• App-Benachrichtigung in AzubiPro\n• E-Mail an Azubi (sofern Adresse hinterlegt)\n• E-Mail an Arbeitgeber\n\nFortfahren?')) return;
   const ref = _db.collection('globalTN').doc(tnId);
   const kursName=S.kats[S.curKat]?.label||'Lehrgang';
+  const kursNameMail=katLabelFull(S.curKat)||kursName;
   const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
   const inst=curInst();
   const kursId=inst?.sharedKursId;
@@ -9817,17 +9822,17 @@ function resetTNStatus(tnId, fromType, tnName){
         .collection('teilnehmer').doc(tnId)
         .update({status:'attending'}).catch(()=>{});
       // E-Mail an Azubi
-      sendTnEmail(data, '↺ Lehrgang "'+kursName+'" – Status zurückgesetzt',
-        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">dein Status für den Lehrgang <b>"'+kursName+'"</b> wurde zurückgesetzt.</p>'
+      sendTnEmail(data, '↺ Lehrgang "'+kursNameMail+'" – Status zurückgesetzt',
+        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">dein Status für den Lehrgang <b>"'+kursNameMail+'"</b> wurde zurückgesetzt.</p>'
         +'<div style="padding:12px;background:#ecfdf5;border:2px solid #a7f3d0;border-radius:8px;margin-bottom:12px">'
         +'<p style="margin:0;font-size:.85rem;color:#065f46;font-weight:700">Du nimmst wieder normal am Kurs teil und wirst zu den regulären Terminen erwartet.</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">📞 Bei Fragen wende dich bitte an deinen Ausbilder oder Ausbildungsbetrieb.</p>'
       );
       // E-Mail an Arbeitgeber
-      sendAgEmail(data, '↺ Status zurückgesetzt – '+kursName,
+      sendAgEmail(data, '↺ Status zurückgesetzt – '+kursNameMail,
         '<div style="padding:12px;background:#ecfdf5;border:2px solid #a7f3d0;border-radius:8px;margin-bottom:12px">'
         +'<p style="margin:0 0 6px;font-size:.85rem;color:#065f46;font-weight:700">Status zurückgesetzt</p>'
-        +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursName+'</p>'
+        +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursNameMail+'</p>'
         +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Vorheriger Status: '+fromLabel+'</p>'
         +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender nimmt wieder normal am Lehrgang teil.</p>'
@@ -10044,6 +10049,7 @@ function syncGlobalTNStatus(tnId, statusType, opts){
   if(!_db || !tnId) return;
   const ref = _db.collection('globalTN').doc(tnId);
   const kursName=S.kats[S.curKat]?.label||'Lehrgang';
+  const kursNameMail=katLabelFull(S.curKat)||kursName;
   const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
   const kursId=curInst()?.sharedKursId;
   if(statusType === 'absent'){
@@ -10092,8 +10098,8 @@ function syncGlobalTNStatus(tnId, statusType, opts){
       // Bei tatsaechlichem Versaeumen kann das spaeter manuell oder ueber Reset bereinigt werden.
       ref.update(upd).catch(()=>{});
       // E-Mail an Azubi (Frist-Variante)
-      sendTnEmail(data, '⚠ Lehrgang "'+kursName+'" – Du fehlst! Melde dich bis '+fristStr,
-        '<p style="margin:0 0 12px;font-size:.92rem;color:#1e293b;line-height:1.55">du wurdest heute zum Lehrgang <b>"'+kursName+'"</b> erwartet, bist aber bisher nicht erschienen.</p>'
+      sendTnEmail(data, '⚠ Lehrgang "'+kursNameMail+'" – Du fehlst! Melde dich bis '+fristStr,
+        '<p style="margin:0 0 12px;font-size:.92rem;color:#1e293b;line-height:1.55">du wurdest heute zum Lehrgang <b>"'+kursNameMail+'"</b> erwartet, bist aber bisher nicht erschienen.</p>'
         +'<div style="padding:14px;background:#fef2f2;border:2px solid #ef4444;border-radius:8px;margin-bottom:14px">'
         +'<p style="margin:0 0 6px;font-size:.78rem;color:#991b1b;font-weight:800;text-transform:uppercase;letter-spacing:.04em">⚠ Bitte sofort melden</p>'
         +'<p style="margin:0;font-size:.92rem;color:#0f172a;font-weight:700;line-height:1.4">Bis spätestens <span style="color:#dc2626">'+fristStr+'</span></p></div>'
@@ -10103,11 +10109,11 @@ function syncGlobalTNStatus(tnId, statusType, opts){
         +'<p style="margin:10px 0 0;font-size:.78rem;color:#64748b;line-height:1.55">Bist du krank, hattest Probleme auf dem Weg (Bahn, Verkehr) oder ist sonst etwas dazwischen gekommen? → Sag uns kurz Bescheid, wir finden eine Lösung.</p>'
       );
       // E-Mail an Arbeitgeber (Frist-Variante mit Bitte um Erreichen)
-      sendAgEmail(data, '⚠ Auszubildender fehlt – '+kursName+' – bitte bis '+fristStr+' Rückmeldung',
+      sendAgEmail(data, '⚠ Auszubildender fehlt – '+kursNameMail+' – bitte bis '+fristStr+' Rückmeldung',
         '<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">Ihr Auszubildender wurde heute zum Lehrgang erwartet, ist bisher aber nicht erschienen.</p>'
         +'<div style="padding:14px;background:#fef2f2;border:2px solid #ef4444;border-radius:8px;margin-bottom:14px">'
         +'<p style="margin:0 0 6px;font-size:.7rem;color:#991b1b;font-weight:800;text-transform:uppercase;letter-spacing:.04em">Status: Nicht angetreten</p>'
-        +'<p style="margin:0 0 4px;font-size:.85rem;color:#0f172a"><b>Lehrgang:</b> '+kursName+'</p>'
+        +'<p style="margin:0 0 4px;font-size:.85rem;color:#0f172a"><b>Lehrgang:</b> '+kursNameMail+'</p>'
         +'<p style="margin:0 0 4px;font-size:.85rem;color:#0f172a"><b>Frist für Rückmeldung:</b> <span style="color:#dc2626;font-weight:700">'+fristStr+'</span></p>'
         +'<p style="margin:0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
         +'<p style="margin:0 0 10px;font-size:.85rem;color:#374151;line-height:1.6"><b>Bitte versuchen Sie kurzfristig, Ihren Azubi zu erreichen</b> und ihn zu informieren. Falls er sich rechtzeitig meldet (z.B. Bahn-Verspätung, Krankmeldung), kann der Status zurückgesetzt werden.</p>'
@@ -10137,17 +10143,17 @@ function syncGlobalTNStatus(tnId, statusType, opts){
       if(data.aktiverKursId===kursId) upd.aktiverKursId=firebase.firestore.FieldValue.delete();
       ref.update(upd).catch(()=>{});
       // E-Mail an Azubi
-      sendTnEmail(data, '↩ Lehrgang "'+kursName+'" – Wiederholung',
-        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">für den Lehrgang <b>"'+kursName+'"</b> wurdest du als <b style="color:#d97706">Wiederholer</b> eingestuft.</p>'
+      sendTnEmail(data, '↩ Lehrgang "'+kursNameMail+'" – Wiederholung',
+        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">für den Lehrgang <b>"'+kursNameMail+'"</b> wurdest du als <b style="color:#d97706">Wiederholer</b> eingestuft.</p>'
         +'<div style="padding:12px;background:#fffbeb;border:2px solid #fde68a;border-radius:8px;margin-bottom:12px">'
         +'<p style="margin:0;font-size:.85rem;color:#92400e;font-weight:700">Du brauchst zu diesem Lehrgang nicht mehr zu erscheinen – der Kurs wird zu einem späteren Zeitpunkt wiederholt.</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">📞 Bitte informiere deinen Ausbildungsbetrieb.</p>'
       );
       // E-Mail an Arbeitgeber
-      sendAgEmail(data, '↩ Auszubildender als Wiederholer eingestuft – '+kursName,
+      sendAgEmail(data, '↩ Auszubildender als Wiederholer eingestuft – '+kursNameMail,
         '<div style="padding:12px;background:#fffbeb;border:2px solid #fde68a;border-radius:8px;margin-bottom:12px">'
         +'<p style="margin:0 0 6px;font-size:.85rem;color:#92400e;font-weight:700">Status: Wiederholer</p>'
-        +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursName+'</p>'
+        +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursNameMail+'</p>'
         +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender wurde als Wiederholer eingestuft und nimmt am aktuellen Kurs nicht mehr teil. Der Kurs wird zu einem späteren Zeitpunkt wiederholt.</p>'
       );
