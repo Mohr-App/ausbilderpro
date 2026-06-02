@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.23.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.23.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2622,10 +2622,7 @@ function _doRenameKat(id,newLabel){
   if(!trimmed){toast('Bezeichnung darf nicht leer sein','bad');return;}
   const _bt=document.getElementById('renameKatBeschr');
   const newBeschr=_bt?String(_bt.value||'').trim():(kat.beschreibung||'');
-  const oldBeschr=kat.beschreibung||'';
   const labelChanged=trimmed!==oldLabel;
-  const beschrChanged=newBeschr!==oldBeschr;
-  if(!labelChanged && !beschrChanged){closeRenameKat();return;}
   // Duplikat verhindern (nur bei Namensänderung)
   if(labelChanged){
     const dup=Object.entries(S.kats).find(([kid,k])=>kid!==id&&String(k.label||'').toLowerCase()===trimmed.toLowerCase());
@@ -3104,7 +3101,9 @@ function _syncLehrgangsartToVP(lbl, beschreibung){
       if(beschr) payload.inhalt = beschr;
       col.add(payload).catch(err=>{console.warn('Lehrgangsart-Sync fehlgeschlagen:',err);toast('⚠ Lehrgangsart-Sync zu VP fehlgeschlagen ('+(err.code||err.message||'?')+')','bad');});
     } else if(beschr && String(match.data().inhalt||'').trim()!==beschr){
-      match.ref.update({inhalt:beschr}).catch(err=>{console.warn('Lehrgangsart-Inhalt-Update fehlgeschlagen:',err);toast('⚠ Beschreibung-Sync zu VP fehlgeschlagen ('+(err.code||err.message||'?')+') — Rechte/Rules prüfen','bad');});
+      match.ref.update({inhalt:beschr})
+        .then(()=>toast('→ Beschreibung in VP-Lehrgangsart „'+name+'" übernommen ✓'))
+        .catch(err=>{console.warn('Lehrgangsart-Inhalt-Update fehlgeschlagen:',err);toast('⚠ Beschreibung-Sync zu VP fehlgeschlagen ('+(err.code||err.message||'?')+') — Rechte/Rules prüfen','bad');});
     }
   }).catch(err=>console.warn('Lehrgangsart-Lookup fehlgeschlagen:',err));
 }
