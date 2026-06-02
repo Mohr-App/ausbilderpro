@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.20.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.21.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2686,14 +2686,19 @@ function _doMoveInst(fromKatId,instId,toKatId){
   S.curKat=toKatId;
   S.curInst=instId;
   S.kats[toKatId].open=true;
-  // Firestore-Kurs umbenennen wenn vorhanden
-  if(inst.sharedKursId&&_db){
-    _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
-      .update({name:S.kats[toKatId].label,lehrgangsart:S.kats[toKatId].label}).catch(()=>{});
-  }
+  const toLabel=S.kats[toKatId].label;
   closeMoveInst();
   persist();renderAll();
-  toast('↔ Verschoben nach „'+S.kats[toKatId].label+'" ✓');
+  // Firestore-Kurs auf Ziel-Lehrgangsart umstellen + Ziel in VP-Registry sicherstellen
+  if(inst.sharedKursId&&_db){
+    _syncLehrgangsartToVP(toLabel);
+    _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
+      .update({name:toLabel,lehrgangsart:toLabel})
+      .then(()=>toast('↔ Verschoben nach „'+toLabel+'" ✓'))
+      .catch(err=>toast('⚠ Cloud-Verschiebung fehlgeschlagen ('+(err.code||err.message||'unbekannt')+') — in VerwaltungPro prüfen','bad'));
+  } else {
+    toast('↔ Verschoben nach „'+toLabel+'" ✓');
+  }
 }
 
 function delInst(katId,instId,e){
@@ -3269,6 +3274,18 @@ function poolEmptyGuideHtml(state){
     +  '</div>'
     +'</div>';
 }
+// Letztes Sitzplan-Layout ueber ALLE Lehrgangsarten (fuer Vererbung bei brandneuer Kursart)
+function _globalLastLayout(){
+  let best=null,bestKey='';
+  Object.values(S.kats||{}).forEach(kat=>{
+    Object.values(kat.instances||{}).forEach(inst=>{
+      if(!inst||!inst.rows||!inst.rows.length) return;
+      const key=(inst.sY||0)+'-'+String(inst.sM||0).padStart(2,'0')+'-'+String(inst.sD||0).padStart(2,'0');
+      if(key>=bestKey){bestKey=key;best=inst;}
+    });
+  });
+  return best;
+}
 function saveNewInst(){
   if(!dpKatId)return;
   if(_demoMode&&countAllInstances()>=10){ showDemoLimit(); closeDp(); return; }
@@ -3280,7 +3297,8 @@ function saveNewInst(){
   const prevInstances=Object.values(S.kats[dpKatId]?.instances||{});
   const setupSkipKey = _lsKey('seatSetupSkip');
   const setupDone = localStorage.getItem(setupSkipKey) === '1';
-  if(prevInstances.length===0 && !_pendingSeatSetup && !setupDone){
+  const _gLayout = _globalLastLayout();
+  if(prevInstances.length===0 && !_gLayout && !_pendingSeatSetup && !setupDone){
     // Datumsfelder merken, Setup-Dialog öffnen
     _pendingSeatSetup = {sD,sM,sY,eD,eM,eY,katId:dpKatId};
     document.getElementById('seatSetupModal').classList.add('open');
@@ -3289,24 +3307,28 @@ function saveNewInst(){
   }
 
   const id=gid();
-  // Tischbeschriftungen vom letzten Lehrgang derselben Art übernehmen
+  // Tischbeschriftungen/Layout vom letzten Lehrgang uebernehmen — erst aus dieser Kursart,
+  // sonst (brandneue Kursart) vom global letzten Lehrgang. Sitzplaetze (Belegung) bleiben leer.
   const prevInstances2=Object.values(S.kats[dpKatId]?.instances||{});
   let lastLabels={};
   let lastRows=null;
   let lastSeatCnt=13;
   let lastNextSeatNum=13;
+  let _srcLayout=null;
   if(prevInstances2.length){
-    // Neuesten Lehrgang finden (nach Startdatum)
-    const sorted=[...prevInstances2].sort((a,b)=>{
+    _srcLayout=[...prevInstances2].sort((a,b)=>{
       const da=a.sY+'-'+String(a.sM).padStart(2,'0')+'-'+String(a.sD).padStart(2,'0');
       const db2=b.sY+'-'+String(b.sM).padStart(2,'0')+'-'+String(b.sD).padStart(2,'0');
       return db2>da?1:db2<da?-1:0;
-    });
-    const last=sorted[0];
-    if(last.seatLabels) lastLabels=JSON.parse(JSON.stringify(last.seatLabels));
-    if(last.rows) lastRows=JSON.parse(JSON.stringify(last.rows));
-    if(last.seatCnt) lastSeatCnt=last.seatCnt;
-    if(last.nextSeatNum) lastNextSeatNum=last.nextSeatNum;
+    })[0];
+  } else if(_gLayout){
+    _srcLayout=_gLayout;
+  }
+  if(_srcLayout){
+    if(_srcLayout.seatLabels) lastLabels=JSON.parse(JSON.stringify(_srcLayout.seatLabels));
+    if(_srcLayout.rows) lastRows=JSON.parse(JSON.stringify(_srcLayout.rows));
+    if(_srcLayout.seatCnt) lastSeatCnt=_srcLayout.seatCnt;
+    if(_srcLayout.nextSeatNum) lastNextSeatNum=_srcLayout.nextSeatNum;
   }
   // Setup hat Priorität, dann Vererbung vom letzten Kurs, dann Default
   let rows, seatCnt, nextSeatNum;
