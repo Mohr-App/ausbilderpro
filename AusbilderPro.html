@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.23.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.23.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -3095,21 +3095,16 @@ function _syncLehrgangsartToVP(lbl, beschreibung){
   const beschr = beschreibung!==undefined ? String(beschreibung||'').trim() : undefined;
   const col = _db.collection('shared').doc('kursSettings').collection('lehrgangsarten');
   col.get().then(snap=>{
-    // Treffer = gleicher Name UND gleiche Berufsgruppe (oder beide ohne Beruf)
-    const match = snap.docs.find(d => {
-      const data = d.data();
-      const sameName = String(data.name||'').trim().toLowerCase() === name.toLowerCase();
-      const sameBeruf = String(data.berufGruppeId||'') === String(myBeruf);
-      return sameName && sameBeruf;
-    });
+    // Alle mit gleichem Namen (case-insensitiv); bevorzugt gleiche Berufsgruppe, sonst irgendeiner
+    const sameName = snap.docs.filter(d => String(d.data().name||'').trim().toLowerCase() === name.toLowerCase());
+    const match = sameName.find(d => String(d.data().berufGruppeId||'') === String(myBeruf)) || sameName[0];
     if(!match){
       const payload = {name, createdBy:_auth.currentUser.email||'', createdAt: firebase.firestore.FieldValue.serverTimestamp()};
       if(myBeruf) payload.berufGruppeId = myBeruf;
-      if(beschr) payload.inhalt = beschr; // nur setzen wenn vorhanden
-      col.add(payload).catch(err=>console.warn('Lehrgangsart-Sync fehlgeschlagen:',err));
+      if(beschr) payload.inhalt = beschr;
+      col.add(payload).catch(err=>{console.warn('Lehrgangsart-Sync fehlgeschlagen:',err);toast('⚠ Lehrgangsart-Sync zu VP fehlgeschlagen ('+(err.code||err.message||'?')+')','bad');});
     } else if(beschr && String(match.data().inhalt||'').trim()!==beschr){
-      // Beschreibung zentral in der Registry aktualisieren (nur wenn nicht-leer, kein versehentliches Loeschen)
-      match.ref.update({inhalt:beschr}).catch(err=>console.warn('Lehrgangsart-Inhalt-Update fehlgeschlagen:',err));
+      match.ref.update({inhalt:beschr}).catch(err=>{console.warn('Lehrgangsart-Inhalt-Update fehlgeschlagen:',err);toast('⚠ Beschreibung-Sync zu VP fehlgeschlagen ('+(err.code||err.message||'?')+') — Rechte/Rules prüfen','bad');});
     }
   }).catch(err=>console.warn('Lehrgangsart-Lookup fehlgeschlagen:',err));
 }
