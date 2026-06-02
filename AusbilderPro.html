@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.23.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.24.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1550,6 +1550,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <input class="katml-inp" id="katInp" type="text" placeholder="z.B. ET1, Klasse 4a…" onkeydown="if(event.key==='Enter')addCustomKat()">
         <button class="katml-add" title="+ Anlegen" onclick="addCustomKat()">+ Anlegen</button>
       </div>
+      <textarea class="katml-inp" id="katBeschrInp" rows="2" placeholder="Beschreibung (optional) – erscheint auf TN-Bescheinigung & in Mails" style="resize:vertical;min-height:44px;margin-top:8px;font-size:.78rem;width:100%;box-sizing:border-box;line-height:1.4"></textarea>
     </div>
   </div>
 </div>
@@ -3110,6 +3111,8 @@ function _syncLehrgangsartToVP(lbl, beschreibung){
 
 function openKatModal(){
   document.getElementById('katInp').value='';
+  const _bk=document.getElementById('katBeschrInp'); if(_bk)_bk.value='';
+  window._katInhaltByName={};
   document.getElementById('katml').classList.add('open');
   // Vorschlaege aus VerwaltungPro-Stamm laden (shared/kursSettings/lehrgangsarten)
   // Filter: nur Lehrgangsarten der eigenen Berufsgruppe oder uebergreifende (ohne berufGruppeId)
@@ -3122,6 +3125,9 @@ function openKatModal(){
   }
   _db.collection('shared').doc('kursSettings').collection('lehrgangsarten').get()
     .then(snap=>{
+      // Name -> Beschreibung (inhalt) merken, damit Vorschlaege die zentrale Beschreibung erben
+      window._katInhaltByName={};
+      snap.docs.forEach(d=>{ const x=d.data(); const nm=String(x.name||'').trim(); const inh=String(x.inhalt||'').trim(); if(nm && inh && !window._katInhaltByName[nm]) window._katInhaltByName[nm]=inh; });
       // Bereits genutzte Kats ausfiltern (case-insensitive Vergleich)
       const usedLabels = new Set(Object.values(S.kats||{}).map(k=>String(k.label||'').trim().toLowerCase()));
       const myBeruf = _myAusbBerufId || '';
@@ -3152,18 +3158,21 @@ function openKatModal(){
 function closeKatModal(){ document.getElementById('katml').classList.remove('open'); }
 function addPredefKat(lbl){
   const id='kat_'+lbl;
-  S.kats[id]={label:lbl,predefined:true,open:false,instances:{}};
+  const _b=document.getElementById('katBeschrInp'); const typed=_b?String(_b.value||'').trim():'';
+  const beschr = typed || (window._katInhaltByName&&window._katInhaltByName[lbl]) || '';
+  S.kats[id]={label:lbl,beschreibung:beschr,predefined:true,open:false,instances:{}};
   if(!S.katOrder.includes(id)) S.katOrder.push(id);
   persist();renderSidebar();closeKatModal();
-  _syncLehrgangsartToVP(lbl);
+  _syncLehrgangsartToVP(lbl,beschr);
 }
 function addCustomKat(){
   const lbl=document.getElementById('katInp').value.trim();if(!lbl)return;
+  const _b=document.getElementById('katBeschrInp'); const beschr=_b?String(_b.value||'').trim():'';
   const id='kat_c_'+gid();
-  S.kats[id]={label:lbl,predefined:false,open:true,instances:{}};
+  S.kats[id]={label:lbl,beschreibung:beschr,predefined:false,open:true,instances:{}};
   S.katOrder.push(id);
   persist();renderSidebar();closeKatModal();
-  _syncLehrgangsartToVP(lbl);
+  _syncLehrgangsartToVP(lbl,beschr);
 }
 
 // Date picker
