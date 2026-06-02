@@ -1070,7 +1070,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.22.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.23.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2581,6 +2581,12 @@ function renameKat(id,e){
     .then(snap=>{
       const usedLabels=new Set(Object.entries(S.kats||{}).filter(([kid])=>kid!==id).map(([,k])=>String(k.label||'').trim().toLowerCase()));
       const myBeruf=_myAusbBerufId||'';
+      // Zentrale Beschreibung (inhalt) aus der Registry vorbefuellen, falls lokal noch keine gesetzt
+      const _btP=document.getElementById('renameKatBeschr');
+      if(_btP && !String(_btP.value||'').trim()){
+        const m=snap.docs.map(d=>d.data()).find(x=>String(x.name||'').trim().toLowerCase()===oldLabel.toLowerCase() && (!myBeruf||!x.berufGruppeId||String(x.berufGruppeId)===String(myBeruf)));
+        if(m && String(m.inhalt||'').trim()) _btP.value=m.inhalt;
+      }
       const items=snap.docs
         .map(d=>{const x=d.data();return {name:String(x.name||'').trim(),berufGruppeId:x.berufGruppeId||''};})
         .filter(x=>x.name && !usedLabels.has(x.name.toLowerCase()))
@@ -2629,7 +2635,7 @@ function _doRenameKat(id,newLabel){
   kat.beschreibung=newBeschr;
   // Firestore-Sync für alle Cloud-Kurse dieser Lehrgangsart (Name + Beschreibung)
   if(_db){
-    if(labelChanged) _syncLehrgangsartToVP(trimmed);
+    _syncLehrgangsartToVP(trimmed, newBeschr);
     const insts=Object.values(kat.instances||{}).filter(i=>i.sharedKursId);
     let _failed=0;
     insts.forEach(inst=>{
@@ -3081,24 +3087,29 @@ function linkHBZKurs(kursId, kursData, targetKatId){
 // Sync neu angelegte Lehrgangsart in VerwaltungPro-Stamm (shared/kursSettings/lehrgangsarten).
 // Damit ist die Lehrgangsart fuer die Verwaltung und andere Ausbilder im Dropdown verfuegbar.
 // Die berufGruppeId des Ausbilders wird mitgespeichert, damit Vorschlaege gezielt nach Beruf gefiltert werden.
-function _syncLehrgangsartToVP(lbl){
+function _syncLehrgangsartToVP(lbl, beschreibung){
   if(!lbl || !_db || !_auth || !_auth.currentUser) return;
   const name = String(lbl).trim();
   if(!name) return;
   const myBeruf = _myAusbBerufId || '';
+  const beschr = beschreibung!==undefined ? String(beschreibung||'').trim() : undefined;
   const col = _db.collection('shared').doc('kursSettings').collection('lehrgangsarten');
   col.get().then(snap=>{
-    // Duplikat = gleicher Name UND gleiche Berufsgruppe (oder beide ohne Beruf)
-    const exists = snap.docs.some(d => {
+    // Treffer = gleicher Name UND gleiche Berufsgruppe (oder beide ohne Beruf)
+    const match = snap.docs.find(d => {
       const data = d.data();
       const sameName = String(data.name||'').trim().toLowerCase() === name.toLowerCase();
       const sameBeruf = String(data.berufGruppeId||'') === String(myBeruf);
       return sameName && sameBeruf;
     });
-    if(!exists){
+    if(!match){
       const payload = {name, createdBy:_auth.currentUser.email||'', createdAt: firebase.firestore.FieldValue.serverTimestamp()};
       if(myBeruf) payload.berufGruppeId = myBeruf;
+      if(beschr) payload.inhalt = beschr; // nur setzen wenn vorhanden
       col.add(payload).catch(err=>console.warn('Lehrgangsart-Sync fehlgeschlagen:',err));
+    } else if(beschr && String(match.data().inhalt||'').trim()!==beschr){
+      // Beschreibung zentral in der Registry aktualisieren (nur wenn nicht-leer, kein versehentliches Loeschen)
+      match.ref.update({inhalt:beschr}).catch(err=>console.warn('Lehrgangsart-Inhalt-Update fehlgeschlagen:',err));
     }
   }).catch(err=>console.warn('Lehrgangsart-Lookup fehlgeschlagen:',err));
 }
@@ -3415,7 +3426,7 @@ function saveNewInst(){
     // ausbilderId ermitteln via Email-Match in shared/ausbilder/list
     // Damit wird der Kurs in VerwaltungPro direkt unter dem richtigen Ausbilder
     // eingeordnet (statt unter Email-Fallback)
-    _syncLehrgangsartToVP(kursName);
+    _syncLehrgangsartToVP(kursName, S.kats[dpKatId]?.beschreibung||'');
     _db.collection('shared').doc('ausbilder').collection('list')
       .where('loginEmail','==',email).limit(1).get()
       .then(snap=>{
