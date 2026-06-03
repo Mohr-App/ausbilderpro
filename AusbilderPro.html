@@ -364,6 +364,23 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .seating.rows-6up .sname{font-size:.65rem;}
 .seating.rows-6up .sco,.seating.rows-6up .satt{display:none;}
 .seating.rows-6up .sgr .gb{font-size:.42rem;padding:1px 2px;letter-spacing:0;}
+/* ── Namens-Abkuerzung (V. Nachname) + Dichte: alles passt ohne Scrollen ── */
+.sname .na{display:none;}
+.seating.rows-5 .sname .nf,.seating.rows-6up .sname .nf,.seating.sc-hi .sname .nf,.seating.sc-xt .sname .nf{display:none;}
+.seating.rows-5 .sname .na,.seating.rows-6up .sname .na,.seating.sc-hi .sname .na,.seating.sc-xt .sname .na{display:inline;}
+/* Vertikale Dichte je Sitze-pro-Reihe – Sitze schrumpfen statt abzuschneiden */
+.seating.sc-md .seat{min-height:50px;padding-top:5px;padding-bottom:5px;}
+.seating.sc-md .seats-grid{gap:5px;}
+.seating.sc-hi .seat{min-height:36px;padding-top:3px;padding-bottom:3px;}
+.seating.sc-hi .seats-grid{gap:3px;}
+.seating.sc-hi .sname{font-size:.72rem;}
+.seating.sc-hi .sco,.seating.sc-hi .satt{display:none;}
+.seating.sc-xt .seat{min-height:0;padding:2px 7px;}
+.seating.sc-xt .seats-grid{gap:2px;}
+.seating.sc-xt .sname{font-size:.64rem;}
+/* Sehr klein → nur der Name hat Vorrang */
+.seating.sc-xt .sco,.seating.sc-xt .satt,.seating.sc-xt .sgr,.seating.sc-xt .smeta,.seating.sc-xt .swz,
+.seating.rows-6up .sgr,.seating.rows-6up .smeta,.seating.rows-6up .swz{display:none;}
 .snum{font-family:'JetBrains Mono',monospace;font-size:.52rem;color:#64748b;position:absolute;top:4px;right:5px;cursor:pointer;border-radius:3px;padding:1px 2px;transition:background .12s,color .12s;}
 .snum:hover{background:rgba(59,130,246,.12);color:var(--acc);}
 .shint{color:#94a3b8;font-size:.76rem;font-style:italic;text-align:center;}
@@ -1077,7 +1094,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.24.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.25.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2235,6 +2252,8 @@ function fmtDE(d){ if(!d||d.length<10) return d||'?'; const p=d.split('-'); retu
 function instLabel(i){ const s=i.sD&&i.sM&&i.sY?String(i.sD).padStart(2,'0')+'.'+String(i.sM).padStart(2,'0')+'.'+i.sY:'?'; const e=i.eD&&i.eM&&i.eY?String(i.eD).padStart(2,'0')+'.'+String(i.eM).padStart(2,'0')+'.'+i.eY:'?'; return s+' – '+e; }
 // Lehrgangsart-Name + Beschreibung (fuer Ausdrucke & Mails; Sidebar nutzt nur .label)
 function katLabelFull(katId){ const k=S.kats[katId]; if(!k) return ''; const b=String(k.beschreibung||'').trim(); return (k.label||'')+(b?' '+b:''); }
+// Name auf "V. Nachname" kuerzen (wenn der Sitz zu klein fuer den vollen Namen wird)
+function _abbrevName(n){ const p=String(n||'').trim().split(/\s+/).filter(Boolean); if(p.length<2) return String(n||''); return p[0].charAt(0).toUpperCase()+'. '+p[p.length-1]; }
 function fillDays(id,val){ const s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">TT</option>';for(let d=1;d<=31;d++){const o=document.createElement('option');o.value=String(d).padStart(2,'0');o.textContent=String(d).padStart(2,'0');s.appendChild(o);}if(val)s.value=val; }
 function fillMonths(id,val){ const s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">MM</option>';MONTHS.forEach((m,i)=>{const o=document.createElement('option');o.value=String(i+1).padStart(2,'0');o.textContent=m;s.appendChild(o);});if(val)s.value=val; }
 function fillYears(id,val){ const s=document.getElementById(id);if(!s)return;s.innerHTML='<option value="">JJJJ</option>';const y=new Date().getFullYear();for(let i=y-4;i<=y+10;i++){const o=document.createElement('option');o.value=i;o.textContent=i;s.appendChild(o);}if(val)s.value=val; }
@@ -3618,6 +3637,9 @@ function renderSeats(){
   // Persistierte Trennlinien-Einstellung anwenden
   applyGridLines();
   const maxCount=rows.reduce((m,r)=>Math.max(m,r.seats.length),0);
+  // Vertikale Dichte nach Sitzen pro Reihe: Sitze schrumpfen statt abzuschneiden (passt immer ohne Scrollen)
+  const scCls = maxCount<=5?'':maxCount<=7?'sc-md':maxCount<=10?'sc-hi':'sc-xt';
+  if(scCls) wrap.classList.add(scCls);
   const cls='seats-grid';
   rows.forEach((row,ri)=>{
     // thin separator between rows (not before first)
@@ -4414,7 +4436,7 @@ function mkSeat(id,seats){
     const instEnd=inst.eY&&inst.eM&&inst.eD?(inst.eY+'-'+inst.eM+'-'+inst.eD):'9999-12-31';
     const instStart=inst.sY&&inst.sM&&inst.sD?(inst.sY+'-'+inst.sM+'-'+inst.sD):'0000-01-01';
     const qaBtn=(qaSt||hasDetail||qaD>instEnd||qaD<instStart)?'':'<div class="sqa-btn" onclick="event.stopPropagation();seatQuickAtt(\''+id+'\')" title="Anwesend markieren">✓</div>';
-    const wzBadge=d.werkzeugStatus==='fehlt'?'<div style="font-size:.5rem;color:#ef4444;font-weight:800;margin-top:1px" title="Werkzeug unvollständig – Details im Teilnehmer-Fenster">🔧 unvollständig</div>':'';
+    const wzBadge=d.werkzeugStatus==='fehlt'?'<div class="swz" style="font-size:.5rem;color:#ef4444;font-weight:800;margin-top:1px" title="Werkzeug unvollständig – Details im Teilnehmer-Fenster">🔧 unvollständig</div>':'';
     // Meldungs-Overlay
     let meldHtml='';
     if(d.poolTnId&&_tnMeldungen[d.poolTnId]&&_tnMeldungen[d.poolTnId].length){
@@ -4423,7 +4445,7 @@ function mkSeat(id,seats){
       el.classList.add('meld-'+(meld.type||'text'));
       meldHtml='<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2.2rem;z-index:6;pointer-events:none;filter:drop-shadow(0 2px 8px rgba(0,0,0,.35))">'+(meldIcons[meld.type]||'💬')+'</div>';
     }
-    el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+'<div class="sname-row"><span class="sname">'+esc(d.name)+'</span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
+    el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
   }
   return el;
 }
