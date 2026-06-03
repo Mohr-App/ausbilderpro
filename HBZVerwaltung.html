@@ -7850,7 +7850,13 @@ function openKursBuilder(){
   const lgartSel = document.getElementById('bldLgart');
   if(ausbSel){
     ausbSel.innerHTML = '<option value="">– Ausbilder wählen –</option>';
+    // Pro Person nur einen Eintrag (Schlüssel: loginEmail/email), bevorzugt der mit Beruf
+    const seen={};
     _ausbilder.forEach(a=>{
+      const key=((a.loginEmail||a.email||'').toLowerCase())||a.id;
+      if(!seen[key] || (a.berufLabel && !seen[key].berufLabel)) seen[key]=a;
+    });
+    Object.values(seen).sort((x,y)=>(x.name||'').localeCompare(y.name||'','de',{sensitivity:'base'})).forEach(a=>{
       const berufLabel = a.berufLabel ? ' ('+a.berufLabel+')' : '';
       ausbSel.innerHTML += '<option value="'+a.id+'">'+esc(a.name)+berufLabel+'</option>';
     });
@@ -9893,7 +9899,7 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
-<div class="copyright">© VerwaltungPro v2.8.9 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
+<div class="copyright">© VerwaltungPro v2.9.0 · by Stefan Mohr · <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none">Was ist neu?</a></div>
 
 <!-- CHANGELOG -->
 <div class="ov" id="changelogModal">

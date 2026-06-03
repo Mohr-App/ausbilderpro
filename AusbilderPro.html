@@ -1094,7 +1094,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.26.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.26.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1926,8 +1926,9 @@ function openMeinUrlaub(){
   el.innerHTML='<div class="empty">Lädt…</div>';
   if(!_db||!_auth?.currentUser) return;
   const email=_auth.currentUser.email.toLowerCase();
-  _db.collection('shared').doc('kursSettings').collection('ausbilder')
-    .where('email','==',email).limit(1).get()
+  const ausbCol=_db.collection('shared').doc('kursSettings').collection('ausbilder');
+  ausbCol.where('loginEmail','==',email).limit(1).get()
+    .then(snap=> snap.empty ? ausbCol.where('email','==',email).limit(1).get() : snap)
     .then(snap=>{
       if(snap.empty){ el.innerHTML='<div class="empty">Kein Ausbilder-Profil gefunden für '+email+'</div>'; return; }
       const doc=snap.docs[0];
@@ -6876,12 +6877,26 @@ function saveAusbilderProfil(){
   // Stammdaten-Cache invalidieren damit andere Ausbilder beim Refresh neu laden
   _ausbStammCache=null;
   if(_fbUid && _db){
+    const loginEmail=(_auth.currentUser?.email||'').toLowerCase();
+    const contactEmail=(email||'').toLowerCase();
+    const ausbCol=_db.collection('shared').doc('kursSettings').collection('ausbilder');
+    // Eigenen Ausbilder-Eintrag finden: zuerst über loginEmail, dann über email==login (Altfälle)
+    const upsertAusb = ausbCol.where('loginEmail','==',loginEmail).limit(1).get()
+      .then(snap=> (snap.empty && loginEmail) ? ausbCol.where('email','==',loginEmail).limit(1).get() : snap)
+      .then(snap=>{
+        const upd={name,vorname,nachname,telefon};
+        if(contactEmail) upd.email=contactEmail; // Kontaktmail nur setzen wenn angegeben (kein Leeren)
+        if(!snap.empty){
+          // Vorhandenen Eintrag aktualisieren – Beruf/Login/Standort bleiben erhalten
+          if(!snap.docs[0].data().loginEmail && loginEmail) upd.loginEmail=loginEmail;
+          return snap.docs[0].ref.set(upd,{merge:true});
+        }
+        // Kein Eintrag vorhanden → neuen anlegen (über Login-Mail auffindbar)
+        return ausbCol.doc(loginEmail||contactEmail).set(Object.assign({loginEmail:loginEmail},upd),{merge:true});
+      });
     Promise.all([
       _db.collection('users').doc(_fbUid).collection('data').doc('profil').set(data,{merge:true}),
-      // Auch in Stammdaten schreiben damit andere Ausbilder den Namen sehen
-      email?_db.collection('shared').doc('kursSettings').collection('ausbilder').doc(email.toLowerCase()).set({
-        name,vorname,nachname,email:email.toLowerCase(),telefon
-      },{merge:true}):Promise.resolve()
+      upsertAusb
     ]).then(()=>{
       toast('Profil gespeichert ✓');
       backfillCourseAusbilderData(data);
@@ -12956,12 +12971,13 @@ function loadAusbilderListe(){
     const m={};
     snap.forEach(doc=>{
       const d=doc.data();
-      const email=(d.email||'').toLowerCase();
-      if(!email) return;
       const vn=(d.vorname||'').trim();
       const nn=(d.nachname||'').trim();
       const fullName=(vn+' '+nn).trim()||(d.name||'').trim();
-      m[email]={name:fullName,berufId:d.berufId||'',vorname:vn,nachname:nn};
+      const rec={name:fullName,berufId:d.berufId||'',vorname:vn,nachname:nn};
+      // Eintrag sowohl über Kontakt-Mail ALS AUCH über Login-Mail auffindbar machen
+      const keys=[(d.email||'').toLowerCase(),(d.loginEmail||'').toLowerCase()].filter(Boolean);
+      keys.forEach(k=>{ if(!m[k] || (fullName && !(m[k].name||'').trim())) m[k]=rec; });
     });
     _ausbStammCache=m;
     return m;
@@ -12985,9 +13001,9 @@ function loadAusbilderListe(){
       const myStamm=stamm[myEmail]||{};
       // Eigenes photoUrl aus users-Doc separat laden (sich selbst gefiltert oben)
       _db.collection('users').doc(_fbUid).get().then(d=>{
-        _chatUsers[_fbUid]={email:_auth.currentUser.email,name:myStamm.name||myEmail.split('@')[0],berufGruppeId:myStamm.berufId||'',photoUrl:d.data()?.photoUrl||''};
+        _chatUsers[_fbUid]={email:_auth.currentUser.email,name:myStamm.name||((getAusbilderProfil&&getAusbilderProfil().name)||'').trim()||myEmail.split('@')[0],berufGruppeId:myStamm.berufId||'',photoUrl:d.data()?.photoUrl||''};
       }).catch(()=>{
-        _chatUsers[_fbUid]={email:_auth.currentUser.email,name:myStamm.name||myEmail.split('@')[0],berufGruppeId:myStamm.berufId||'',photoUrl:''};
+        _chatUsers[_fbUid]={email:_auth.currentUser.email,name:myStamm.name||((getAusbilderProfil&&getAusbilderProfil().name)||'').trim()||myEmail.split('@')[0],berufGruppeId:myStamm.berufId||'',photoUrl:''};
       });
     }
     arr.sort((a,b)=>(a.name||'').localeCompare(b.name||'','de',{sensitivity:'base'}));
