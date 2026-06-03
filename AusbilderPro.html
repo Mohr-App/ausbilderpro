@@ -1094,7 +1094,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.27.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.27.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1699,6 +1699,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div class="ac-drop" id="acCo"></div>
           </div>
         </div>
+        <div class="fg" style="margin-top:6px">
+          <label class="fl">AG-E-Mail <span style="font-weight:400;color:var(--mu)">– für Benachrichtigung bei Fehlen (falls kein ArbeitgeberPro-Account)</span></label>
+          <input class="fi" type="email" id="iAgEmail" placeholder="ausbildung@betrieb.de" autocomplete="off">
+        </div>
 
         <!-- Kontakt -->
         <div class="tp-section">
@@ -1860,6 +1864,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <button class="badd" title="Anwesenheit für Datum hinzufügen" onclick="addAtt()" style="flex:1">+ Hinzufügen</button>
             <button class="badd" id="btnSaveAtt" title="Alle Änderungen speichern" onclick="saveSeat()" style="flex:1;background:linear-gradient(135deg,#2563eb,#3b82f6);box-shadow:0 4px 14px rgba(59,130,246,.25);opacity:.35;pointer-events:none">💾 Speichern</button>
           </div>
+        </div>
+        <div class="tp-section">
+          <div class="tp-section-hd">📣 Unentschuldigtes Fehlen</div>
+          <div id="nsHint" style="font-size:.72rem;color:#64748b;line-height:1.5;margin-bottom:8px">Kein unentschuldigter Fehltag.</div>
+          <button class="tbtn" id="btnNoShowNotify" onclick="notifyUnexcusedAbsence()" style="width:100%;background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;font-weight:700;opacity:.4;pointer-events:none" disabled>📣 Wegen Fehltag melden lassen</button>
+          <div style="font-size:.66rem;color:#94a3b8;line-height:1.45;margin-top:8px">Erinnert den Azubi (und den Betrieb) an einen unentschuldigten Fehltag — <b>ohne</b> den Lehrgang als „nicht teilgenommen" zu werten. Für den 1. Tag oder mehr als 1 Tag bitte „Nicht angetreten" nutzen.</div>
         </div>
         <div class="tp-section">
           <div class="tp-section-hd">📋 Verlauf</div>
@@ -4804,7 +4814,7 @@ function openModal(id){
   if(hint) hint.style.display=sperrePerson?'':'none';
   // Person-Tab-Eingaben sperren wenn leerer Sitz auf Cloud-Kurs:
   // User soll erst über +TN in der Sidebar einen TN anlegen, dann auf den Sitz ziehen.
-  ['iName','iCo','iProfOber','iProfFach','iAusbjahr','iNote','iBemerkung','wzOk','wzFehlt','wzFehltText'].forEach(fid=>{
+  ['iName','iCo','iAgEmail','iProfOber','iProfFach','iAusbjahr','iNote','iBemerkung','wzOk','wzFehlt','wzFehltText'].forEach(fid=>{
     const el=document.getElementById(fid);
     if(!el) return;
     el.disabled=sperrePerson;
@@ -4812,7 +4822,7 @@ function openModal(id){
     el.style.cursor=sperrePerson?'not-allowed':'';
   });
   // Snapshot für Dirty-Check
-  _modalSnapshot={name:d.name||'',company:d.company||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',attLen:(d.attendance||[]).length};
+  _modalSnapshot={name:d.name||'',company:d.company||'',agEmail:d.agEmail||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',attLen:(d.attendance||[]).length};
   const inst_=curInst();
   const seatLabel=(inst_&&inst_.seatLabels&&inst_.seatLabels[id]!=null&&inst_.seatLabels[id]!=='')?inst_.seatLabels[id]:null;
   // Titel-Zusammensetzung: "Sitzplatz 5 (Ma. Mu.)" wenn belegt, sonst nur "Sitzplatz 5"
@@ -4911,6 +4921,7 @@ function openModal(id){
   }catch(e){console.warn('fsInfo error',e);}
   document.getElementById('iName').value=d.name||'';
   document.getElementById('iCo').value=d.company||'';
+  { const _ag=document.getElementById('iAgEmail'); if(_ag) _ag.value=d.agEmail||''; }
   // E-Mail + Telefon werden gleich async aus globalTN gefuellt (sobald geladen) - erstmal leer
   document.getElementById('iEmail').value='';
   document.getElementById('iTelefon').value='';
@@ -5118,6 +5129,7 @@ function _seatModalDirty(){
   const s=_modalSnapshot;
   if((document.getElementById('iName').value||'')!==s.name) return true;
   if((document.getElementById('iCo').value||'')!==s.company) return true;
+  if(((document.getElementById('iAgEmail')||{}).value||'')!==s.agEmail) return true;
   if((document.getElementById('iProf').value||'')!==s.profession) return true;
   if((document.getElementById('iAusbjahr').value||'')!==s.ausbjahr) return true;
   if((document.getElementById('iNote').value||'')!==s.note) return true;
@@ -5485,6 +5497,52 @@ function saveEditAtt(i){
   if(saveBtn){saveBtn.style.opacity='1';saveBtn.style.pointerEvents='auto';saveBtn.classList.add('btn-blink');}
   toast('Eintrag aktualisiert','ok');
 }
+// Button-Status für weichen No-Show-Pfad (aktiv wenn unentschuldigter Fehltag vorhanden)
+function updNoShowBtn(){
+  const btn=document.getElementById('btnNoShowNotify');
+  const hint=document.getElementById('nsHint');
+  if(!btn) return;
+  const au=(tmpAtt||[]).filter(a=>a.type==='absent_u').sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(au.length){
+    btn.disabled=false; btn.style.opacity=''; btn.style.pointerEvents='';
+    if(hint) hint.innerHTML='Letzter unentschuldigter Fehltag: <b>'+fmtD(au[0].date)+'</b>'+(au.length>1?' (insgesamt '+au.length+')':'');
+  } else {
+    btn.disabled=true; btn.style.opacity='.4'; btn.style.pointerEvents='none';
+    if(hint) hint.textContent='Kein unentschuldigter Fehltag.';
+  }
+}
+// Weicher Pfad: Azubi (+ AG) wegen einzelnem unentschuldigtem Fehltag erinnern — OHNE Kurs-Status zu ändern
+function notifyUnexcusedAbsence(){
+  if(!curSeat||!S.curKat||!S.curInst){ toast('Kein TN ausgewählt','bad'); return; }
+  const seat=(curSeats()[curSeat])||{};
+  const poolTnId=seat.poolTnId;
+  const au=(tmpAtt||[]).filter(a=>a.type==='absent_u').sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(!au.length){ toast('Kein unentschuldigter Fehltag','bad'); return; }
+  const datumDE=fmtD(au[0].date);
+  if(!_db||!poolTnId){ toast('TN ist nicht mit der Cloud verknüpft – Mail nicht möglich','bad'); return; }
+  if(!confirm('📣 Azubi (und Betrieb) wegen unentschuldigtem Fehlen am '+datumDE+' anschreiben?\n\nDer Lehrgang wird NICHT als „nicht teilgenommen" gewertet.')) return;
+  const kursName=S.kats[S.curKat]?.label||'Lehrgang';
+  const kursNameMail=katLabelFull(S.curKat)||kursName;
+  const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
+  _db.collection('globalTN').doc(poolTnId).get().then(doc=>{
+    if(!doc.exists){ toast('TN-Daten nicht gefunden','bad'); return; }
+    const data=doc.data();
+    // Weiche Azubi-Mail – KEIN "gilt als nicht teilgenommen"
+    sendTnEmail(data, '⚠ Unentschuldigtes Fehlen am '+datumDE+' – '+kursNameMail,
+      '<p style="margin:0 0 12px;font-size:.92rem;color:#1e293b;line-height:1.55">du hast am <b>'+datumDE+'</b> beim Lehrgang <b>"'+kursNameMail+'"</b> unentschuldigt gefehlt.</p>'
+      +'<div style="padding:12px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:6px;margin-bottom:12px">'
+      +'<p style="margin:0;font-size:.85rem;color:#92400e;line-height:1.5">Bitte melde dich umgehend bei deinem Ausbilder oder dem Bildungszentrum und reiche – falls vorhanden – eine Entschuldigung (z.B. Krankmeldung) nach.</p></div>'
+      +'<p style="margin:0;font-size:.8rem;color:#64748b;line-height:1.55">Eine kurze Nachricht über AzubiPro genügt.</p>'
+    );
+    // AG-Mail mit Fallback (ArbeitgeberPro-Account → sonst hinterlegte AG-Mail)
+    sendAgEmail(data, '⚠ Unentschuldigtes Fehlen – '+kursNameMail+' ('+datumDE+')',
+      '<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">Ihr Auszubildender hat am <b>'+datumDE+'</b> beim Lehrgang <b>'+kursNameMail+'</b> unentschuldigt gefehlt und sich nicht gemeldet.</p>'
+      +'<p style="margin:0;font-size:.82rem;color:#374151;line-height:1.55">Bitte sprechen Sie ihn darauf an. Der Lehrgang bleibt davon unberührt.</p>'
+      +'<p style="margin:8px 0 0;font-size:.75rem;color:#64748b">Ausbilder: '+ausName+'</p>'
+    , _seatAgEmailByTnId(poolTnId));
+    toast('Meldung wegen Fehltag verschickt ✓');
+  }).catch(()=>toast('Fehler beim Laden der TN-Daten','bad'));
+}
 function renderAtt(){
   const att=tmpAtt;
   const pCnt=att.filter(a=>a.type==='present').length;
@@ -5499,6 +5557,7 @@ function renderAtt(){
   document.getElementById('stAU').textContent=auCnt;
   document.getElementById('stK').textContent=kCnt;
   document.getElementById('stBS').textContent=bsCnt;
+  updNoShowBtn();
   // (Stat-Kästchen werden immer sichtbar angezeigt — feste 6er-Reihe)
   const c=document.getElementById('ahist');
   if(!att.length){c.innerHTML='<p style="color:var(--mu);font-size:.73rem;text-align:center;padding:9px">Noch keine Einträge</p>';return;}
@@ -5595,6 +5654,7 @@ function saveSeat(){
   S.kats[S.curKat].instances[S.curInst].seats[curSeat]={
     name:_seatName,
     company:document.getElementById('iCo').value.trim(),
+    agEmail:(document.getElementById('iAgEmail')?.value||'').trim(),
     profession:document.getElementById('iProf').value.trim(),
     ausbjahr:document.getElementById('iAusbjahr').value,
     note:document.getElementById('iNote').value.trim(),
@@ -9717,39 +9777,50 @@ function sendTnEmail(tnData, subject, htmlBody){
 }
 
 // Generischer AG-Notif-Helper: sendet Mail an alle Arbeitgeber-User der Firma des TN
-function sendAgEmail(tnData, subject, htmlBody){
+// Lokale AG-Mail eines TN (am Sitz hinterlegt) anhand der globalTN-ID finden — für AG-Mail-Fallback ohne ArbeitgeberPro-Account
+function _seatAgEmailByTnId(tnId){
+  if(!tnId || !S || !S.kats) return '';
+  for(const kid in S.kats){
+    const inst=S.kats[kid].instances||{};
+    for(const iid in inst){
+      const seats=inst[iid].seats||{};
+      for(const sid in seats){
+        if(seats[sid] && seats[sid].poolTnId===tnId) return (seats[sid].agEmail||'').trim();
+      }
+    }
+  }
+  return '';
+}
+function sendAgEmail(tnData, subject, htmlBody, fallbackEmail){
   if(!_db) return;
   const firma=tnData.firma||'';
-  if(!firma) return;
   const tnName=((tnData.vorname||'')+' '+(tnData.nachname||'')).trim()||'Azubi';
   const appLink='https://mohr-app.github.io/ausbilderpro/ArbeitgeberPro.html';
   const appBanner='<div style="margin-top:18px;padding:14px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:2px solid #93c5fd;border-radius:10px;text-align:center">'
     +'<p style="margin:0 0 8px;font-size:.78rem;color:#1e40af;font-weight:700">📱 ArbeitgeberPro öffnen</p>'
     +'<a href="'+appLink+'" style="display:inline-block;padding:9px 18px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:.78rem">App öffnen →</a>'
     +'</div>';
-  _db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
-    if(snap.empty) return;
-    snap.forEach(doc=>{
-      const u=doc.data();
-      if(!u.email) return;
-      _db.collection('mail').add({
-        to: u.email,
-        replyTo: _auth?.currentUser?.email||'',
-        message: {
-          subject: subject,
-          html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
-            +'<div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div>'
-            +'<div style="padding:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">'
-            +'<p style="margin:0 0 12px;font-size:.9rem;color:#374151">Information zu Ihrem Auszubildenden <b>'+tnName+'</b>:</p>'
-            +htmlBody
-            +appBanner
-            +'</div>'
-            +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
-            +'</div>'
-        }
-      }).catch(()=>{});
-    });
-  }).catch(()=>{});
+  const _msgHtml='<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
+    +'<div style="text-align:center;margin-bottom:20px"><span style="font-size:1.4rem;font-weight:800;color:#1E40AF">Ausbilder<span style="color:#3b82f6">Pro</span></span></div>'
+    +'<div style="padding:20px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">'
+    +'<p style="margin:0 0 12px;font-size:.9rem;color:#374151">Information zu Ihrem Auszubildenden <b>'+tnName+'</b>:</p>'
+    +htmlBody
+    +appBanner
+    +'</div>'
+    +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
+    +'</div>';
+  const _sendTo=(toEmail)=>{ if(!toEmail) return; _db.collection('mail').add({ to: toEmail, replyTo: _auth?.currentUser?.email||'', message:{ subject: subject, html: _msgHtml } }).catch(()=>{}); };
+  if(firma){
+    _db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
+      let sent=false;
+      snap.forEach(doc=>{ const u=doc.data(); if(u.email){ _sendTo(u.email); sent=true; } });
+      // Kein ArbeitgeberPro-Account (oder ohne Mail) gefunden → Fallback auf hinterlegte AG-Mail
+      if(!sent && fallbackEmail) _sendTo(fallbackEmail);
+    }).catch(()=>{ if(fallbackEmail) _sendTo(fallbackEmail); });
+  } else if(fallbackEmail){
+    // Keine Firma hinterlegt, aber freie AG-Mail vorhanden
+    _sendTo(fallbackEmail);
+  }
 }
 
 function sendKursAusfallEmailAG(tnData, kursLabel, datumDE, ausbilderName, wann){
@@ -9921,7 +9992,7 @@ function resetTNStatus(tnId, fromType, tnName){
         +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Vorheriger Status: '+fromLabel+'</p>'
         +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender nimmt wieder normal am Lehrgang teil.</p>'
-      );
+      , _seatAgEmailByTnId(tnId));
     }).catch(()=>{});
   }
   toast('↺ Status zurückgesetzt');
@@ -10203,7 +10274,7 @@ function syncGlobalTNStatus(tnId, statusType, opts){
         +'<p style="margin:0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
         +'<p style="margin:0 0 10px;font-size:.85rem;color:#374151;line-height:1.6"><b>Bitte versuchen Sie kurzfristig, Ihren Azubi zu erreichen</b> und ihn zu informieren. Falls er sich rechtzeitig meldet (z.B. Bahn-Verspätung, Krankmeldung), kann der Status zurückgesetzt werden.</p>'
         +'<p style="margin:10px 0 0;font-size:.78rem;color:#64748b;line-height:1.55">Erfolgt keine Rückmeldung innerhalb der Frist, gilt der Lehrgang für ihn als nicht teilgenommen.</p>'
-      );
+      , _seatAgEmailByTnId(tnId));
       // Verwaltung benachrichtigen (Aufploppen + Browser-Push)
       _notifyVwEvent('absent', tnId, data, kursName, ausName, {frist: opts.frist});
     }).catch(()=>{});
@@ -10241,7 +10312,7 @@ function syncGlobalTNStatus(tnId, statusType, opts){
         +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursNameMail+'</p>'
         +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender wurde als Wiederholer eingestuft und nimmt am aktuellen Kurs nicht mehr teil. Der Kurs wird zu einem späteren Zeitpunkt wiederholt.</p>'
-      );
+      , _seatAgEmailByTnId(tnId));
       // Verwaltung benachrichtigen (Aufploppen + Browser-Push)
       _notifyVwEvent('wiederholer', tnId, data, kursName, ausName, {grund:data.wdhGrund||''});
     }).catch(()=>{});
