@@ -1094,7 +1094,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.26.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.26.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6896,6 +6896,8 @@ function saveAusbilderProfil(){
       });
     Promise.all([
       _db.collection('users').doc(_fbUid).collection('data').doc('profil').set(data,{merge:true}),
+      // Name direkt aufs User-Konto (per User-ID im Chat auflösbar, auch für andere)
+      _db.collection('users').doc(_fbUid).set({ausbilderName:name,lastApp:'AusbilderPro'},{merge:true}),
       upsertAusb
     ]).then(()=>{
       toast('Profil gespeichert ✓');
@@ -12991,7 +12993,7 @@ function loadAusbilderListe(){
       const d=doc.data();
       const email=(d.email||'').toLowerCase();
       const stammData=stamm[email]||{};
-      const displayName=stammData.name || d.ausbilderName || d.profil?.name || (email?email.split('@')[0]:'Unbekannt');
+      const displayName=stammData.name || d.ausbilderName || d.name || d.profil?.name || (email?email.split('@')[0]:'Unbekannt');
       _chatUsers[doc.id]={email:d.email||'',name:displayName,berufGruppeId:stammData.berufId||d.berufGruppeId||'',photoUrl:d.photoUrl||''};
       arr.push({uid:doc.id,...(_chatUsers[doc.id])});
     });
@@ -13029,11 +13031,11 @@ async function ensureChatUsersLoaded(){
       const m={};
       snap.forEach(doc=>{
         const d=doc.data();
-        const email=(d.email||'').toLowerCase();
-        if(!email) return;
         const vn=(d.vorname||'').trim();
         const nn=(d.nachname||'').trim();
-        m[email]={name:(vn+' '+nn).trim()||(d.name||'').trim(),berufId:d.berufId||'',vorname:vn,nachname:nn};
+        const rec={name:(vn+' '+nn).trim()||(d.name||'').trim(),berufId:d.berufId||'',vorname:vn,nachname:nn};
+        const keys=[(d.email||'').toLowerCase(),(d.loginEmail||'').toLowerCase()].filter(Boolean);
+        keys.forEach(k=>{ if(!m[k] || (rec.name && !(m[k].name||'').trim())) m[k]=rec; });
       });
       _ausbStammCache=m;
     }catch(e){_ausbStammCache={};}
@@ -13043,7 +13045,7 @@ async function ensureChatUsersLoaded(){
       const d=doc.exists?(doc.data()||{}):{};
       const email=(d.email||'').toLowerCase();
       const stammData=_ausbStammCache[email]||{};
-      const displayName=stammData.name||d.ausbilderName||d.profil?.name||(email?email.split('@')[0]:'Unbekannt');
+      const displayName=stammData.name||d.ausbilderName||d.name||d.profil?.name||(email?email.split('@')[0]:'Unbekannt');
       _chatUsers[uid]={email:d.email||'',name:displayName,berufGruppeId:stammData.berufId||d.berufGruppeId||'',photoUrl:d.photoUrl||''};
     }).catch(()=>{
       _chatUsers[uid]={email:'',name:'Unbekannt',berufGruppeId:'',photoUrl:''};
