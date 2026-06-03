@@ -199,6 +199,18 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
 
+    // collectionGroup-Query auf berichtsheft (Phase 2): AG liest die abgegebenen
+    // Wochenberichte seiner verknuepften Azubis (firmaUid == seine UID) und darf
+    // ausschliesslich Bestaetigungs-/Status-Felder schreiben. Der Azubi (Besitzer)
+    // hat Voll-Zugriff bereits ueber die generische users/{uid}/{sub}-Regel.
+    match /{path=**}/berichtsheft/{w} {
+      allow read: if request.auth != null && resource.data.firmaUid == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.firmaUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status','agSignatur','agSignDatum','agKommentar','geaendertAt']);
+    }
+
     // Audit-Log: nur Admin darf schreiben, niemand darf modifizieren/loeschen
     match /auditLog/{logId} {
       allow read: if isAdmin();
