@@ -721,12 +721,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div style="flex:1.4"><label class="fl">Abteilung (optional)</label><input class="fi" id="bhAbt" placeholder="z.B. Werkstatt"></div>
           </div>
           <div id="bhDays"></div>
-          <label class="fl">Berufsschule</label>
-          <textarea class="fi" id="bhBs" rows="2" placeholder="Themen / Fächer…" style="margin-bottom:6px"></textarea>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span class="fl" style="margin:0">Stunden</span><input class="fi" type="number" min="0" step="0.5" id="bhBsH" style="width:90px;margin:0" oninput="bhCalcSum()"></div>
-          <label class="fl">Überbetriebliche Unterweisung (ÜBL)</label>
-          <textarea class="fi" id="bhUebl" rows="2" placeholder="Themen…" style="margin-bottom:6px"></textarea>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span class="fl" style="margin:0">Stunden</span><input class="fi" type="number" min="0" step="0.5" id="bhUeblH" style="width:90px;margin:0" oninput="bhCalcSum()"></div>
           <label class="fl">Besondere Bemerkungen</label>
           <textarea class="fi" id="bhBemerk" rows="2" placeholder="optional…" style="margin-bottom:12px"></textarea>
           <div style="text-align:right;font-weight:800;font-size:.92rem;margin-bottom:12px">Gesamtstunden: <span id="bhSum" style="color:var(--acc)">0</span> h</div>
@@ -1884,6 +1878,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 let _bhList=[], _bhCur=null, _bhEditId=null;
 let _bhDaysState={mo:[],di:[],mi:[],do:[],fr:[]};
 let _bhMon=null, _bhSig={name:'',datum:''};
+let _bhSchule={mo:false,di:false,mi:false,do:false,fr:false};
 const _bhDayKeys=['mo','di','mi','do','fr'];
 const _bhDayNames=['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'];
 function _bhIsoWeek(d){
@@ -1946,14 +1941,11 @@ function _bhMigrateDays(tage){
 }
 function _bhFillEditor(b){
   _bhDaysState=_bhMigrateDays(b.tage);
+  _bhDayKeys.forEach(k=>{ _bhSchule[k]=!!(b.tage&&b.tage[k]&&b.tage[k].schule); });
   _bhSig={name:b.azubiSignatur||'', datum:b.azubiSignDatum||''};
   document.getElementById('bhWeekDate').value=b.montag||_bhDateStr(new Date());
   document.getElementById('bhJahr').value=b.ausbildungsjahr||'1';
   document.getElementById('bhAbt').value=b.abteilung||'';
-  document.getElementById('bhBs').value=(b.bs&&b.bs.text)||'';
-  document.getElementById('bhBsH').value=(b.bs&&b.bs.std)||'';
-  document.getElementById('bhUebl').value=(b.uebl&&b.uebl.text)||'';
-  document.getElementById('bhUeblH').value=(b.uebl&&b.uebl.std)||'';
   document.getElementById('bhBemerk').value=b.bemerkungen||'';
   document.getElementById('bhEditStatus').innerHTML=_bhEditStatusHtml(b);
   bhWeekChanged();
@@ -1985,7 +1977,11 @@ function _bhRenderDays(){
       +'</div>'
     )).join('');
     return '<div style="margin-bottom:10px;padding:10px;background:var(--sur2);border-radius:10px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label class="fl" style="margin:0">'+_bhDayNames[i]+', '+fmtDE(_bhDateStr(dt))+'</label><span style="font-size:.68rem;font-weight:800;color:var(--acc)">Tag: <span id="bhDaySum_'+k+'">0</span> h</span></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap">'
+      +'<label class="fl" style="margin:0">'+_bhDayNames[i]+', '+fmtDE(_bhDateStr(dt))+'</label>'
+      +'<label style="display:flex;align-items:center;gap:4px;font-size:.66rem;color:var(--mu);cursor:pointer;white-space:nowrap"><input type="checkbox" '+(_bhSchule[k]?'checked':'')+' onchange="_bhSetSchule(\''+k+'\',this.checked)" style="margin:0;width:auto">Berufsschule</label>'
+      +'<span style="font-size:.68rem;font-weight:800;color:var(--acc);white-space:nowrap">Tag: <span id="bhDaySum_'+k+'">0</span> h</span>'
+      +'</div>'
       +rows
       +'<button onclick="bhAddRow(\''+k+'\')" style="border:none;background:rgba(37,99,235,.08);color:var(--acc);border-radius:8px;padding:6px 10px;font-size:.7rem;font-weight:700;cursor:pointer">+ Zeile</button>'
       +'</div>';
@@ -1997,11 +1993,9 @@ function bhAddRow(day){ if(!_bhDaysState[day]) _bhDaysState[day]=[]; _bhDaysStat
 function bhDelRow(day,idx){ if(!_bhDaysState[day]) return; _bhDaysState[day].splice(idx,1); if(!_bhDaysState[day].length) _bhDaysState[day]=[{text:'',std:''}]; _bhRenderDays(); }
 function _bhDaySum(day){ return Math.round(((_bhDaysState[day]||[]).reduce((s,e)=>s+((e.std!==''&&e.std!==undefined)?(parseFloat(e.std)||0):0),0))*100)/100; }
 function _bhUpdDaySum(day){ const el=document.getElementById('bhDaySum_'+day); if(el) el.textContent=_bhDaySum(day); }
+function _bhSetSchule(day,val){ _bhSchule[day]=!!val; }
 function _bhUpdWeekSum(){
   let s=0; _bhDayKeys.forEach(k=>s+=_bhDaySum(k));
-  const bs=document.getElementById('bhBsH'), ue=document.getElementById('bhUeblH');
-  if(bs&&bs.value) s+=parseFloat(bs.value)||0;
-  if(ue&&ue.value) s+=parseFloat(ue.value)||0;
   s=Math.round(s*100)/100;
   const el=document.getElementById('bhSum'); if(el) el.textContent=s;
   return s;
@@ -2013,7 +2007,7 @@ function _bhCollectDays(){
   _bhDayKeys.forEach(k=>{
     const eintraege=(_bhDaysState[k]||[]).map(e=>({text:(e.text||'').trim(), std:(e.std!==''&&e.std!==undefined)?(parseFloat(e.std)||0):0})).filter(e=>e.text||e.std);
     const summe=Math.round(eintraege.reduce((s,e)=>s+(e.std||0),0)*100)/100;
-    tage[k]={eintraege:eintraege, summe:summe};
+    tage[k]={eintraege:eintraege, summe:summe, schule:!!_bhSchule[k]};
   });
   return tage;
 }
@@ -2042,15 +2036,13 @@ function _bhCollect(){
   const iso=_bhIsoWeek(mon);
   const fri=_bhAddDays(mon,4);
   const tage=_bhCollectDays();
-  const bs={text:document.getElementById('bhBs').value.trim(), std:parseFloat(document.getElementById('bhBsH').value)||0};
-  const uebl={text:document.getElementById('bhUebl').value.trim(), std:parseFloat(document.getElementById('bhUeblH').value)||0};
-  let g=0; _bhDayKeys.forEach(k=>g+=tage[k].summe||0); g+=bs.std+uebl.std; g=Math.round(g*100)/100;
+  let g=0; _bhDayKeys.forEach(k=>g+=tage[k].summe||0); g=Math.round(g*100)/100;
   return {
     id:_bhId(iso.year,iso.week),
     jahr:iso.year, kw:iso.week, montag:_bhDateStr(mon), freitag:_bhDateStr(fri),
     ausbildungsjahr:document.getElementById('bhJahr').value||'1',
     abteilung:document.getElementById('bhAbt').value.trim(),
-    tage:tage, bs:bs, uebl:uebl,
+    tage:tage,
     bemerkungen:document.getElementById('bhBemerk').value.trim(),
     gesamt:g, azubiName:_bhAzubiName(),
     azubiSignatur:_bhSig.name||'', azubiSignDatum:_bhSig.datum||''
@@ -2064,7 +2056,7 @@ function bhSave(submit){
   const doc={
     jahr:d.jahr, kw:d.kw, montag:d.montag, freitag:d.freitag,
     ausbildungsjahr:d.ausbildungsjahr, abteilung:d.abteilung,
-    tage:d.tage, bs:d.bs, uebl:d.uebl, bemerkungen:d.bemerkungen,
+    tage:d.tage, bemerkungen:d.bemerkungen,
     gesamt:d.gesamt, azubiName:d.azubiName,
     azubiSignatur:d.azubiSignatur, azubiSignDatum:d.azubiSignDatum,
     status: submit?'abgegeben':((prev.status==='abgegeben'||prev.status==='bestaetigt')?prev.status:'entwurf'),
@@ -2086,7 +2078,7 @@ function bhPrint(){
     const dt=_bhAddDays(mon,i);
     const es=(d.tage[k].eintraege||[]).slice();
     const n=Math.max(es.length,MIN);
-    const dayLabel='<b>'+_bhDayNames[i]+'</b><br><span class="dt">'+fmtDE(_bhDateStr(dt))+'</span>';
+    const dayLabel='<b>'+_bhDayNames[i]+'</b><br><span class="dt">'+fmtDE(_bhDateStr(dt))+'</span>'+((d.tage[k]&&d.tage[k].schule)?'<br><span class="bsb">Berufsschule</span>':'');
     let html='';
     for(let r=0;r<n;r++){
       const e=es[r]||{};
@@ -2098,8 +2090,6 @@ function bhPrint(){
     }
     return html;
   }).join('');
-  const bsLine='<tr class="blk"><td class="d"><b>Berufsschule</b></td><td class="ta">'+(d.bs.text?esc(d.bs.text).replace(/\n/g,'<br>'):'&nbsp;')+'</td><td class="h">'+(d.bs.std||'&nbsp;')+'</td><td class="h tg">'+(d.bs.std||0)+'</td></tr>';
-  const ueLine='<tr class="blk"><td class="d"><b>&Uuml;BL</b></td><td class="ta">'+(d.uebl.text?esc(d.uebl.text).replace(/\n/g,'<br>'):'&nbsp;')+'</td><td class="h">'+(d.uebl.std||'&nbsp;')+'</td><td class="h tg">'+(d.uebl.std||0)+'</td></tr>';
   const azubiSig = d.azubiSignatur ? ('Digital best&auml;tigt: '+esc(d.azubiSignatur)+(d.azubiSignDatum?(', '+fmtDE(d.azubiSignDatum)):'')) : '';
   const c=_bhCur||{};
   const agSig = (c.status==='bestaetigt'&&c.agSignatur) ? ('Digital best&auml;tigt: '+esc(c.agSignatur)+(c.agSignDatum?(', '+fmtDE(c.agSignDatum)):'')) : '';
@@ -2118,6 +2108,7 @@ function bhPrint(){
     +'th{background:#eef2f7;font-size:9px;text-transform:uppercase;letter-spacing:.4px}'
     +'tr.ln td{height:8mm}tr.blk td{height:9mm}'
     +'td.d{font-size:10px}.dt{color:#666;font-size:9px;font-weight:normal}'
+    +'.bsb{display:inline-block;margin-top:2px;font-size:8px;font-weight:bold;color:#1d4ed8;background:#e8effc;padding:1px 4px;border-radius:3px}'
     +'td.ta{white-space:pre-wrap;word-break:break-word}'
     +'td.h{text-align:center}'
     +'.tg{background:#f4f6f9;font-weight:bold;text-align:center}'
@@ -2144,7 +2135,7 @@ function bhPrint(){
     +'</div>'
     +'<table><colgroup><col style="width:30mm"><col><col style="width:15mm"><col style="width:18mm"></colgroup>'
     +'<thead><tr><th>Tag</th><th>Ausgef&uuml;hrte Arbeiten / Unterricht</th><th>Std.</th><th>Tag&nbsp;ges.</th></tr></thead>'
-    +'<tbody>'+rows+bsLine+ueLine+'</tbody>'
+    +'<tbody>'+rows+'</tbody>'
     +'<tfoot><tr><td colspan="3" style="text-align:right">Gesamtstunden der Woche</td><td class="h tg">'+d.gesamt+'</td></tr></tfoot>'
     +'</table>'
     +bemerk
