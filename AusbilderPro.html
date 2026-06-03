@@ -1094,7 +1094,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.26.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.27.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1408,6 +1408,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <input type="range" min="1" max="8" step="0.5" value="2" id="apSigPenSlider" oninput="apSigSetPen(this.value)" style="flex:1">
       <span style="display:inline-flex;align-items:center;justify-content:center;width:46px;height:14px;flex-shrink:0"><span id="apSigPenPrev" style="display:block;width:40px;height:2px;background:#1a1a2e;border-radius:4px"></span></span>
       <span id="apSigPenLabel" style="font-family:'JetBrains Mono',monospace;color:#0f172a;min-width:36px;text-align:right">2 px</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;font-size:.72rem;color:#64748b;font-weight:600">
+      <span style="white-space:nowrap">🖊️ Farbe</span>
+      <button type="button" id="apSigSwDark" onclick="apSigSetColor('#1a1a2e')" title="Dunkel" style="width:20px;height:20px;border-radius:50%;background:#1a1a2e;border:2px solid #0f172a;cursor:pointer;padding:0"></button>
+      <button type="button" id="apSigSwNavy" onclick="apSigSetColor('#1e3a8a')" title="Marineblau" style="width:20px;height:20px;border-radius:50%;background:#1e3a8a;border:2px solid transparent;cursor:pointer;padding:0"></button>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button onclick="apSigDrawClear()" style="padding:8px 14px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:8px;font-weight:700;cursor:pointer">↺ Neu</button>
@@ -2261,6 +2266,15 @@ function fillYears(id,val){ const s=document.getElementById(id);if(!s)return;s.i
 function gradeClass(n){ const v=parseInt(n); return v>=1&&v<=6?'gn'+v:''; }
 function gradeColor(n){ return ['','#34d399','#6ee7b7','#fcd34d','#fdba74','#fca5a5','#f87171'][parseInt(n)]||'var(--mu)'; }
 function gradeLabel(n){ return ['','sehr gut','gut','befriedigend','ausreichend','mangelhaft','ungenügend'][parseInt(n)]||''; }
+// Note ausgeschrieben (kursiv) + Plus/Minus als Zeichen. Nicht-1-6-Werte (Freitext) bleiben roh.
+function gradeOut(val){
+  var v=String(val==null?'':val).trim();
+  if(!v) return '';
+  var m=v.match(/^([1-6])\s*([+\-–−±]?)$/);
+  if(!m) return esc(v);
+  var w=gradeLabel(m[1]);
+  return w ? ('<i>'+esc(w)+'</i>'+(m[2]?esc(m[2]):'')) : esc(v);
+}
 
 // att config
 function attCfg(entry){
@@ -6115,7 +6129,7 @@ function generateAlleBescheinigungenAusbilder(){
         }
         val=String(val||'').trim();
         if(val){
-          notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(g.label).trim())}:</span><span class="note-line">${esc(val)}</span></div>`);
+          notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(g.label).trim())}:</span><span class="note-line">${gradeOut(val)}</span></div>`);
         }
       });
       // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
@@ -6634,7 +6648,16 @@ function _updateSigStempelUI(){
   }
   const stClr=document.getElementById('apStempelClearBtn');if(stClr) stClr.style.display=(_apStempelDataUrl||store.encStempel)?'inline-block':'none';
 }
-let _apSigDrawCtx=null,_apSigDrawing=false,_apSigDrawHasInk=false,_apSigPenW=2,_apSigStrokes=[],_apSigCur=null,_apSigRedraw=null,_apSigVec=null,_apSigCanvasCss=null;
+let _apSigDrawCtx=null,_apSigDrawing=false,_apSigDrawHasInk=false,_apSigPenW=2,_apSigStrokes=[],_apSigCur=null,_apSigRedraw=null,_apSigVec=null,_apSigCanvasCss=null,_apSigColor='#1a1a2e';
+function apSigSetColor(c){
+  _apSigColor=c;
+  if(_apSigDrawCtx)_apSigDrawCtx.strokeStyle=c;
+  if(_apSigRedraw)_apSigRedraw();
+  const pv=document.getElementById('apSigPenPrev');if(pv)pv.style.background=c;
+  const d=document.getElementById('apSigSwDark'),n=document.getElementById('apSigSwNavy');
+  if(d)d.style.borderColor=(c==='#1e3a8a')?'transparent':'#0f172a';
+  if(n)n.style.borderColor=(c==='#1e3a8a')?'#0f172a':'transparent';
+}
 function apSigSetPen(v){_apSigPenW=+v;if(_apSigDrawCtx)_apSigDrawCtx.lineWidth=_apSigPenW;const l=document.getElementById('apSigPenLabel');if(l)l.textContent=(+v)+' px';const p=document.getElementById('apSigPenPrev');if(p)p.style.height=v+'px';if(_apSigRedraw)_apSigRedraw();}
 function apOpenSigDraw(){
   document.getElementById('apSigDrawOverlay').style.display='flex';
@@ -6644,13 +6667,14 @@ function apOpenSigDraw(){
     _apSigCanvasCss={w:c.offsetWidth,h:c.offsetHeight};
     _apSigDrawCtx=c.getContext('2d');
     _apSigDrawCtx.scale(2,2);
-    _apSigDrawCtx.strokeStyle='#1a1a2e';_apSigDrawCtx.lineWidth=_apSigPenW;
+    _apSigDrawCtx.strokeStyle=_apSigColor;_apSigDrawCtx.lineWidth=_apSigPenW;
     _apSigDrawCtx.lineCap='round';_apSigDrawCtx.lineJoin='round';
     _apSigDrawHasInk=false;_apSigStrokes=[];_apSigCur=null;
     const apPos=e=>{const rc=c.getBoundingClientRect();return{x:e.clientX-rc.left,y:e.clientY-rc.top};};
     _apSigRedraw=()=>{
       _apSigDrawCtx.clearRect(0,0,c.width,c.height);
       _apSigDrawCtx.lineWidth=_apSigPenW;
+      _apSigDrawCtx.strokeStyle=_apSigColor;
       for(const st of _apSigStrokes){
         if(!st.length)continue;
         _apSigDrawCtx.beginPath();_apSigDrawCtx.moveTo(st[0].x,st[0].y);
@@ -6675,6 +6699,7 @@ function apOpenSigDraw(){
             const W=_apSigCanvasCss.w,H=_apSigCanvasCss.h;
             _apSigStrokes=vec.strokes.map(st=>st.map(p=>({x:p.x*W,y:p.y*H})));
             _apSigPenW=+vec.pen||_apSigPenW;_apSigPinSession=pin;
+            apSigSetColor(vec.color||'#1a1a2e');
             const sl=document.getElementById('apSigPenSlider');if(sl)sl.value=_apSigPenW;
             const lb=document.getElementById('apSigPenLabel');if(lb)lb.textContent=_apSigPenW+' px';
             const pv=document.getElementById('apSigPenPrev');if(pv)pv.style.height=_apSigPenW+'px';
@@ -6703,7 +6728,7 @@ function apSigDrawSave(){
   _apSigDataUrl=document.getElementById('apSigDrawCanvas').toDataURL('image/png');
   if(_apSigCanvasCss&&_apSigStrokes.length){
     const W=_apSigCanvasCss.w||1,H=_apSigCanvasCss.h||1;
-    _apSigVec={pen:_apSigPenW,strokes:_apSigStrokes.map(st=>st.map(p=>({x:+(p.x/W).toFixed(4),y:+(p.y/H).toFixed(4)})))};
+    _apSigVec={pen:_apSigPenW,color:_apSigColor,strokes:_apSigStrokes.map(st=>st.map(p=>({x:+(p.x/W).toFixed(4),y:+(p.y/H).toFixed(4)})))};
   } else { _apSigVec=null; }
   document.getElementById('apSigDrawOverlay').style.display='none';
   if(!_apSigEditMode) _apSigEditMode=true;
@@ -8859,7 +8884,7 @@ function generateBescheinigungAusbilder(){
       }
       val=String(val||'').trim();
       if(val){
-        notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(g.label).trim())}:</span><span class="note-line">${esc(val)}</span></div>`);
+        notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(g.label).trim())}:</span><span class="note-line">${gradeOut(val)}</span></div>`);
       }
     });
     // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
@@ -9016,7 +9041,7 @@ ${notenHtml}
         ?'<div class="sig-canvas-wrap signed" id="sigWrap"><img src="'+existingSig+'" class="sig-img"><button class="btn-remove-overlay no-print" onclick="removeLoadedSig(event)" title="Unterschrift entfernen">✕</button></div>'
         :'<div class="sig-canvas-wrap" id="sigWrap"><canvas class="sig" id="sigCanvas"></canvas></div><button class="btn-clear-sig no-print" title="↺ Neu" onclick="clearSig()">↺ Neu</button>'}
     </div>
-    <div class="no-print" id="sigPenCtrl" style="${existingSig?'display:none':'display:flex'};align-items:center;gap:6px;font-size:10px;color:#64748b;justify-content:center;margin:4px 0">✏️ Strichstärke <input type="range" min="1" max="8" step="0.5" value="2" id="sigPenSlider" oninput="setSigPen(this.value)" style="width:90px"><span style="display:inline-flex;align-items:center;width:34px;height:12px"><span id="sigPenPrev" style="display:block;width:30px;height:2px;background:#1a1a2e;border-radius:4px"></span></span><span id="sigPenLabel" style="font-family:'JetBrains Mono',monospace;color:#0f172a">2 px</span></div>
+    <div class="no-print" id="sigPenCtrl" style="${existingSig?'display:none':'display:flex'};align-items:center;gap:6px;font-size:10px;color:#64748b;justify-content:center;margin:4px 0">✏️ Strichstärke <input type="range" min="1" max="8" step="0.5" value="2" id="sigPenSlider" oninput="setSigPen(this.value)" style="width:90px"><span style="display:inline-flex;align-items:center;width:34px;height:12px"><span id="sigPenPrev" style="display:block;width:30px;height:2px;background:#1a1a2e;border-radius:4px"></span></span><span id="sigPenLabel" style="font-family:'JetBrains Mono',monospace;color:#0f172a">2 px</span><span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px">🖊️<button type="button" id="sigSwDark" onclick="setSigColor('#1a1a2e')" title="Dunkel" style="width:16px;height:16px;border-radius:50%;background:#1a1a2e;border:2px solid #0f172a;cursor:pointer;padding:0"></button><button type="button" id="sigSwNavy" onclick="setSigColor('#1e3a8a')" title="Marineblau" style="width:16px;height:16px;border-radius:50%;background:#1e3a8a;border:2px solid transparent;cursor:pointer;padding:0"></button></span></div>
     <div class="resize-ctrl no-print" id="sigResizeCtrl" style="display:none">📏 <input type="range" min="10" max="30" value="16" id="sigSizeSlider" oninput="resizeSig(this.value)"><span id="sigSizeLabel">16mm</span></div>
     <div class="sig-line">Lehrgangsleiter</div>
   </div>
@@ -9156,8 +9181,9 @@ function toggleNachweis(val){
 }
 // Signature Canvas
 const canvas=document.getElementById('sigCanvas');
-let ctx,drawing=false,_sigPenW=2,_sigStrokes=[],_sigCur=null,hasSig=${existingSig?'true':'false'};
+let ctx,drawing=false,_sigPenW=2,_sigStrokes=[],_sigCur=null,_sigColor='#1a1a2e',hasSig=${existingSig?'true':'false'};
 function setSigPen(v){_sigPenW=+v;if(ctx)ctx.lineWidth=_sigPenW;const l=document.getElementById('sigPenLabel');if(l)l.textContent=(+v)+' px';const p=document.getElementById('sigPenPrev');if(p)p.style.height=v+'px';if(window._redrawSig)window._redrawSig();}
+function setSigColor(c){_sigColor=c;if(ctx)ctx.strokeStyle=c;if(window._redrawSig)window._redrawSig();const p=document.getElementById('sigPenPrev');if(p)p.style.background=c;const d=document.getElementById('sigSwDark'),n=document.getElementById('sigSwNavy');if(d)d.style.borderColor=(c==='#1e3a8a')?'transparent':'#0f172a';if(n)n.style.borderColor=(c==='#1e3a8a')?'#0f172a':'transparent';}
 // Wenn schon existierende Sig: Slider sichtbar machen + draggable
 if(${existingSig?'true':'false'}){
   window._loadedSig=${JSON.stringify(existingSig||'')};
@@ -9172,7 +9198,7 @@ if(canvas){
   canvas.width=canvas.offsetWidth*2;
   canvas.height=canvas.offsetHeight*2;
   ctx.scale(2,2);
-  ctx.strokeStyle='#1a1a2e';
+  ctx.strokeStyle=_sigColor;
   ctx.lineWidth=_sigPenW;
   ctx.lineCap='round';
   ctx.lineJoin='round';
@@ -9184,6 +9210,7 @@ if(canvas){
   function redrawSig(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.lineWidth=_sigPenW;
+    ctx.strokeStyle=_sigColor;
     for(const st of _sigStrokes){
       if(!st.length)continue;
       ctx.beginPath();ctx.moveTo(st[0].x,st[0].y);
