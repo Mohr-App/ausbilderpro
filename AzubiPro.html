@@ -691,9 +691,49 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="display:flex;flex-direction:column;gap:6px">
         <button class="card" onclick="showPage('profil')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Profil"><span style="font-size:1.4rem">👤</span><div><div style="font-weight:700;font-size:.85rem">Mein Profil</div><div style="font-size:.65rem;color:var(--mu)">Name, Kontakt, Passwort</div></div></button>
         <button class="card" onclick="showPage('docs')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Dokumente"><span style="font-size:1.4rem">📁</span><div><div style="font-weight:700;font-size:.85rem">Dokumente</div><div style="font-size:.65rem;color:var(--mu)">Kursunterlagen, Betrieb, eigene Dateien</div></div></button>
+        <button class="card" onclick="showPage('berichtsheft')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Berichtsheft"><span style="font-size:1.4rem">📒</span><div><div style="font-weight:700;font-size:.85rem">Berichtsheft <span style="font-size:.55rem;font-weight:800;color:#b45309;background:rgba(245,158,11,.15);padding:1px 6px;border-radius:999px;vertical-align:middle">BETA</span></div><div style="font-size:.65rem;color:var(--mu)">Wochenberichte · Ausbildungsnachweis</div></div></button>
         <button class="card" id="mehrFirmaBtn" onclick="showPage('firma')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px;display:none" title="Betriebsverknüpfung"><span style="font-size:1.4rem">🔗</span><div><div style="font-weight:700;font-size:.85rem">Betriebsverknüpfung</div><div style="font-size:.65rem;color:var(--mu)" id="mehrFirmaSub">Mit Betrieb verbunden</div></div></button>
         <button class="card" onclick="showPage('hilfe')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Hilfe"><span style="font-size:1.4rem">❓</span><div><div style="font-weight:700;font-size:.85rem">Hilfe</div><div style="font-size:.65rem;color:var(--mu)">Anleitung & Tipps</div></div></button>
         <button title="Abmelden" onclick="doLogout()" style="margin-top:8px;width:100%;padding:12px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Abmelden</button>
+      </div>
+    </div>
+
+    <!-- BERICHTSHEFT -->
+    <div class="page" id="page-berichtsheft">
+      <button onclick="showPage('mehr')" style="background:none;border:none;color:var(--acc);font-size:.78rem;font-weight:600;cursor:pointer;padding:0;margin-bottom:12px" title="Zurück">← Zurück</button>
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:2px">📒 Berichtsheft</div>
+      <div style="font-size:.66rem;color:var(--mu);margin-bottom:14px">Wochenbericht · Ausbildungsnachweis (BBiG §13) <span style="display:inline-block;margin-left:4px;padding:1px 7px;border-radius:999px;font-size:.58rem;font-weight:800;color:#b45309;background:rgba(245,158,11,.15);vertical-align:middle">BETA</span></div>
+
+      <div id="bhListView">
+        <button class="btn" onclick="bhNew()" style="margin-bottom:12px" title="Neue Woche anlegen">+ Neue Woche</button>
+        <div id="bhList"><div class="empty">Lädt…</div></div>
+      </div>
+
+      <div id="bhEditView" style="display:none">
+        <button onclick="bhBackToList()" style="background:none;border:none;color:var(--acc);font-size:.74rem;font-weight:600;cursor:pointer;padding:0;margin-bottom:10px" title="Zurück zur Liste">← Zurück zur Liste</button>
+        <div class="card" style="border-color:rgba(37,99,235,.25)">
+          <div id="bhEditStatus" style="margin-bottom:12px"></div>
+          <label class="fl">Woche (beliebiger Tag der Woche)</label>
+          <input class="fi" type="date" id="bhWeekDate" onchange="bhWeekChanged()">
+          <div id="bhWeekInfo" style="font-size:.72rem;color:var(--acc);font-weight:700;margin:-4px 0 12px"></div>
+          <div style="display:flex;gap:8px">
+            <div style="flex:1"><label class="fl">Ausbildungsjahr</label><select class="fi" id="bhJahr"><option value="1">1. Jahr</option><option value="2">2. Jahr</option><option value="3">3. Jahr</option><option value="4">4. Jahr</option></select></div>
+            <div style="flex:1.4"><label class="fl">Abteilung (optional)</label><input class="fi" id="bhAbt" placeholder="z.B. Werkstatt"></div>
+          </div>
+          <div id="bhDays"></div>
+          <label class="fl">Berufsschule</label>
+          <textarea class="fi" id="bhBs" rows="2" placeholder="Themen / Fächer…" style="margin-bottom:6px"></textarea>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span class="fl" style="margin:0">Stunden</span><input class="fi" type="number" min="0" step="0.5" id="bhBsH" style="width:90px;margin:0" oninput="bhCalcSum()"></div>
+          <label class="fl">Überbetriebliche Unterweisung (ÜBL)</label>
+          <textarea class="fi" id="bhUebl" rows="2" placeholder="Themen…" style="margin-bottom:6px"></textarea>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span class="fl" style="margin:0">Stunden</span><input class="fi" type="number" min="0" step="0.5" id="bhUeblH" style="width:90px;margin:0" oninput="bhCalcSum()"></div>
+          <div style="text-align:right;font-weight:800;font-size:.92rem;margin-bottom:12px">Gesamtstunden: <span id="bhSum" style="color:var(--acc)">0</span> h</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="bhSave(false)" style="flex:1;background:var(--sur2);color:var(--tx);box-shadow:none" title="Als Entwurf speichern">💾 Entwurf</button>
+            <button class="btn" onclick="bhSave(true)" style="flex:1" title="Woche abgeben">✓ Abgeben</button>
+          </div>
+          <button class="btn" onclick="bhPrint()" style="margin-top:8px;background:var(--sur2);color:var(--acc);box-shadow:none" title="Drucken oder als PDF speichern">🖨 Drucken / PDF</button>
+        </div>
       </div>
     </div>
 
@@ -1834,13 +1874,177 @@ window.addEventListener('DOMContentLoaded',()=>{
   }catch(e){}
 });
 
+// ───────────────────────── BERICHTSHEFT (Phase 1) ─────────────────────────
+let _bhList=[], _bhCur=null, _bhEditId=null;
+const _bhDayKeys=['mo','di','mi','do','fr'];
+const _bhDayNames=['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'];
+function _bhIsoWeek(d){
+  const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=(t.getUTCDay()+6)%7;
+  t.setUTCDate(t.getUTCDate()-day+3);
+  const firstThu=new Date(Date.UTC(t.getUTCFullYear(),0,4));
+  const fday=(firstThu.getUTCDay()+6)%7;
+  firstThu.setUTCDate(firstThu.getUTCDate()-fday+3);
+  const week=1+Math.round((t.getTime()-firstThu.getTime())/(7*24*3600*1000));
+  return {year:t.getUTCFullYear(), week:week};
+}
+function _bhMonday(d){ const t=new Date(d); const day=(t.getDay()+6)%7; t.setDate(t.getDate()-day); t.setHours(12,0,0,0); return t; }
+function _bhAddDays(d,n){ const t=new Date(d); t.setDate(t.getDate()+n); return t; }
+function _bhDateStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _bhId(y,w){ return y+'-W'+String(w).padStart(2,'0'); }
+function _bhAzubiName(){ const n=(((_tnData&&_tnData.vorname)||'')+' '+((_tnData&&_tnData.nachname)||'')).trim(); return n||_email||'Auszubildende(r)'; }
+function _bhStatusBadge(st){
+  const map={entwurf:['Entwurf','#64748b','rgba(100,116,139,.12)'],abgegeben:['Abgegeben','#1d4ed8','rgba(37,99,235,.12)'],bestaetigt:['Bestätigt','#059669','rgba(16,185,129,.14)'],zurueck:['Zurück','#b45309','rgba(245,158,11,.15)']};
+  const m=map[st]||map.entwurf;
+  return '<span style="display:inline-block;padding:2px 9px;border-radius:999px;font-size:.62rem;font-weight:800;color:'+m[1]+';background:'+m[2]+'">'+m[0]+'</span>';
+}
+function loadBerichtsheft(){
+  bhBackToList();
+  const el=document.getElementById('bhList');
+  if(!db||!_uid){ if(el) el.innerHTML='<div class="empty">Nicht angemeldet.</div>'; return; }
+  if(el) el.innerHTML='<div class="empty">Lädt…</div>';
+  db.collection('users').doc(_uid).collection('berichtsheft').get().then(snap=>{
+    _bhList=[]; snap.forEach(d=>_bhList.push(Object.assign({id:d.id},d.data())));
+    _bhList.sort((a,b)=>(b.id||'').localeCompare(a.id||''));
+    renderBhList();
+  }).catch(e=>{ if(el) el.innerHTML='<div class="empty">Fehler beim Laden.</div>'; });
+}
+function renderBhList(){
+  const el=document.getElementById('bhList'); if(!el) return;
+  if(!_bhList.length){ el.innerHTML='<div class="empty" style="padding:18px;text-align:center;color:var(--mu);font-size:.8rem">Noch keine Wochenberichte.<br>Tippe auf „+ Neue Woche".</div>'; return; }
+  el.innerHTML=_bhList.map(b=>{
+    const zeit=(b.montag?fmtDE(b.montag):'?')+' – '+(b.freitag?fmtDE(b.freitag):'?');
+    return '<button class="card" onclick="bhOpen(\''+b.id+'\')" style="width:100%;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;border-color:rgba(37,99,235,.25)">'
+      +'<div><div style="font-weight:800;font-size:.9rem">KW '+(b.kw||'?')+' / '+(b.jahr||'?')+'</div>'
+      +'<div style="font-size:.66rem;color:var(--mu);margin-top:2px">'+zeit+' · '+(Number(b.gesamt)||0)+' h</div></div>'
+      +'<div>'+_bhStatusBadge(b.status)+'</div></button>';
+  }).join('');
+}
+function bhBackToList(){ const l=document.getElementById('bhListView'),e=document.getElementById('bhEditView'); if(l)l.style.display=''; if(e)e.style.display='none'; }
+function _bhShowEditor(){ const l=document.getElementById('bhListView'),e=document.getElementById('bhEditView'); if(l)l.style.display='none'; if(e)e.style.display=''; window.scrollTo(0,0); }
+function bhNew(){ _bhEditId=null; _bhCur=null; _bhFillEditor({}); _bhShowEditor(); }
+function bhOpen(id){ const b=_bhList.find(x=>x.id===id); if(!b) return; _bhEditId=id; _bhCur=b; _bhFillEditor(b); _bhShowEditor(); }
+function _bhFillEditor(b){
+  const wd = b.montag || _bhDateStr(new Date());
+  document.getElementById('bhWeekDate').value=wd;
+  document.getElementById('bhJahr').value=b.ausbildungsjahr||'1';
+  document.getElementById('bhAbt').value=b.abteilung||'';
+  document.getElementById('bhBs').value=(b.bs&&b.bs.text)||'';
+  document.getElementById('bhBsH').value=(b.bs&&b.bs.std)||'';
+  document.getElementById('bhUebl').value=(b.uebl&&b.uebl.text)||'';
+  document.getElementById('bhUeblH').value=(b.uebl&&b.uebl.std)||'';
+  document.getElementById('bhEditStatus').innerHTML=_bhEditStatusHtml(b);
+  bhWeekChanged(b.tage||{});
+}
+function _bhEditStatusHtml(b){
+  let h=_bhStatusBadge(b.status||'entwurf');
+  if(b.status==='bestaetigt'&&b.agSignDatum) h+=' <span style="font-size:.66rem;color:var(--mu)">am '+fmtDE(b.agSignDatum)+(b.agSignatur?(' von '+esc(b.agSignatur)):'')+'</span>';
+  if(b.status==='zurueck'&&b.agKommentar) h+='<div style="margin-top:6px;padding:8px 10px;background:rgba(245,158,11,.1);border-left:3px solid #f59e0b;border-radius:6px;font-size:.72rem;color:#92400e">Vom Betrieb zurückgegeben: '+esc(b.agKommentar)+'</div>';
+  return h;
+}
+function bhWeekChanged(existingTage){
+  const v=document.getElementById('bhWeekDate').value; if(!v) return;
+  const mon=_bhMonday(new Date(v+'T12:00:00'));
+  const iso=_bhIsoWeek(mon);
+  const fri=_bhAddDays(mon,4);
+  document.getElementById('bhWeekInfo').textContent='KW '+iso.week+' / '+iso.year+'  ·  '+fmtDE(_bhDateStr(mon))+' – '+fmtDE(_bhDateStr(fri));
+  const tage = (existingTage && existingTage.mo!==undefined) ? existingTage : _bhCollectDays();
+  const wrap=document.getElementById('bhDays');
+  wrap.innerHTML=_bhDayKeys.map((k,i)=>{
+    const dt=_bhAddDays(mon,i);
+    const t=(tage&&tage[k])||{};
+    return '<div style="margin-bottom:10px;padding:10px;background:var(--sur2);border-radius:10px">'
+      +'<label class="fl" style="margin-bottom:6px">'+_bhDayNames[i]+', '+fmtDE(_bhDateStr(dt))+'</label>'
+      +'<textarea class="fi" id="bhDayText_'+i+'" rows="2" placeholder="Tätigkeiten…" style="margin-bottom:6px">'+esc(t.text||'')+'</textarea>'
+      +'<div style="display:flex;align-items:center;gap:8px"><span class="fl" style="margin:0">Stunden</span><input class="fi" type="number" min="0" step="0.5" id="bhDayH_'+i+'" value="'+(t.std!==undefined&&t.std!==''?t.std:'')+'" style="width:90px;margin:0" oninput="bhCalcSum()"></div>'
+      +'</div>';
+  }).join('');
+  bhCalcSum();
+}
+function _bhCollectDays(){
+  const tage={};
+  _bhDayKeys.forEach((k,i)=>{
+    const tx=document.getElementById('bhDayText_'+i), h=document.getElementById('bhDayH_'+i);
+    tage[k]={text:tx?tx.value.trim():'', std:(h&&h.value!=='')?(parseFloat(h.value)||0):0};
+  });
+  return tage;
+}
+function bhCalcSum(){
+  let s=0;
+  _bhDayKeys.forEach((k,i)=>{ const h=document.getElementById('bhDayH_'+i); if(h&&h.value) s+=parseFloat(h.value)||0; });
+  const bs=document.getElementById('bhBsH'), ue=document.getElementById('bhUeblH');
+  if(bs&&bs.value) s+=parseFloat(bs.value)||0;
+  if(ue&&ue.value) s+=parseFloat(ue.value)||0;
+  s=Math.round(s*100)/100;
+  const el=document.getElementById('bhSum'); if(el) el.textContent=s;
+  return s;
+}
+function _bhCollect(){
+  const v=document.getElementById('bhWeekDate').value;
+  const mon=_bhMonday(new Date(v+'T12:00:00'));
+  const iso=_bhIsoWeek(mon);
+  const fri=_bhAddDays(mon,4);
+  return {
+    id:_bhId(iso.year,iso.week),
+    jahr:iso.year, kw:iso.week, montag:_bhDateStr(mon), freitag:_bhDateStr(fri),
+    ausbildungsjahr:document.getElementById('bhJahr').value||'1',
+    abteilung:document.getElementById('bhAbt').value.trim(),
+    tage:_bhCollectDays(),
+    bs:{text:document.getElementById('bhBs').value.trim(), std:parseFloat(document.getElementById('bhBsH').value)||0},
+    uebl:{text:document.getElementById('bhUebl').value.trim(), std:parseFloat(document.getElementById('bhUeblH').value)||0},
+    gesamt:bhCalcSum(),
+    azubiName:_bhAzubiName()
+  };
+}
+function bhSave(submit){
+  if(!db||!_uid){ toast('Nicht angemeldet','bad'); return; }
+  const d=_bhCollect();
+  const prev=_bhCur||{};
+  const doc={
+    jahr:d.jahr, kw:d.kw, montag:d.montag, freitag:d.freitag,
+    ausbildungsjahr:d.ausbildungsjahr, abteilung:d.abteilung,
+    tage:d.tage, bs:d.bs, uebl:d.uebl, gesamt:d.gesamt, azubiName:d.azubiName,
+    status: submit?'abgegeben':((prev.status==='abgegeben'||prev.status==='bestaetigt')?prev.status:'entwurf'),
+    agSignatur:prev.agSignatur||'', agSignDatum:prev.agSignDatum||'', agKommentar:prev.agKommentar||'',
+    erstelltAt: prev.erstelltAt||Date.now(),
+    geaendertAt: Date.now()
+  };
+  if(submit) doc.abgegebenAt=Date.now();
+  db.collection('users').doc(_uid).collection('berichtsheft').doc(d.id).set(doc,{merge:true}).then(()=>{
+    toast(submit?'Woche abgegeben ✓':'Entwurf gespeichert ✓');
+    loadBerichtsheft();
+  }).catch(e=>toast('Speichern fehlgeschlagen','bad'));
+}
+function bhPrint(){
+  const d=_bhCollect();
+  const mon=_bhMonday(new Date(d.montag+'T12:00:00'));
+  const rows=_bhDayKeys.map((k,i)=>{
+    const t=d.tage[k]||{};
+    const dt=_bhAddDays(mon,i);
+    return '<tr><td class="d">'+_bhDayNames[i]+'<br><span class="dt">'+fmtDE(_bhDateStr(dt))+'</span></td><td>'+esc(t.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(t.std||0)+'</td></tr>';
+  }).join('');
+  const html='<!doctype html><html><head><meta charset="utf-8"><title>Ausbildungsnachweis KW '+d.kw+'</title>'
+    +'<style>body{font-family:Arial,sans-serif;color:#111;padding:24px;max-width:780px;margin:0 auto}h1{font-size:18px;text-align:center;margin:0 0 4px}.sub{text-align:center;font-size:12px;color:#555;margin-bottom:16px}.meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #999;padding:6px 8px;vertical-align:top;text-align:left}th{background:#f1f5f9}td.d{width:120px;font-weight:bold}.dt{color:#666;font-size:10px;font-weight:normal}td.h{width:55px;text-align:center}tfoot td{font-weight:bold}.sig{display:flex;justify-content:space-between;margin-top:40px;font-size:12px}.sig div{width:45%;border-top:1px solid #333;padding-top:4px;text-align:center}@media print{button{display:none}}</style></head><body>'
+    +'<h1>Ausbildungsnachweis</h1><div class="sub">Wochenbericht · BBiG §13</div>'
+    +'<div class="meta"><div><b>Name:</b> '+esc(d.azubiName)+'</div><div><b>Ausbildungsjahr:</b> '+esc(d.ausbildungsjahr)+'</div></div>'
+    +'<div class="meta"><div><b>Woche:</b> KW '+d.kw+' / '+d.jahr+' ('+fmtDE(d.montag)+' – '+fmtDE(d.freitag)+')</div><div><b>Abteilung:</b> '+esc(d.abteilung||'–')+'</div></div>'
+    +'<table><thead><tr><th>Tag</th><th>Tätigkeiten</th><th>Std.</th></tr></thead><tbody>'+rows
+    +'<tr><td class="d">Berufsschule</td><td>'+esc(d.bs.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(d.bs.std||0)+'</td></tr>'
+    +'<tr><td class="d">ÜBL</td><td>'+esc(d.uebl.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(d.uebl.std||0)+'</td></tr>'
+    +'</tbody><tfoot><tr><td colspan="2" style="text-align:right">Gesamtstunden</td><td class="h">'+d.gesamt+'</td></tr></tfoot></table>'
+    +'<div class="sig"><div>Datum, Unterschrift Auszubildende(r)</div><div>Datum, Unterschrift Ausbilder/in</div></div>'
+    +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},300);}<\/scr'+'ipt></body></html>';
+  const w=window.open('','_blank'); if(!w){ toast('Pop-up blockiert – bitte erlauben','bad'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
 function showPage(id){
   if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
   _curPage=id; _navFromPop=false;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
-  const navMap={'docs':'mehr','profil':'mehr','hilfe':'mehr','firma':'mehr','kursdetail':'uebl'};
+  const navMap={'docs':'mehr','profil':'mehr','hilfe':'mehr','firma':'mehr','berichtsheft':'mehr','kursdetail':'uebl'};
   const navId=navMap[id]||id;
   const nb=document.getElementById('nav-'+navId);
   if(nb) nb.classList.add('active');
@@ -1849,6 +2053,7 @@ function showPage(id){
   if(id==='betrieb') initBetrieb();
   if(id==='uebl') loadKurse();
   if(id==='mehr') updateMehrFirmaBtn();
+  if(id==='berichtsheft') loadBerichtsheft();
   if(id==='firma') renderFirmaPage();
 }
 
