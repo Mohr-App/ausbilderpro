@@ -2084,11 +2084,12 @@ function bhPrint(){
   const rows=_bhDayKeys.map((k,i)=>{
     const dt=_bhAddDays(mon,i);
     const es=(d.tage[k].eintraege||[]);
-    const dayLabel=_bhDayNames[i]+'<br><span class="dt">'+fmtDE(_bhDateStr(dt))+'</span>'+(es.length?('<br><span class="dt">Σ '+(d.tage[k].summe||0)+' h</span>'):'');
-    if(!es.length) return '<tr><td class="d">'+dayLabel+'</td><td>–</td><td class="h"></td></tr>';
+    const dayLabel=_bhDayNames[i]+'<br><span class="dt">'+fmtDE(_bhDateStr(dt))+'</span>';
+    if(!es.length) return '<tr><td class="d">'+dayLabel+'</td><td>–</td><td class="h"></td><td class="h tg">0</td></tr>';
     return es.map((e,ei)=>{
-      const tag = ei===0 ? '<td class="d" rowspan="'+es.length+'">'+dayLabel+'</td>' : '';
-      return '<tr>'+tag+'<td>'+esc(e.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(e.std||0)+'</td></tr>';
+      const head = ei===0 ? ('<td class="d" rowspan="'+es.length+'">'+dayLabel+'</td>') : '';
+      const sum = ei===0 ? ('<td class="h tg" rowspan="'+es.length+'">'+(d.tage[k].summe||0)+'</td>') : '';
+      return '<tr>'+head+'<td>'+esc(e.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(e.std||0)+'</td>'+sum+'</tr>';
     }).join('');
   }).join('');
   const azubiSig = d.azubiSignatur ? ('Digital unterschrieben von '+esc(d.azubiSignatur)+(d.azubiSignDatum?(' am '+fmtDE(d.azubiSignDatum)):'')) : '';
@@ -2096,14 +2097,14 @@ function bhPrint(){
   const agSig = (c.status==='bestaetigt'&&c.agSignatur) ? ('Bestätigt von '+esc(c.agSignatur)+(c.agSignDatum?(' am '+fmtDE(c.agSignDatum)):'')) : '';
   const bemerk = d.bemerkungen ? ('<div class="bem"><b>Besondere Bemerkungen:</b><br>'+esc(d.bemerkungen).replace(/\n/g,'<br>')+'</div>') : '';
   const html='<!doctype html><html><head><meta charset="utf-8"><title>Ausbildungsnachweis KW '+d.kw+'</title>'
-    +'<style>body{font-family:Arial,sans-serif;color:#111;padding:24px;max-width:800px;margin:0 auto}h1{font-size:18px;text-align:center;margin:0 0 4px}.sub{text-align:center;font-size:12px;color:#555;margin-bottom:16px}.meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #999;padding:6px 8px;vertical-align:top;text-align:left}th{background:#f1f5f9}td.d{width:115px;font-weight:bold}.dt{color:#666;font-size:10px;font-weight:normal}.eh{color:#555;font-size:10px}td.h{width:55px;text-align:center}tfoot td{font-weight:bold}.bem{margin-top:14px;font-size:12px;border:1px solid #999;padding:8px}.sig{display:flex;justify-content:space-between;margin-top:42px;font-size:12px}.sig div{width:45%}.sigline{border-top:1px solid #333;padding-top:4px;text-align:center}.signed{font-size:10px;color:#059669;margin-bottom:2px;text-align:center}@media print{button{display:none}}</style></head><body>'
+    +'<style>body{font-family:Arial,sans-serif;color:#111;padding:24px;max-width:800px;margin:0 auto}h1{font-size:18px;text-align:center;margin:0 0 4px}.sub{text-align:center;font-size:12px;color:#555;margin-bottom:16px}.meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #999;padding:6px 8px;vertical-align:top;text-align:left}th{background:#f1f5f9}td.d{width:115px;font-weight:bold}.dt{color:#666;font-size:10px;font-weight:normal}.eh{color:#555;font-size:10px}td.h{width:52px;text-align:center}.tg{background:#f8fafc;font-weight:bold}tfoot td{font-weight:bold}.bem{margin-top:14px;font-size:12px;border:1px solid #999;padding:8px}.sig{display:flex;justify-content:space-between;margin-top:42px;font-size:12px}.sig div{width:45%}.sigline{border-top:1px solid #333;padding-top:4px;text-align:center}.signed{font-size:10px;color:#059669;margin-bottom:2px;text-align:center}@media print{button{display:none}}</style></head><body>'
     +'<h1>Ausbildungsnachweis</h1><div class="sub">Wochenbericht · BBiG §13</div>'
     +'<div class="meta"><div><b>Name:</b> '+esc(d.azubiName)+'</div><div><b>Ausbildungsjahr:</b> '+esc(d.ausbildungsjahr)+'</div></div>'
     +'<div class="meta"><div><b>Woche:</b> KW '+d.kw+' / '+d.jahr+' ('+fmtDE(d.montag)+' – '+fmtDE(d.freitag)+')</div><div><b>Abteilung:</b> '+esc(d.abteilung||'–')+'</div></div>'
-    +'<table><thead><tr><th>Tag</th><th>Tätigkeiten</th><th>Std.</th></tr></thead><tbody>'+rows
-    +'<tr><td class="d">Berufsschule</td><td>'+esc(d.bs.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(d.bs.std||0)+'</td></tr>'
-    +'<tr><td class="d">ÜBL</td><td>'+esc(d.uebl.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(d.uebl.std||0)+'</td></tr>'
-    +'</tbody><tfoot><tr><td colspan="2" style="text-align:right">Gesamtstunden</td><td class="h">'+d.gesamt+'</td></tr></tfoot></table>'
+    +'<table><thead><tr><th>Tag</th><th>Tätigkeiten</th><th>Std.</th><th>Tag&nbsp;ges.</th></tr></thead><tbody>'+rows
+    +'<tr><td class="d">Berufsschule</td><td>'+esc(d.bs.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(d.bs.std||0)+'</td><td class="h tg">'+(d.bs.std||0)+'</td></tr>'
+    +'<tr><td class="d">ÜBL</td><td>'+esc(d.uebl.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(d.uebl.std||0)+'</td><td class="h tg">'+(d.uebl.std||0)+'</td></tr>'
+    +'</tbody><tfoot><tr><td colspan="3" style="text-align:right">Gesamtstunden</td><td class="h">'+d.gesamt+'</td></tr></tfoot></table>'
     +bemerk
     +'<div class="sig"><div>'+(azubiSig?('<div class="signed">'+azubiSig+'</div>'):'')+'<div class="sigline">Datum, Unterschrift Auszubildende(r)</div></div>'
     +'<div>'+(agSig?('<div class="signed">'+agSig+'</div>'):'')+'<div class="sigline">Datum, Unterschrift Ausbilder/in</div></div></div>'
