@@ -1910,16 +1910,30 @@ function loadBerichtsheft(){
     renderBhList();
   }).catch(e=>{ if(el) el.innerHTML='<div class="empty">Fehler beim Laden.</div>'; });
 }
+function _bhCard(b){
+  const zeit=(b.montag?fmtDE(b.montag):'?')+' – '+(b.freitag?fmtDE(b.freitag):'?');
+  return '<button class="card" onclick="bhOpen(\''+b.id+'\')" style="width:100%;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;border-color:rgba(37,99,235,.25);margin-bottom:8px">'
+    +'<div><div style="font-weight:800;font-size:.9rem">KW '+(b.kw||'?')+' / '+(b.jahr||'?')+'</div>'
+    +'<div style="font-size:.66rem;color:var(--mu);margin-top:2px">'+zeit+' · '+(Number(b.gesamt)||0)+' h</div></div>'
+    +'<div>'+_bhStatusBadge(b.status)+'</div></button>';
+}
 function renderBhList(){
   const el=document.getElementById('bhList'); if(!el) return;
-  if(!_bhList.length){ el.innerHTML='<div class="empty" style="padding:18px;text-align:center;color:var(--mu);font-size:.8rem">Noch keine Wochenberichte.<br>Tippe auf „+ Neue Woche".</div>'; return; }
-  el.innerHTML=_bhList.map(b=>{
-    const zeit=(b.montag?fmtDE(b.montag):'?')+' – '+(b.freitag?fmtDE(b.freitag):'?');
-    return '<button class="card" onclick="bhOpen(\''+b.id+'\')" style="width:100%;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;border-color:rgba(37,99,235,.25)">'
-      +'<div><div style="font-weight:800;font-size:.9rem">KW '+(b.kw||'?')+' / '+(b.jahr||'?')+'</div>'
-      +'<div style="font-size:.66rem;color:var(--mu);margin-top:2px">'+zeit+' · '+(Number(b.gesamt)||0)+' h</div></div>'
-      +'<div>'+_bhStatusBadge(b.status)+'</div></button>';
-  }).join('');
+  if(!_bhList.length){ el.innerHTML='<div class="empty" style="padding:18px;text-align:center;color:var(--mu);font-size:.8rem">Noch keine Wochenberichte.<br>Tippe oben auf „+ Neue Woche".</div>'; return; }
+  const aktiv=_bhList.filter(b=>b.status!=='bestaetigt');
+  const archiv=_bhList.filter(b=>b.status==='bestaetigt');
+  let h='<div style="font-size:.66rem;font-weight:800;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin:2px 0 8px">Aktuell</div>';
+  h+= aktiv.length ? aktiv.map(_bhCard).join('') : '<div class="empty" style="padding:12px;text-align:center;color:var(--mu);font-size:.74rem">Keine offenen Wochen.</div>';
+  if(archiv.length){
+    h+='<details style="margin-top:14px;background:var(--sur2);border-radius:12px;overflow:hidden">'
+      +'<summary style="cursor:pointer;padding:11px 13px;font-size:.78rem;font-weight:700;color:var(--tx);display:flex;justify-content:space-between;align-items:center;gap:8px">'
+      +'<span>📦 Archiv (bestätigt)</span>'
+      +'<span style="font-size:.62rem;background:rgba(16,185,129,.14);color:#059669;padding:2px 8px;border-radius:999px;font-weight:800">'+archiv.length+'</span>'
+      +'</summary>'
+      +'<div style="padding:0 13px 10px">'+archiv.map(_bhCard).join('')+'</div>'
+      +'</details>';
+  }
+  el.innerHTML=h;
 }
 function bhBackToList(){ const l=document.getElementById('bhListView'),e=document.getElementById('bhEditView'); if(l)l.style.display=''; if(e)e.style.display='none'; }
 function _bhShowEditor(){ const l=document.getElementById('bhListView'),e=document.getElementById('bhEditView'); if(l)l.style.display='none'; if(e)e.style.display=''; window.scrollTo(0,0); }

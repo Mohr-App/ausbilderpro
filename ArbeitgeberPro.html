@@ -1714,16 +1714,32 @@ function loadBerichtshefte(){
     }
   });
 }
+function _agBhCard(b,i){
+  const zeit=(b.montag?fmtDE(b.montag):'?')+' – '+(b.freitag?fmtDE(b.freitag):'?');
+  return '<button onclick="openBericht('+i+')" style="width:100%;text-align:left;cursor:pointer;background:#fff;border:1px solid var(--brd);border-radius:10px;padding:9px 11px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-family:inherit">'
+    +'<span style="font-size:.72rem;color:var(--mu)">KW '+(b.kw||'?')+'/'+(b.jahr||'?')+' · '+zeit+' · '+(Number(b.gesamt)||0)+' h</span>'
+    +'<span>'+_bhStatusBadgeAG(b.status)+'</span></button>';
+}
 function renderBerichteListe(){
   const el=document.getElementById('agBerichteListe'); if(!el) return;
   const cnt=document.getElementById('cntBerichte');
   if(cnt) cnt.textContent=_bhefte.filter(b=>b.status==='abgegeben').length;
   if(!_bhefte.length){ el.innerHTML='<div class="empty">Noch keine abgegebenen Wochenberichte.</div>'; return; }
-  el.innerHTML=_bhefte.map((b,i)=>{
-    const zeit=(b.montag?fmtDE(b.montag):'?')+' – '+(b.freitag?fmtDE(b.freitag):'?');
-    return '<button onclick="openBericht('+i+')" style="width:100%;text-align:left;cursor:pointer;background:#fff;border:1px solid var(--brd);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-family:inherit">'
-      +'<span><span style="font-weight:700;font-size:.82rem">'+esc(b.azubiName||'?')+'</span><br><span style="font-size:.66rem;color:var(--mu)">KW '+(b.kw||'?')+'/'+(b.jahr||'?')+' · '+zeit+' · '+(Number(b.gesamt)||0)+' h</span></span>'
-      +'<span>'+_bhStatusBadgeAG(b.status)+'</span></button>';
+  const groups={};
+  _bhefte.forEach(b=>{ const key=b.azubiUid||b.azubiName||'?'; if(!groups[key]) groups[key]={name:b.azubiName||'?', items:[]}; groups[key].items.push(b); });
+  const keys=Object.keys(groups).sort((a,b)=>groups[a].name.localeCompare(groups[b].name));
+  el.innerHTML=keys.map(k=>{
+    const g=groups[k];
+    g.items.sort((a,b)=>((b.abgegebenAt||0)-(a.abgegebenAt||0))||String(b.id||'').localeCompare(String(a.id||'')));
+    const neu=g.items.filter(x=>x.status==='abgegeben').length;
+    const cards=g.items.map(b=>_agBhCard(b,_bhefte.indexOf(b))).join('');
+    const badge = neu
+      ? '<span style="font-size:.6rem;background:rgba(37,99,235,.12);color:var(--acc);padding:2px 8px;border-radius:999px;font-weight:800">'+neu+' neu</span>'
+      : '<span style="font-size:.6rem;background:rgba(100,116,139,.12);color:#64748b;padding:2px 8px;border-radius:999px;font-weight:800">'+g.items.length+'</span>';
+    return '<details'+(neu?' open':'')+' style="margin-bottom:8px;background:var(--sur2,#f8fafc);border:1px solid var(--brd);border-radius:12px;overflow:hidden">'
+      +'<summary style="cursor:pointer;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:700;font-size:.86rem">'
+      +'<span>🎓 '+esc(g.name)+'</span>'+badge+'</summary>'
+      +'<div style="padding:0 12px 10px">'+cards+'</div></details>';
   }).join('');
 }
 function openBericht(i){
