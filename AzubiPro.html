@@ -2084,8 +2084,12 @@ function bhPrint(){
   const rows=_bhDayKeys.map((k,i)=>{
     const dt=_bhAddDays(mon,i);
     const es=(d.tage[k].eintraege||[]);
-    const inner = es.length ? es.map(e=>esc(e.text||'').replace(/\n/g,'<br>')+' <span class="eh">('+(e.std||0)+' h)</span>').join('<br>') : '–';
-    return '<tr><td class="d">'+_bhDayNames[i]+'<br><span class="dt">'+fmtDE(_bhDateStr(dt))+'</span></td><td>'+inner+'</td><td class="h">'+(d.tage[k].summe||0)+'</td></tr>';
+    const dayLabel=_bhDayNames[i]+'<br><span class="dt">'+fmtDE(_bhDateStr(dt))+'</span>'+(es.length?('<br><span class="dt">Σ '+(d.tage[k].summe||0)+' h</span>'):'');
+    if(!es.length) return '<tr><td class="d">'+dayLabel+'</td><td>–</td><td class="h"></td></tr>';
+    return es.map((e,ei)=>{
+      const tag = ei===0 ? '<td class="d" rowspan="'+es.length+'">'+dayLabel+'</td>' : '';
+      return '<tr>'+tag+'<td>'+esc(e.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(e.std||0)+'</td></tr>';
+    }).join('');
   }).join('');
   const azubiSig = d.azubiSignatur ? ('Digital unterschrieben von '+esc(d.azubiSignatur)+(d.azubiSignDatum?(' am '+fmtDE(d.azubiSignDatum)):'')) : '';
   const c=_bhCur||{};
