@@ -1702,7 +1702,17 @@ function loadBerichtshefte(){
     snap.forEach(doc=>{ const d=doc.data(); if(d.status && d.status!=='entwurf'){ _bhefte.push(Object.assign({_ref:doc.ref},d)); } });
     _bhefte.sort((a,b)=>((b.abgegebenAt||0)-(a.abgegebenAt||0))||String(b.id||'').localeCompare(String(a.id||'')));
     renderBerichteListe();
-  }, e=>{ console.warn('[Berichtshefte]',e); const el=document.getElementById('agBerichteListe'); if(el) el.innerHTML='<div class="empty">Konnte nicht laden (Firestore-Regeln/Index?).</div>'; });
+  }, e=>{
+    console.warn('[Berichtshefte]',e);
+    const el=document.getElementById('agBerichteListe');
+    if(el){
+      const code=(e&&e.code)||'';
+      const msg=(e&&e.message)||String(e);
+      const url=(msg.match(/https?:\/\/\S+/)||[])[0];
+      const link=url?('<br><a href="'+url+'" target="_blank" style="color:var(--acc);word-break:break-all;font-weight:700">→ Fehlenden Index erstellen</a>'):'';
+      el.innerHTML='<div class="empty" style="text-align:left;font-size:.7rem;line-height:1.5">Konnte nicht laden.<br><b>'+esc(code)+'</b><br>'+esc(msg)+link+'</div>';
+    }
+  });
 }
 function renderBerichteListe(){
   const el=document.getElementById('agBerichteListe'); if(!el) return;
