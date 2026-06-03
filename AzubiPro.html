@@ -727,7 +727,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <label class="fl">Überbetriebliche Unterweisung (ÜBL)</label>
           <textarea class="fi" id="bhUebl" rows="2" placeholder="Themen…" style="margin-bottom:6px"></textarea>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span class="fl" style="margin:0">Stunden</span><input class="fi" type="number" min="0" step="0.5" id="bhUeblH" style="width:90px;margin:0" oninput="bhCalcSum()"></div>
+          <label class="fl">Besondere Bemerkungen</label>
+          <textarea class="fi" id="bhBemerk" rows="2" placeholder="optional…" style="margin-bottom:12px"></textarea>
           <div style="text-align:right;font-weight:800;font-size:.92rem;margin-bottom:12px">Gesamtstunden: <span id="bhSum" style="color:var(--acc)">0</span> h</div>
+          <div id="bhSigBlock" style="margin-bottom:12px;padding:12px;background:var(--sur2);border-radius:10px">
+            <div id="bhAzubiSig"></div>
+            <div id="bhAgSig" style="margin-top:8px"></div>
+          </div>
           <div style="display:flex;gap:8px">
             <button class="btn" onclick="bhSave(false)" style="flex:1;background:var(--sur2);color:var(--tx);box-shadow:none" title="Als Entwurf speichern">💾 Entwurf</button>
             <button class="btn" onclick="bhSave(true)" style="flex:1" title="Woche abgeben">✓ Abgeben</button>
@@ -1874,8 +1880,10 @@ window.addEventListener('DOMContentLoaded',()=>{
   }catch(e){}
 });
 
-// ───────────────────────── BERICHTSHEFT (Phase 1) ─────────────────────────
+// ───────────────────────── BERICHTSHEFT (Phase 1, BETA) ─────────────────────────
 let _bhList=[], _bhCur=null, _bhEditId=null;
+let _bhDaysState={mo:[],di:[],mi:[],do:[],fr:[]};
+let _bhMon=null, _bhSig={name:'',datum:''};
 const _bhDayKeys=['mo','di','mi','do','fr'];
 const _bhDayNames=['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'];
 function _bhIsoWeek(d){
@@ -1924,17 +1932,32 @@ function bhBackToList(){ const l=document.getElementById('bhListView'),e=documen
 function _bhShowEditor(){ const l=document.getElementById('bhListView'),e=document.getElementById('bhEditView'); if(l)l.style.display='none'; if(e)e.style.display=''; window.scrollTo(0,0); }
 function bhNew(){ _bhEditId=null; _bhCur=null; _bhFillEditor({}); _bhShowEditor(); }
 function bhOpen(id){ const b=_bhList.find(x=>x.id===id); if(!b) return; _bhEditId=id; _bhCur=b; _bhFillEditor(b); _bhShowEditor(); }
+function _bhMigrateDays(tage){
+  const st={mo:[],di:[],mi:[],do:[],fr:[]};
+  _bhDayKeys.forEach(k=>{
+    const t=(tage&&tage[k])||{};
+    let arr=[];
+    if(Array.isArray(t.eintraege)) arr=t.eintraege.map(e=>({text:e.text||'',std:(e.std!==undefined&&e.std!=='')?e.std:''}));
+    else if(t.text!==undefined||t.std!==undefined){ if((t.text||'').trim()||t.std) arr=[{text:t.text||'',std:(t.std!==undefined&&t.std!=='')?t.std:''}]; }
+    if(!arr.length) arr=[{text:'',std:''}];
+    st[k]=arr;
+  });
+  return st;
+}
 function _bhFillEditor(b){
-  const wd = b.montag || _bhDateStr(new Date());
-  document.getElementById('bhWeekDate').value=wd;
+  _bhDaysState=_bhMigrateDays(b.tage);
+  _bhSig={name:b.azubiSignatur||'', datum:b.azubiSignDatum||''};
+  document.getElementById('bhWeekDate').value=b.montag||_bhDateStr(new Date());
   document.getElementById('bhJahr').value=b.ausbildungsjahr||'1';
   document.getElementById('bhAbt').value=b.abteilung||'';
   document.getElementById('bhBs').value=(b.bs&&b.bs.text)||'';
   document.getElementById('bhBsH').value=(b.bs&&b.bs.std)||'';
   document.getElementById('bhUebl').value=(b.uebl&&b.uebl.text)||'';
   document.getElementById('bhUeblH').value=(b.uebl&&b.uebl.std)||'';
+  document.getElementById('bhBemerk').value=b.bemerkungen||'';
   document.getElementById('bhEditStatus').innerHTML=_bhEditStatusHtml(b);
-  bhWeekChanged(b.tage||{});
+  bhWeekChanged();
+  _bhRenderSig();
 }
 function _bhEditStatusHtml(b){
   let h=_bhStatusBadge(b.status||'entwurf');
@@ -1942,36 +1965,40 @@ function _bhEditStatusHtml(b){
   if(b.status==='zurueck'&&b.agKommentar) h+='<div style="margin-top:6px;padding:8px 10px;background:rgba(245,158,11,.1);border-left:3px solid #f59e0b;border-radius:6px;font-size:.72rem;color:#92400e">Vom Betrieb zurückgegeben: '+esc(b.agKommentar)+'</div>';
   return h;
 }
-function bhWeekChanged(existingTage){
+function bhWeekChanged(){
   const v=document.getElementById('bhWeekDate').value; if(!v) return;
-  const mon=_bhMonday(new Date(v+'T12:00:00'));
-  const iso=_bhIsoWeek(mon);
-  const fri=_bhAddDays(mon,4);
-  document.getElementById('bhWeekInfo').textContent='KW '+iso.week+' / '+iso.year+'  ·  '+fmtDE(_bhDateStr(mon))+' – '+fmtDE(_bhDateStr(fri));
-  const tage = (existingTage && existingTage.mo!==undefined) ? existingTage : _bhCollectDays();
-  const wrap=document.getElementById('bhDays');
+  _bhMon=_bhMonday(new Date(v+'T12:00:00'));
+  const iso=_bhIsoWeek(_bhMon);
+  const fri=_bhAddDays(_bhMon,4);
+  document.getElementById('bhWeekInfo').textContent='KW '+iso.week+' / '+iso.year+'  ·  '+fmtDE(_bhDateStr(_bhMon))+' – '+fmtDE(_bhDateStr(fri));
+  _bhRenderDays();
+}
+function _bhRenderDays(){
+  const wrap=document.getElementById('bhDays'); if(!wrap||!_bhMon) return;
   wrap.innerHTML=_bhDayKeys.map((k,i)=>{
-    const dt=_bhAddDays(mon,i);
-    const t=(tage&&tage[k])||{};
+    const dt=_bhAddDays(_bhMon,i);
+    const rows=(_bhDaysState[k]||[]).map((e,ri)=>(
+      '<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px">'
+      +'<textarea class="fi" rows="2" placeholder="Tätigkeit…" style="margin:0;flex:1" oninput="_bhSet(\''+k+'\','+ri+',\'text\',this.value)">'+esc(e.text||'')+'</textarea>'
+      +'<input class="fi" type="number" min="0" step="0.5" placeholder="Std" value="'+(e.std!==''&&e.std!==undefined?e.std:'')+'" style="margin:0;width:64px" oninput="_bhSet(\''+k+'\','+ri+',\'std\',this.value)">'
+      +'<button onclick="bhDelRow(\''+k+'\','+ri+')" title="Zeile entfernen" style="border:none;background:rgba(239,68,68,.1);color:#ef4444;border-radius:8px;width:34px;flex:none;cursor:pointer;font-weight:700;align-self:stretch">✕</button>'
+      +'</div>'
+    )).join('');
     return '<div style="margin-bottom:10px;padding:10px;background:var(--sur2);border-radius:10px">'
-      +'<label class="fl" style="margin-bottom:6px">'+_bhDayNames[i]+', '+fmtDE(_bhDateStr(dt))+'</label>'
-      +'<textarea class="fi" id="bhDayText_'+i+'" rows="2" placeholder="Tätigkeiten…" style="margin-bottom:6px">'+esc(t.text||'')+'</textarea>'
-      +'<div style="display:flex;align-items:center;gap:8px"><span class="fl" style="margin:0">Stunden</span><input class="fi" type="number" min="0" step="0.5" id="bhDayH_'+i+'" value="'+(t.std!==undefined&&t.std!==''?t.std:'')+'" style="width:90px;margin:0" oninput="bhCalcSum()"></div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label class="fl" style="margin:0">'+_bhDayNames[i]+', '+fmtDE(_bhDateStr(dt))+'</label><span style="font-size:.68rem;font-weight:800;color:var(--acc)">Tag: <span id="bhDaySum_'+k+'">0</span> h</span></div>'
+      +rows
+      +'<button onclick="bhAddRow(\''+k+'\')" style="border:none;background:rgba(37,99,235,.08);color:var(--acc);border-radius:8px;padding:6px 10px;font-size:.7rem;font-weight:700;cursor:pointer">+ Zeile</button>'
       +'</div>';
   }).join('');
-  bhCalcSum();
+  _bhUpdAllSums();
 }
-function _bhCollectDays(){
-  const tage={};
-  _bhDayKeys.forEach((k,i)=>{
-    const tx=document.getElementById('bhDayText_'+i), h=document.getElementById('bhDayH_'+i);
-    tage[k]={text:tx?tx.value.trim():'', std:(h&&h.value!=='')?(parseFloat(h.value)||0):0};
-  });
-  return tage;
-}
-function bhCalcSum(){
-  let s=0;
-  _bhDayKeys.forEach((k,i)=>{ const h=document.getElementById('bhDayH_'+i); if(h&&h.value) s+=parseFloat(h.value)||0; });
+function _bhSet(day,idx,field,val){ if(!_bhDaysState[day]||!_bhDaysState[day][idx]) return; _bhDaysState[day][idx][field]=val; if(field==='std'){ _bhUpdDaySum(day); _bhUpdWeekSum(); } }
+function bhAddRow(day){ if(!_bhDaysState[day]) _bhDaysState[day]=[]; _bhDaysState[day].push({text:'',std:''}); _bhRenderDays(); }
+function bhDelRow(day,idx){ if(!_bhDaysState[day]) return; _bhDaysState[day].splice(idx,1); if(!_bhDaysState[day].length) _bhDaysState[day]=[{text:'',std:''}]; _bhRenderDays(); }
+function _bhDaySum(day){ return Math.round(((_bhDaysState[day]||[]).reduce((s,e)=>s+((e.std!==''&&e.std!==undefined)?(parseFloat(e.std)||0):0),0))*100)/100; }
+function _bhUpdDaySum(day){ const el=document.getElementById('bhDaySum_'+day); if(el) el.textContent=_bhDaySum(day); }
+function _bhUpdWeekSum(){
+  let s=0; _bhDayKeys.forEach(k=>s+=_bhDaySum(k));
   const bs=document.getElementById('bhBsH'), ue=document.getElementById('bhUeblH');
   if(bs&&bs.value) s+=parseFloat(bs.value)||0;
   if(ue&&ue.value) s+=parseFloat(ue.value)||0;
@@ -1979,31 +2006,67 @@ function bhCalcSum(){
   const el=document.getElementById('bhSum'); if(el) el.textContent=s;
   return s;
 }
+function _bhUpdAllSums(){ _bhDayKeys.forEach(k=>_bhUpdDaySum(k)); _bhUpdWeekSum(); }
+function bhCalcSum(){ return _bhUpdWeekSum(); }
+function _bhCollectDays(){
+  const tage={};
+  _bhDayKeys.forEach(k=>{
+    const eintraege=(_bhDaysState[k]||[]).map(e=>({text:(e.text||'').trim(), std:(e.std!==''&&e.std!==undefined)?(parseFloat(e.std)||0):0})).filter(e=>e.text||e.std);
+    const summe=Math.round(eintraege.reduce((s,e)=>s+(e.std||0),0)*100)/100;
+    tage[k]={eintraege:eintraege, summe:summe};
+  });
+  return tage;
+}
+function _bhRenderSig(){
+  const az=document.getElementById('bhAzubiSig'); const ag=document.getElementById('bhAgSig');
+  if(az){
+    if(_bhSig.name){
+      az.innerHTML='<div style="font-size:.74rem;color:#059669;font-weight:700">✓ Digital unterschrieben von '+esc(_bhSig.name)+(_bhSig.datum?(' am '+fmtDE(_bhSig.datum)):'')+'</div>';
+    } else {
+      az.innerHTML='<button class="btn" onclick="bhSignAzubi()" style="background:linear-gradient(135deg,#059669,#10b981);font-size:.78rem;padding:9px" title="Digital unterschreiben">✓ Digital unterschreiben (Azubi)</button>';
+    }
+  }
+  if(ag){
+    const c=_bhCur||{};
+    if(c.status==='bestaetigt'&&c.agSignatur){
+      ag.innerHTML='<div style="font-size:.74rem;color:#1d4ed8;font-weight:700">✓ Vom Betrieb bestätigt: '+esc(c.agSignatur)+(c.agSignDatum?(' am '+fmtDE(c.agSignDatum)):'')+'</div>';
+    } else {
+      ag.innerHTML='<div style="font-size:.72rem;color:var(--mu)">Betrieb: noch nicht bestätigt</div>';
+    }
+  }
+}
+function bhSignAzubi(){ _bhSig={name:_bhAzubiName(), datum:_bhDateStr(new Date())}; _bhRenderSig(); toast('Digital unterschrieben ✓'); }
 function _bhCollect(){
   const v=document.getElementById('bhWeekDate').value;
   const mon=_bhMonday(new Date(v+'T12:00:00'));
   const iso=_bhIsoWeek(mon);
   const fri=_bhAddDays(mon,4);
+  const tage=_bhCollectDays();
+  const bs={text:document.getElementById('bhBs').value.trim(), std:parseFloat(document.getElementById('bhBsH').value)||0};
+  const uebl={text:document.getElementById('bhUebl').value.trim(), std:parseFloat(document.getElementById('bhUeblH').value)||0};
+  let g=0; _bhDayKeys.forEach(k=>g+=tage[k].summe||0); g+=bs.std+uebl.std; g=Math.round(g*100)/100;
   return {
     id:_bhId(iso.year,iso.week),
     jahr:iso.year, kw:iso.week, montag:_bhDateStr(mon), freitag:_bhDateStr(fri),
     ausbildungsjahr:document.getElementById('bhJahr').value||'1',
     abteilung:document.getElementById('bhAbt').value.trim(),
-    tage:_bhCollectDays(),
-    bs:{text:document.getElementById('bhBs').value.trim(), std:parseFloat(document.getElementById('bhBsH').value)||0},
-    uebl:{text:document.getElementById('bhUebl').value.trim(), std:parseFloat(document.getElementById('bhUeblH').value)||0},
-    gesamt:bhCalcSum(),
-    azubiName:_bhAzubiName()
+    tage:tage, bs:bs, uebl:uebl,
+    bemerkungen:document.getElementById('bhBemerk').value.trim(),
+    gesamt:g, azubiName:_bhAzubiName(),
+    azubiSignatur:_bhSig.name||'', azubiSignDatum:_bhSig.datum||''
   };
 }
 function bhSave(submit){
   if(!db||!_uid){ toast('Nicht angemeldet','bad'); return; }
+  if(submit && !_bhSig.name){ toast('Bitte zuerst digital unterschreiben','bad'); return; }
   const d=_bhCollect();
   const prev=_bhCur||{};
   const doc={
     jahr:d.jahr, kw:d.kw, montag:d.montag, freitag:d.freitag,
     ausbildungsjahr:d.ausbildungsjahr, abteilung:d.abteilung,
-    tage:d.tage, bs:d.bs, uebl:d.uebl, gesamt:d.gesamt, azubiName:d.azubiName,
+    tage:d.tage, bs:d.bs, uebl:d.uebl, bemerkungen:d.bemerkungen,
+    gesamt:d.gesamt, azubiName:d.azubiName,
+    azubiSignatur:d.azubiSignatur, azubiSignDatum:d.azubiSignDatum,
     status: submit?'abgegeben':((prev.status==='abgegeben'||prev.status==='bestaetigt')?prev.status:'entwurf'),
     agSignatur:prev.agSignatur||'', agSignDatum:prev.agSignDatum||'', agKommentar:prev.agKommentar||'',
     erstelltAt: prev.erstelltAt||Date.now(),
@@ -2019,12 +2082,17 @@ function bhPrint(){
   const d=_bhCollect();
   const mon=_bhMonday(new Date(d.montag+'T12:00:00'));
   const rows=_bhDayKeys.map((k,i)=>{
-    const t=d.tage[k]||{};
     const dt=_bhAddDays(mon,i);
-    return '<tr><td class="d">'+_bhDayNames[i]+'<br><span class="dt">'+fmtDE(_bhDateStr(dt))+'</span></td><td>'+esc(t.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(t.std||0)+'</td></tr>';
+    const es=(d.tage[k].eintraege||[]);
+    const inner = es.length ? es.map(e=>esc(e.text||'').replace(/\n/g,'<br>')+' <span class="eh">('+(e.std||0)+' h)</span>').join('<br>') : '–';
+    return '<tr><td class="d">'+_bhDayNames[i]+'<br><span class="dt">'+fmtDE(_bhDateStr(dt))+'</span></td><td>'+inner+'</td><td class="h">'+(d.tage[k].summe||0)+'</td></tr>';
   }).join('');
+  const azubiSig = d.azubiSignatur ? ('Digital unterschrieben von '+esc(d.azubiSignatur)+(d.azubiSignDatum?(' am '+fmtDE(d.azubiSignDatum)):'')) : '';
+  const c=_bhCur||{};
+  const agSig = (c.status==='bestaetigt'&&c.agSignatur) ? ('Bestätigt von '+esc(c.agSignatur)+(c.agSignDatum?(' am '+fmtDE(c.agSignDatum)):'')) : '';
+  const bemerk = d.bemerkungen ? ('<div class="bem"><b>Besondere Bemerkungen:</b><br>'+esc(d.bemerkungen).replace(/\n/g,'<br>')+'</div>') : '';
   const html='<!doctype html><html><head><meta charset="utf-8"><title>Ausbildungsnachweis KW '+d.kw+'</title>'
-    +'<style>body{font-family:Arial,sans-serif;color:#111;padding:24px;max-width:780px;margin:0 auto}h1{font-size:18px;text-align:center;margin:0 0 4px}.sub{text-align:center;font-size:12px;color:#555;margin-bottom:16px}.meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #999;padding:6px 8px;vertical-align:top;text-align:left}th{background:#f1f5f9}td.d{width:120px;font-weight:bold}.dt{color:#666;font-size:10px;font-weight:normal}td.h{width:55px;text-align:center}tfoot td{font-weight:bold}.sig{display:flex;justify-content:space-between;margin-top:40px;font-size:12px}.sig div{width:45%;border-top:1px solid #333;padding-top:4px;text-align:center}@media print{button{display:none}}</style></head><body>'
+    +'<style>body{font-family:Arial,sans-serif;color:#111;padding:24px;max-width:800px;margin:0 auto}h1{font-size:18px;text-align:center;margin:0 0 4px}.sub{text-align:center;font-size:12px;color:#555;margin-bottom:16px}.meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #999;padding:6px 8px;vertical-align:top;text-align:left}th{background:#f1f5f9}td.d{width:115px;font-weight:bold}.dt{color:#666;font-size:10px;font-weight:normal}.eh{color:#555;font-size:10px}td.h{width:55px;text-align:center}tfoot td{font-weight:bold}.bem{margin-top:14px;font-size:12px;border:1px solid #999;padding:8px}.sig{display:flex;justify-content:space-between;margin-top:42px;font-size:12px}.sig div{width:45%}.sigline{border-top:1px solid #333;padding-top:4px;text-align:center}.signed{font-size:10px;color:#059669;margin-bottom:2px;text-align:center}@media print{button{display:none}}</style></head><body>'
     +'<h1>Ausbildungsnachweis</h1><div class="sub">Wochenbericht · BBiG §13</div>'
     +'<div class="meta"><div><b>Name:</b> '+esc(d.azubiName)+'</div><div><b>Ausbildungsjahr:</b> '+esc(d.ausbildungsjahr)+'</div></div>'
     +'<div class="meta"><div><b>Woche:</b> KW '+d.kw+' / '+d.jahr+' ('+fmtDE(d.montag)+' – '+fmtDE(d.freitag)+')</div><div><b>Abteilung:</b> '+esc(d.abteilung||'–')+'</div></div>'
@@ -2032,12 +2100,13 @@ function bhPrint(){
     +'<tr><td class="d">Berufsschule</td><td>'+esc(d.bs.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(d.bs.std||0)+'</td></tr>'
     +'<tr><td class="d">ÜBL</td><td>'+esc(d.uebl.text||'').replace(/\n/g,'<br>')+'</td><td class="h">'+(d.uebl.std||0)+'</td></tr>'
     +'</tbody><tfoot><tr><td colspan="2" style="text-align:right">Gesamtstunden</td><td class="h">'+d.gesamt+'</td></tr></tfoot></table>'
-    +'<div class="sig"><div>Datum, Unterschrift Auszubildende(r)</div><div>Datum, Unterschrift Ausbilder/in</div></div>'
+    +bemerk
+    +'<div class="sig"><div>'+(azubiSig?('<div class="signed">'+azubiSig+'</div>'):'')+'<div class="sigline">Datum, Unterschrift Auszubildende(r)</div></div>'
+    +'<div>'+(agSig?('<div class="signed">'+agSig+'</div>'):'')+'<div class="sigline">Datum, Unterschrift Ausbilder/in</div></div></div>'
     +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},300);}<\/scr'+'ipt></body></html>';
   const w=window.open('','_blank'); if(!w){ toast('Pop-up blockiert – bitte erlauben','bad'); return; }
   w.document.open(); w.document.write(html); w.document.close();
 }
-
 function showPage(id){
   if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
   _curPage=id; _navFromPop=false;
