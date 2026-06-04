@@ -809,7 +809,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="pw-logo">Ausbilder<span>Pro</span></div>
     <div class="pw-sub" id="fbSubTxt">Mit deinem Konto anmelden</div>
     <input class="pw-inp" id="fbEmail" type="email" placeholder="E-Mail" autocomplete="email" style="letter-spacing:normal;text-align:left;font-size:.85rem;">
-    <input class="pw-inp" id="fbPass" type="password" placeholder="Passwort" onkeydown="if(event.key==='Enter')fbLogin()" autocomplete="current-password">
+    <div style="position:relative;width:100%">
+      <input class="pw-inp" id="fbPass" type="password" placeholder="Passwort" onkeydown="if(event.key==='Enter')fbLogin()" autocomplete="current-password" style="padding-right:40px">
+      <button type="button" id="fbPassEye" title="Anzeigen / Verbergen" onclick="togglePwVis('fbPass','fbPassEye')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:1.1rem;padding:4px;line-height:1">&#128065;</button>
+    </div>
     <button class="pw-btn" title="Anmelden" onclick="fbLogin()" id="fbLoginBtn">Anmelden</button>
     <button class="pw-btn" title="Passwort vergessen" onclick="fbReset()" style="background:#fff;border:1px solid #e2e8f0;box-shadow:none;color:#475569;font-size:.78rem;padding:8px;width:100%">Passwort vergessen</button>
     <div class="pw-err" id="fbErr"></div>
@@ -1094,7 +1097,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.27.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.27.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6523,6 +6526,21 @@ async function _loadPositionsBulk(){
 }
 setTimeout(_loadPositionsBulk,200);
 
+function askPin(msg){
+  return new Promise(function(resolve){
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:Arial,Helvetica,sans-serif';
+    ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:20px;width:300px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.25)"><div style="font-size:.9rem;font-weight:700;color:#1e293b;margin-bottom:12px">'+msg+'</div><div style="position:relative"><input id="_pinIn" type="password" inputmode="numeric" maxlength="4" autocomplete="off" style="width:100%;box-sizing:border-box;padding:11px 42px 11px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:1.1rem;letter-spacing:.3em;text-align:center;font-family:monospace"><button id="_pinEye" type="button" title="Anzeigen / Verbergen" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:1.15rem;padding:4px;line-height:1">&#128065;</button></div><div style="display:flex;gap:8px;margin-top:14px"><button id="_pinCancel" type="button" style="flex:1;padding:10px;border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:10px;font-weight:600;cursor:pointer">Abbrechen</button><button id="_pinOk" type="button" style="flex:1;padding:10px;border:none;background:linear-gradient(135deg,#0ea5e9,#10b981);color:#fff;border-radius:10px;font-weight:700;cursor:pointer">OK</button></div></div>';
+    document.body.appendChild(ov);
+    var inp=ov.querySelector('#_pinIn'), eye=ov.querySelector('#_pinEye');
+    function done(v){ try{document.body.removeChild(ov);}catch(e){} resolve(v); }
+    eye.onclick=function(){ if(inp.type==='password'){inp.type='text';eye.innerHTML='&#128584;';}else{inp.type='password';eye.innerHTML='&#128065;';} inp.focus(); };
+    ov.querySelector('#_pinCancel').onclick=function(){ done(null); };
+    ov.querySelector('#_pinOk').onclick=function(){ done(inp.value?String(inp.value).trim():''); };
+    inp.addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault();ov.querySelector('#_pinOk').click();} else if(e.key==='Escape'){done(null);} });
+    setTimeout(function(){inp.focus();},60);
+  });
+}
 // Sig + Stempel fuer ALLE TN aus encrypted store einfuegen
 async function insertSigStempelBulk(){
   if(!window.opener||!window.opener._getDefaultSigStempel){
@@ -6531,7 +6549,7 @@ async function insertSigStempelBulk(){
   }
   var pin=window.opener._getCachedSigStempelPin?window.opener._getCachedSigStempelPin():null;
   if(!pin){
-    pin=prompt('4-stellige PIN zum Entsperren von Unterschrift & Stempel:');
+    pin=await askPin('4-stellige PIN zum Entsperren von Unterschrift & Stempel:');
     if(!pin||pin.length!==4)return;
   }
   var result;
@@ -9297,6 +9315,21 @@ function getSignatureData(){
   if(!canvas||!hasSig)return null;
   return canvas.toDataURL('image/png');
 }
+function askPin(msg){
+  return new Promise(function(resolve){
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:Arial,Helvetica,sans-serif';
+    ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:20px;width:300px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,.25)"><div style="font-size:.9rem;font-weight:700;color:#1e293b;margin-bottom:12px">'+msg+'</div><div style="position:relative"><input id="_pinIn" type="password" inputmode="numeric" maxlength="4" autocomplete="off" style="width:100%;box-sizing:border-box;padding:11px 42px 11px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:1.1rem;letter-spacing:.3em;text-align:center;font-family:monospace"><button id="_pinEye" type="button" title="Anzeigen / Verbergen" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:1.15rem;padding:4px;line-height:1">&#128065;</button></div><div style="display:flex;gap:8px;margin-top:14px"><button id="_pinCancel" type="button" style="flex:1;padding:10px;border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:10px;font-weight:600;cursor:pointer">Abbrechen</button><button id="_pinOk" type="button" style="flex:1;padding:10px;border:none;background:linear-gradient(135deg,#0ea5e9,#10b981);color:#fff;border-radius:10px;font-weight:700;cursor:pointer">OK</button></div></div>';
+    document.body.appendChild(ov);
+    var inp=ov.querySelector('#_pinIn'), eye=ov.querySelector('#_pinEye');
+    function done(v){ try{document.body.removeChild(ov);}catch(e){} resolve(v); }
+    eye.onclick=function(){ if(inp.type==='password'){inp.type='text';eye.innerHTML='&#128584;';}else{inp.type='password';eye.innerHTML='&#128065;';} inp.focus(); };
+    ov.querySelector('#_pinCancel').onclick=function(){ done(null); };
+    ov.querySelector('#_pinOk').onclick=function(){ done(inp.value?String(inp.value).trim():''); };
+    inp.addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault();ov.querySelector('#_pinOk').click();} else if(e.key==='Escape'){done(null);} });
+    setTimeout(function(){inp.focus();},60);
+  });
+}
 async function insertDefaultSigStempel(){
   if(!window.opener||!window.opener._getDefaultSigStempel){
     alert('Bitte AusbilderPro im Hauptfenster geöffnet halten.');
@@ -9304,7 +9337,7 @@ async function insertDefaultSigStempel(){
   }
   let pin=(window.opener._getCachedSigStempelPin&&window.opener._getCachedSigStempelPin())||'';
   if(!pin){
-    pin=prompt('PIN eingeben (4-stellig):');
+    pin=await askPin('PIN eingeben (4-stellig):');
     if(!pin) return;
     pin=String(pin).trim();
   }
@@ -11830,6 +11863,13 @@ function fbLogin(){
     .catch(e=>{ document.getElementById('fbLoginBtn').textContent='Anmelden'; fbErr(fbErrMsg(e)); });
 }
 
+function togglePwVis(id,btnId){
+  var i=document.getElementById(id), b=document.getElementById(btnId);
+  if(!i) return;
+  if(i.type==='password'){ i.type='text'; if(b) b.innerHTML='&#128584;'; }
+  else { i.type='password'; if(b) b.innerHTML='&#128065;'; }
+  i.focus();
+}
 function fbReset(){
   const email=document.getElementById('fbEmail').value.trim();
   if(!email){fbErr('Bitte zuerst E-Mail eingeben');return;}
