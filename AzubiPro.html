@@ -194,7 +194,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div id="joinLoginSection">
       <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px;text-align:center">Bereits ein Konto?</div>
       <div><label class="fl">E-Mail</label><input class="fi" type="email" id="jLoginEmail" placeholder="deine@email.de" autocomplete="email"></div>
-      <div style="margin-top:6px"><label class="fl">Passwort</label><input class="fi" type="password" id="jLoginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitJoinLogin()"></div>
+      <div style="margin-top:6px"><label class="fl">Passwort</label><div style="position:relative;margin-bottom:10px"><input class="fi" type="password" id="jLoginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitJoinLogin()" style="padding-right:40px;box-sizing:border-box;margin-bottom:0"><button type="button" id="jLoginPassEye" title="Anzeigen / Verbergen" onclick="togglePwVis('jLoginPass','jLoginPassEye')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:1.05rem;padding:4px;line-height:1">&#128065;</button></div></div>
       <div class="err" id="jLoginErr"></div>
       <button class="btn" onclick="submitJoinLogin()" style="margin-top:8px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Anmelden & beitreten">Anmelden & Lehrgang beitreten</button>
       <div style="margin-top:14px;border-top:1px solid var(--brd);padding-top:12px;text-align:center">
@@ -285,7 +285,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="login-sub">Dein Lehrgangsportal</div>
     <div class="login-badge">📚 FÜR AUSZUBILDENDE</div>
     <div><label class="fl">E-Mail</label><input class="fi" type="email" id="lEmail" placeholder="deine@email.de" autocomplete="email"></div>
-    <div><label class="fl">Passwort</label><input class="fi" type="password" id="lPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div><label class="fl">Passwort</label><div style="position:relative;margin-bottom:10px"><input class="fi" type="password" id="lPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:40px;box-sizing:border-box;margin-bottom:0"><button type="button" id="lPassEye" title="Anzeigen / Verbergen" onclick="togglePwVis('lPass','lPassEye')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:1.05rem;padding:4px;line-height:1">&#128065;</button></div></div>
     <div class="err" id="lErr"></div>
     <button class="btn" onclick="doLogin()" title="Anmelden">Anmelden</button>
     <button class="btn" title="Passwort vergessen" onclick="doReset()" style="background:var(--sur2);box-shadow:none;color:var(--mu);font-size:.7rem;padding:9px;margin-top:6px">Passwort vergessen</button>
@@ -1132,6 +1132,13 @@ function doLogin(){
       const map={'auth/user-not-found':'E-Mail oder Passwort falsch','auth/wrong-password':'E-Mail oder Passwort falsch','auth/invalid-credential':'E-Mail oder Passwort falsch','auth/invalid-email':'Ungültige E-Mail','auth/too-many-requests':'Zu viele Versuche – kurz warten'};
       showErr(map[err.code]||err.message);
     });
+}
+function togglePwVis(id,btnId){
+  var i=document.getElementById(id), b=document.getElementById(btnId);
+  if(!i) return;
+  if(i.type==='password'){ i.type='text'; if(b) b.innerHTML='&#128584;'; }
+  else { i.type='password'; if(b) b.innerHTML='&#128065;'; }
+  i.focus();
 }
 function doReset(){
   const e=document.getElementById('lEmail').value.trim();
