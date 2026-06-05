@@ -1097,7 +1097,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.27.3 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.27.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1869,10 +1869,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           </div>
         </div>
         <div class="tp-section">
-          <div class="tp-section-hd">📣 Unentschuldigtes Fehlen</div>
-          <div id="nsHint" style="font-size:.72rem;color:#64748b;line-height:1.5;margin-bottom:8px">Kein unentschuldigter Fehltag.</div>
-          <button class="tbtn" id="btnNoShowNotify" onclick="notifyUnexcusedAbsence()" style="width:100%;background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;font-weight:700;opacity:.4;pointer-events:none" disabled>📣 Wegen Fehltag melden lassen</button>
-          <div style="font-size:.66rem;color:#94a3b8;line-height:1.45;margin-top:8px">Erinnert den Azubi (und den Betrieb) an einen unentschuldigten Fehltag — <b>ohne</b> den Lehrgang als „nicht teilgenommen" zu werten. Für den 1. Tag oder mehr als 1 Tag bitte „Nicht angetreten" nutzen.</div>
+          <div class="tp-section-hd">📣 Bei Fehlen informieren</div>
+          <div id="nsHint" style="font-size:.72rem;color:#64748b;line-height:1.5;margin-bottom:8px">Informiert Azubi (und Betrieb) über das Fehlen am gewählten Tag.</div>
+          <button class="tbtn" id="btnNoShowNotify" onclick="notifyUnexcusedAbsence()" style="width:100%;background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;font-weight:700">📣 Wegen Fehlen informieren</button>
+          <div style="font-size:.66rem;color:#94a3b8;line-height:1.45;margin-top:8px"><b>Vorab-Info:</b> Schreibt Azubi (und Betrieb) an, dass er am gewählten Tag (oben im Datum, sonst heute) bisher <b>nicht erschienen</b> ist — <b>ohne</b> Fehltag einzutragen. Kommt er nicht, kannst du ihn danach separat als „Unentsch." eintragen.</div>
         </div>
         <div class="tp-section">
           <div class="tp-section-hd">📋 Verlauf</div>
@@ -5506,13 +5506,11 @@ function updNoShowBtn(){
   const btn=document.getElementById('btnNoShowNotify');
   const hint=document.getElementById('nsHint');
   if(!btn) return;
-  const au=(tmpAtt||[]).filter(a=>a.type==='absent_u').sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  if(au.length){
-    btn.disabled=false; btn.style.opacity=''; btn.style.pointerEvents='';
-    if(hint) hint.innerHTML='Letzter unentschuldigter Fehltag: <b>'+fmtD(au[0].date)+'</b>'+(au.length>1?' (insgesamt '+au.length+')':'');
-  } else {
-    btn.disabled=true; btn.style.opacity='.4'; btn.style.pointerEvents='none';
-    if(hint) hint.textContent='Kein unentschuldigter Fehltag.';
+  btn.disabled=false; btn.style.opacity=''; btn.style.pointerEvents='';
+  if(hint){
+    let d=getDateFromSelects();
+    if(!d){ const t=new Date(); d=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); }
+    hint.innerHTML='Informiert Azubi (und Betrieb) über das Fehlen am <b>'+fmtD(d)+'</b> – ohne Fehltag einzutragen.';
   }
 }
 // Weicher Pfad: Azubi (+ AG) wegen einzelnem unentschuldigtem Fehltag erinnern — OHNE Kurs-Status zu ändern
@@ -5520,11 +5518,11 @@ function notifyUnexcusedAbsence(){
   if(!curSeat||!S.curKat||!S.curInst){ toast('Kein TN ausgewählt','bad'); return; }
   const seat=(curSeats()[curSeat])||{};
   const poolTnId=seat.poolTnId;
-  const au=(tmpAtt||[]).filter(a=>a.type==='absent_u').sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  if(!au.length){ toast('Kein unentschuldigter Fehltag','bad'); return; }
-  const datumDE=fmtD(au[0].date);
+  let _nd=getDateFromSelects();
+  if(!_nd){ const t=new Date(); _nd=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); }
+  const datumDE=fmtD(_nd);
   if(!_db||!poolTnId){ toast('TN ist nicht mit der Cloud verknüpft – Mail nicht möglich','bad'); return; }
-  if(!confirm('📣 Azubi (und Betrieb) wegen unentschuldigtem Fehlen am '+datumDE+' anschreiben?\n\nDer Lehrgang wird NICHT als „nicht teilgenommen" gewertet.')) return;
+  if(!confirm('📣 Azubi (und Betrieb) informieren, dass er am '+datumDE+' (noch) nicht erschienen ist?\n\nEs wird KEIN Fehltag eingetragen – falls er nicht kommt, kannst du ihn danach separat als „Unentsch." eintragen.')) return;
   const kursName=S.kats[S.curKat]?.label||'Lehrgang';
   const kursNameMail=katLabelFull(S.curKat)||kursName;
   const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
@@ -5532,19 +5530,19 @@ function notifyUnexcusedAbsence(){
     if(!doc.exists){ toast('TN-Daten nicht gefunden','bad'); return; }
     const data=doc.data();
     // Weiche Azubi-Mail – KEIN "gilt als nicht teilgenommen"
-    sendTnEmail(data, '⚠ Unentschuldigtes Fehlen am '+datumDE+' – '+kursNameMail,
-      '<p style="margin:0 0 12px;font-size:.92rem;color:#1e293b;line-height:1.55">du hast am <b>'+datumDE+'</b> beim Lehrgang <b>"'+kursNameMail+'"</b> unentschuldigt gefehlt.</p>'
+    sendTnEmail(data, '📣 Fehlen am '+datumDE+' – bitte melden – '+kursNameMail,
+      '<p style="margin:0 0 12px;font-size:.92rem;color:#1e293b;line-height:1.55">du bist am <b>'+datumDE+'</b> beim Lehrgang <b>"'+kursNameMail+'"</b> bisher nicht erschienen.</p>'
       +'<div style="padding:12px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:6px;margin-bottom:12px">'
       +'<p style="margin:0;font-size:.85rem;color:#92400e;line-height:1.5">Bitte melde dich umgehend bei deinem Ausbilder oder dem Bildungszentrum und reiche – falls vorhanden – eine Entschuldigung (z.B. Krankmeldung) nach.</p></div>'
       +'<p style="margin:0;font-size:.8rem;color:#64748b;line-height:1.55">Eine kurze Nachricht über AzubiPro genügt.</p>'
     );
     // AG-Mail mit Fallback (ArbeitgeberPro-Account → sonst hinterlegte AG-Mail)
-    sendAgEmail(data, '⚠ Unentschuldigtes Fehlen – '+kursNameMail+' ('+datumDE+')',
-      '<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">Ihr Auszubildender hat am <b>'+datumDE+'</b> beim Lehrgang <b>'+kursNameMail+'</b> unentschuldigt gefehlt und sich nicht gemeldet.</p>'
+    sendAgEmail(data, '📣 Fehlen – '+kursNameMail+' ('+datumDE+')',
+      '<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">Ihr Auszubildender ist am <b>'+datumDE+'</b> beim Lehrgang <b>'+kursNameMail+'</b> bisher nicht erschienen und hat sich nicht gemeldet.</p>'
       +'<p style="margin:0;font-size:.82rem;color:#374151;line-height:1.55">Bitte sprechen Sie ihn darauf an. Der Lehrgang bleibt davon unberührt.</p>'
       +'<p style="margin:8px 0 0;font-size:.75rem;color:#64748b">Ausbilder: '+ausName+'</p>'
     , _seatAgEmailByTnId(poolTnId));
-    toast('Meldung wegen Fehltag verschickt ✓');
+    toast('Info wegen Fehlen verschickt ✓');
   }).catch(()=>toast('Fehler beim Laden der TN-Daten','bad'));
 }
 function renderAtt(){
