@@ -1097,7 +1097,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.27.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.27.5 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1811,6 +1811,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
       <div class="tp" id="tp-att">
+        <div id="meldHinweisBanner" style="display:none"></div>
         <div class="tp-section">
           <div class="tp-section-hd">📊 Statistik</div>
           <div class="asts">
@@ -4471,6 +4472,9 @@ function mkSeat(id,seats){
       const meldIcons={'spaeter':'🕐','frueher':'🚶','krank':'🤒','text':'💬'};
       el.classList.add('meld-'+(meld.type||'text'));
       meldHtml='<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2.2rem;z-index:6;pointer-events:none;filter:drop-shadow(0 2px 8px rgba(0,0,0,.35))">'+(meldIcons[meld.type]||'💬')+'</div>';
+    } else if(d.offeneMeldung){
+      const oi={'spaeter':'🕐','frueher':'🚶','text':'💬'}[d.offeneMeldung.type]||'📬';
+      meldHtml='<div title="Gemeldet: '+esc(d.offeneMeldung.label||'')+' – noch nicht eingetragen" style="position:absolute;top:3px;right:3px;font-size:1rem;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">'+oi+'</div>';
     }
     el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
   }
@@ -5502,6 +5506,25 @@ function saveEditAtt(i){
   toast('Eintrag aktualisiert','ok');
 }
 // Button-Status für weichen No-Show-Pfad (aktiv wenn unentschuldigter Fehltag vorhanden)
+function _updMeldBanner(){
+  const bn=document.getElementById('meldHinweisBanner'); if(!bn) return;
+  const s=(curSeat?(curSeats()[curSeat]||{}):{});
+  const om=s.offeneMeldung;
+  if(!om){ bn.style.display='none'; bn.innerHTML=''; return; }
+  const ic={'spaeter':'🕐','frueher':'🚶','text':'💬'}[om.type]||'📬';
+  const zeit=om.ts?new Date(om.ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+  bn.style.display='';
+  bn.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;background:rgba(245,158,11,.1);border:1.5px solid rgba(245,158,11,.4);border-radius:10px">'
+    +'<span style="font-size:1.4rem">'+ic+'</span>'
+    +'<div style="flex:1;font-size:.74rem;color:#92400e;line-height:1.4"><b>Gemeldet: '+esc(om.label||'Meldung')+'</b>'+(om.type==='text'&&om.text?' – „'+esc(om.text)+'"':'')+'<br>Noch nicht eingetragen'+(zeit?' · '+zeit:'')+'.</div>'
+    +'<button onclick="clearOffeneMeldung()" title="Hinweis entfernen" style="border:1px solid rgba(245,158,11,.5);background:#fff;color:#92400e;border-radius:8px;padding:6px 10px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">erledigt</button>'
+    +'</div>';
+}
+function clearOffeneMeldung(){
+  if(!curSeat) return;
+  const s=curSeats()[curSeat]; if(s){ s.offeneMeldung=null; persist(); }
+  _updMeldBanner(); renderSeats();
+}
 function updNoShowBtn(){
   const btn=document.getElementById('btnNoShowNotify');
   const hint=document.getElementById('nsHint');
@@ -5560,6 +5583,7 @@ function renderAtt(){
   document.getElementById('stK').textContent=kCnt;
   document.getElementById('stBS').textContent=bsCnt;
   updNoShowBtn();
+  _updMeldBanner();
   // (Stat-Kästchen werden immer sichtbar angezeigt — feste 6er-Reihe)
   const c=document.getElementById('ahist');
   if(!att.length){c.innerHTML='<p style="color:var(--mu);font-size:.73rem;text-align:center;padding:9px">Noch keine Einträge</p>';return;}
@@ -5652,6 +5676,8 @@ function saveSeat(){
   const extraGrades={};
   (inst.customGrades||[]).forEach(g=>{ const el=document.getElementById('ig_'+g.id); extraGrades[g.id]=el?el.value:''; });
   const oldSeat=S.kats[S.curKat].instances[S.curInst].seats[curSeat]||{};
+  const _todayIso=new Date().toISOString().slice(0,10);
+  const _hatHeute=tmpAtt.some(a=>a.date===_todayIso);
   let _seatName=document.getElementById('iName').value.trim();
   S.kats[S.curKat].instances[S.curInst].seats[curSeat]={
     name:_seatName,
@@ -5670,6 +5696,7 @@ function saveSeat(){
     // Firestore-Verknüpfung beibehalten
     poolTnId:oldSeat.poolTnId||null,
     poolKursId:oldSeat.poolKursId||null,
+    offeneMeldung: _hatHeute ? null : (oldSeat.offeneMeldung||null),
     werkzeugStatus:document.getElementById('wzFehlt')?.checked?'fehlt':document.getElementById('wzOk')?.checked?'ok':'',
     werkzeugFehlt:(document.getElementById('wzFehltText')?.value||'').trim(),
   };
@@ -7561,6 +7588,13 @@ function confirmMeldungGelesen(){
   _pendingMeldung=null;
   document.getElementById('tnDetailModal').classList.remove('open');
   const finalize=()=>{
+    // Offenen Hinweis am Sitz merken (alle Typen ausser 'krank') – bleibt bis Eintrag/erledigt
+    const _rel=(melds||[]).find(m=>m.type!=='krank');
+    if(_rel){
+      const _lab={'spaeter':'Kommt heute später','frueher':'Geht heute früher','text':'Nachricht'}[_rel.type]||'Meldung';
+      const _seat=curSeats()[seatId];
+      if(_seat){ _seat.offeneMeldung={type:_rel.type,label:_lab,text:_rel.text||'',ts:Date.now()}; persist(); }
+    }
     // Aus lokalem Cache entfernen
     delete _tnMeldungen[tnId];
     // Seats neu rendern (entfernt Rahmen/Icon)
