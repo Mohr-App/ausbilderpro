@@ -1097,7 +1097,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.27.6 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.27.7 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -4476,6 +4476,9 @@ function mkSeat(id,seats){
       const oi={'spaeter':'🕐','frueher':'🚶','text':'💬'}[d.offeneMeldung.type]||'📬';
       meldHtml='<div title="Gemeldet: '+esc(d.offeneMeldung.label||'')+' – noch nicht eingetragen" style="position:absolute;top:3px;right:3px;font-size:1rem;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">'+oi+'</div>';
     }
+    if(d.fehlInfo){
+      meldHtml+='<div title="Wegen Fehlen informiert am '+fmtD(d.fehlInfo.date)+'" style="position:absolute;top:3px;left:3px;font-size:.8rem;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">📣</div>';
+    }
     el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
   }
   return el;
@@ -5530,10 +5533,16 @@ function updNoShowBtn(){
   const hint=document.getElementById('nsHint');
   if(!btn) return;
   btn.disabled=false; btn.style.opacity=''; btn.style.pointerEvents='';
+  const s=(curSeat?(curSeats()[curSeat]||{}):{});
   if(hint){
-    let d=getDateFromSelects();
-    if(!d){ const t=new Date(); d=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); }
-    hint.innerHTML='Informiert Azubi (und Betrieb) über das Fehlen am <b>'+fmtD(d)+'</b> – ohne Fehltag einzutragen.';
+    if(s.fehlInfo){
+      const z=s.fehlInfo.ts?new Date(s.fehlInfo.ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+      hint.innerHTML='<span style="color:#059669;font-weight:700">✓ Am '+fmtD(s.fehlInfo.date)+' wegen Fehlen informiert'+(z?' ('+z+')':'')+'.</span><br>Verschwindet automatisch, sobald du die Anwesenheit für den Tag einträgst.';
+    } else {
+      let d=getDateFromSelects();
+      if(!d){ const t=new Date(); d=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); }
+      hint.innerHTML='Informiert Azubi (und Betrieb) über das Fehlen am <b>'+fmtD(d)+'</b> – ohne Fehltag einzutragen.';
+    }
   }
 }
 // Weicher Pfad: Azubi (+ AG) wegen einzelnem unentschuldigtem Fehltag erinnern — OHNE Kurs-Status zu ändern
@@ -5571,6 +5580,7 @@ function notifyUnexcusedAbsence(){
       +'<p style="margin:8px 0 0;font-size:.75rem;color:#64748b">Ausbilder: '+ausName+'</p>'
     , _agMail);
     toast('Info wegen Fehlen verschickt ✓');
+    { const _s=curSeats()[curSeat]; if(_s){ _s.fehlInfo={date:_nd,ts:Date.now()}; persist(); } updNoShowBtn(); renderSeats(); }
   }).catch(()=>toast('Fehler beim Laden der TN-Daten','bad'));
 }
 function renderAtt(){
@@ -5683,6 +5693,8 @@ function saveSeat(){
   const oldSeat=S.kats[S.curKat].instances[S.curInst].seats[curSeat]||{};
   const _todayIso=new Date().toISOString().slice(0,10);
   const _hatHeute=tmpAtt.some(a=>a.date===_todayIso);
+  const _fi=oldSeat.fehlInfo||null;
+  const _fiKeep=(_fi && !tmpAtt.some(a=>a.date===_fi.date)) ? _fi : null;
   let _seatName=document.getElementById('iName').value.trim();
   S.kats[S.curKat].instances[S.curInst].seats[curSeat]={
     name:_seatName,
@@ -5702,6 +5714,7 @@ function saveSeat(){
     poolTnId:oldSeat.poolTnId||null,
     poolKursId:oldSeat.poolKursId||null,
     offeneMeldung: _hatHeute ? null : (oldSeat.offeneMeldung||null),
+    fehlInfo: _fiKeep,
     werkzeugStatus:document.getElementById('wzFehlt')?.checked?'fehlt':document.getElementById('wzOk')?.checked?'ok':'',
     werkzeugFehlt:(document.getElementById('wzFehltText')?.value||'').trim(),
   };
