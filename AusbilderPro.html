@@ -1097,7 +1097,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.27.9 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.28.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6268,6 +6268,8 @@ function generateAlleBescheinigungenAusbilder(){
   <div class="field kurs-title"><b>${esc(kursLabel)}</b></div>
 </div>
 ${notenHtml}
+</div>
+<div class="cert-bottom">
 <div class="ausbildungsnachweis"><b>Ausbildungsnachweis wurde für den Zeitraum der überbetrieblichen<br>Unterweisung geführt:</b> &nbsp;&nbsp;<span class="radio rb-yes ${initYesChecked?'checked':''}" data-tn="${tnId}" onclick="toggleNachweis('${tnId}','yes')"><span class="radio-dot"></span></span> ja &nbsp;&nbsp;&nbsp;<span class="radio rb-no ${initNoChecked?'checked':''}" data-tn="${tnId}" onclick="toggleNachweis('${tnId}','no')"><span class="radio-dot"></span></span> nein</div>
 <div class="datum-zeile"><b>Siegburg, den ${heute}</b></div>
 <div class="sig-row">
@@ -6370,21 +6372,22 @@ h1{text-align:center;font-size:22pt;font-weight:bold;font-style:italic;margin:4m
 .datum-zeile{margin:2mm 0 2mm 0;font-size:12pt;}
 
 /* Unterschriften */
-.sig-row{display:flex;justify-content:space-between;margin:1mm 0 3mm 0;gap:15mm;position:relative;align-items:flex-end;}
-.sig-block{flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;}
+.sig-row{display:flex;justify-content:space-between;margin:1mm 0 3mm 0;gap:15mm;position:relative;align-items:flex-end;flex-shrink:0;}
+.sig-block{flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;position:relative;}
 .sig-space{height:16mm;}
 .sig-line{border-top:1pt dotted #000;padding-top:1mm;font-size:11pt;width:100%;}
 .sig-img{max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;}
 
 /* Hinweis + Handwerk Logo */
-.hinweis-row{display:flex;justify-content:space-between;align-items:center;margin:15mm 0 4mm 0;gap:10mm;}
+.cert-bottom{flex-shrink:0;}
+.hinweis-row{display:flex;justify-content:space-between;align-items:center;margin:15mm 0 4mm 0;gap:10mm;flex-shrink:0;}
 body.pdf-mode .hinweis-row{margin:4mm 0;}
 @media print{.hinweis-row{margin:4mm 0 !important;}}
 .hinweis{flex:1;font-size:10.5pt;line-height:1.4;}
 .handwerk-logo{flex-shrink:0;display:flex;align-items:center;justify-content:center;}.handwerk-logo img{width:55mm;height:auto;max-height:22mm;object-fit:contain;}
 
 /* Footer - immer unten, Serif wie Original */
-.footer{flex-shrink:0;margin-top:auto;padding-top:3mm;border-top:1pt solid #000;font-size:8.5pt;font-family:'Times New Roman',Times,serif;}
+.footer{flex-shrink:0;padding-top:3mm;border-top:1pt solid #000;font-size:8.5pt;font-family:'Times New Roman',Times,serif;}
 .footer-cols{display:flex;justify-content:space-between;gap:10mm;margin-bottom:3mm;}
 .footer-col{flex:1;}
 .footer-head{font-weight:bold;margin-bottom:1mm;}
@@ -6408,6 +6411,8 @@ body.pdf-mode .hinweis-row{margin:4mm 0;}
 /* Sig + Stempel (wie in Einzel-Bescheinigung) */
 .sig-canvas-wrap{border:2px dashed #999;border-radius:8px;padding:4px;margin-bottom:4px;background:#fafafa;position:relative;height:16mm;width:80%;}
 .sig-canvas-wrap.signed{border-color:#22c55e;border-style:dashed;background:transparent;}
+.sig-canvas-wrap.signed{height:16mm!important;overflow:visible;}
+.sig-canvas-wrap.signed .sig-img{position:absolute;left:50%;bottom:0;transform:translateX(-50%);height:16mm;width:auto;max-width:72mm;max-height:none;margin:0;}
 .sig-canvas-wrap-empty{height:16mm;width:80%;}
 @media print{.sig-canvas-wrap,.sig-canvas-wrap.signed{border:none !important;background:none !important;padding:0 !important;}.sig-canvas-wrap-empty{display:none;}}
 body.pdf-mode .sig-canvas-wrap{border:none !important;background:transparent !important;padding:0 !important;}
@@ -6508,7 +6513,9 @@ const _MM_PER_PX=1/3.78;
 function _applySigPosAll(){
   document.querySelectorAll('.sig-canvas-wrap').forEach(function(wrap){
     wrap.style.transform='translate('+_sigPos.x+'mm,'+_sigPos.y+'mm)';
-    wrap.style.height=_sigPos.size+'mm';
+    var _img=wrap.querySelector('.sig-img');
+    if(_img){ wrap.style.height='16mm'; _img.style.height=_sigPos.size+'mm'; }
+    else { wrap.style.height=_sigPos.size+'mm'; }
   });
 }
 function _applyStempelPosAll(){
