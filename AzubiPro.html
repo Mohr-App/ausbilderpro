@@ -679,6 +679,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </button>
       </div>
       <div id="sitzplatzPopup"></div>
+      <button id="qrCheckinBtn" onclick="openQRScanner()" title="Anwesenheit: QR-Code im Kursraum scannen (nur vor Ort möglich)" style="width:100%;margin-bottom:12px;padding:14px;background:linear-gradient(135deg,#2563eb,#059669);border:none;border-radius:14px;cursor:pointer;color:#fff;font-size:.88rem;font-weight:800;font-family:'Sora',sans-serif;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 4px 14px rgba(37,99,235,.3)">📡 Anwesenheit – QR scannen</button>
       <div id="homeKurse"><div class="empty">Lädt Lehrgänge…</div></div>
       <div style="margin-top:14px;padding:12px 14px;background:rgba(100,116,139,.05);border:1px dashed rgba(100,116,139,.2);border-radius:10px;font-size:.7rem;color:var(--mu);line-height:1.5;text-align:center">
         Weiterer Lehrgang? Tippe oben rechts auf <b style="color:#2563eb">QR</b>, um einen zusätzlichen Kurs hinzuzufügen.
@@ -2298,6 +2299,7 @@ function renderFirmaPage(){
 
 // ── Load Data ──
 function loadData(){
+  try{ setTimeout(_tryQRCheckin,400); }catch(e){}
   // Activity tracking
   if(_tnId) db.collection('users').doc(_uid).set({lastActive:Date.now(),lastApp:'AzubiPro',email:_email||'',role:'azubi',sessionStart:Date.now()},{merge:true}).catch(()=>{});
   // Heartbeat alle 60s
@@ -2336,6 +2338,7 @@ function loadData(){
         || JSON.stringify(newData.kursHistory||[])!==JSON.stringify(_tnData?.kursHistory||[])
         || newData.status!==_tnData?.status;
       _tnData=newData;
+      try{ _tryQRCheckin(); }catch(e){}
       if(changed){
         loadKurse();
         checkBenachrichtigungen();
@@ -3149,6 +3152,158 @@ function getGPS(){
       {enableHighAccuracy:true,timeout:8000,maximumAge:60000}
     );
   });
+}
+
+// ═══ QR-ANWESENHEIT CHECK-IN (Scan des Kurs-QR + GPS-Pruefung) ═══
+let _checkinKursId=(function(){try{return new URLSearchParams(window.location.search).get('join')||null;}catch(e){return null;}})();
+let _checkinDone=false;
+function _qrDistanz(gps,geo){
+  const R=6371000;
+  const dLat=(gps.lat-geo.lat)*Math.PI/180;
+  const dLng=(gps.lng-geo.lng)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(geo.lat*Math.PI/180)*Math.cos(gps.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function _checkinBanner(kind,txt){
+  let el=document.getElementById('qrCiBanner');
+  if(!el){
+    el=document.createElement('div');
+    el.id='qrCiBanner';
+    el.style.cssText='position:fixed;top:10px;left:10px;right:10px;z-index:9999;padding:12px 38px 12px 14px;border-radius:12px;font-size:.78rem;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.18);line-height:1.45';
+    const x=document.createElement('button');
+    x.textContent='✕';
+    x.style.cssText='position:absolute;top:8px;right:10px;background:none;border:none;font-size:1rem;cursor:pointer;color:inherit;opacity:.7';
+    x.onclick=()=>el.remove();
+    el.appendChild(x);
+    const sp=document.createElement('span'); sp.id='qrCiBannerTxt';
+    el.insertBefore(sp,x);
+    document.body.appendChild(el);
+  }
+  const colors={ok:['rgba(5,150,105,.97)','#fff'],info:['rgba(37,99,235,.97)','#fff'],warn:['rgba(245,158,11,.97)','#fff'],bad:['rgba(220,38,38,.97)','#fff']};
+  const c=colors[kind]||colors.info;
+  el.style.background=c[0]; el.style.color=c[1];
+  document.getElementById('qrCiBannerTxt').textContent=txt;
+  if(kind==='ok'){ setTimeout(()=>{try{el.remove();}catch(e){}},10000); }
+}
+// GPS fuer Check-in: grosszuegiger Cache (letzter Fix vor der Tuer zaehlt, bis 3 min alt)
+function _getGPSCheckin(){
+  return new Promise(resolve=>{
+    if(!navigator.geolocation){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(
+      pos=>resolve({lat:Math.round(pos.coords.latitude*1e6)/1e6,lng:Math.round(pos.coords.longitude*1e6)/1e6,acc:Math.round(pos.coords.accuracy)}),
+      ()=>resolve(null),
+      {enableHighAccuracy:true,timeout:12000,maximumAge:300000}
+    );
+  });
+}
+// ── In-App QR-Scanner (Weg B: Button in der App → Kamera → Scan) ──
+let _qrScanStream=null,_qrScanRAF=null,_jsQRLoading=null;
+function _loadJsQR(){
+  if(window.jsQR) return Promise.resolve();
+  if(_jsQRLoading) return _jsQRLoading;
+  _jsQRLoading=new Promise((res,rej)=>{
+    const sc=document.createElement('script');
+    sc.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
+    sc.onload=()=>res(); sc.onerror=()=>{_jsQRLoading=null;rej(new Error('Scanner-Modul konnte nicht geladen werden (Internet?)'));};
+    document.head.appendChild(sc);
+  });
+  return _jsQRLoading;
+}
+function openQRScanner(){
+  if(!_tnData||!_tnData.aktiverKursId){ _checkinBanner('warn','Kein aktiver Lehrgang – Check-in nicht möglich.'); return; }
+  // Overlay bauen
+  let ov=document.getElementById('qrScanOv');
+  if(ov) ov.remove();
+  ov=document.createElement('div');
+  ov.id='qrScanOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div style="color:#fff;font-weight:800;font-size:.95rem;margin-bottom:14px;font-family:\'Sora\',sans-serif">📡 Kurs-QR scannen</div>'
+    +'<div style="position:relative;width:min(86vw,420px);aspect-ratio:1;border-radius:18px;overflow:hidden;border:3px solid rgba(255,255,255,.35)">'
+    +'<video id="qrScanVideo" playsinline style="width:100%;height:100%;object-fit:cover"></video>'
+    +'<div style="position:absolute;inset:12%;border:2.5px dashed rgba(255,255,255,.55);border-radius:14px;pointer-events:none"></div>'
+    +'</div>'
+    +'<div id="qrScanStatus" style="color:rgba(255,255,255,.85);font-size:.75rem;margin-top:14px;text-align:center;min-height:1.2em">Kamera startet…</div>'
+    +'<button onclick="stopQRScanner()" style="margin-top:16px;padding:11px 26px;background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.4);border-radius:12px;color:#fff;font-weight:800;font-size:.8rem;cursor:pointer;font-family:\'Sora\',sans-serif" title="Scanner schließen">Abbrechen</button>';
+  document.body.appendChild(ov);
+  const status=document.getElementById('qrScanStatus');
+  _loadJsQR().then(()=>navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})).then(stream=>{
+    _qrScanStream=stream;
+    const video=document.getElementById('qrScanVideo');
+    if(!video){ stopQRScanner(); return; }
+    video.srcObject=stream;
+    video.setAttribute('playsinline','');
+    video.play();
+    status.textContent='Halte den QR-Code in den Rahmen';
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    const tick=()=>{
+      if(!_qrScanStream) return;
+      if(video.readyState===video.HAVE_ENOUGH_DATA){
+        canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        try{
+          const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+          const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+          if(code&&code.data){ _onQRScanned(code.data); return; }
+        }catch(e){}
+      }
+      _qrScanRAF=requestAnimationFrame(tick);
+    };
+    _qrScanRAF=requestAnimationFrame(tick);
+  }).catch(e=>{
+    status.textContent='⚠ '+(e&&e.name==='NotAllowedError'?'Kamera-Zugriff verweigert. Bitte Kamera für die App/Website erlauben.':(e.message||'Kamera konnte nicht gestartet werden.'));
+  });
+}
+function stopQRScanner(){
+  if(_qrScanRAF){cancelAnimationFrame(_qrScanRAF);_qrScanRAF=null;}
+  if(_qrScanStream){try{_qrScanStream.getTracks().forEach(t=>t.stop());}catch(e){} _qrScanStream=null;}
+  const ov=document.getElementById('qrScanOv'); if(ov) ov.remove();
+}
+function _onQRScanned(data){
+  // kursId aus gescanntem Inhalt ziehen (Link mit ?join=… oder roher Code)
+  let kursId=null;
+  try{ const u=new URL(data); kursId=u.searchParams.get('join'); }catch(e){}
+  if(!kursId&&/^[A-Za-z0-9_-]{6,}$/.test((data||'').trim())) kursId=data.trim();
+  stopQRScanner();
+  if(!kursId){ _checkinBanner('warn','⚠ Das ist kein Kurs-QR-Code.'); return; }
+  if(kursId!==_tnData?.aktiverKursId){ _checkinBanner('warn','⚠ Dieser QR-Code gehört nicht zu deinem aktuellen Lehrgang.'); return; }
+  _checkinKursId=kursId;
+  _checkinDone=false;
+  _tryQRCheckin();
+}
+function _tryQRCheckin(){
+  if(_checkinDone||!_checkinKursId||!_tnId||!_tnData) return;
+  if(_tnData.aktiverKursId!==_checkinKursId) return; // anderer/kein Kurs -> Beitritts-Flow regelt das
+  _checkinDone=true;
+  const kursId=_checkinKursId;
+  const kursRef=db.collection('shared').doc('kurse').collection('list').doc(kursId);
+  kursRef.get().then(doc=>{
+    const qrGeo=(doc.exists&&doc.data().qrGeo)?doc.data().qrGeo:null;
+    if(!qrGeo||!qrGeo.lat) return; // QR-Anwesenheit fuer den Kurs nicht aktiviert -> still
+    const datum=new Date().toISOString().slice(0,10);
+    const ciRef=kursRef.collection('checkins').doc(_tnId+'_'+datum);
+    ciRef.get().then(ci=>{
+      if(ci.exists){ _checkinBanner('ok','✓ Heute bereits eingecheckt'+(ci.data().zeit?' um '+ci.data().zeit+' Uhr':'')+'.'); return; }
+      _checkinBanner('info','📡 Anwesenheits-Check-in – GPS wird geprüft…');
+      _getGPSCheckin().then(gps=>{
+        if(!gps){ _checkinBanner('warn','⚠ Check-in nicht möglich: Kein GPS-Signal oder Standortfreigabe verweigert. Bitte Standort für den Browser erlauben und den QR-Code erneut scannen.'); return; }
+        const dist=_qrDistanz(gps,qrGeo);
+        const radius=qrGeo.radius||100;
+        if(dist>radius){ _checkinBanner('bad','📍 Check-in abgelehnt: Du bist '+Math.round(dist)+' m vom Kursort entfernt (erlaubt: '+radius+' m). Der Check-in ist nur vor Ort möglich – deine Anwesenheit trägt sonst dein Ausbilder ein.'); return; }
+        const zeit=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+        ciRef.set({
+          tnId:_tnId, datum, zeit,
+          dist:Math.round(dist), acc:gps.acc||null,
+          name:((_tnData.vorname||'')+' '+(_tnData.nachname||'')).trim(),
+          ts:Date.now()
+        }).then(()=>{
+          _checkinBanner('ok','✓ Eingecheckt um '+zeit+' Uhr – dein Ausbilder sieht deine Anwesenheit.');
+        }).catch(e=>{
+          _checkinBanner('bad','Check-in fehlgeschlagen: '+(e.message||'unbekannter Fehler'));
+        });
+      });
+    }).catch(()=>{});
+  }).catch(()=>{});
 }
 
 function checkGeofence(gps){
