@@ -1097,7 +1097,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.28.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.28.2 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1460,6 +1460,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="modal" style="max-width:400px">
 <div class="mhd"><div class="mtit">📱 QR-Code Registrierung</div><button class="xcls" onclick="document.getElementById('qrModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
 <div class="mbdy" id="qrBody" style="text-align:center;padding:20px">
+</div></div></div>
+
+<div class="ov" id="qrAttModal" title="Schließen" onclick="if(event.target===this)this.classList.remove('open')">
+<div class="modal" style="max-width:420px">
+<div class="mhd"><div class="mtit">📡 QR-Anwesenheit</div><button class="xcls" onclick="document.getElementById('qrAttModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
+<div class="mbdy" id="qrAttBody" style="text-align:center;padding:20px">
 </div></div></div>
 
 <!-- MANUELL TN HINZUFÜGEN MODAL -->
@@ -3578,7 +3584,7 @@ function renderMain(){
     +'<button class="tbtn main-docs-btn ka-b" onclick="openCourseDocsModal()" title="Kursunterlagen hochladen und verwalten">📁 Dokumente</button>'
     +'<button class="tbtn main-docs-btn ka-g" onclick="generateTNListeAusbilder()" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">📋 TN-Liste</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="generateAlleBescheinigungenAusbilder()" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen</button>'
-    +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g" onclick="openManualTNModal()" title="Teilnehmer manuell zum Kurs hinzufügen">👤+ TN</button><button class="tbtn main-docs-btn ka-b" onclick="openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
+    +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g" onclick="openManualTNModal()" title="Teilnehmer manuell zum Kurs hinzufügen">👤+ TN</button><button class="tbtn main-docs-btn ka-b" onclick="openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button><button class="tbtn main-docs-btn ka-g" onclick="openQRAttModal()" title="QR-Anwesenheit: Azubis checken per Scan + GPS-Standortprüfung selbst ein">📡 QR-Anwesenheit</button>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
     +'<button class="tbtn main-docs-btn ka-g" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Diesen Lehrgang in einen anderen Kurs verschieben">↔ Lehrgang verschieben</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="showAktionsVerlauf()" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">📋 Aktions-Verlauf</button>'
     +'<div class="ka-divider"></div>'
@@ -4483,6 +4489,9 @@ function mkSeat(id,seats){
     }
     if(d.fehlInfo){
       meldHtml+='<div title="Wegen Fehlen informiert am '+fmtD(d.fehlInfo.date)+'" style="position:absolute;top:3px;left:3px;font-size:.8rem;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">📣</div>';
+    }
+    if(d.qrCheckin&&d.qrCheckin.datum===new Date().toISOString().slice(0,10)){
+      meldHtml+='<div title="Per QR eingecheckt um '+esc(d.qrCheckin.zeit||'')+' Uhr'+(d.qrCheckin.dist!=null?' ('+d.qrCheckin.dist+' m vom Standort)':'')+'" style="position:absolute;bottom:3px;left:3px;font-size:.5rem;font-weight:800;z-index:6;pointer-events:none;background:rgba(5,150,105,.92);color:#fff;padding:1px 5px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.3)">📡 '+esc(d.qrCheckin.zeit||'QR')+'</div>';
     }
     el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
   }
@@ -5733,6 +5742,7 @@ function saveSeat(){
     poolKursId:oldSeat.poolKursId||null,
     offeneMeldung: _hatHeute ? null : (oldSeat.offeneMeldung||null),
     fehlInfo: _fiKeep,
+    qrCheckin: oldSeat.qrCheckin||null,
     werkzeugStatus:document.getElementById('wzFehlt')?.checked?'fehlt':document.getElementById('wzOk')?.checked?'ok':'',
     werkzeugFehlt:(document.getElementById('wzFehltText')?.value||'').trim(),
   };
@@ -7931,6 +7941,118 @@ function printQR(){
     +'<script>setTimeout(function(){window.print()},800)<\/script>'
     +'</body></html>');
   w.document.close();
+}
+
+// ═══ QR-ANWESENHEIT (Check-in per Scan + Geofence) ═══
+let _qrAttGeo=null; // {lat,lng,radius} des aktuellen Kurses (Cache fuer Modal)
+function _qrAttUrl(kursId){
+  // Derselbe Link wie der Kurs-Registrierungs-QR: AzubiPro entscheidet beim Oeffnen
+  // (nicht im Kurs -> Beitritt; schon im Kurs -> Check-in mit GPS-Pruefung)
+  return window.location.origin+window.location.pathname.replace('AusbilderPro.html','AzubiPro.html')+'?join='+kursId;
+}
+function openQRAttModal(){
+  const inst=curInst();
+  if(!inst||!inst.sharedKursId){toast('Kein Kurs verknüpft','bad');return;}
+  const kursId=inst.sharedKursId;
+  const body=document.getElementById('qrAttBody');
+  body.innerHTML='<div style="color:var(--mu);font-size:.75rem">Lade…</div>';
+  document.getElementById('qrAttModal').classList.add('open');
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(doc=>{
+    _qrAttGeo=(doc.exists&&doc.data().qrGeo)?doc.data().qrGeo:null;
+    _renderQRAttBody(kursId);
+  }).catch(e=>{body.innerHTML='<div style="color:#dc2626;font-size:.75rem">Fehler beim Laden: '+esc(e.message||'')+'</div>';});
+}
+function _renderQRAttBody(kursId){
+  const body=document.getElementById('qrAttBody');
+  const url=_qrAttUrl(kursId);
+  const qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=250x250&data='+encodeURIComponent(url);
+  const geo=_qrAttGeo;
+  const geoOk=!!(geo&&geo.lat&&geo.lng);
+  let html='';
+  // Standort-Status
+  if(geoOk){
+    html+='<div style="padding:8px 12px;background:rgba(5,150,105,.08);border:1.5px solid rgba(5,150,105,.35);border-radius:8px;font-size:.68rem;color:#059669;font-weight:700;margin-bottom:12px">📍 Kurs-Standort gesetzt · Radius '+(geo.radius||100)+' m</div>';
+  } else {
+    html+='<div style="padding:8px 12px;background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.4);border-radius:8px;font-size:.68rem;color:#b45309;font-weight:700;margin-bottom:12px">⚠ Noch kein Standort gesetzt – Check-in ist erst möglich, wenn du hier vor Ort den Standort festlegst.</div>';
+  }
+  // QR nur zeigen wenn Standort da
+  if(geoOk){
+    html+='<div style="background:#fff;padding:16px;border-radius:12px;display:inline-block;border:2px solid #e2e8f0">'
+      +'<img src="'+qrImgUrl+'" width="220" height="220" alt="QR Anwesenheit" style="display:block"></div>'
+      +'<div style="font-size:.72rem;margin-top:10px;color:var(--mu)">Das ist <b>derselbe QR-Code wie für die Kurs-Registrierung</b> – Azubis, die schon im Kurs sind, werden beim Scannen eingecheckt (GPS-Prüfung, max. '+(geo.radius||100)+' m).<br>Scan nach <b>7:30 Uhr</b> wird automatisch als <b>verspätet</b> eingetragen.</div>'
+      +'<div style="margin-top:8px;padding:8px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;font-size:.6rem;font-family:\'JetBrains Mono\',monospace;word-break:break-all;color:var(--mu)">'+esc(url)+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:12px;justify-content:center">'
+      +'<button class="tbtn" title="QR-Aushang drucken (A4)" onclick="printQRAtt()" style="padding:8px 16px;font-weight:700">🖨 Drucken (A4)</button>'
+      +'</div><hr style="border:none;border-top:1px solid var(--brd);margin:14px 0">';
+  }
+  // Standort-Verwaltung
+  html+='<div style="text-align:left;font-size:.68rem;font-weight:800;margin-bottom:6px">Standort &amp; Radius</div>'
+    +'<button class="tbtn" onclick="setQRAttStandort()" style="width:100%;padding:9px;font-weight:700" title="Deine aktuelle GPS-Position als Kurs-Standort speichern (du musst dafür im HBZ stehen)">📍 Aktuelle Position als Kurs-Standort '+(geoOk?'aktualisieren':'setzen')+'</button>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
+    +'<label style="font-size:.68rem;font-weight:700;white-space:nowrap">Radius (m)</label>'
+    +'<input class="fi" type="number" id="qrAttRadius" min="30" max="1000" step="10" value="'+((geo&&geo.radius)||100)+'" style="flex:1">'
+    +'<button class="tbtn" onclick="saveQRAttRadius()" style="padding:8px 12px;font-weight:700" title="Radius speichern">✓</button>'
+    +'</div>'
+    +'<div id="qrAttGeoMsg" style="font-size:.64rem;color:var(--mu);margin-top:8px;text-align:left"></div>';
+  body.innerHTML=html;
+}
+function setQRAttStandort(){
+  const inst=curInst(); if(!inst||!inst.sharedKursId) return;
+  const kursId=inst.sharedKursId;
+  const msg=document.getElementById('qrAttGeoMsg');
+  if(!navigator.geolocation){ if(msg)msg.textContent='GPS wird von diesem Gerät/Browser nicht unterstützt.'; return; }
+  if(msg)msg.textContent='📡 Hole GPS-Position…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const lat=Math.round(pos.coords.latitude*1e6)/1e6, lng=Math.round(pos.coords.longitude*1e6)/1e6, acc=Math.round(pos.coords.accuracy);
+    const radius=parseInt(document.getElementById('qrAttRadius')?.value)||100;
+    const geo={lat,lng,radius,acc,setAm:new Date().toISOString()};
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId).update({qrGeo:geo}).then(()=>{
+      _qrAttGeo=geo;
+      toast('📍 Kurs-Standort gespeichert ✓ (GPS-Genauigkeit '+acc+' m)');
+      _renderQRAttBody(kursId);
+    }).catch(e=>{ if(msg)msg.textContent='Fehler beim Speichern: '+(e.message||''); });
+  },err=>{
+    if(msg)msg.textContent='⚠ GPS fehlgeschlagen ('+(err.message||'keine Berechtigung')+'). Standort-Freigabe im Browser erlauben und erneut versuchen.';
+  },{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+}
+function saveQRAttRadius(){
+  const inst=curInst(); if(!inst||!inst.sharedKursId) return;
+  if(!_qrAttGeo||!_qrAttGeo.lat){toast('Erst Standort setzen','bad');return;}
+  const radius=Math.min(1000,Math.max(30,parseInt(document.getElementById('qrAttRadius')?.value)||100));
+  const geo=Object.assign({},_qrAttGeo,{radius});
+  _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).update({qrGeo:geo}).then(()=>{
+    _qrAttGeo=geo; toast('Radius gespeichert: '+radius+' m ✓');
+    _renderQRAttBody(inst.sharedKursId);
+  }).catch(e=>toast('Fehler: '+(e.message||''),'bad'));
+}
+function printQRAtt(){
+  const inst=curInst(); if(!inst||!inst.sharedKursId) return;
+  const url=_qrAttUrl(inst.sharedKursId);
+  const qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=500x500&data='+encodeURIComponent(url);
+  const kursName=S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs';
+  const w=window.open('','_blank');
+  if(!w){toast('Popup blockiert','bad');return;}
+  w.document.write('<!DOCTYPE html><html><head><title>QR-Anwesenheit</title><style>'
+    +'body{font-family:Arial,sans-serif;text-align:center;padding:40px}'
+    +'h1{font-size:26pt;margin:0 0 6px}h2{font-size:15pt;font-weight:400;color:#444;margin:0 0 24px}'
+    +'img{width:130mm;height:130mm}'
+    +'.steps{font-size:13pt;margin-top:22px;text-align:left;display:inline-block}'
+    +'.steps li{margin:6px 0}'
+    +'.url{font-family:monospace;font-size:9pt;color:#777;margin-top:18px;word-break:break-all}'
+    +'</style></head><body>'
+    +'<h1>📡 Anwesenheit – Check-in</h1>'
+    +'<h2>'+esc(kursName)+'</h2>'
+    +'<img src="'+qrImgUrl+'" alt="QR">'
+    +'<ol class="steps"><li>QR-Code mit der <b>Handykamera</b> scannen</li><li>AzubiPro öffnet sich – <b>Standortfreigabe erlauben</b></li><li>Check-in funktioniert nur <b>vor Ort</b></li></ol>'
+    +'<div class="url">'+url+'</div>'
+    +'<script>setTimeout(function(){window.print()},800)<\\/script>'
+    +'</body></html>');
+  w.document.close();
+}
+function _qrLateMins(zeit){ // 'HH:MM' → Minuten nach 7:30 (0 wenn puenktlich)
+  if(!zeit||!/^\d{1,2}:\d{2}$/.test(zeit)) return 0;
+  const p=zeit.split(':'), m=parseInt(p[0])*60+parseInt(p[1]);
+  return Math.max(0, m-(7*60+30));
 }
 
 function openManualTNModal(){
@@ -10468,6 +10590,7 @@ let _poolLoadGen = 0; // Generation counter – stale async responses get discar
 let _poolUnsub = null; // onSnapshot listener cleanup
 let _meldungenUnsub = null;
 let _meldUnsub = null; // Meldungen listener
+let _checkinUnsub = null; // QR-Anwesenheit Check-in listener
 let _meldSeen = new Set(); // bereits angezeigte Meldungen
 let _autoPlacedIds = new Set(); // Verhindert doppelte Toast-Meldungen
 
@@ -10764,6 +10887,7 @@ function loadPool(){
   // Alten Listener abmelden
   if(_poolUnsub){_poolUnsub();_poolUnsub=null;}
   if(_meldUnsub){_meldUnsub();_meldUnsub=null;}
+  if(_checkinUnsub){_checkinUnsub();_checkinUnsub=null;}
   const inst = curInst();
   const body = document.getElementById('poolSbBody');
   const hdr  = document.getElementById('poolSbHdr');
@@ -10853,6 +10977,33 @@ function loadPool(){
         }
       });
     },err=>console.warn('Meldungen error:',err));
+    // ── QR-Anwesenheit Check-in Live-Listener ──
+    const _ciToday=new Date().toISOString().slice(0,10);
+    _checkinUnsub = kursRef.collection('checkins').where('datum','==',_ciToday).onSnapshot(snap=>{
+      if(isStale()){if(_checkinUnsub){_checkinUnsub();_checkinUnsub=null;}return;}
+      let changed=false;
+      snap.forEach(doc=>{
+        const c=doc.data();
+        if(!c.tnId||!c.datum) return;
+        const seats=curSeats();
+        for(const sid in seats){
+          const d=seats[sid];
+          if(!d||d.poolTnId!==c.tnId) continue;
+          // Badge-Info am Sitz merken
+          if(!d.qrCheckin||d.qrCheckin.datum!==c.datum){ d.qrCheckin={datum:c.datum,zeit:c.zeit||'',dist:(typeof c.dist==='number'?c.dist:null)}; changed=true; }
+          // Auto-Eintrag nur wenn fuer heute noch nichts erfasst (manuell gewinnt)
+          if(!d.attendance) d.attendance=[];
+          if(!d.attendance.some(a=>a.date===c.datum)){
+            const lm=_qrLateMins(c.zeit||'');
+            d.attendance.push({date:c.datum,type:'present',note:'per QR-Check-in'+(c.zeit?' '+c.zeit:''),lateMins:lm,earlyMins:0,qr:true});
+            changed=true;
+            try{ syncAttendanceToFirestore(sid); }catch(e){}
+            toast('📡 '+esc(d.name||'TN')+' per QR eingecheckt'+(lm>0?' – verspätet +'+lm+' min':' ✓'));
+          }
+        }
+      });
+      if(changed){ persist(); renderSeats(); }
+    },err=>console.warn('Checkin error:',err));
     _poolUnsub = kursRef.collection('teilnehmer').orderBy('nachname').onSnapshot(snap=>{
       // ── Snapshot-Guard ──
       if(isStale()){if(_poolUnsub){_poolUnsub();_poolUnsub=null;}return;}

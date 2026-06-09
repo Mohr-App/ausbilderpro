@@ -54,6 +54,9 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['berufsschultage']);
         allow update: if request.auth != null
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['kurstage']);
+        // QR-Anwesenheit: Ausbilder setzt Kurs-Standort + Radius (Geofence)
+        allow update: if request.auth != null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['qrGeo']);
         // Profil-Backfill: Kurs-Ersteller darf eigene Ausbilder-Stammdaten nachtragen
         allow update: if request.auth != null
           && resource.data.createdBy == request.auth.token.email
@@ -87,6 +90,12 @@ service cloud.firestore {
           allow delete: if request.auth != null && deep == 'meldungen';
           allow update: if request.auth != null && deep == 'meldungen'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gelesen','gelesenVon','gelesenAm']);
+          // QR-Anwesenheit Check-ins: Azubi erstellt (nur fuer sich, heute, einmal - DocId tnId_datum
+          // verhindert Doppel-Check-in), kein Update (kein Manipulieren), Ausbilder darf aufraeumen
+          allow create: if request.auth != null && deep == 'checkins'
+            && request.resource.data.keys().hasAll(['tnId','datum','zeit'])
+            && deepDoc == request.resource.data.tnId + '_' + request.resource.data.datum;
+          allow delete: if request.auth != null && deep == 'checkins';
         }
       }
     }
