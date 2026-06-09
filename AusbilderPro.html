@@ -1097,7 +1097,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.28.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.28.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -1713,6 +1713,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div style="display:flex;gap:8px">
             <div class="fg" style="flex:1"><label class="fl">E-Mail</label><input class="fi" type="email" id="iEmail" placeholder="max@firma.de" autocomplete="off"></div>
             <div class="fg" style="flex:1"><label class="fl">Telefon</label><input class="fi" type="tel" id="iTelefon" placeholder="+49 …" autocomplete="off"></div>
+          </div>
+          <div class="fg" id="gebFg" style="margin-top:6px">
+            <label class="fl">🎂 Geburtsdatum <span style="font-weight:400;color:var(--mu)">– für die Teilnahmebescheinigung</span></label>
+            <input class="fi" type="date" id="iGeb" autocomplete="off" oninput="_gebHintUpd()">
+            <div id="gebHint" style="display:none;margin-top:5px;padding:6px 9px;background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.4);border-radius:7px;font-size:.66rem;color:#b45309;font-weight:600">⚠ Kein Geburtsdatum hinterlegt – für die Bescheinigung bitte nachtragen.</div>
           </div>
         </div>
 
@@ -4833,7 +4838,7 @@ function openModal(id){
     el.style.cursor=sperrePerson?'not-allowed':'';
   });
   // Snapshot für Dirty-Check
-  _modalSnapshot={name:d.name||'',company:d.company||'',agEmail:d.agEmail||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',attLen:(d.attendance||[]).length};
+  _modalSnapshot={name:d.name||'',company:d.company||'',agEmail:d.agEmail||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',geburtsdatum:'',attLen:(d.attendance||[]).length};
   const inst_=curInst();
   const seatLabel=(inst_&&inst_.seatLabels&&inst_.seatLabels[id]!=null&&inst_.seatLabels[id]!=='')?inst_.seatLabels[id]:null;
   // Titel-Zusammensetzung: "Sitzplatz 5 (Ma. Mu.)" wenn belegt, sonst nur "Sitzplatz 5"
@@ -4883,6 +4888,10 @@ function openModal(id){
           const _iTelEl=document.getElementById('iTelefon');
           if(_iEmailEl && !_iEmailEl.value) _iEmailEl.value=t.kontaktEmail||t.email||'';
           if(_iTelEl && !_iTelEl.value) _iTelEl.value=t.kontaktTelefon||t.tel||'';
+          const _iGebEl=document.getElementById('iGeb');
+          if(_iGebEl && !_iGebEl.value) _iGebEl.value=t.geburtsdatum||'';
+          if(_modalSnapshot) _modalSnapshot.geburtsdatum=_iGebEl?(_iGebEl.value||''):'';
+          if(typeof _gebHintUpd==='function') _gebHintUpd();
           if(t.selfRegistered){
             const rd=t.registeredAt?new Date(t.registeredAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
             h+=fld('📝','Selbst registriert am',rd);
@@ -4936,6 +4945,7 @@ function openModal(id){
   // E-Mail + Telefon werden gleich async aus globalTN gefuellt (sobald geladen) - erstmal leer
   document.getElementById('iEmail').value='';
   document.getElementById('iTelefon').value='';
+  { const _g=document.getElementById('iGeb'); if(_g){ _g.value=''; _g.style.borderColor=''; } const _gh=document.getElementById('gebHint'); if(_gh) _gh.style.display='none'; }
   populateProfOber(); setProfFromValue(d.profession||'');
   document.getElementById('iAusbjahr').value=d.ausbjahr||'';
   document.getElementById('iNote').value=d.note||'';
@@ -5145,8 +5155,16 @@ function _seatModalDirty(){
   if((document.getElementById('iAusbjahr').value||'')!==s.ausbjahr) return true;
   if((document.getElementById('iNote').value||'')!==s.note) return true;
   if((document.getElementById('iBemerkung').value||'')!==s.bemerkung) return true;
+  { const _g=document.getElementById('iGeb'); if(_g && (_g.value||'')!==(s.geburtsdatum||'')) return true; }
   if(tmpAtt.length!==s.attLen) return true;
   return false;
+}
+function _gebHintUpd(){
+  const el=document.getElementById('iGeb'); if(!el) return;
+  const nm=(document.getElementById('iName')?.value||'').trim();
+  const fehlt=!!nm && !((el.value||'').trim());
+  el.style.borderColor=fehlt?'#f59e0b':'';
+  const h=document.getElementById('gebHint'); if(h) h.style.display=fehlt?'':'none';
 }
 function safeCloseModal(){
   if(_seatModalDirty()){
@@ -5734,6 +5752,7 @@ function saveSeat(){
   // E-Mail/Telefon aus Person-Tab nach globalTN syncen
   const _newEmail=(document.getElementById('iEmail')?.value||'').trim();
   const _newTelefon=(document.getElementById('iTelefon')?.value||'').trim();
+  const _newGeb=(document.getElementById('iGeb')?.value||'').trim();
   persist();renderSeats();updBadge();renderSidebar();closeModal();
   // Attendance + Noten an HBZ synchronisieren
   syncAttendanceToFirestore(_saveSeatId);
@@ -5742,6 +5761,7 @@ function saveSeat(){
     const _tnUpdate={};
     _tnUpdate.kontaktEmail=_newEmail;
     _tnUpdate.kontaktTelefon=_newTelefon;
+    if(_newGeb) _tnUpdate.geburtsdatum=_newGeb;
     _db.collection('globalTN').doc(poolTnId).update(_tnUpdate).catch(()=>{});
   }
   // Beruf/Fachrichtung zurück an globalTN synchen
