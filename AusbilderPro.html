@@ -1097,7 +1097,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.28.6 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.28.7 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -7963,6 +7963,23 @@ function openQRAttModal(){
     _renderQRAttBody(kursId);
   }).catch(e=>{body.innerHTML='<div style="color:#dc2626;font-size:.75rem">Fehler beim Laden: '+esc(e.message||'')+'</div>';});
 }
+let _qrAttMap=null,_qrAttMarker=null,_qrAttCircle=null,_leafletLoading=null;
+function _loadLeaflet(){
+  if(window.L) return Promise.resolve();
+  if(_leafletLoading) return _leafletLoading;
+  _leafletLoading=new Promise((res,rej)=>{
+    const css=document.createElement('link');
+    css.rel='stylesheet';
+    css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+    document.head.appendChild(css);
+    const sc=document.createElement('script');
+    sc.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    sc.onload=()=>res();
+    sc.onerror=()=>{_leafletLoading=null;rej(new Error('Karte konnte nicht geladen werden (Internet?)'));};
+    document.head.appendChild(sc);
+  });
+  return _leafletLoading;
+}
 function _renderQRAttBody(kursId){
   const body=document.getElementById('qrAttBody');
   const url=_qrAttUrl(kursId);
@@ -7970,13 +7987,11 @@ function _renderQRAttBody(kursId){
   const geo=_qrAttGeo;
   const geoOk=!!(geo&&geo.lat&&geo.lng);
   let html='';
-  // Standort-Status
   if(geoOk){
-    html+='<div style="padding:8px 12px;background:rgba(5,150,105,.08);border:1.5px solid rgba(5,150,105,.35);border-radius:8px;font-size:.68rem;color:#059669;font-weight:700;margin-bottom:12px">📍 Kurs-Standort gesetzt · Radius '+(geo.radius||100)+' m</div>';
+    html+='<div style="padding:8px 12px;background:rgba(5,150,105,.08);border:1.5px solid rgba(5,150,105,.35);border-radius:8px;font-size:.68rem;color:#059669;font-weight:700;margin-bottom:12px">📍 Kurs-Standort: '+geo.lat+', '+geo.lng+' · Radius '+(geo.radius||100)+' m</div>';
   } else {
-    html+='<div style="padding:8px 12px;background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.4);border-radius:8px;font-size:.68rem;color:#b45309;font-weight:700;margin-bottom:12px">⚠ Noch kein Standort gesetzt – Check-in ist erst möglich, wenn du hier vor Ort den Standort festlegst.</div>';
+    html+='<div style="padding:8px 12px;background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.4);border-radius:8px;font-size:.68rem;color:#b45309;font-weight:700;margin-bottom:12px">⚠ Noch kein Standort gesetzt – Check-in ist erst möglich, wenn du unten einen Standort festlegst und speicherst.</div>';
   }
-  // QR nur zeigen wenn Standort da
   if(geoOk){
     html+='<div style="background:#fff;padding:16px;border-radius:12px;display:inline-block;border:2px solid #e2e8f0">'
       +'<img src="'+qrImgUrl+'" width="220" height="220" alt="QR Anwesenheit" style="display:block"></div>'
@@ -7986,47 +8001,94 @@ function _renderQRAttBody(kursId){
       +'<button class="tbtn" title="QR-Aushang drucken (A4)" onclick="printQRAtt()" style="padding:8px 16px;font-weight:700">🖨 Drucken (A4)</button>'
       +'</div><hr style="border:none;border-top:1px solid var(--brd);margin:14px 0">';
   }
-  // Standort-Verwaltung
   html+='<div style="text-align:left;font-size:.68rem;font-weight:800;margin-bottom:6px">Standort &amp; Radius</div>'
-    +'<button class="tbtn" onclick="setQRAttStandort()" style="width:100%;padding:9px;font-weight:700" title="Deine aktuelle GPS-Position als Kurs-Standort speichern (du musst dafür im HBZ stehen)">📍 Aktuelle Position als Kurs-Standort '+(geoOk?'aktualisieren':'setzen')+'</button>'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
+    +'<div id="qrAttMap" style="height:250px;border-radius:10px;border:1px solid var(--brd);margin-bottom:8px;background:var(--sur2);overflow:hidden"><div style="padding:20px;font-size:.7rem;color:var(--mu)">Karte lädt…</div></div>'
+    +'<div style="text-align:left;font-size:.62rem;color:var(--mu);margin-bottom:8px">📌 Stecknadel verschieben oder auf die Karte tippen – der grüne Kreis zeigt den Check-in-Bereich.</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:8px">'
+    +'<div style="flex:1;text-align:left"><label class="fl" style="font-size:.6rem">Breitengrad</label><input class="fi" type="text" id="qrAttLat" placeholder="z. B. 50.7903" oninput="_qrAttFieldsToMarker()"></div>'
+    +'<div style="flex:1;text-align:left"><label class="fl" style="font-size:.6rem">Längengrad</label><input class="fi" type="text" id="qrAttLng" placeholder="z. B. 7.1815" oninput="_qrAttFieldsToMarker()"></div>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
     +'<label style="font-size:.68rem;font-weight:700;white-space:nowrap">Radius (m)</label>'
-    +'<input class="fi" type="number" id="qrAttRadius" min="30" max="1000" step="10" value="'+((geo&&geo.radius)||100)+'" style="flex:1">'
-    +'<button class="tbtn" onclick="saveQRAttRadius()" style="padding:8px 12px;font-weight:700" title="Radius speichern">✓</button>'
+    +'<input class="fi" type="number" id="qrAttRadius" min="30" max="1000" step="10" value="'+((geo&&geo.radius)||100)+'" style="flex:1" oninput="_qrAttRadiusToCircle()">'
+    +'</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="tbtn" onclick="setQRAttStandort()" style="flex:1;padding:9px;font-weight:700" title="Deine aktuelle GPS-Position auf die Karte übernehmen (speichert noch nicht)">📍 Meine GPS-Position</button>'
+    +'<button class="tbtn" onclick="saveQRAttGeo()" style="flex:1;padding:9px;font-weight:800;border-color:#059669;color:#059669" title="Stecknadel-Position + Radius als Kurs-Standort speichern">💾 Speichern</button>'
     +'</div>'
     +'<div id="qrAttGeoMsg" style="font-size:.64rem;color:var(--mu);margin-top:8px;text-align:left"></div>';
   body.innerHTML=html;
+  _initQRAttMap();
+}
+function _initQRAttMap(){
+  const el=document.getElementById('qrAttMap'); if(!el) return;
+  _loadLeaflet().then(()=>{
+    const el2=document.getElementById('qrAttMap'); if(!el2) return;
+    if(_qrAttMap){try{_qrAttMap.remove();}catch(e){} _qrAttMap=null;}
+    el2.innerHTML='';
+    const geo=_qrAttGeo;
+    const hasGeo=!!(geo&&geo.lat);
+    const center=hasGeo?[geo.lat,geo.lng]:[51.163,10.447];
+    _qrAttMap=L.map('qrAttMap').setView(center,hasGeo?17:6);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(_qrAttMap);
+    _qrAttMarker=L.marker(center,{draggable:true}).addTo(_qrAttMap);
+    _qrAttCircle=L.circle(center,{radius:parseInt(document.getElementById('qrAttRadius')?.value)||100,color:'#059669',fillColor:'#059669',fillOpacity:.12,weight:2}).addTo(_qrAttMap);
+    if(hasGeo) _qrAttFieldsSet(geo.lat,geo.lng);
+    _qrAttMarker.on('dragend',()=>{const p=_qrAttMarker.getLatLng();_qrAttFieldsSet(p.lat,p.lng);_qrAttCircle.setLatLng(p);});
+    _qrAttMap.on('click',e=>{_qrAttMarker.setLatLng(e.latlng);_qrAttCircle.setLatLng(e.latlng);_qrAttFieldsSet(e.latlng.lat,e.latlng.lng);});
+    setTimeout(()=>{try{_qrAttMap.invalidateSize();}catch(e){}},250);
+  }).catch(e=>{
+    el.innerHTML='<div style="padding:20px;font-size:.7rem;color:#dc2626">'+esc(e.message||'Karte nicht verfügbar')+' – Koordinaten können trotzdem manuell eingetragen und gespeichert werden.</div>';
+  });
+}
+function _qrAttFieldsSet(lat,lng){
+  const a=document.getElementById('qrAttLat'),b=document.getElementById('qrAttLng');
+  if(a)a.value=Math.round(lat*1e6)/1e6;
+  if(b)b.value=Math.round(lng*1e6)/1e6;
+}
+function _qrAttFieldsToMarker(){
+  const lat=parseFloat((document.getElementById('qrAttLat')?.value||'').replace(',','.'));
+  const lng=parseFloat((document.getElementById('qrAttLng')?.value||'').replace(',','.'));
+  if(isNaN(lat)||isNaN(lng)||lat<-90||lat>90||lng<-180||lng>180) return;
+  if(_qrAttMarker)_qrAttMarker.setLatLng([lat,lng]);
+  if(_qrAttCircle)_qrAttCircle.setLatLng([lat,lng]);
+  if(_qrAttMap)_qrAttMap.setView([lat,lng],Math.max(_qrAttMap.getZoom(),16));
+}
+function _qrAttRadiusToCircle(){
+  if(_qrAttCircle){
+    const r=Math.min(1000,Math.max(30,parseInt(document.getElementById('qrAttRadius')?.value)||100));
+    _qrAttCircle.setRadius(r);
+  }
 }
 function setQRAttStandort(){
-  const inst=curInst(); if(!inst||!inst.sharedKursId) return;
-  const kursId=inst.sharedKursId;
   const msg=document.getElementById('qrAttGeoMsg');
-  if(!navigator.geolocation){ if(msg)msg.textContent='GPS wird von diesem Gerät/Browser nicht unterstützt.'; return; }
+  if(!navigator.geolocation){ if(msg)msg.textContent='GPS wird von diesem Gerät/Browser nicht unterstützt – Standort per Karte/Koordinaten setzen.'; return; }
   if(msg)msg.textContent='📡 Hole GPS-Position…';
   navigator.geolocation.getCurrentPosition(pos=>{
     const lat=Math.round(pos.coords.latitude*1e6)/1e6, lng=Math.round(pos.coords.longitude*1e6)/1e6, acc=Math.round(pos.coords.accuracy);
     if(acc>200){
-      if(msg)msg.innerHTML='⚠ <b>Position zu ungenau ('+(acc>=10000?Math.round(acc/1000)+' km':acc+' m')+')</b> – das ist vermutlich nur eine grobe Internet-Ortung (PC ohne GPS). Bitte den Standort <b>mit dem Smartphone vor Ort</b> setzen (AusbilderPro am Handy öffnen → dieses Modal → Position setzen).';
+      if(msg)msg.innerHTML='⚠ <b>Position zu ungenau ('+(acc>=10000?Math.round(acc/1000)+' km':acc+' m')+')</b> – vermutlich nur grobe Internet-Ortung (PC ohne GPS). Standort per Stecknadel/Koordinaten setzen oder am Smartphone vor Ort übernehmen.';
       return;
     }
-    const radius=parseInt(document.getElementById('qrAttRadius')?.value)||100;
-    const geo={lat,lng,radius,acc,setAm:new Date().toISOString()};
-    _db.collection('shared').doc('kurse').collection('list').doc(kursId).update({qrGeo:geo}).then(()=>{
-      _qrAttGeo=geo;
-      toast('📍 Kurs-Standort gespeichert ✓ (GPS-Genauigkeit '+acc+' m)');
-      _renderQRAttBody(kursId);
-    }).catch(e=>{ if(msg)msg.textContent='Fehler beim Speichern: '+(e.message||''); });
+    _qrAttFieldsSet(lat,lng);
+    if(_qrAttMarker)_qrAttMarker.setLatLng([lat,lng]);
+    if(_qrAttCircle)_qrAttCircle.setLatLng([lat,lng]);
+    if(_qrAttMap)_qrAttMap.setView([lat,lng],17);
+    if(msg)msg.textContent='✓ Position übernommen (±'+acc+' m) – ggf. Stecknadel feinjustieren, dann 💾 Speichern.';
   },err=>{
-    if(msg)msg.textContent='⚠ GPS fehlgeschlagen ('+(err.message||'keine Berechtigung')+'). Standort-Freigabe im Browser erlauben und erneut versuchen.';
+    if(msg)msg.textContent='⚠ GPS fehlgeschlagen ('+(err.message||'keine Berechtigung')+') – Standort per Stecknadel/Koordinaten setzen.';
   },{enableHighAccuracy:true,timeout:10000,maximumAge:0});
 }
-function saveQRAttRadius(){
+function saveQRAttGeo(){
   const inst=curInst(); if(!inst||!inst.sharedKursId) return;
-  if(!_qrAttGeo||!_qrAttGeo.lat){toast('Erst Standort setzen','bad');return;}
+  const lat=parseFloat((document.getElementById('qrAttLat')?.value||'').replace(',','.'));
+  const lng=parseFloat((document.getElementById('qrAttLng')?.value||'').replace(',','.'));
+  if(isNaN(lat)||isNaN(lng)||lat<-90||lat>90||lng<-180||lng>180){ toast('Ungültige Koordinaten','bad'); return; }
   const radius=Math.min(1000,Math.max(30,parseInt(document.getElementById('qrAttRadius')?.value)||100));
-  const geo=Object.assign({},_qrAttGeo,{radius});
+  const geo={lat:Math.round(lat*1e6)/1e6,lng:Math.round(lng*1e6)/1e6,radius,setAm:new Date().toISOString()};
   _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).update({qrGeo:geo}).then(()=>{
-    _qrAttGeo=geo; toast('Radius gespeichert: '+radius+' m ✓');
+    _qrAttGeo=geo;
+    toast('📍 Kurs-Standort gespeichert ✓');
     _renderQRAttBody(inst.sharedKursId);
   }).catch(e=>toast('Fehler: '+(e.message||''),'bad'));
 }
