@@ -1690,10 +1690,32 @@ let _selectedKursId = null;
 
 // ── Auth ──
 auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
+function _loginNotifyCheck(user,appName){
+  // Mail nur bei erster Anmeldung auf diesem Geraet/Browser (localStorage-Flag pro Konto)
+  if(!user||!user.email||!db) return;
+  const key='loginDevKnown_'+user.uid;
+  try{ if(localStorage.getItem(key)) return; localStorage.setItem(key,'1'); }catch(e){ return; }
+  db.collection('mail').add({
+    to: user.email,
+    message: {
+      subject: '🔐 '+appName+': Anmeldung auf neuem Gerät',
+      html: '<div style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b;line-height:1.6">'
+        +'<p>Hallo,</p>'
+        +'<p>soeben hat sich jemand auf einem <b>neuen Gerät oder Browser</b> an deinem '+appName+'-Konto angemeldet:</p>'
+        +'<p><b>Konto:</b> '+user.email+'<br><b>Zeit:</b> '+new Date().toLocaleString('de-DE')+' Uhr</p>'
+        +'<p>Warst du das selbst, ist alles in Ordnung – diese Mail kommt nur einmal pro Gerät.</p>'
+        +'<p><b>Warst du das nicht:</b> Ändere bitte sofort dein Passwort (Login-Seite → „Passwort vergessen").</p>'
+        +'<p style="color:#64748b;font-size:12px">Diese Sicherheitsbenachrichtigung wurde automatisch von '+appName+' versendet.</p>'
+        +'</div>'
+    }
+  }).catch(err=>console.warn('Login-Notify-Mail-Fehler:',err));
+}
 auth.onAuthStateChanged(u => {
   if(u){
     _uid = u.uid;
     _email = u.email;
+    // Sicherheits-Mail bei Anmeldung auf neuem Geraet/Browser
+    setTimeout(()=>{try{_loginNotifyCheck(u,'VerwaltungPro');}catch(e){}}, 1500);
     const emailLow = u.email.toLowerCase();
     // Stefan-Whitelist: Immer Admin-Zugang
     const stefanWhitelist=['s.mohr@ish.de'];

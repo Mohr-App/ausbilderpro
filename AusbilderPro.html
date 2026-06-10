@@ -1097,7 +1097,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.28.8 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.28.9 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -12019,10 +12019,32 @@ try{
   // Nur für diese Sitzung eingeloggt bleiben – nach Browser-Schließen neu anmelden
   _auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 
+function _loginNotifyCheck(user,appName){
+  // Mail nur bei erster Anmeldung auf diesem Geraet/Browser (localStorage-Flag pro Konto)
+  if(!user||!user.email||!_db) return;
+  const key='loginDevKnown_'+user.uid;
+  try{ if(localStorage.getItem(key)) return; localStorage.setItem(key,'1'); }catch(e){ return; }
+  _db.collection('mail').add({
+    to: user.email,
+    message: {
+      subject: '🔐 '+appName+': Anmeldung auf neuem Gerät',
+      html: '<div style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b;line-height:1.6">'
+        +'<p>Hallo,</p>'
+        +'<p>soeben hat sich jemand auf einem <b>neuen Gerät oder Browser</b> an deinem '+appName+'-Konto angemeldet:</p>'
+        +'<p><b>Konto:</b> '+user.email+'<br><b>Zeit:</b> '+new Date().toLocaleString('de-DE')+' Uhr</p>'
+        +'<p>Warst du das selbst, ist alles in Ordnung – diese Mail kommt nur einmal pro Gerät.</p>'
+        +'<p><b>Warst du das nicht:</b> Ändere bitte sofort dein Passwort (Login-Seite → „Passwort vergessen").</p>'
+        +'<p style="color:#64748b;font-size:12px">Diese Sicherheitsbenachrichtigung wurde automatisch von '+appName+' versendet.</p>'
+        +'</div>'
+    }
+  }).catch(err=>console.warn('Login-Notify-Mail-Fehler:',err));
+}
   _auth.onAuthStateChanged(user=>{
   if(user){
     _fbUid=user.uid;
     _dataOwner=null; // Reset bis Daten geladen sind
+    // Sicherheits-Mail bei Anmeldung auf neuem Geraet/Browser
+    setTimeout(()=>{try{_loginNotifyCheck(user,'AusbilderPro');}catch(e){}}, 1500);
     // Sig+Stempel: auto-sync local nach cloud falls noch nicht geschehen
     setTimeout(()=>{try{_ensureSigStempelCloudSync();}catch(e){}}, 2000);
     // Cross-Ausbilder Noten-Sync nach Initialdaten-Load (3s damit Firestore Subscription Time hat)
