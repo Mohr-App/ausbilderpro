@@ -1097,7 +1097,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.28.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.28.5 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -8008,6 +8008,10 @@ function setQRAttStandort(){
   if(msg)msg.textContent='📡 Hole GPS-Position…';
   navigator.geolocation.getCurrentPosition(pos=>{
     const lat=Math.round(pos.coords.latitude*1e6)/1e6, lng=Math.round(pos.coords.longitude*1e6)/1e6, acc=Math.round(pos.coords.accuracy);
+    if(acc>200){
+      if(msg)msg.innerHTML='⚠ <b>Position zu ungenau ('+(acc>=10000?Math.round(acc/1000)+' km':acc+' m')+')</b> – das ist vermutlich nur eine grobe Internet-Ortung (PC ohne GPS). Bitte den Standort <b>mit dem Smartphone vor Ort</b> setzen (AusbilderPro am Handy öffnen → dieses Modal → Position setzen).';
+      return;
+    }
     const radius=parseInt(document.getElementById('qrAttRadius')?.value)||100;
     const geo={lat,lng,radius,acc,setAm:new Date().toISOString()};
     _db.collection('shared').doc('kurse').collection('list').doc(kursId).update({qrGeo:geo}).then(()=>{
