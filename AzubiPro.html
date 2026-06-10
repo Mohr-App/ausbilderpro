@@ -3211,7 +3211,6 @@ function _loadJsQR(){
 }
 function openQRScanner(){
   if(!_tnData||!_tnData.aktiverKursId){ _checkinBanner('warn','Kein aktiver Lehrgang – Check-in nicht möglich.'); return; }
-  // Overlay bauen
   let ov=document.getElementById('qrScanOv');
   if(ov) ov.remove();
   ov=document.createElement('div');
@@ -3219,40 +3218,65 @@ function openQRScanner(){
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px';
   ov.innerHTML='<div style="color:#fff;font-weight:800;font-size:.95rem;margin-bottom:14px;font-family:\'Sora\',sans-serif">📡 Kurs-QR scannen</div>'
     +'<div style="position:relative;width:min(86vw,420px);aspect-ratio:1;border-radius:18px;overflow:hidden;border:3px solid rgba(255,255,255,.35)">'
-    +'<video id="qrScanVideo" playsinline style="width:100%;height:100%;object-fit:cover"></video>'
+    +'<video id="qrScanVideo" playsinline muted autoplay style="width:100%;height:100%;object-fit:cover"></video>'
     +'<div style="position:absolute;inset:12%;border:2.5px dashed rgba(255,255,255,.55);border-radius:14px;pointer-events:none"></div>'
     +'</div>'
-    +'<div id="qrScanStatus" style="color:rgba(255,255,255,.85);font-size:.75rem;margin-top:14px;text-align:center;min-height:1.2em">Kamera startet…</div>'
+    +'<div id="qrScanStatus" style="color:rgba(255,255,255,.85);font-size:.75rem;margin-top:14px;text-align:center;min-height:1.2em;max-width:420px">Warte auf Kamera-Freigabe…</div>'
     +'<button onclick="stopQRScanner()" style="margin-top:16px;padding:11px 26px;background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.4);border-radius:12px;color:#fff;font-weight:800;font-size:.8rem;cursor:pointer;font-family:\'Sora\',sans-serif" title="Scanner schließen">Abbrechen</button>';
   document.body.appendChild(ov);
   const status=document.getElementById('qrScanStatus');
-  _loadJsQR().then(()=>navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})).then(stream=>{
-    _qrScanStream=stream;
-    const video=document.getElementById('qrScanVideo');
-    if(!video){ stopQRScanner(); return; }
-    video.srcObject=stream;
-    video.setAttribute('playsinline','');
-    video.play();
-    status.textContent='Halte den QR-Code in den Rahmen';
-    const canvas=document.createElement('canvas');
-    const ctx=canvas.getContext('2d',{willReadFrequently:true});
-    const tick=()=>{
-      if(!_qrScanStream) return;
-      if(video.readyState===video.HAVE_ENOUGH_DATA){
-        canvas.width=video.videoWidth; canvas.height=video.videoHeight;
-        ctx.drawImage(video,0,0,canvas.width,canvas.height);
-        try{
-          const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-          const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
-          if(code&&code.data){ _onQRScanned(code.data); return; }
-        }catch(e){}
-      }
+  const setSt=t=>{ if(document.getElementById('qrScanStatus')) document.getElementById('qrScanStatus').textContent=t; };
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    setSt('⚠ Dieser Browser unterstützt keinen Kamera-Zugriff. Alternative: QR-Code direkt mit der Handykamera-App scannen.');
+    return;
+  }
+  // jsQR parallel laden (blockiert den Kamera-Start nicht)
+  let jsqrFailed=false;
+  _loadJsQR().catch(()=>{jsqrFailed=true;});
+  // Kamera starten: erst Rueckkamera, bei Fehlschlag beliebige Kamera
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})
+    .catch(()=>navigator.mediaDevices.getUserMedia({video:true,audio:false}))
+    .then(stream=>{
+      _qrScanStream=stream;
+      const video=document.getElementById('qrScanVideo');
+      if(!video){ stopQRScanner(); return; }
+      video.srcObject=stream;
+      video.setAttribute('playsinline','');
+      const p=video.play(); if(p&&p.catch) p.catch(()=>{});
+      setSt('Halte den QR-Code in den Rahmen');
+      const canvas=document.createElement('canvas');
+      const ctx=canvas.getContext('2d',{willReadFrequently:true});
+      let waitedMs=0;
+      const tick=()=>{
+        if(!_qrScanStream) return;
+        if(!window.jsQR){
+          if(jsqrFailed){ setSt('⚠ Scanner-Modul konnte nicht geladen werden (Internetverbindung prüfen). Alternative: QR-Code direkt mit der Handykamera-App scannen.'); return; }
+          waitedMs+=200;
+          if(waitedMs>12000){ setSt('⚠ Scanner-Modul lädt nicht (Internetverbindung prüfen). Alternative: QR-Code mit der Handykamera-App scannen.'); return; }
+          setSt('Scanner-Modul lädt…');
+          setTimeout(tick,200); return;
+        }
+        if(video.readyState===video.HAVE_ENOUGH_DATA){
+          if(!canvas.width){ setSt('Halte den QR-Code in den Rahmen'); }
+          canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+          ctx.drawImage(video,0,0,canvas.width,canvas.height);
+          try{
+            const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+            const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+            if(code&&code.data){ _onQRScanned(code.data); return; }
+          }catch(e){}
+        }
+        _qrScanRAF=requestAnimationFrame(tick);
+      };
       _qrScanRAF=requestAnimationFrame(tick);
-    };
-    _qrScanRAF=requestAnimationFrame(tick);
-  }).catch(e=>{
-    status.textContent='⚠ '+(e&&e.name==='NotAllowedError'?'Kamera-Zugriff verweigert. Bitte Kamera für die App/Website erlauben.':(e.message||'Kamera konnte nicht gestartet werden.'));
-  });
+    })
+    .catch(e=>{
+      const n=(e&&e.name)||'';
+      if(n==='NotAllowedError'||n==='SecurityError') setSt('⚠ Kamera-Zugriff verweigert. Bitte in den Browser-/App-Einstellungen die Kamera für ausbilderpro.de erlauben und erneut versuchen.');
+      else if(n==='NotFoundError') setSt('⚠ Keine Kamera gefunden.');
+      else if(n==='NotReadableError') setSt('⚠ Kamera ist von einer anderen App belegt. Andere Apps schließen und erneut versuchen.');
+      else setSt('⚠ Kamera konnte nicht gestartet werden ('+(e&&e.message||n||'unbekannt')+'). Alternative: QR-Code direkt mit der Handykamera-App scannen.');
+    });
 }
 function stopQRScanner(){
   if(_qrScanRAF){cancelAnimationFrame(_qrScanRAF);_qrScanRAF=null;}
