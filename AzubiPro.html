@@ -3243,7 +3243,6 @@ function openQRScanner(){
       video.srcObject=stream;
       video.setAttribute('playsinline','');
       const p=video.play(); if(p&&p.catch) p.catch(()=>{});
-      setSt('Halte den QR-Code in den Rahmen');
       const canvas=document.createElement('canvas');
       const ctx=canvas.getContext('2d',{willReadFrequently:true});
       let waitedMs=0;
@@ -3257,7 +3256,7 @@ function openQRScanner(){
           setTimeout(tick,200); return;
         }
         if(video.readyState===video.HAVE_ENOUGH_DATA){
-          if(!canvas.width){ setSt('Halte den QR-Code in den Rahmen'); }
+          setSt('Halte den QR-Code in den Rahmen');
           canvas.width=video.videoWidth; canvas.height=video.videoHeight;
           ctx.drawImage(video,0,0,canvas.width,canvas.height);
           try{
@@ -3265,7 +3264,7 @@ function openQRScanner(){
             const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
             if(code&&code.data){ _onQRScanned(code.data); return; }
           }catch(e){}
-        }
+        } else { setSt('Kamera startet…'); }
         _qrScanRAF=requestAnimationFrame(tick);
       };
       _qrScanRAF=requestAnimationFrame(tick);
