@@ -3196,17 +3196,22 @@ function _getGPSCheckin(){
     );
   });
 }
-// ── In-App QR-Scanner (Weg B: Button in der App → Kamera → Scan) ──
+// ── In-App QR-Scanner (Weg B): nativer BarcodeDetector zuerst, jsQR als Fallback ──
 let _qrScanStream=null,_qrScanRAF=null,_jsQRLoading=null;
 function _loadJsQR(){
   if(window.jsQR) return Promise.resolve();
   if(_jsQRLoading) return _jsQRLoading;
-  _jsQRLoading=new Promise((res,rej)=>{
+  const urls=['https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js','https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js'];
+  const tryLoad=i=>new Promise((res,rej)=>{
+    if(i>=urls.length){rej(new Error('alle CDNs fehlgeschlagen'));return;}
     const sc=document.createElement('script');
-    sc.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
-    sc.onload=()=>res(); sc.onerror=()=>{_jsQRLoading=null;rej(new Error('Scanner-Modul konnte nicht geladen werden (Internet?)'));};
+    sc.src=urls[i];
+    const to=setTimeout(()=>{sc.remove();tryLoad(i+1).then(res,rej);},7000);
+    sc.onload=()=>{clearTimeout(to);res();};
+    sc.onerror=()=>{clearTimeout(to);sc.remove();tryLoad(i+1).then(res,rej);};
     document.head.appendChild(sc);
   });
+  _jsQRLoading=tryLoad(0).catch(e=>{_jsQRLoading=null;throw e;});
   return _jsQRLoading;
 }
 function openQRScanner(){
@@ -3224,47 +3229,60 @@ function openQRScanner(){
     +'<div id="qrScanStatus" style="color:rgba(255,255,255,.85);font-size:.75rem;margin-top:14px;text-align:center;min-height:1.2em;max-width:420px">Warte auf Kamera-Freigabe…</div>'
     +'<button onclick="stopQRScanner()" style="margin-top:16px;padding:11px 26px;background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.4);border-radius:12px;color:#fff;font-weight:800;font-size:.8rem;cursor:pointer;font-family:\'Sora\',sans-serif" title="Scanner schließen">Abbrechen</button>';
   document.body.appendChild(ov);
-  const status=document.getElementById('qrScanStatus');
-  const setSt=t=>{ if(document.getElementById('qrScanStatus')) document.getElementById('qrScanStatus').textContent=t; };
+  const statusEl=ov.querySelector('#qrScanStatus');
+  const setSt=t=>{ if(statusEl&&statusEl.textContent!==t) statusEl.textContent=t; };
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
     setSt('⚠ Dieser Browser unterstützt keinen Kamera-Zugriff. Alternative: QR-Code direkt mit der Handykamera-App scannen.');
     return;
   }
-  // jsQR parallel laden (blockiert den Kamera-Start nicht)
-  let jsqrFailed=false;
-  _loadJsQR().catch(()=>{jsqrFailed=true;});
-  // Kamera starten: erst Rueckkamera, bei Fehlschlag beliebige Kamera
+  // Scan-Engine: nativ (Android Chrome) bevorzugt, sonst jsQR (2 CDNs)
+  let detector=null,jsqrState='loading';
+  if(window.BarcodeDetector){
+    try{ detector=new BarcodeDetector({formats:['qr_code']}); jsqrState='native'; }catch(e){ detector=null; }
+  }
+  if(!detector){
+    _loadJsQR().then(()=>{jsqrState='ready';}).catch(()=>{jsqrState='failed';});
+  }
   navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false})
     .catch(()=>navigator.mediaDevices.getUserMedia({video:true,audio:false}))
     .then(stream=>{
       _qrScanStream=stream;
-      const video=document.getElementById('qrScanVideo');
+      const video=ov.querySelector('#qrScanVideo');
       if(!video){ stopQRScanner(); return; }
       video.srcObject=stream;
       video.setAttribute('playsinline','');
       const p=video.play(); if(p&&p.catch) p.catch(()=>{});
       const canvas=document.createElement('canvas');
       const ctx=canvas.getContext('2d',{willReadFrequently:true});
-      let waitedMs=0;
+      let busy=false;
       const tick=()=>{
         if(!_qrScanStream) return;
-        if(!window.jsQR){
-          if(jsqrFailed){ setSt('⚠ Scanner-Modul konnte nicht geladen werden (Internetverbindung prüfen). Alternative: QR-Code direkt mit der Handykamera-App scannen.'); return; }
-          waitedMs+=200;
-          if(waitedMs>12000){ setSt('⚠ Scanner-Modul lädt nicht (Internetverbindung prüfen). Alternative: QR-Code mit der Handykamera-App scannen.'); return; }
-          setSt('Scanner-Modul lädt…');
-          setTimeout(tick,200); return;
+        if(video.readyState!==video.HAVE_ENOUGH_DATA){
+          setSt('Kamera startet…');
+          _qrScanRAF=requestAnimationFrame(tick); return;
         }
-        if(video.readyState===video.HAVE_ENOUGH_DATA){
+        if(detector){
           setSt('Halte den QR-Code in den Rahmen');
-          canvas.width=video.videoWidth; canvas.height=video.videoHeight;
-          ctx.drawImage(video,0,0,canvas.width,canvas.height);
-          try{
-            const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-            const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
-            if(code&&code.data){ _onQRScanned(code.data); return; }
-          }catch(e){}
-        } else { setSt('Kamera startet…'); }
+          if(!busy){
+            busy=true;
+            detector.detect(video).then(codes=>{
+              busy=false;
+              if(codes&&codes.length&&codes[0].rawValue){ _onQRScanned(codes[0].rawValue); return; }
+              _qrScanRAF=requestAnimationFrame(tick);
+            }).catch(()=>{ busy=false; detector=null; _qrScanRAF=requestAnimationFrame(tick); });
+          } else { _qrScanRAF=requestAnimationFrame(tick); }
+          return;
+        }
+        if(jsqrState==='loading'){ if(!window.jsQR){ setSt('Scanner-Modul lädt…'); setTimeout(tick,200); return; } jsqrState='ready'; }
+        if(jsqrState==='failed'&&!window.jsQR){ setSt('⚠ Scanner-Modul konnte nicht geladen werden (Internet/Blocker prüfen). Alternative: QR-Code direkt mit der Handykamera-App scannen.'); return; }
+        setSt('Halte den QR-Code in den Rahmen');
+        canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        try{
+          const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+          const code=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+          if(code&&code.data){ _onQRScanned(code.data); return; }
+        }catch(e){}
         _qrScanRAF=requestAnimationFrame(tick);
       };
       _qrScanRAF=requestAnimationFrame(tick);
