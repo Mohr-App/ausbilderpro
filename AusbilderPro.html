@@ -1088,7 +1088,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.29.0 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.29.1 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -3488,6 +3488,10 @@ function saveNewInst(){
       .where('loginEmail','==',email).limit(1).get()
       .then(snap=>{
         if(!snap.empty){ kursData.ausbilderId = snap.docs[0].id; }
+        return _fetchMyVPStandortRaum();
+      })
+      .then(loc=>{
+        Object.assign(kursData,loc||{});
         return _db.collection('shared').doc('kurse').collection('list').add(kursData);
       })
       .then(ref=>{
@@ -7164,6 +7168,38 @@ function submitDsgvoConsent(){
     toast('✓ Zustimmung gespeichert');
   }).catch(err=>{if(errEl)errEl.textContent='Fehler: '+err.message;});
 }
+function _fetchMyVPStandortRaum(){
+  // Standardort + Standardraum des eigenen VP-Ausbilder-Datensatzes holen (Match ueber Login-Email)
+  if(!_db||!_auth||!_auth.currentUser) return Promise.resolve({});
+  const email=(_auth.currentUser.email||'').toLowerCase();
+  const ausbCol=_db.collection('shared').doc('kursSettings').collection('ausbilder');
+  return ausbCol.where('loginEmail','==',email).limit(1).get()
+    .then(snap=> snap.empty ? ausbCol.where('email','==',email).limit(1).get() : snap)
+    .then(snap=>{
+      if(snap.empty) return {};
+      const a=snap.docs[0].data();
+      const out={}; const jobs=[];
+      if(a.standortId) jobs.push(
+        _db.collection('shared').doc('kursSettings').collection('standorte').doc(a.standortId).get().then(d=>{
+          if(d.exists){
+            const st=d.data();
+            out.standortName=st.name||'';
+            out.standortAdresse=((st.strasse||'')+(st.plz?' · '+st.plz:'')+(st.ort?' '+st.ort:'')).trim();
+            out.standortGebaeude=st.gebaeude||'';
+            out.standortHinweis=st.hinweis||'';
+            out.standortMapsUrl='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((st.strasse||'')+' '+(st.plz||'')+' '+(st.ort||''));
+          }
+        }).catch(()=>{})
+      );
+      if(a.raumId) jobs.push(
+        _db.collection('shared').doc('kursSettings').collection('raeume').doc(a.raumId).get().then(d=>{
+          if(d.exists) out.raum=d.data().name||'';
+        }).catch(()=>{})
+      );
+      return Promise.all(jobs).then(()=>out);
+    })
+    .catch(()=>({}));
+}
 function getAusbilderKursData(){
   const p=getAusbilderProfil();
   const loginEmail=_auth?.currentUser?.email?.toLowerCase()||'';
@@ -7839,7 +7875,10 @@ function activateFirestore(){
   };
   toast('Aktiviere Kurs …');
   _syncLehrgangsartToVP(kursName);
-  _db.collection('shared').doc('kurse').collection('list').add(kursData).then(ref=>{
+  _fetchMyVPStandortRaum().then(loc=>{
+    Object.assign(kursData,loc||{});
+    return _db.collection('shared').doc('kurse').collection('list').add(kursData);
+  }).then(ref=>{
     inst.sharedKursId=ref.id;
     persist();renderMain();
     toast('QR-Code + Pool aktiviert ✓');
