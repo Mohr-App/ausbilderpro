@@ -1142,6 +1142,22 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             </div>
           </div>
 
+          <!-- RÄUME KARTE -->
+          <div class="card scard" title="Auf-/Zuklappen" onclick="toggleSCard(this)">
+            <div class="scard-hdr">
+              <div style="font-size:.85rem;font-weight:700">🚪 Räume</div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span class="scard-cnt" id="scCntRaum">0</span>
+                <span class="scard-arr">▸</span>
+              </div>
+            </div>
+            <div class="scard-body">
+              <div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Unterrichts- und Werkstatträume. Werden beim Ausbilder als Standardraum hinterlegt.</div>
+              <div id="raumListSettings"></div>
+              <button class="btn-sm btn-ok" onclick="event.stopPropagation();openAddRaumModal()" style="width:100%;margin-top:8px;font-size:.72rem;padding:6px" title="OK">+ Hinzufügen</button>
+            </div>
+          </div>
+
           <!-- BERUFSGRUPPEN KARTE -->
           <div class="card scard" title="Auf-/Zuklappen" onclick="toggleSCard(this)">
             <div class="scard-hdr">
@@ -1295,6 +1311,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div class="fg" id="addAusbPwRow"><label class="fl">Passwort (AusbilderPro Login) <span style="color:var(--bad)">*</span></label><input class="fi" id="addAusbPwInp" type="text" placeholder="Mind. 6 Zeichen – wird dem Ausbilder mitgeteilt"></div>
             <div class="fg"><label class="fl">Berufsgruppe <span style="color:var(--bad)">*</span></label><select class="fi" id="addAusbBerufInp"><option value="">– bitte wählen –</option></select></div>
             <div class="fg"><label class="fl">🏢 Standardort</label><select class="fi" id="addAusbStandortInp"><option value="">– kein Standardort –</option></select></div>
+            <div class="fg"><label class="fl">🚪 Standardraum</label><select class="fi" id="addAusbRaumInp"><option value="">– kein Standardraum –</option></select></div>
             <!-- URLAUB -->
             <div id="ausbUrlaubWrap" style="display:none;margin-top:10px;padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -1411,6 +1428,21 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
                 <button class="btn-sm btn-ok" id="impDoBtn" onclick="doImport()" style="flex:2" title="OK">Jetzt importieren</button>
               </div>
               <div id="impProgress" style="display:none;margin-top:8px;padding:10px;background:var(--sur2);border-radius:8px;font-size:.72rem;text-align:center"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD/EDIT RAUM MODAL -->
+      <div class="ov" id="addRaumModal">
+        <div class="modal" style="max-width:360px">
+          <div class="mhd"><div class="mtit" id="addRaumModalTit">Raum hinzufügen</div><button class="xcls" onclick="closeAddRaumModal()" title="Schließen">&#10005;</button></div>
+          <div class="mbdy">
+            <input type="hidden" id="addRaumId">
+            <div class="fg"><label class="fl">Raum <span style="color:var(--bad)">*</span></label><input class="fi" id="addRaumName" placeholder="z.B. E.0.2"></div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="btn-sm" id="addRaumDelBtn" style="flex:1;display:none;background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)" title="Löschen" onclick="confirmDeleteRaum()">&#128465; Löschen</button>
+              <button class="btn-sm btn-ok" style="flex:2" onclick="saveRaum()" title="OK">&#10003; Speichern</button>
             </div>
           </div>
         </div>
@@ -3446,6 +3478,7 @@ let _ausbilder = [];  // [{id,name,email}]
 let _verwaltung = []; // [{id,name,email}]
 let _lehrgangsarten = []; // [{id,name}]
 let _standorte = []; // [{id,name,strasse,plz,ort,gebaeude,hinweis}]
+let _raeume = []; // [{id,name}]
 let _kursForm = { ausbId: null, lgartId: null }; // selected in modal
 
 function loadKursSettings() {
@@ -3486,6 +3519,14 @@ function loadKursSettings() {
       snap.forEach(doc => _standorte.push({id: doc.id, ...doc.data()}));
       renderStandortListSettings();
     }, err => console.warn('Standorte laden:', err.message));
+  // Räume
+  db.collection('shared').doc('kursSettings').collection('raeume')
+    .orderBy('name').onSnapshot(snap => {
+      _raeume = [];
+      snap.forEach(doc => _raeume.push({id: doc.id, ...doc.data()}));
+      renderRaumListSettings();
+      // Offenes Ausbilder-Modal: Dropdown aktuell halten waere komplex - Liste wird beim naechsten Oeffnen befuellt
+    }, err => console.warn('Räume laden:', err.message));
 }
 
 function renderAusbChips() {
@@ -3661,6 +3702,7 @@ function openAddAusbModal(){
   populateAusbBerufSelect();
   document.getElementById('addAusbBerufInp').value = '';
   populateStandortSelect('addAusbStandortInp','');
+  populateRaumSelect('addAusbRaumInp','');
   document.getElementById('ausbUrlaubWrap').style.display='none';
   _ausbUrlaubTemp=[];
   document.getElementById('addAusbModal').classList.add('open');
@@ -3678,6 +3720,7 @@ function openEditAusbSettings(id){
   populateAusbBerufSelect();
   document.getElementById('addAusbBerufInp').value = a.berufId||'';
   populateStandortSelect('addAusbStandortInp', a.standortId||'');
+  populateRaumSelect('addAusbRaumInp', a.raumId||'');
   document.getElementById('addAusbDelBtn').style.display = 'flex';
   document.getElementById('addAusbModalTit').textContent = 'Ausbilder bearbeiten';
   // Urlaub laden
@@ -3704,8 +3747,9 @@ function saveAusbilder(){
   const beruf = BERUFE[berufId];
   const berufLabel = beruf ? beruf.label : berufId;
   const standortId = document.getElementById('addAusbStandortInp')?.value||'';
+  const raumId = document.getElementById('addAusbRaumInp')?.value||'';
   const col = db.collection('shared').doc('kursSettings').collection('ausbilder');
-  const data = {name, email, loginEmail, tel, berufId, berufLabel, standortId, urlaub:_ausbUrlaubTemp||[]};
+  const data = {name, email, loginEmail, tel, berufId, berufLabel, standortId, raumId, urlaub:_ausbUrlaubTemp||[]};
 
   if(id){
     // Bearbeiten – nur Daten updaten
@@ -3847,6 +3891,67 @@ function saveLgart(){
 }
 
 // ── STANDORTE ──
+function renderRaumListSettings(){
+  const scCnt=document.getElementById('scCntRaum');if(scCnt)scCnt.textContent=_raeume.length;
+  const el=document.getElementById('raumListSettings');
+  if(!el) return;
+  if(!_raeume.length){ el.innerHTML='<div style="font-size:.72rem;color:var(--mu);font-style:italic">Noch keine Räume angelegt</div>'; return; }
+  el.innerHTML='';
+  const sorted=[..._raeume].sort((a,b)=>(a.name||'').localeCompare(b.name||'',undefined,{numeric:true}));
+  sorted.forEach(r=>{
+    const row=document.createElement('div');
+    row.className='settings-row';
+    row.innerHTML='<div><div class="settings-row-name">🚪 '+esc(r.name)+'</div></div>'
+      +'<div class="settings-row-actions"><button class="s-act-btn" title="Bearbeiten" onclick="openEditRaum(\''+r.id+'\')">Bearbeiten</button></div>';
+    el.appendChild(row);
+  });
+}
+function openAddRaumModal(){
+  document.getElementById('addRaumId').value='';
+  document.getElementById('addRaumName').value='';
+  document.getElementById('addRaumDelBtn').style.display='none';
+  document.getElementById('addRaumModalTit').textContent='Raum hinzufügen';
+  document.getElementById('addRaumModal').classList.add('open');
+  setTimeout(()=>document.getElementById('addRaumName').focus(),60);
+}
+function openEditRaum(id){
+  const r=_raeume.find(x=>x.id===id);if(!r) return;
+  document.getElementById('addRaumId').value=id;
+  document.getElementById('addRaumName').value=r.name||'';
+  document.getElementById('addRaumDelBtn').style.display='flex';
+  document.getElementById('addRaumModalTit').textContent='Raum bearbeiten';
+  document.getElementById('addRaumModal').classList.add('open');
+}
+function closeAddRaumModal(){ document.getElementById('addRaumModal').classList.remove('open'); }
+function saveRaum(){
+  const id=document.getElementById('addRaumId').value;
+  const name=(document.getElementById('addRaumName').value||'').trim();
+  if(!name){toast('Bitte Raum eingeben','bad');return;}
+  const col=db.collection('shared').doc('kursSettings').collection('raeume');
+  const p=id?col.doc(id).update({name}):col.add({name});
+  p.then(()=>{closeAddRaumModal();toast('Gespeichert ✓');})
+   .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+function confirmDeleteRaum(){
+  const id=document.getElementById('addRaumId').value;
+  if(!confirm('Raum wirklich löschen?')) return;
+  db.collection('shared').doc('kursSettings').collection('raeume').doc(id).delete()
+    .then(()=>{closeAddRaumModal();toast('Gelöscht');})
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+function populateRaumSelect(selectId, selectedId){
+  const sel=document.getElementById(selectId);
+  if(!sel) return;
+  sel.innerHTML='<option value="">– kein Standardraum –</option>';
+  const sorted=[..._raeume].sort((a,b)=>(a.name||'').localeCompare(b.name||'',undefined,{numeric:true}));
+  sorted.forEach(r=>{
+    const o=document.createElement('option');
+    o.value=r.id;
+    o.textContent='🚪 '+r.name;
+    if(r.id===selectedId) o.selected=true;
+    sel.appendChild(o);
+  });
+}
 function renderStandortListSettings(){
   const scCnt=document.getElementById('scCntStandort');if(scCnt)scCnt.textContent=_standorte.length;
   const el=document.getElementById('standortListSettings');
