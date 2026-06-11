@@ -1309,6 +1309,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             </div>
             <div class="fg"><label class="fl">Login-Email (AusbilderPro) <span style="font-weight:400;color:var(--mu)">– wenn abweichend</span></label><input class="fi" id="addAusbLoginEmailInp" type="email" placeholder="login@provider.de"></div>
             <div class="fg" id="addAusbPwRow"><label class="fl">Passwort (AusbilderPro Login) <span style="color:var(--bad)">*</span></label><input class="fi" id="addAusbPwInp" type="text" placeholder="Mind. 6 Zeichen – wird dem Ausbilder mitgeteilt"></div>
+            <div id="ausbAcctStatus" style="display:none;margin:-2px 0 10px 0;font-size:.68rem;font-weight:700"></div>
+            <div id="ausbAcctCreate" style="display:none;margin:-2px 0 10px 0;padding:10px;background:rgba(245,158,11,.06);border:1.5px solid rgba(245,158,11,.35);border-radius:8px">
+              <div style="font-size:.68rem;font-weight:700;color:#b45309;margin-bottom:6px">⚠ Noch kein Login-Account – hier nachträglich erstellen:</div>
+              <input class="fi" id="ausbAcctPwInp" type="text" placeholder="Start-Passwort (mind. 6 Zeichen)">
+              <button class="btn-sm btn-ok" style="width:100%;margin-top:8px;font-size:.72rem;padding:7px" onclick="createAusbAccount()" title="OK">🔑 Login-Account erstellen</button>
+            </div>
             <div class="fg"><label class="fl">Berufsgruppe <span style="color:var(--bad)">*</span></label><select class="fi" id="addAusbBerufInp"><option value="">– bitte wählen –</option></select></div>
             <div class="fg"><label class="fl">🏢 Standardort</label><select class="fi" id="addAusbStandortInp"><option value="">– kein Standardort –</option></select></div>
             <div class="fg"><label class="fl">🚪 Standardraum</label><select class="fi" id="addAusbRaumInp"><option value="">– kein Standardraum –</option></select></div>
@@ -3696,6 +3702,8 @@ function openAddAusbModal(){
   document.getElementById('addAusbLoginEmailInp').value = '';
   document.getElementById('addAusbPwInp').value = '';
   document.getElementById('addAusbPwRow').style.display = '';
+  { const st=document.getElementById('ausbAcctStatus'); if(st)st.style.display='none';
+    const cr=document.getElementById('ausbAcctCreate'); if(cr)cr.style.display='none'; }
   document.getElementById('addAusbTelInp').value = '';
   document.getElementById('addAusbDelBtn').style.display = 'none';
   document.getElementById('addAusbModalTit').textContent = 'Ausbilder hinzufügen';
@@ -3716,6 +3724,21 @@ function openEditAusbSettings(id){
   document.getElementById('addAusbEmailInp').value = a.email||'';
   document.getElementById('addAusbLoginEmailInp').value = a.loginEmail||'';
   document.getElementById('addAusbPwRow').style.display = 'none';
+  // Login-Account-Status anzeigen (nachtraegliches Erstellen ermoeglichen)
+  {
+    const st=document.getElementById('ausbAcctStatus'), cr=document.getElementById('ausbAcctCreate');
+    if(st&&cr){
+      if(a.authUid){
+        st.style.display=''; st.style.color='#059669';
+        st.textContent='✓ Login-Account vorhanden ('+(a.loginEmail||a.email||'')+')';
+        cr.style.display='none';
+      } else {
+        st.style.display='none';
+        cr.style.display='';
+        document.getElementById('ausbAcctPwInp').value='';
+      }
+    }
+  }
   document.getElementById('addAusbTelInp').value = a.tel||'';
   populateAusbBerufSelect();
   document.getElementById('addAusbBerufInp').value = a.berufId||'';
@@ -3729,6 +3752,34 @@ function openEditAusbSettings(id){
   document.getElementById('ausbUrlaubForm').style.display='none';
   renderAusbUrlaubList();
   document.getElementById('addAusbModal').classList.add('open');
+}
+function createAusbAccount(){
+  const id=document.getElementById('addAusbId').value;
+  const a=_ausbilder.find(x=>x.id===id);
+  if(!a){ toast('Ausbilder nicht gefunden','bad'); return; }
+  if(a.authUid){ toast('Login-Account existiert bereits','bad'); return; }
+  const loginEmail=(document.getElementById('addAusbLoginEmailInp').value||'').trim();
+  const email=(document.getElementById('addAusbEmailInp').value||'').trim();
+  const authEmail=loginEmail||email||a.loginEmail||a.email||'';
+  if(!authEmail){ toast('Bitte erst E-Mail oder Login-Email eintragen','bad'); return; }
+  const pw=(document.getElementById('ausbAcctPwInp').value||'').trim();
+  if(pw.length<6){ toast('Passwort mind. 6 Zeichen','bad'); return; }
+  toast('Account wird erstellt…');
+  _secondaryAuth.createUserWithEmailAndPassword(authEmail, pw).then(cred=>{
+    const uid=cred.user.uid;
+    const secDb=_secondaryApp.firestore();
+    secDb.collection('users').doc(uid).set({email:authEmail, role:'ausbilder', name:a.name||''});
+    _secondaryAuth.signOut();
+    return db.collection('shared').doc('kursSettings').collection('ausbilder').doc(id).update({authUid:uid});
+  }).then(()=>{
+    const st=document.getElementById('ausbAcctStatus'), cr=document.getElementById('ausbAcctCreate');
+    if(cr)cr.style.display='none';
+    if(st){ st.style.display=''; st.style.color='#059669'; st.textContent='✓ Login-Account erstellt ('+authEmail+')'; }
+    toast('✅ Login-Account erstellt – Login: '+authEmail);
+  }).catch(err=>{
+    const msgs={'auth/email-already-in-use':'E-Mail bereits vergeben (Account existiert evtl. schon in Firebase)','auth/invalid-email':'Ungültige E-Mail','auth/weak-password':'Passwort zu schwach'};
+    toast('❌ '+(msgs[err.code]||err.message),'bad');
+  });
 }
 function closeAddAusbModal(){ document.getElementById('addAusbModal').classList.remove('open'); }
 function saveAusbilder(){
