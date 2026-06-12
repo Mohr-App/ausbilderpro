@@ -1088,7 +1088,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.29.4 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.29.5 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -6228,8 +6228,9 @@ function generateAlleBescheinigungenAusbilder(){
       const fehltage=(sync.attAbsentE||0)+(sync.attAbsentU||0)+(sync.attSick||0);
       const verspaetungen=sync.attLate||0;
       const bemerkung=sync.bemerkung||s.bemerkung||'';
-      const sigData=sync.bescheinigungSignatur||'';
-      if(sigData) sigCount++;
+      const wasSignedA=!!(sync.bescheinigungSignatur||'');
+      const sigData=''; // PIN-Pflicht: gespeicherte Unterschrift wird nicht mehr automatisch angezeigt
+      if(wasSignedA) sigCount++;
       const tnId=s.poolTnId||idx;
       // Gespeicherte Bescheinigungs-Auswahl pro TN (falls vorhanden)
       const storedStandort=sync.bescheinigungStandort;
@@ -9231,7 +9232,8 @@ function generateBescheinigungAusbilder(){
     const fehltage=(sync.attAbsentE||0)+(sync.attAbsentU||0)+(sync.attSick||0);
     const verspaetungen=sync.attLate||0;
     const bemerkung=sync.bemerkung||d.bemerkung||'';
-    const existingSig=sync.bescheinigungSignatur||'';
+    const wasSigned=!!(sync.bescheinigungSignatur||'');
+    const existingSig=''; // PIN-Pflicht: gespeicherte Unterschrift wird nicht mehr automatisch angezeigt
     const tnEmail=(tn.kontaktEmail||tn.email||'').trim();
     // Gespeicherte Bescheinigungs-Auswahl
     const storedStandort=sync.bescheinigungStandort;
@@ -9500,6 +9502,7 @@ function _makeDraggable(el,posObj,applyFn){
   el.classList.add('draggable');
   let baseX,baseY,startX,startY,dragging=false;
   el.addEventListener('pointerdown',e=>{
+    if(e.target.classList.contains('btn-remove-overlay'))return;
     dragging=true;startX=e.clientX;startY=e.clientY;
     baseX=posObj.x;baseY=posObj.y;
     el.setPointerCapture(e.pointerId);
@@ -9778,7 +9781,7 @@ async function sendBescheinigung(){
     btn.disabled=false;btn.textContent='📤 Abschicken';
   }
 }
-${existingSig?'document.getElementById("btnSend").textContent="✅ Bereits abgeschickt";document.getElementById("btnSend").style.background="#22c55e";':''}
+${wasSigned?'document.getElementById("btnSend").textContent="✅ Bereits abgeschickt";document.getElementById("btnSend").style.background="#22c55e";':''}
 <\/script>
 </body></html>`);
     w.document.close();
