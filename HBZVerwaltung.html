@@ -2231,6 +2231,17 @@ function renderSbAusbTree(){
       const aBody = document.createElement('div'); aBody.className = 'sb-ausb-body';
 
       const ausbEmail = (_ausbilder.find(x=>x.id===aId)||{}).email || '';
+      // Aktuellen (laufenden) bzw. zuletzt gegebenen Kurs ermitteln
+      const _today = new Date().toISOString().slice(0,10);
+      let _aktKurs=null, _running=false;
+      const _sorted=[...ausbData.kurse].sort((a,b)=>(b.von||'')>(a.von||'')?1:-1);
+      _aktKurs=_sorted.find(k=>k.von&&k.bis&&_today>=k.von&&_today<=k.bis);
+      if(_aktKurs){ _running=true; } else { _aktKurs=_sorted.find(k=>k.bis&&k.bis<_today)||_sorted[0]||null; }
+      const _aktLabel=_aktKurs?((_aktKurs.lehrgangsart||_aktKurs.name||'Lehrgang')):'';
+      const _aktZeile=_aktKurs
+        ? '<div style="font-size:.6rem;color:'+(_running?'#16a34a':'var(--mu)')+';font-weight:'+(_running?'700':'400')+';padding:1px 0 0 22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+          +(_running?'▶ läuft: ':'zuletzt: ')+esc(_aktLabel)+' ('+fmtDE(_aktKurs.von)+'–'+fmtDE(_aktKurs.bis)+')</div>'
+        : '';
       aHdr.innerHTML =
         '<span class="sa">&#9654;</span>'
         + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(ausbData.name) + '</span>'
@@ -2284,6 +2295,7 @@ function renderSbAusbTree(){
       }
 
       aDiv.appendChild(aHdr);
+      if(_aktZeile){ const _z=document.createElement('div'); _z.innerHTML=_aktZeile; if(_z.firstChild) aDiv.appendChild(_z.firstChild); }
       aDiv.appendChild(aBody);
       bBody.appendChild(aDiv);
     });
