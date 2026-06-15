@@ -3503,6 +3503,7 @@ function saveNewInst(){
       })
       .then(loc=>{
         Object.assign(kursData,loc||{});
+        const _g=_myQrGeoDefault(); if(_g) kursData.qrGeo=_g;
         return _db.collection('shared').doc('kurse').collection('list').add(kursData);
       })
       .then(ref=>{
@@ -7923,6 +7924,7 @@ function activateFirestore(){
   _syncLehrgangsartToVP(kursName);
   _fetchMyVPStandortRaum().then(loc=>{
     Object.assign(kursData,loc||{});
+    const _g=_myQrGeoDefault(); if(_g) kursData.qrGeo=_g;
     return _db.collection('shared').doc('kurse').collection('list').add(kursData);
   }).then(ref=>{
     inst.sharedKursId=ref.id;
@@ -8034,6 +8036,20 @@ function openQRAttModal(){
   document.getElementById('qrAttModal').classList.add('open');
   _db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(doc=>{
     _qrAttGeo=(doc.exists&&doc.data().qrGeo)?doc.data().qrGeo:null;
+    // Kein Geofence am Kurs? Persönlichen Standard dieses Ausbilders automatisch übernehmen
+    if(!_qrAttGeo){
+      try{
+        const _em=(_auth&&_auth.currentUser&&_auth.currentUser.email||'x').toLowerCase();
+        const def=localStorage.getItem('myQrGeoDefault_'+_em);
+        if(def){
+          const geo=JSON.parse(def);
+          if(geo&&typeof geo.lat==='number'&&typeof geo.lng==='number'){
+            _qrAttGeo=geo;
+            _db.collection('shared').doc('kurse').collection('list').doc(kursId).update({qrGeo:geo}).catch(()=>{});
+          }
+        }
+      }catch(e){}
+    }
     _renderQRAttBody(kursId);
   }).catch(e=>{body.innerHTML='<div style="color:#dc2626;font-size:.75rem">Fehler beim Laden: '+esc(e.message||'')+'</div>';});
 }
@@ -8153,6 +8169,16 @@ function setQRAttStandort(){
     if(msg)msg.textContent='⚠ GPS fehlgeschlagen ('+(err.message||'keine Berechtigung')+') – Standort per Stecknadel/Koordinaten setzen.';
   },{enableHighAccuracy:true,timeout:10000,maximumAge:0});
 }
+function _myQrGeoDefault(){
+  try{
+    const _em=(_auth&&_auth.currentUser&&_auth.currentUser.email||'x').toLowerCase();
+    const def=localStorage.getItem('myQrGeoDefault_'+_em);
+    if(!def) return null;
+    const g=JSON.parse(def);
+    if(g&&typeof g.lat==='number'&&typeof g.lng==='number') return g;
+  }catch(e){}
+  return null;
+}
 function saveQRAttGeo(){
   const inst=curInst(); if(!inst||!inst.sharedKursId) return;
   const lat=parseFloat((document.getElementById('qrAttLat')?.value||'').replace(',','.'));
@@ -8162,6 +8188,8 @@ function saveQRAttGeo(){
   const geo={lat:Math.round(lat*1e6)/1e6,lng:Math.round(lng*1e6)/1e6,radius,setAm:new Date().toISOString()};
   _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).update({qrGeo:geo}).then(()=>{
     _qrAttGeo=geo;
+    // Als persönlichen Standard dieses Ausbilders merken (für künftige Kurse)
+    try{ const _em=(_auth&&_auth.currentUser&&_auth.currentUser.email||'x').toLowerCase(); localStorage.setItem('myQrGeoDefault_'+_em, JSON.stringify(geo)); }catch(e){}
     toast('📍 Kurs-Standort gespeichert ✓');
     _renderQRAttBody(inst.sharedKursId);
   }).catch(e=>toast('Fehler: '+(e.message||''),'bad'));
