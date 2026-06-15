@@ -695,6 +695,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="card" onclick="showPage('berichtsheft')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Berichtsheft"><span style="font-size:1.4rem">📒</span><div><div style="font-weight:700;font-size:.85rem">Berichtsheft <span style="font-size:.55rem;font-weight:800;color:#b45309;background:rgba(245,158,11,.15);padding:1px 6px;border-radius:999px;vertical-align:middle">BETA</span></div><div style="font-size:.65rem;color:var(--mu)">Wochenberichte · Ausbildungsnachweis</div></div></button>
         <button class="card" id="mehrFirmaBtn" onclick="showPage('firma')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px;display:none" title="Betriebsverknüpfung"><span style="font-size:1.4rem">🔗</span><div><div style="font-weight:700;font-size:.85rem">Betriebsverknüpfung</div><div style="font-size:.65rem;color:var(--mu)" id="mehrFirmaSub">Mit Betrieb verbunden</div></div></button>
         <button class="card" onclick="showPage('hilfe')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Hilfe"><span style="font-size:1.4rem">❓</span><div><div style="font-weight:700;font-size:.85rem">Hilfe</div><div style="font-size:.65rem;color:var(--mu)">Anleitung & Tipps</div></div></button>
+        <button class="card" onclick="showWelcomeAgain()" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Erste Schritte"><span style="font-size:1.4rem">🧭</span><div><div style="font-weight:700;font-size:.85rem">Erste Schritte</div><div style="font-size:.65rem;color:var(--mu)">Begrüßung &amp; Sitzplatz erneut ansehen</div></div></button>
         <button title="Abmelden" onclick="doLogout()" style="margin-top:8px;width:100%;padding:12px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Abmelden</button>
       </div>
     </div>
@@ -775,6 +776,61 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- WILLKOMMENS-WIZARD (nach Registrierung) -->
+<div id="welcomeOverlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.55);backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--sur);border-radius:18px;max-width:380px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+    <div style="background:linear-gradient(135deg,#2563eb,#059669);padding:18px 20px;border-radius:18px 18px 0 0">
+      <div style="font-size:1.15rem;font-weight:800;color:#fff" id="wcTitle">Willkommen!</div>
+      <div style="font-size:.7rem;color:rgba(255,255,255,.85);margin-top:2px" id="wcStepLabel">Schritt 1 von 3</div>
+      <div style="height:5px;background:rgba(255,255,255,.25);border-radius:3px;overflow:hidden;margin-top:10px">
+        <div id="wcProgress" style="height:100%;background:#fff;width:33%;transition:width .25s"></div>
+      </div>
+    </div>
+    <div style="padding:22px 20px">
+      <!-- Schritt 1: Willkommen -->
+      <div class="wc-step" data-wc="1">
+        <div style="font-size:2.4rem;text-align:center;margin-bottom:10px">🎉</div>
+        <div style="font-size:1.05rem;font-weight:800;color:var(--tx);text-align:center;margin-bottom:8px" id="wcWelcomeName">Schön, dass du da bist!</div>
+        <div style="font-size:.8rem;color:var(--tx);line-height:1.6;text-align:center">Diese App begleitet dich durch deinen Lehrgang: Anwesenheit, Kursinfos und Nachrichten an deinen Ausbilder – alles an einem Ort.</div>
+      </div>
+      <!-- Schritt 2: Lehrgang bestätigen -->
+      <div class="wc-step" data-wc="2" style="display:none">
+        <div style="font-size:.95rem;font-weight:800;color:var(--tx);margin-bottom:4px">Ist das dein Lehrgang?</div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:12px">Bitte bestätige, dass du im richtigen Lehrgang bist.</div>
+        <div style="background:var(--sur2);border:2px solid var(--brd);border-radius:12px;padding:14px;margin-bottom:14px">
+          <div style="font-size:.95rem;font-weight:800;color:var(--tx)" id="wcKursName">–</div>
+          <div style="font-size:.72rem;color:var(--mu);margin-top:3px" id="wcKursDates"></div>
+          <div style="font-size:.72rem;color:var(--mu);margin-top:2px" id="wcKursAusb"></div>
+        </div>
+        <button onclick="wcConfirmKurs()" id="wcConfirmBtn" style="width:100%;padding:12px;background:linear-gradient(135deg,#2563eb,#059669);border:none;border-radius:10px;color:#fff;font-weight:800;font-size:.85rem;cursor:pointer">✓ Ja, das ist mein Lehrgang</button>
+        <button onclick="wcWrongKurs()" style="width:100%;padding:10px;background:none;border:none;color:var(--mu);font-size:.72rem;cursor:pointer;text-decoration:underline;margin-top:8px">Das stimmt nicht</button>
+        <div id="wcConfirmedMsg" style="display:none;font-size:.75rem;color:#16a34a;font-weight:700;text-align:center;margin-top:8px">✓ Bestätigt – danke!</div>
+      </div>
+      <!-- Schritt 3: Navigation + Sitzplatz -->
+      <div class="wc-step" data-wc="3" style="display:none">
+        <div style="font-size:.95rem;font-weight:800;color:var(--tx);margin-bottom:10px">So findest du dich zurecht</div>
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+          <div style="font-size:1.2rem">📺</div>
+          <div style="font-size:.76rem;color:var(--tx);line-height:1.5"><b>ÜBL</b> – hier ist alles zu deinem Lehrgang: Anwesenheit, Kursdetails und dein Sitzplatz. Das ist dein wichtigster Bereich.</div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+          <div style="font-size:1.2rem">💺</div>
+          <div style="font-size:.76rem;color:var(--tx);line-height:1.5"><b>Dein Sitzplatz</b> – dein Ausbilder nennt dir deine Platznummer. Trag sie unter ÜBL bei „Mein Platz" ein und tippe auf Speichern.</div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="font-size:1.2rem">⚙️</div>
+          <div style="font-size:.76rem;color:var(--tx);line-height:1.5"><b>Mehr</b> – dein Profil, Einstellungen und diese Erste-Schritte-Hilfe.</div>
+        </div>
+      </div>
+      <!-- Navigation -->
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button id="wcBackBtn" onclick="wcNav(-1)" style="display:none;flex:1;padding:11px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;color:var(--tx);font-weight:700;font-size:.8rem;cursor:pointer">Zurück</button>
+        <button id="wcNextBtn" onclick="wcNav(1)" style="flex:2;padding:11px;background:linear-gradient(135deg,#2563eb,#059669);border:none;border-radius:10px;color:#fff;font-weight:800;font-size:.8rem;cursor:pointer">Weiter</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- AUSSTEMPEL-MODAL -->
 <style>
@@ -1513,6 +1569,7 @@ function submitJoinLogin(){
           document.getElementById('app').classList.add('show');
           document.getElementById('hdrUser').textContent=_email.split('@')[0];
           loadData();
+          maybeStartWelcome(savedKursId);
         });
       });
     });
@@ -5980,6 +6037,78 @@ function markNotifRead(filteredIdx){
 }
 
 // ── Kurs bestätigen ──
+// ===== WILLKOMMENS-WIZARD (nach Registrierung) =====
+let _wcStep=1, _wcKursId=null, _wcConfirmed=false;
+function startWelcomeWizard(kursId){
+  _wcStep=1; _wcKursId=kursId||_tnData?.aktiverKursId||null; _wcConfirmed=false;
+  // Begrüßung mit Name
+  const vn=_tnData?.vorname||'';
+  document.getElementById('wcWelcomeName').textContent = vn ? ('Willkommen, '+vn+'!') : 'Schön, dass du da bist!';
+  // Kursdaten für Schritt 2 laden
+  if(_wcKursId){
+    db.collection('shared').doc('kurse').collection('list').doc(_wcKursId).get().then(d=>{
+      if(d.exists){
+        const k=d.data();
+        document.getElementById('wcKursName').textContent=k.name||k.lehrgangsart||'Lehrgang';
+        document.getElementById('wcKursDates').textContent=(k.von?fmtDE(k.von):'')+(k.bis?(' – '+fmtDE(k.bis)):'');
+        document.getElementById('wcKursAusb').textContent=k.ausbilderName?('Ausbilder: '+k.ausbilderName):'';
+      }
+    }).catch(()=>{});
+  }
+  _wcRender();
+  document.getElementById('welcomeOverlay').style.display='flex';
+}
+function _wcRender(){
+  document.querySelectorAll('.wc-step').forEach(s=>s.style.display=(+s.dataset.wc===_wcStep)?'':'none');
+  document.getElementById('wcStepLabel').textContent='Schritt '+_wcStep+' von 3';
+  document.getElementById('wcProgress').style.width=(_wcStep*33.33)+'%';
+  document.getElementById('wcBackBtn').style.display=_wcStep>1?'':'none';
+  const next=document.getElementById('wcNextBtn');
+  next.textContent=_wcStep===3?'Los geht\u2019s':'Weiter';
+  // Schritt 2: Weiter blockieren bis bestätigt
+  if(_wcStep===2 && !_wcConfirmed){ next.style.opacity='.5'; next.style.pointerEvents='none'; }
+  else { next.style.opacity='1'; next.style.pointerEvents='auto'; }
+}
+function wcNav(dir){
+  const n=_wcStep+dir;
+  if(n<1) return;
+  if(n>3){ wcFinish(); return; }
+  _wcStep=n; _wcRender();
+}
+function wcConfirmKurs(){
+  if(!_wcKursId||!_tnId){ _wcConfirmed=true; _wcAfterConfirm(); return; }
+  const ref=db.collection('shared').doc('kurse').collection('list').doc(_wcKursId).collection('teilnehmer').doc(_tnId);
+  ref.set({bestaetigtAm:Date.now(),bestaetigtVon:_email},{merge:true})
+    .then(()=>{ _wcConfirmed=true; _wcAfterConfirm(); })
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+function _wcAfterConfirm(){
+  document.getElementById('wcConfirmBtn').style.display='none';
+  document.querySelector('[data-wc="2"] [onclick="wcWrongKurs()"]').style.display='none';
+  document.getElementById('wcConfirmedMsg').style.display='';
+  _wcRender();
+}
+function wcWrongKurs(){
+  const ausb=document.getElementById('wcKursAusb').textContent||'deinen Ausbilder';
+  alert('Kein Problem. Bitte wende dich an '+ausb.replace('Ausbilder: ','')+' – er kann die Zuordnung korrigieren.\n\nDu kannst die App trotzdem schon nutzen.');
+  _wcConfirmed=true; // Weitergehen erlauben, aber NICHT bestätigt speichern (bleibt rot beim Ausbilder)
+  document.getElementById('wcConfirmBtn').style.display='none';
+  _wcRender();
+}
+function wcFinish(){
+  document.getElementById('welcomeOverlay').style.display='none';
+  try{ localStorage.setItem('wcSeen_'+(_tnId||_email),'1'); }catch(e){}
+  // Direkt auf ÜBL-Tab springen
+  if(typeof showPage==='function'){ showPage('uebl'); }
+}
+function maybeStartWelcome(kursId){
+  // Nur einmalig pro Gerät zeigen
+  let seen=false;
+  try{ seen=localStorage.getItem('wcSeen_'+(_tnId||_email))==='1'; }catch(e){}
+  if(!seen){ setTimeout(()=>startWelcomeWizard(kursId), 400); }
+}
+function showWelcomeAgain(){ startWelcomeWizard(_tnData?.aktiverKursId||null); }
+
 function confirmKurs(kursId, kursName){
   if(!confirm('Hiermit bestätige ich, dass ich den Lehrgang "'+kursName+'" zur Kenntnis genommen habe.')) return;
   if(!_tnId){toast('Fehler: TN nicht zugeordnet','bad');return;}
