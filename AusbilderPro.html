@@ -1096,7 +1096,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.29.17 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.29.18 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -9828,6 +9828,10 @@ async function sendBescheinigung(){
       throw new Error('Bitte AusbilderPro im Hauptfenster neu laden');
     }
     await window.opener._sendBescheinigungMail(window._tnEmail,subject,emailHtml,pdfBase64,filename);
+    // Erst NACH erfolgreichem Versand als ausgestellt markieren
+    if(window.opener._markBescheinigungAusgestellt){
+      window.opener._markBescheinigungAusgestellt(window._kursId,window._tnId,'mail');
+    }
     document.getElementById('statusArea').innerHTML='<div class="status-msg" style="background:#f0fdf4;color:#16a34a">✅ Bescheinigung als PDF-Anhang an '+window._tnEmail+' versendet!</div>';
     btn.textContent='✅ Gesendet';
   } catch(err){
@@ -13385,8 +13389,7 @@ window._saveBescheinigungSignature=function(kursId,tnId,signatureData){
   // JSON-Roundtrip + lokales Object stellt sicher dass es 100% plain ist
   const data=JSON.parse(JSON.stringify({
     bescheinigungSignatur:String(signatureData||''),
-    bescheinigungDatum:Date.now(),
-    bescheinigungAusgestellt:{am:new Date().toISOString().slice(0,10),art:'mail'}
+    bescheinigungDatum:Date.now()
   }));
   return _db.collection('shared').doc('kurse').collection('list').doc(String(kursId)).collection('teilnehmer').doc(String(tnId)).set(data,{merge:true});
 };
