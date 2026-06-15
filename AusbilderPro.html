@@ -215,6 +215,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .pool-guide-btn-primary{background:linear-gradient(135deg,#2563eb,#059669);color:#fff;border-color:transparent;}
 .pool-guide-btn-primary:hover{opacity:.92;}
 .pool-card{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:5px;cursor:grab;transition:all .12s;user-select:none;display:flex;align-items:center;gap:8px;}
+.pool-card-unbestaetigt{border:2px solid #ef4444!important;box-shadow:0 0 0 1px rgba(239,68,68,.2);}
 .pool-card:hover{border-color:var(--acc);background:rgba(59,130,246,.05);}
 .pool-card.dragging{opacity:.4;border-color:var(--acc);}
 .pool-card.placed{opacity:.45;border-color:var(--ok);border-style:dashed;cursor:default;}
@@ -1095,7 +1096,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.29.15 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.29.16 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -11195,10 +11196,12 @@ function loadPool(){
         card.dataset.ausbjahr=d.ausbjahr||'';
         const urlConf=getTnUrlaubConflict(doc.id);
         const isPending=!!_tnPending[doc.id];
+        const isUnbestaetigt = !!d.bestaetigungAngefordert && !d.bestaetigtAm;
         if(isPending){ card.style.opacity='.5'; card.style.borderColor='rgba(239,68,68,.4)'; card.draggable=false; }
+        else if(isUnbestaetigt){ card.classList.add('pool-card-unbestaetigt'); }
         card.innerHTML='<div class="pool-avatar"'+(isPending?' style="background:rgba(239,68,68,.2);color:#ef4444"':'')+'>'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(fullName)+'</div>'
-          +'<div class="pool-sub">'+(isPending?'<span style="color:#ef4444;font-weight:700">🔴 Wird entfernt</span>':isPlaced?'✓ Platziert':urlConf?'<span style="color:#f59e0b;font-weight:700">🏖 '+urlConf.days+'d Urlaub</span>':(d.wunschSitzplatz?'<span style="color:#10b981;font-weight:600">🪑 Platz '+esc(d.wunschSitzplatz)+'</span> · ':'')+esc(d.firma||d.beruf||''))+'</div></div>';
+          +'<div class="pool-sub">'+(isPending?'<span style="color:#ef4444;font-weight:700">🔴 Wird entfernt</span>':isUnbestaetigt?'<span style="color:#ef4444;font-weight:700">⚠️ noch nicht bestätigt</span>':isPlaced?'✓ Platziert':urlConf?'<span style="color:#f59e0b;font-weight:700">🏖 '+urlConf.days+'d Urlaub</span>':(d.wunschSitzplatz?'<span style="color:#10b981;font-weight:600">🪑 Platz '+esc(d.wunschSitzplatz)+'</span> · ':'')+esc(d.firma||d.beruf||''))+'</div></div>';
         card.addEventListener('dragstart',e=>{
           _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
           e.dataTransfer.setData('text/plain',fullName);
