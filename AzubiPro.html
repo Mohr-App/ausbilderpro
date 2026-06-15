@@ -83,6 +83,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .btab{display:none;}.btab.active{display:block;}
 .az-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:800;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 2px 6px rgba(239,68,68,.4);animation:pulseBadge 1.5s infinite;}
 @keyframes pulseBadge{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 8px rgba(239,68,68,0)}}
+@keyframes tipPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
 .card{background:var(--sur2);border:2px solid rgba(37,99,235,.4);border-radius:14px;padding:16px;margin-bottom:12px;}
 
 .card-title{font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;margin-bottom:10px;}
@@ -5826,11 +5827,12 @@ function loadKurse(){
       }
       // Sitzplatz-Feld immer anzeigen
       const spVal=_tnData?.wunschSitzplatz||'';
-      html+='<div onclick="event.stopPropagation()" style="margin-top:10px;padding:12px 14px;background:#ffffff;border:2px solid rgba(37,99,235,.4);border-radius:10px;display:flex;align-items:center;gap:10px">'
-        +'<span style="font-size:.78rem;font-weight:700;color:#2563eb">🪑 Mein Platz:</span>'
-        +'<input id="homeSitzplatz" type="number" min="1" value="'+esc(spVal)+'" placeholder="Nr." style="width:60px;padding:6px 8px;border:2px solid rgba(59,130,246,.3);border-radius:7px;font-size:.88rem;font-weight:800;text-align:center;background:var(--sur);color:var(--tx);font-family:\'Sora\',sans-serif">'
+      const spLeer=!String(spVal).trim();
+      html+='<div onclick="event.stopPropagation()" style="margin-top:10px;padding:12px 14px;background:#ffffff;border:2px solid '+(spLeer?'#ef4444':'rgba(37,99,235,.4)')+';border-radius:10px;display:flex;align-items:center;gap:10px'+(spLeer?';box-shadow:0 0 0 1px rgba(239,68,68,.2)':'')+'">'
+        +'<span style="font-size:.78rem;font-weight:700;color:'+(spLeer?'#dc2626':'#2563eb')+'">🪑 Mein Platz:</span>'
+        +'<input id="homeSitzplatz" type="number" min="1" value="'+esc(spVal)+'" placeholder="Nr." style="width:60px;padding:6px 8px;border:2px solid '+(spLeer?'rgba(239,68,68,.5)':'rgba(59,130,246,.3)')+';border-radius:7px;font-size:.88rem;font-weight:800;text-align:center;background:var(--sur);color:var(--tx);font-family:\'Sora\',sans-serif">'
         +'<button onclick="saveHomeSitzplatz()" style="padding:6px 14px;background:var(--acc);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif" title="Sitzplatz speichern">'+(spVal?'Ändern':'Speichern')+'</button>'
-        +(spVal?'<span style="font-size:.6rem;color:#10b981;font-weight:600">✓</span>':'')
+        +(spVal?'<span style="font-size:.6rem;color:#10b981;font-weight:600">✓</span>':'<span style="font-size:.62rem;color:#dc2626;font-weight:700">fehlt</span>')
         +'</div>';
       // Meldung an Ausbilder
       html+='<div onclick="event.stopPropagation()" style="margin-top:10px;padding:12px 14px;background:#ffffff;border:2px solid rgba(37,99,235,.4);border-radius:10px">'
@@ -6099,8 +6101,30 @@ function wcWrongKurs(){
 function wcFinish(){
   document.getElementById('welcomeOverlay').style.display='none';
   try{ localStorage.setItem('wcSeen_'+(_tnId||_email)+'_'+(_wcKursId||''),'1'); }catch(e){}
-  // Direkt auf ÜBL-Tab springen
+  // Auf Übersicht bleiben und kurz das Sitzplatz-Feld hervorheben
   if(typeof showPage==='function'){ showPage('uebl'); }
+  setTimeout(highlightSitzplatzHint, 600);
+}
+function highlightSitzplatzHint(){
+  const inp=document.getElementById('homeSitzplatz');
+  if(!inp){ return; }
+  const box=inp.closest('div');
+  if(!box) return;
+  // schon ausgefüllt? dann kein Hinweis nötig
+  if((inp.value||'').trim()) return;
+  box.scrollIntoView({behavior:'smooth',block:'center'});
+  // Sprechblase
+  const tip=document.createElement('div');
+  tip.id='sitzplatzTip';
+  tip.textContent='👉 Hier deine Tischplatz-Nummer eintragen';
+  tip.style.cssText='font-size:.68rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#2563eb,#059669);padding:6px 10px;border-radius:8px;margin-top:8px;text-align:center;animation:tipPulse 1.4s ease-in-out infinite;box-shadow:0 3px 10px rgba(37,99,235,.3)';
+  if(!document.getElementById('sitzplatzTip')) box.parentNode.insertBefore(tip, box.nextSibling);
+  box.style.transition='box-shadow .3s';
+  box.style.boxShadow='0 0 0 3px rgba(37,99,235,.45)';
+  // Bei Eingabe oder nach 12s wieder entfernen
+  const clear=()=>{ const t=document.getElementById('sitzplatzTip'); if(t)t.remove(); box.style.boxShadow=''; inp.removeEventListener('focus',clear); };
+  inp.addEventListener('focus',clear);
+  setTimeout(clear, 12000);
 }
 function maybeStartWelcome(kursId){
   // Pro Kurs einmal zeigen (nicht nur einmal pro Geraet) - so kommt der Wizard bei jedem neuen Kurs
