@@ -1571,6 +1571,7 @@ function submitJoinLogin(){
           document.getElementById('hdrUser').textContent=_email.split('@')[0];
           loadData();
           maybeStartWelcome(savedKursId);
+          _autoCheckinBeiRegistrierung(savedKursId);
         });
       });
     });
@@ -2731,6 +2732,7 @@ function processJoinUrl(url){
       toast('✓ Lehrgang beigetreten: '+(kd.name||kd.lehrgangsart||'Kurs'));
       loadKurse();
       maybeStartWelcome(kursId);
+      _autoCheckinBeiRegistrierung(kursId);
       // Willkommens-Mail an Azubi + Info-Mail an AG (wie beim Ausbilder-manualTNAdd)
       _sendKursBeitrittMails(kd, kursId);
     });
@@ -3372,6 +3374,30 @@ function _onQRScanned(data){
   _checkinKursId=kursId;
   _checkinDone=false;
   _tryQRCheckin();
+}
+function _autoCheckinBeiRegistrierung(kursId){
+  // Registrierung am QR-Code zählt als Anwesenheit für heute (ohne GPS - QR hängt ja im Kursraum)
+  if(!kursId||!_tnId) return;
+  const kursRef=db.collection('shared').doc('kurse').collection('list').doc(kursId);
+  kursRef.get().then(doc=>{
+    if(!doc.exists) return;
+    const d=doc.data();
+    // nur wenn QR-Anwesenheit für den Kurs aktiviert ist (sonst kein Check-in-System)
+    if(!d.qrGeo||!d.qrGeo.lat) return;
+    const datum=new Date().toISOString().slice(0,10);
+    const ciRef=kursRef.collection('checkins').doc(_tnId+'_'+datum);
+    ciRef.get().then(ci=>{
+      if(ci.exists) return; // heute schon erfasst
+      const zeit=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+      ciRef.set({
+        tnId:_tnId, datum, zeit,
+        dist:0, acc:null,
+        name:((_tnData?.vorname||'')+' '+(_tnData?.nachname||'')).trim(),
+        viaRegistrierung:true,
+        ts:Date.now()
+      }).catch(()=>{});
+    }).catch(()=>{});
+  }).catch(()=>{});
 }
 function _tryQRCheckin(){
   if(_checkinDone||!_checkinKursId||!_tnId||!_tnData) return;
