@@ -347,6 +347,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .seat.drag-over{outline:2px dashed var(--acc);outline-offset:2px;}
 
 .seat.filled{background:#f1f5f9;border:1.5px solid #94a3b8;}
+.seat.filled.seat-unbestaetigt{border:2.5px solid #ef4444!important;box-shadow:0 0 0 1px rgba(239,68,68,.25);}
+.seat.filled.seat-unbestaetigt::after{content:'unbestätigt';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:.5rem;font-weight:700;color:#ef4444;background:rgba(239,68,68,.12);padding:0 4px;border-radius:4px;pointer-events:none;white-space:nowrap;z-index:2;}
 .seat.filled:hover{border-color:var(--acc);}
 .seating.rows-3 .seats-grid{gap:5px;}
 .seating.rows-3 .seat{padding:7px 12px 7px 10px;}
@@ -1093,7 +1095,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.29.14 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.29.15 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -2578,6 +2580,9 @@ async function syncSeatGradesFromFirestore(){
           if(sync.werkzeugStatus && seat.werkzeugStatus!==sync.werkzeugStatus){seat.werkzeugStatus=sync.werkzeugStatus;changed=true;}
           if(sync.werkzeugFehlt && seat.werkzeugFehlt!==sync.werkzeugFehlt){seat.werkzeugFehlt=sync.werkzeugFehlt;changed=true;}
           if(sync.bemerkung && seat.bemerkung!==sync.bemerkung){seat.bemerkung=sync.bemerkung;changed=true;}
+          // Lehrgangs-Bestätigung: rot markieren wenn angefordert aber noch nicht bestätigt
+          const _unbest = !!sync.bestaetigungAngefordert && !sync.bestaetigtAm;
+          if(seat._unbestaetigt!==_unbest){seat._unbestaetigt=_unbest;changed=true;}
           if(changed) anyChanged=true;
         })
         .catch(()=>{})
@@ -4417,6 +4422,7 @@ function mkSeat(id,seats){
   }
   else{
     el.classList.add('filled');
+    if(d._unbestaetigt) el.classList.add('seat-unbestaetigt');
     el.title=d.name+' – Klicken für Details';
     if(d.wiederholer) el.classList.add('wiederholer');
     const att=d.attendance||[];
