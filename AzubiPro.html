@@ -2729,6 +2729,7 @@ function processJoinUrl(url){
       closeQrJoin();
       toast('✓ Lehrgang beigetreten: '+(kd.name||kd.lehrgangsart||'Kurs'));
       loadKurse();
+      maybeStartWelcome(kursId);
       // Willkommens-Mail an Azubi + Info-Mail an AG (wie beim Ausbilder-manualTNAdd)
       _sendKursBeitrittMails(kd, kursId);
     });
@@ -6097,15 +6098,16 @@ function wcWrongKurs(){
 }
 function wcFinish(){
   document.getElementById('welcomeOverlay').style.display='none';
-  try{ localStorage.setItem('wcSeen_'+(_tnId||_email),'1'); }catch(e){}
+  try{ localStorage.setItem('wcSeen_'+(_tnId||_email)+'_'+(_wcKursId||''),'1'); }catch(e){}
   // Direkt auf ÜBL-Tab springen
   if(typeof showPage==='function'){ showPage('uebl'); }
 }
 function maybeStartWelcome(kursId){
-  // Nur einmalig pro Gerät zeigen
+  // Pro Kurs einmal zeigen (nicht nur einmal pro Geraet) - so kommt der Wizard bei jedem neuen Kurs
+  const kid=kursId||_tnData?.aktiverKursId||'';
   let seen=false;
-  try{ seen=localStorage.getItem('wcSeen_'+(_tnId||_email))==='1'; }catch(e){}
-  if(!seen){ setTimeout(()=>startWelcomeWizard(kursId), 400); }
+  try{ seen=localStorage.getItem('wcSeen_'+(_tnId||_email)+'_'+kid)==='1'; }catch(e){}
+  if(!seen){ setTimeout(()=>startWelcomeWizard(kid), 400); }
 }
 function showWelcomeAgain(){ startWelcomeWizard(_tnData?.aktiverKursId||null); }
 
