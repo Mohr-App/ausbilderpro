@@ -1096,7 +1096,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.29.24 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.29.25 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -7821,14 +7821,48 @@ function deleteTnKomplett(tnId){
   const inst=curInst();
   const kursId=inst?.sharedKursId;
   if(!kursId){toast('Kein Kurs verknüpft','bad');return;}
-  if(!confirm('⚠️ Teilnehmer aus diesem Kurs entfernen?\n\nFolgende Aktionen werden ausgelöst:\n• TN wird aus dem Kurs entfernt\n• App-Benachrichtigung in AzubiPro\n• E-Mail an Azubi (sofern Adresse hinterlegt)\n• E-Mail an Arbeitgeber (sofern hinterlegt)\n\nFortfahren?')) return;
+  // Erst TN-Typ ermitteln: manueller Eintrag (Karteileiche) oder echter selbstregistrierter Azubi?
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(tnId).get().then(tnSnap=>{
+    const tnK = tnSnap.exists ? tnSnap.data() : {};
+    const istManuell = tnK.selfRegistered!==true;
+    if(istManuell){ return _deleteTnManuellKomplett(tnId, kursId, inst); }
+    return _deleteTnEchterAzubi(tnId, kursId, inst);
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// Manueller Eintrag / Dublette: still + KOMPLETT entfernen (Kurs-Eintrag + globalTN-ID), keine Mails
+function _deleteTnManuellKomplett(tnId, kursId, inst){
+  if(!confirm('🗑 Diesen Eintrag KOMPLETT löschen?\n\nDas ist ein manuell angelegter Eintrag (kein aktives Azubi-Konto) – typisch für einen Doppel-Eintrag.\n\n• Wird komplett aus Kurs und Datenbank entfernt (inkl. ID)\n• KEINE E-Mail, KEINE Benachrichtigung\n\nFortfahren?')) return Promise.resolve();
+  const col=_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer');
+  return col.doc(tnId).delete().then(()=>{
+    return _db.collection('globalTN').doc(tnId).get().then(g=>{
+      if(!g.exists) return;
+      if(g.data().selfRegistered===true) return; // echtes Konto -> ID behalten
+      return _db.collection('globalTN').doc(tnId).delete().catch(()=>{});
+    });
+  }).then(()=>{
+    if(inst){
+      Object.keys(inst.seats||{}).forEach(sid=>{
+        if(inst.seats[sid]&&inst.seats[sid].poolTnId===tnId){ inst.seats[sid]={}; }
+      });
+    }
+    const ov=document.getElementById('ov'); if(ov) ov.classList.remove('open');
+    const dm=document.getElementById('tnDetailModal'); if(dm) dm.classList.remove('open');
+    persist();renderSeats();loadPool();
+    toast('🗑 Doppel-Eintrag komplett gelöscht');
+  });
+}
+
+// Echter selbstregistrierter Azubi: wie bisher mit Mail + Benachrichtigung
+function _deleteTnEchterAzubi(tnId, kursId, inst){
+  if(!confirm('⚠️ Teilnehmer aus diesem Kurs entfernen?\n\nFolgende Aktionen werden ausgelöst:\n• TN wird aus dem Kurs entfernt\n• App-Benachrichtigung in AzubiPro\n• E-Mail an Azubi (sofern Adresse hinterlegt)\n• E-Mail an Arbeitgeber (sofern hinterlegt)\n\nFortfahren?')) return Promise.resolve();
 
   const kursName=S.kats[S.curKat]?.label||'Lehrgang';
   const kursNameMail=katLabelFull(S.curKat)||kursName;
   const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
 
-  // 0. TN-Daten VORHER laden für Mails (sonst sind sie nach delete weg)
-  _db.collection('globalTN').doc(tnId).get().then(doc=>{
+  return _db.collection('globalTN').doc(tnId).get().then(doc=>{
     const tnDataForMail = doc.exists ? doc.data() : null;
 
     // 1. Aus Kurs-Teilnehmer-Subcollection löschen

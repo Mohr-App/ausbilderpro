@@ -1851,23 +1851,46 @@ function submitJoinRegistration(){
       // Direkt neuen TN anlegen (kein where-Query mehr - Rules erlauben create einfacher als update von vielen Feldern)
       return db.collection('globalTN').add(tnData);
     }).then(ref=>{
-      // 3. In Kurs-TN-Subcollection eintragen
-      return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId)
-        .collection('teilnehmer').doc(ref.id).set({
+      // 3. In Kurs-TN-Subcollection eintragen — vorher pruefen ob schon ein (manueller) TN
+      //    mit exakt gleichem Namen im Kurs existiert -> dessen Stammdaten uebernehmen + alten loeschen
+      const _kursTnCol=db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).collection('teilnehmer');
+      const _norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+      const _zielName=_norm(vorname+' '+nachname);
+      return _kursTnCol.get().then(snap=>{
+        let altDocId=null, altData=null;
+        snap.forEach(d=>{
+          if(d.id===ref.id) return;
+          const x=d.data();
+          // nur nicht-selbstregistrierte (manuelle) Eintraege als Match zulassen
+          if(x.selfRegistered===true) return;
+          if(_norm((x.vorname||'')+' '+(x.nachname||''))===_zielName && !altDocId){ altDocId=d.id; altData=x; }
+        });
+        // Stammdaten aus altem Eintrag uebernehmen, die der Azubi NICHT selbst angibt
+        const erbe={};
+        if(altData){
+          ['berufGruppeId','berufGruppe','firmaUid','arbeitgeberId','betriebId','wunschSitzplatz','noten_mitarbeit','noten_fuehrung','noten_praxis','noten_extra','werkzeugStatus','werkzeugFehlt','bemerkung'].forEach(f=>{
+            if(altData[f]!==undefined && altData[f]!==null && altData[f]!=='') erbe[f]=altData[f];
+          });
+        }
+        const neu=Object.assign({}, erbe, {
           vorname, nachname, firma, beruf, berufGruppe, ausbjahr,
           kontaktEmail: email,
           kontaktTelefon: telefon,
           status: 'active',
           selfRegistered: true,
+          bestaetigungAngefordert: true,
           addedAt: Date.now()
+        });
+        return _kursTnCol.doc(ref.id).set(neu,{merge:true}).then(()=>{
+          // alten manuellen Doppel-Eintrag entfernen
+          if(altDocId) return _kursTnCol.doc(altDocId).delete().catch(()=>{});
         }).then(()=>{
-          // 4. users-Dokument mit azubi-Rolle
           return db.collection('users').doc(uid).set({email: email, role:'azubi'},{merge:true});
         }).then(()=>{
-          // 5. Willkommens-Mail an Azubi (mit App-Link, Installations-Anleitung, Datenschutz-Info)
           const fullName=((vorname||'')+' '+(nachname||'')).trim();
           sendWelcomeEmail(email, fullName, _kursNameForMail);
         });
+      });
     });
   }).then(()=>{
     errEl.style.color='var(--acc)';
