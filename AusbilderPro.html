@@ -1096,7 +1096,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
-<div class="copyright" style="display:none">© AusbilderPro v3.29.25 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
+<div class="copyright" style="display:none">© AusbilderPro v3.29.26 ─ by Stefan Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
 
 <!-- HILFE MODAL -->
 <!-- AKTION DATUMS-AUSWAHL MODAL (Ausfall / Verspätung mit wählbarem Datum) -->
@@ -7629,8 +7629,11 @@ function openTnDetail(tnId){
     html+=field('Sitzplatz-Wunsch',t.wunschSitzplatz?'Platz '+t.wunschSitzplatz:'','🪑');
     // Registrierungsinfo
     if(t.selfRegistered){
+      html+='<div style="margin:8px 0;padding:7px 10px;background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.3);border-radius:8px;font-size:.68rem;font-weight:700;color:#059669">✅ Per App registriert (aktives Azubi-Konto)</div>';
       const regDate=t.registeredAt?new Date(t.registeredAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
       html+=field('Registriert am',regDate,'✅');
+    } else {
+      html+='<div style="margin:8px 0;padding:7px 10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);border-radius:8px;font-size:.68rem;font-weight:700;color:#b45309">✏️ Manuell angelegt (kein aktives Azubi-Konto) – bei Doppel-Eintrag dieser hier löschen</div>';
     }
     if(t.manuellAngelegt){
       html+=field('Angelegt von',t.angelegtVon||'Ausbilder','✏️');
@@ -7826,14 +7829,15 @@ function deleteTnKomplett(tnId){
     .collection('teilnehmer').doc(tnId).get().then(tnSnap=>{
     const tnK = tnSnap.exists ? tnSnap.data() : {};
     const istManuell = tnK.selfRegistered!==true;
-    if(istManuell){ return _deleteTnManuellKomplett(tnId, kursId, inst); }
-    return _deleteTnEchterAzubi(tnId, kursId, inst);
+    const nm = ((tnK.vorname||'')+' '+(tnK.nachname||'')).trim() || 'dieser Teilnehmer';
+    if(istManuell){ return _deleteTnManuellKomplett(tnId, kursId, inst, nm); }
+    return _deleteTnEchterAzubi(tnId, kursId, inst, nm);
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 // Manueller Eintrag / Dublette: still + KOMPLETT entfernen (Kurs-Eintrag + globalTN-ID), keine Mails
-function _deleteTnManuellKomplett(tnId, kursId, inst){
-  if(!confirm('🗑 Diesen Eintrag KOMPLETT löschen?\n\nDas ist ein manuell angelegter Eintrag (kein aktives Azubi-Konto) – typisch für einen Doppel-Eintrag.\n\n• Wird komplett aus Kurs und Datenbank entfernt (inkl. ID)\n• KEINE E-Mail, KEINE Benachrichtigung\n\nFortfahren?')) return Promise.resolve();
+function _deleteTnManuellKomplett(tnId, kursId, inst, nm){
+  if(!confirm('🗑 "'+(nm||'Eintrag')+'" KOMPLETT löschen?\n\nTyp: MANUELL angelegter Eintrag (kein aktives Azubi-Konto) – das ist typischerweise der Doppel-Eintrag, den du entfernen willst.\n\n• Wird komplett aus Kurs und Datenbank entfernt (inkl. ID)\n• KEINE E-Mail, KEINE Benachrichtigung\n\nFortfahren?')) return Promise.resolve();
   const col=_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer');
   return col.doc(tnId).delete().then(()=>{
     return _db.collection('globalTN').doc(tnId).get().then(g=>{
@@ -7855,8 +7859,8 @@ function _deleteTnManuellKomplett(tnId, kursId, inst){
 }
 
 // Echter selbstregistrierter Azubi: wie bisher mit Mail + Benachrichtigung
-function _deleteTnEchterAzubi(tnId, kursId, inst){
-  if(!confirm('⚠️ Teilnehmer aus diesem Kurs entfernen?\n\nFolgende Aktionen werden ausgelöst:\n• TN wird aus dem Kurs entfernt\n• App-Benachrichtigung in AzubiPro\n• E-Mail an Azubi (sofern Adresse hinterlegt)\n• E-Mail an Arbeitgeber (sofern hinterlegt)\n\nFortfahren?')) return Promise.resolve();
+function _deleteTnEchterAzubi(tnId, kursId, inst, nm){
+  if(!confirm('⚠️ "'+(nm||'Teilnehmer')+'" aus diesem Kurs entfernen?\n\nTyp: per App REGISTRIERTER Azubi (aktives Konto).\n\nFolgende Aktionen werden ausgelöst:\n• TN wird aus dem Kurs entfernt\n• App-Benachrichtigung in AzubiPro\n• E-Mail an Azubi (sofern Adresse hinterlegt)\n• E-Mail an Arbeitgeber (sofern hinterlegt)\n\nFortfahren?')) return Promise.resolve();
 
   const kursName=S.kats[S.curKat]?.label||'Lehrgang';
   const kursNameMail=katLabelFull(S.curKat)||kursName;
