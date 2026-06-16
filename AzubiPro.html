@@ -3382,8 +3382,12 @@ function _autoCheckinBeiRegistrierung(kursId){
   kursRef.get().then(doc=>{
     if(!doc.exists) return;
     const d=doc.data();
-    // nur wenn QR-Anwesenheit für den Kurs aktiviert ist (sonst kein Check-in-System)
-    if(!d.qrGeo||!d.qrGeo.lat) return;
+    // QR-Anwesenheit gilt als aktiviert, wenn ein Geofence gesetzt ist ODER der GPS-Schalter bewusst gesetzt wurde
+    const hatGeo=!!(d.qrGeo&&d.qrGeo.lat);
+    const gpsKonfiguriert=(typeof d.qrGpsPflicht==='boolean');
+    if(!hatGeo && !gpsKonfiguriert) return; // QR-Anwesenheit nicht eingerichtet -> kein Auto-Checkin
+    const gpsPflicht=d.qrGpsPflicht===true;
+    if(gpsPflicht && !hatGeo) return;
     const datum=new Date().toISOString().slice(0,10);
     const ciRef=kursRef.collection('checkins').doc(_tnId+'_'+datum);
     ciRef.get().then(ci=>{
@@ -3407,11 +3411,27 @@ function _tryQRCheckin(){
   const kursRef=db.collection('shared').doc('kurse').collection('list').doc(kursId);
   kursRef.get().then(doc=>{
     const qrGeo=(doc.exists&&doc.data().qrGeo)?doc.data().qrGeo:null;
-    if(!qrGeo||!qrGeo.lat) return; // QR-Anwesenheit fuer den Kurs nicht aktiviert -> still
+    const gpsPflicht=doc.exists&&doc.data().qrGpsPflicht===true;
+    const hatGeo=!!(qrGeo&&qrGeo.lat);
+    const gpsKonfiguriert=doc.exists&&(typeof doc.data().qrGpsPflicht==='boolean');
+    if(!hatGeo && !gpsKonfiguriert) return; // QR-Anwesenheit nicht eingerichtet -> still
+    if(gpsPflicht && !hatGeo) return; // GPS-Pflicht an aber kein Standort -> still
     const datum=new Date().toISOString().slice(0,10);
     const ciRef=kursRef.collection('checkins').doc(_tnId+'_'+datum);
     ciRef.get().then(ci=>{
       if(ci.exists){ _checkinBanner('ok','✓ Heute bereits eingecheckt'+(ci.data().zeit?' um '+ci.data().zeit+' Uhr':'')+'.'); return; }
+      if(!gpsPflicht){
+        // Ohne GPS: Scan genügt
+        const zeit=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+        ciRef.set({
+          tnId:_tnId, datum, zeit, dist:0, acc:null,
+          name:((_tnData.vorname||'')+' '+(_tnData.nachname||'')).trim(),
+          ts:Date.now()
+        }).then(()=>{
+          _checkinBanner('ok','✓ Eingecheckt um '+zeit+' Uhr – dein Ausbilder sieht deine Anwesenheit.');
+        }).catch(e=>{ _checkinBanner('bad','Check-in fehlgeschlagen: '+(e.message||'unbekannter Fehler')); });
+        return;
+      }
       _checkinBanner('info','📡 Anwesenheits-Check-in – GPS wird geprüft…');
       _getGPSCheckin().then(gps=>{
         if(!gps){ _checkinBanner('warn','⚠ Check-in nicht möglich: Kein GPS-Signal oder Standortfreigabe verweigert. Bitte Standort für den Browser erlauben und den QR-Code erneut scannen.'); return; }
