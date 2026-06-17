@@ -103,6 +103,11 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
               ['firma','beruf','berufGruppeId','ausbjahr','kontaktEmail','kontaktTelefon','wunschSitzplatz','mergedFromManual']
             );
+          // Azubi-Selbstbeitritt zu weiterem Kurs (processJoinUrl): markiert eigenen Eintrag
+          allow update: if request.auth != null
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+              ['vorname','nachname','firma','beruf','ausbjahr','kontaktEmail','kontaktTelefon','status','addedAt','selfRegistered','bestaetigungAngefordert']
+            );
           allow create, delete: if request.auth != null && deep == 'dokumente';
           // Meldungen: Azubi darf erstellen, Ausbilder darf lesen/löschen
           allow create: if request.auth != null && deep == 'meldungen';

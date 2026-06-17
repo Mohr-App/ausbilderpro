@@ -7837,14 +7837,28 @@ function deleteTnKomplett(tnId){
   const inst=curInst();
   const kursId=inst?.sharedKursId;
   if(!kursId){toast('Kein Kurs verknüpft','bad');return;}
-  // Erst TN-Typ ermitteln: manueller Eintrag (Karteileiche) oder echter selbstregistrierter Azubi?
-  _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-    .collection('teilnehmer').doc(tnId).get().then(tnSnap=>{
-    const tnK = tnSnap.exists ? tnSnap.data() : {};
-    const istManuell = tnK.selfRegistered!==true;
-    const nm = ((tnK.vorname||'')+' '+(tnK.nachname||'')).trim() || 'dieser Teilnehmer';
-    if(istManuell){ return _deleteTnManuellKomplett(tnId, kursId, inst, nm); }
-    return _deleteTnEchterAzubi(tnId, kursId, inst, nm);
+  // TN-Typ ermitteln: manueller Eintrag (Karteileiche) oder echter selbstregistrierter Azubi?
+  // ROBUST: sowohl teilnehmer-Doc als auch globalTN prüfen. Ein echtes Azubi-Konto erkennt
+  // man an selfRegistered===true ODER einer hinterlegten Login-/Kontakt-E-Mail.
+  const tnRef=_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId);
+  Promise.all([ tnRef.get().catch(()=>null), _db.collection('globalTN').doc(tnId).get().catch(()=>null) ])
+    .then(([tnSnap, gSnap])=>{
+    const tnK = (tnSnap&&tnSnap.exists) ? tnSnap.data() : {};
+    const gK  = (gSnap&&gSnap.exists)  ? gSnap.data()  : {};
+    const nm = ((tnK.vorname||gK.vorname||'')+' '+(tnK.nachname||gK.nachname||'')).trim() || 'dieser Teilnehmer';
+    // Echtes Azubi-Konto, wenn selfRegistered===true ODER eine echte E-Mail existiert.
+    // ABER: ist globalTN explizit als manuell markiert (selfRegistered===false), bleibt es manuell
+    // (das ist der typische Dubletten-/Karteileiche-Fall) - außer es ist doch selbst registriert.
+    const explizitManuell = gK.selfRegistered===false && tnK.selfRegistered!==true;
+    const istEchterAzubi = !explizitManuell && (
+         tnK.selfRegistered===true
+      || gK.selfRegistered===true
+      || !!(gK.email && String(gK.email).includes('@'))
+      || !!(tnK.kontaktEmail && String(tnK.kontaktEmail).includes('@'))
+      || !!(gK.kontaktEmail && String(gK.kontaktEmail).includes('@'))
+    );
+    if(istEchterAzubi){ return _deleteTnEchterAzubi(tnId, kursId, inst, nm); }
+    return _deleteTnManuellKomplett(tnId, kursId, inst, nm);
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
