@@ -2945,6 +2945,10 @@ function processJoinUrl(url){
 // QR für neuen Kurs gescannt während bereits eingeloggt -> direkt beitreten/bestätigen
 function _autoJoinScannedKurs(kursId){
   if(!kursId||!_tnData||!db) return;
+  // WICHTIG: ?join= sofort aus der Adresszeile entfernen, sonst tritt der Azubi
+  // bei jedem Neuladen automatisch wieder bei (Endlosschleife nach Entfernen).
+  try{ window.history.replaceState({},'',window.location.pathname); }catch(e){}
+  try{ _checkinKursId=null; }catch(e){}
   // Schon in diesem Kurs? -> nur freundlicher Hinweis, kein Doppel-Beitritt
   if(_tnData.aktiverKursId===kursId || (_tnData.kursHistory||[]).some(function(h){return h.kursId===kursId;})){
     toast('Du bist in diesem Lehrgang bereits angemeldet ✓');
