@@ -709,6 +709,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="card" id="mehrFirmaBtn" onclick="showPage('firma')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px;display:none" title="Betriebsverknüpfung"><span style="font-size:1.4rem">🔗</span><div><div style="font-weight:700;font-size:.85rem">Betriebsverknüpfung</div><div style="font-size:.65rem;color:var(--mu)" id="mehrFirmaSub">Mit Betrieb verbunden</div></div></button>
         <button class="card" onclick="showPage('hilfe')" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Hilfe"><span style="font-size:1.4rem">❓</span><div><div style="font-weight:700;font-size:.85rem">Hilfe</div><div style="font-size:.65rem;color:var(--mu)">Anleitung & Tipps</div></div></button>
         <button class="card" onclick="showWelcomeAgain()" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Erste Schritte"><span style="font-size:1.4rem">🧭</span><div><div style="font-weight:700;font-size:.85rem">Erste Schritte</div><div style="font-size:.65rem;color:var(--mu)">Begrüßung &amp; Sitzplatz erneut ansehen</div></div></button>
+        <button class="card" id="bioToggleCard" onclick="toggleBioSetting()" style="text-align:left;cursor:pointer;border:none;display:none;align-items:center;gap:12px;padding:14px" title="Fingerabdruck / Face ID"><span style="font-size:1.4rem">🔒</span><div style="flex:1"><div style="font-weight:700;font-size:.85rem">Fingerabdruck / Face&nbsp;ID</div><div style="font-size:.65rem;color:var(--mu)" id="bioToggleSub">App per Fingerabdruck entsperren</div></div><span id="bioToggleState" style="font-size:.7rem;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--sur2);color:var(--mu)">aus</span></button>
         <button title="Abmelden" onclick="doLogout()" style="margin-top:8px;width:100%;padding:12px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Abmelden</button>
       </div>
     </div>
@@ -1247,6 +1248,37 @@ function _bioVerify(email){
   }catch(e){ return Promise.resolve(false); }
 }
 function _bioDisable(email){ try{ localStorage.removeItem(_bioKey(email)); }catch(e){} }
+
+// Status der Fingerabdruck-Karte in 'Mehr' aktualisieren
+function _refreshBioToggle(){
+  var card=document.getElementById('bioToggleCard');
+  if(!card) return;
+  if(!_bioSupported()){ card.style.display='none'; return; } // Gerät kann's nicht -> Karte ausblenden
+  card.style.display='flex';
+  var on=_bioEnabled(_email);
+  var st=document.getElementById('bioToggleState');
+  var sub=document.getElementById('bioToggleSub');
+  if(st){ st.textContent=on?'an':'aus'; st.style.background=on?'rgba(5,150,105,.12)':'var(--sur2)'; st.style.color=on?'#059669':'var(--mu)'; }
+  if(sub){ sub.textContent=on?'Beim Öffnen mit Fingerabdruck entsperren':'App per Fingerabdruck entsperren'; }
+}
+
+// An-/Ausschalten über die Karte
+function toggleBioSetting(){
+  if(!_bioSupported()){ alert('Dieses Gerät oder dieser Browser unterstützt keine biometrische Entsperrung.'); return; }
+  if(_bioEnabled(_email)){
+    if(confirm('Fingerabdruck-Entsperrung deaktivieren?\n\nDu meldest dich dann wieder mit E-Mail und Passwort an.')){
+      _bioDisable(_email);
+      try{ localStorage.removeItem('azubiBioDeclined_'+_email); }catch(e){}
+      _refreshBioToggle();
+    }
+  } else {
+    _bioRegister(_email).then(function(res){
+      if(res&&res.ok){ alert('✅ Fingerabdruck aktiviert. Beim nächsten Öffnen kannst du damit entsperren.'); }
+      else { alert('Konnte nicht aktiviert werden:\n'+((res&&res.err)||'unbekannt')+'\n\nDu kannst dich weiterhin mit Passwort anmelden.'); }
+      _refreshBioToggle();
+    });
+  }
+}
 
 
 // Zeigt die App (gemeinsamer Eintrittspunkt, egal ob direkt oder nach Entsperrung)
@@ -2425,7 +2457,7 @@ function showPage(id){
   if(id==='profil'){ loadProfil(); loadAzubiUrlaub(); }
   if(id==='betrieb') initBetrieb();
   if(id==='uebl') loadKurse();
-  if(id==='mehr') updateMehrFirmaBtn();
+  if(id==='mehr'){ updateMehrFirmaBtn(); _refreshBioToggle(); }
   if(id==='berichtsheft') loadBerichtsheft();
   if(id==='firma') renderFirmaPage();
 }
