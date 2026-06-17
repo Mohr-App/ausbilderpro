@@ -1211,37 +1211,43 @@ function _bioEnabled(email){
   try{ return !!localStorage.getItem(_bioKey(email)); }catch(e){ return false; }
 }
 // Registriert einen Geräte-Passkey (nach bewusstem Opt-in)
+function _bioRand(){
+  const a=new Uint8Array(32);
+  try{ (window.crypto||window.msCrypto).getRandomValues(a); }catch(e){ for(let i=0;i<32;i++)a[i]=Math.floor(Math.random()*256); }
+  return a;
+}
 function _bioRegister(email){
-  if(!_bioSupported()) return Promise.resolve(false);
+  if(!_bioSupported()) return Promise.resolve({ok:false,err:'Dieses Gerät/dieser Browser unterstützt keine biometrische Anmeldung.'});
   try{
-    const uidBytes=new TextEncoder().encode((email||'user').slice(0,32));
-    const challenge=new Uint8Array(32); (crypto.getRandomValues||function(a){return a;})(challenge);
+    const uidBytes=new TextEncoder().encode(((email||'user')+'_'+Date.now()).slice(0,60));
     return navigator.credentials.create({publicKey:{
-      challenge,
-      rp:{name:'AusbilderPro'},
+      challenge:_bioRand(),
+      rp:{name:'AusbilderPro', id:location.hostname},
       user:{id:uidBytes, name:email||'user', displayName:email||'AzubiPro'},
       pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
-      authenticatorSelection:{userVerification:'required'},
+      authenticatorSelection:{authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred'},
+      attestation:'none',
       timeout:60000
     }}).then(cred=>{
-      if(cred){ try{ localStorage.setItem(_bioKey(email),'1'); }catch(e){} return true; }
-      return false;
-    }).catch(()=>false);
-  }catch(e){ return Promise.resolve(false); }
+      if(cred){ try{ localStorage.setItem(_bioKey(email),'1'); }catch(e){} return {ok:true}; }
+      return {ok:false,err:'Keine Anmeldedaten erstellt.'};
+    }).catch(e=>({ok:false,err:(e&&e.name?e.name+': ':'')+(e&&e.message||'unbekannter Fehler')}));
+  }catch(e){ return Promise.resolve({ok:false,err:(e&&e.message)||'Fehler'}); }
 }
 // Fordert eine biometrische Bestätigung an (zum Entsperren)
 function _bioVerify(email){
   if(!_bioSupported()) return Promise.resolve(false);
   try{
-    const challenge=new Uint8Array(32); (crypto.getRandomValues||function(a){return a;})(challenge);
     return navigator.credentials.get({publicKey:{
-      challenge,
+      challenge:_bioRand(),
+      rpId:location.hostname,
       userVerification:'required',
       timeout:60000
     }}).then(assertion=>!!assertion).catch(()=>false);
   }catch(e){ return Promise.resolve(false); }
 }
 function _bioDisable(email){ try{ localStorage.removeItem(_bioKey(email)); }catch(e){} }
+
 
 // Zeigt die App (gemeinsamer Eintrittspunkt, egal ob direkt oder nach Entsperrung)
 function _enterApp(){
@@ -1289,9 +1295,9 @@ function _maybeOfferBio(){
   setTimeout(function(){
     var ok=confirm('🔒 Möchtest du AzubiPro künftig per Fingerabdruck / Face-ID öffnen?\n\nDu bleibst angemeldet und entsperrst beim Öffnen einfach mit deinem Finger. Mit Passwort geht es weiterhin jederzeit.');
     if(ok){
-      _bioRegister(_email).then(function(done){
-        if(done){ alert('✅ Fingerabdruck aktiviert. Beim nächsten Öffnen kannst du damit entsperren.'); }
-        else { alert('Konnte nicht aktiviert werden. Du kannst es später in den Einstellungen erneut versuchen.'); }
+      _bioRegister(_email).then(function(res){
+        if(res&&res.ok){ alert('✅ Fingerabdruck aktiviert. Beim nächsten Öffnen kannst du damit entsperren.'); }
+        else { alert('Konnte nicht aktiviert werden:\n'+((res&&res.err)||'unbekannt')+'\n\nDu kannst dich weiterhin mit Passwort anmelden.'); }
       });
     } else {
       try{ localStorage.setItem('azubiBioDeclined_'+_email,'1'); }catch(e){}
