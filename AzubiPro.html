@@ -1163,22 +1163,11 @@ auth.onAuthStateChanged(u=>{
     findTN(_email).then(found=>{
       if(_registering) return;
       if(found){
-        // Fingerabdruck-Sperre aktiviert? -> Sperrbildschirm, sonst direkt rein + ggf. Opt-in
+        // Fingerabdruck-Sperre aktiviert? -> Sperrbildschirm (danach _enterApp), sonst direkt _enterApp
         if(_bioSupported() && _bioEnabled(_email)){
           _showBioLock();
         } else {
-          document.getElementById('loginWrap').style.display='none';
-          document.getElementById('joinWrap').style.display='none';
-          document.getElementById('app').classList.add('show');
-          document.getElementById('hdrUser').textContent=_email.split('@')[0];
-          loadData();
-          _maybeOfferBio();
-          // QR für NEUEN Kurs gescannt (Kamera) während bereits eingeloggt?
-          // -> direkt zum Kurs-Beitritt führen, ohne erneuten Scan
-          if(_joinKursId){
-            var _jk=_joinKursId; _joinKursId=null;
-            setTimeout(function(){ _autoJoinScannedKurs(_jk); }, 600);
-          }
+          _enterApp();
         }
       } else {
         auth.signOut();
@@ -1188,7 +1177,14 @@ auth.onAuthStateChanged(u=>{
   } else {
     _uid=null; _tnId=null; _tnData=null;
     if(_tnDocUnsub){_tnDocUnsub();_tnDocUnsub=null;}
-    if(!_registering&&!_joinKursId){
+    if(!_registering && _joinKursId){
+      // QR gescannt, aber nicht eingeloggt -> Registrierungs-/Beitritts-Screen
+      document.getElementById('loginWrap').style.display='none';
+      var jw=document.getElementById('joinWrap'); if(jw) jw.style.display='flex';
+      var jls=document.getElementById('joinLoginSection'); if(jls) jls.style.display='block';
+      var jwz=document.getElementById('joinWizard'); if(jwz) jwz.style.display='none';
+      setTimeout(function(){ try{ updateJoinInstallHint(); }catch(e){} }, 100);
+    } else if(!_registering){
       document.getElementById('loginWrap').style.display='flex';
     }
     document.getElementById('app').classList.remove('show');
@@ -1314,6 +1310,12 @@ function _enterApp(){
   document.getElementById('app').classList.add('show');
   document.getElementById('hdrUser').textContent=_email.split('@')[0];
   loadData();
+  _maybeOfferBio();
+  // QR für NEUEN Kurs gescannt (Kamera) – auch nach Fingerabdruck-Entsperrung
+  if(_joinKursId){
+    var _jk=_joinKursId; _joinKursId=null;
+    setTimeout(function(){ _autoJoinScannedKurs(_jk); }, 600);
+  }
 }
 
 // Sperrbildschirm anzeigen (App-Daten bleiben verborgen bis entsperrt)
@@ -1580,14 +1582,8 @@ let _joinKursId=null;
   }).catch(()=>{
     infoEl.innerHTML='<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Registriere dich um dem Lehrgang beizutreten.</div>';
   });
-  // Join-Screen anzeigen statt Login
-  document.getElementById('loginWrap').style.display='none';
-  document.getElementById('joinWrap').style.display='flex';
-  // Wizard-Reset: Login-Section sichtbar, Wizard versteckt, bei Step 1 starten
-  document.getElementById('joinLoginSection').style.display='block';
-  document.getElementById('joinWizard').style.display='none';
-  // Install-Hinweis kontextsensitiv anzeigen
-  setTimeout(()=>{ try{ updateJoinInstallHint(); }catch(e){} }, 100);
+  // Screen-Umschaltung übernimmt der Auth-Handler (je nach Login-Status):
+  // nicht eingeloggt -> Join-/Registrierungs-Screen, eingeloggt -> _autoJoinScannedKurs.
 })();
 
 // ── INSTALL-HINWEIS (im Join-Screen) ──
