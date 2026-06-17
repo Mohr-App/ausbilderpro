@@ -709,6 +709,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="card" onclick="showWelcomeAgain()" style="text-align:left;cursor:pointer;border:none;display:flex;align-items:center;gap:12px;padding:14px" title="Erste Schritte"><span style="font-size:1.4rem">🧭</span><div><div style="font-weight:700;font-size:.85rem">Erste Schritte</div><div style="font-size:.65rem;color:var(--mu)">Begrüßung &amp; Sitzplatz erneut ansehen</div></div></button>
         <button class="card" id="bioToggleCard" onclick="toggleBioSetting()" style="text-align:left;cursor:pointer;border:none;display:none;align-items:center;gap:12px;padding:14px" title="Fingerabdruck / Face ID"><span style="font-size:1.4rem">🔒</span><div style="flex:1"><div style="font-weight:700;font-size:.85rem">Fingerabdruck / Face&nbsp;ID</div><div style="font-size:.65rem;color:var(--mu)" id="bioToggleSub">App per Fingerabdruck entsperren</div></div><span id="bioToggleState" style="font-size:.7rem;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--sur2);color:var(--mu)">aus</span></button>
         <button title="Abmelden" onclick="doLogout()" style="margin-top:8px;width:100%;padding:12px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Abmelden</button>
+        <div id="azubiVersionLabel" style="text-align:center;margin-top:14px;font-size:.62rem;color:var(--mu);opacity:.7">AzubiPro</div>
       </div>
     </div>
 
@@ -1050,6 +1051,7 @@ const _fbCfg={
 firebase.initializeApp(_fbCfg);
 const auth=firebase.auth();
 const db=firebase.firestore();
+const AZUBI_VERSION='v229'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
 const st=firebase.storage();
 let _uid=null, _email=null, _tnId=null, _tnData=null, _kurse=[];
@@ -2476,7 +2478,7 @@ function showPage(id){
   if(id==='profil'){ loadProfil(); loadAzubiUrlaub(); }
   if(id==='betrieb') initBetrieb();
   if(id==='uebl') loadKurse();
-  if(id==='mehr'){ updateMehrFirmaBtn(); _refreshBioToggle(); }
+  if(id==='mehr'){ updateMehrFirmaBtn(); _refreshBioToggle(); var _vl=document.getElementById('azubiVersionLabel'); if(_vl) _vl.textContent='AzubiPro '+AZUBI_VERSION; }
   if(id==='berichtsheft') loadBerichtsheft();
   if(id==='firma') renderFirmaPage();
 }
