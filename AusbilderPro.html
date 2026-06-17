@@ -3741,6 +3741,8 @@ function renderSeats(){
   if(typeof setupSeatDropTargets==='function') setupSeatDropTargets();
   // Pool-Hinweis ggf. ausblenden wenn jetzt TN platziert sind
   try{ if(typeof updatePoolHint==='function') updatePoolHint(); }catch(e){}
+  // QR-Check-ins gegen aktuelle Sitze abgleichen (Badge erscheint auch wenn Platzierung NACH Check-in kam)
+  try{ _applyCheckinsToSeats(false); }catch(e){}
 }
 function scaleSeating(){} // disabled
 window.addEventListener('resize', ()=>scaleSeating());
@@ -10005,9 +10007,15 @@ function clearSeat(){
   // Firestore-Status zurücksetzen → "offen"
   if(_db && d && d.poolTnId && (d.poolKursId || inst.sharedKursId)){
     const kursId = d.poolKursId || inst.sharedKursId;
-    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-      .collection('teilnehmer').doc(d.poolTnId)
-      .update({status: firebase.firestore.FieldValue.delete()}).catch(()=>{});
+    const tnRef=_db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').doc(d.poolTnId);
+    // getrennte Updates, damit jedes in die bestehende Rules-Whitelist passt (status bzw. wunschSitzplatz)
+    tnRef.update({status: firebase.firestore.FieldValue.delete()}).catch(()=>{});
+    tnRef.update({wunschSitzplatz: ''}).catch(()=>{});
+    // wunschSitzplatz auch in globalTN leeren, sonst platziert die Auto-Logik den TN sofort wieder
+    _db.collection('globalTN').doc(d.poolTnId).update({wunschSitzplatz: ''}).catch(()=>{});
+    // aus der Session-Auto-Platzierungs-Sperre nehmen
+    try{ _autoPlacedIds.delete(d.poolTnId); }catch(e){}
     syncGlobalTNStatus(d.poolTnId, 'clear');
   }
   delete inst.seats[curSeat];
@@ -10880,6 +10888,38 @@ let _poolUnsub = null; // onSnapshot listener cleanup
 let _meldungenUnsub = null;
 let _meldUnsub = null; // Meldungen listener
 let _checkinUnsub = null; // QR-Anwesenheit Check-in listener
+let _todayCheckinMap = {}; // tnId -> checkin-Doc (heutige QR-Check-ins, für Abgleich auch bei späterer Platzierung)
+
+// Gleicht heutige QR-Check-ins gegen die aktuell platzierten Sitze ab.
+// Greift auch, wenn der TN ERST NACH dem Check-in platziert wird. Manueller Eintrag gewinnt.
+function _applyCheckinsToSeats(showToast){
+  if(window._applyingCheckins) return; // Rekursions-Guard (renderSeats ruft uns ggf. erneut)
+  if(!_todayCheckinMap || !Object.keys(_todayCheckinMap).length) return;
+  const inst=curInst(); if(!inst) return;
+  const seats=curSeats(); if(!seats) return;
+  window._applyingCheckins=true;
+  let changed=false;
+  for(const sid in seats){
+    const d=seats[sid];
+    if(!d||!d.poolTnId) continue;
+    const c=_todayCheckinMap[d.poolTnId];
+    if(!c||!c.datum) continue;
+    if(!d.qrCheckin||d.qrCheckin.datum!==c.datum){ d.qrCheckin={datum:c.datum,zeit:c.zeit||'',dist:(typeof c.dist==='number'?c.dist:null)}; changed=true; }
+    if(!d.attendance) d.attendance=[];
+    if(!d.attendance.some(a=>a.date===c.datum)){
+      const lm=_qrLateMins(c.zeit||'');
+      d.attendance.push({date:c.datum,type:'present',note:'per QR-Check-in'+(c.zeit?' '+c.zeit:''),lateMins:lm,earlyMins:0,qr:true});
+      if(!inst.attendance) inst.attendance={};
+      if(!inst.attendance[c.datum]) inst.attendance[c.datum]={};
+      if(!inst.attendance[c.datum][sid]) inst.attendance[c.datum][sid]='P';
+      changed=true;
+      try{ syncAttendanceToFirestore(sid); }catch(e){}
+      if(showToast) toast('📡 '+esc(d.name||'TN')+' per QR eingecheckt'+(lm>0?' – verspätet +'+lm+' min':' ✓'));
+    }
+  }
+  window._applyingCheckins=false;
+  if(changed){ persist(); renderSeats(); }
+}
 let _meldSeen = new Set(); // bereits angezeigte Meldungen
 let _autoPlacedIds = new Set(); // Verhindert doppelte Toast-Meldungen
 
@@ -11270,32 +11310,11 @@ function loadPool(){
     const _ciToday=new Date().toISOString().slice(0,10);
     _checkinUnsub = kursRef.collection('checkins').where('datum','==',_ciToday).onSnapshot(snap=>{
       if(isStale()){if(_checkinUnsub){_checkinUnsub();_checkinUnsub=null;}return;}
-      let changed=false;
-      snap.forEach(doc=>{
-        const c=doc.data();
-        if(!c.tnId||!c.datum) return;
-        const seats=curSeats();
-        for(const sid in seats){
-          const d=seats[sid];
-          if(!d||d.poolTnId!==c.tnId) continue;
-          // Badge-Info am Sitz merken
-          if(!d.qrCheckin||d.qrCheckin.datum!==c.datum){ d.qrCheckin={datum:c.datum,zeit:c.zeit||'',dist:(typeof c.dist==='number'?c.dist:null)}; changed=true; }
-          // Auto-Eintrag nur wenn fuer heute noch nichts erfasst (manuell gewinnt)
-          if(!d.attendance) d.attendance=[];
-          if(!d.attendance.some(a=>a.date===c.datum)){
-            const lm=_qrLateMins(c.zeit||'');
-            d.attendance.push({date:c.datum,type:'present',note:'per QR-Check-in'+(c.zeit?' '+c.zeit:''),lateMins:lm,earlyMins:0,qr:true});
-            // Tages-Raster wie beim manuellen Schnell-Haken setzen (gruenes Kaestchen/Mobile-Liste)
-            if(!inst.attendance) inst.attendance={};
-            if(!inst.attendance[c.datum]) inst.attendance[c.datum]={};
-            if(!inst.attendance[c.datum][sid]) inst.attendance[c.datum][sid]='P';
-            changed=true;
-            try{ syncAttendanceToFirestore(sid); }catch(e){}
-            toast('📡 '+esc(d.name||'TN')+' per QR eingecheckt'+(lm>0?' – verspätet +'+lm+' min':' ✓'));
-          }
-        }
-      });
-      if(changed){ persist(); renderSeats(); }
+      // Heutige Check-ins in Cache halten, damit die Badge auch erscheint,
+      // wenn der TN ERST NACH dem Check-in platziert wird (sonst erst nach Neuladen sichtbar)
+      _todayCheckinMap={};
+      snap.forEach(doc=>{ const c=doc.data(); if(c&&c.tnId&&c.datum){ _todayCheckinMap[c.tnId]=c; } });
+      _applyCheckinsToSeats(true);
     },err=>console.warn('Checkin error:',err));
     _poolUnsub = kursRef.collection('teilnehmer').orderBy('nachname').onSnapshot(snap=>{
       // ── Snapshot-Guard ──
