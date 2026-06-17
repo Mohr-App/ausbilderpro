@@ -65,6 +65,22 @@ service cloud.firestore {
           && resource.data.createdBy == request.auth.token.email
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ausbilderName','ausbilderEmail','ausbilderTel']);
         allow create: if request.auth != null && docId == 'urlaubLog';
+        // Ausbilder darf seinen EIGENEN Profil-Eintrag in kursSettings/ausbilder schreiben
+        // (Dokument-ID = eigene Login-Mail oder loginEmail-Feld = eigene Mail, kein Fremdzugriff)
+        allow create: if request.auth != null
+          && docId == 'kursSettings' && sub == 'ausbilder'
+          && (subDoc == request.auth.token.email
+              || request.resource.data.loginEmail == request.auth.token.email);
+        allow update: if request.auth != null
+          && docId == 'kursSettings' && sub == 'ausbilder'
+          && (subDoc == request.auth.token.email
+              || resource.data.loginEmail == request.auth.token.email
+              || request.resource.data.loginEmail == request.auth.token.email);
+        // Gemeinsame Nachschlage-Listen (Lehrgangsarten, Berufe, Räume, Standorte):
+        // jeder eingeloggte Ausbilder darf Einträge ergänzen/aktualisieren
+        allow create, update: if request.auth != null
+          && docId == 'kursSettings'
+          && (sub == 'lehrgangsarten' || sub == 'berufe' || sub == 'raeume' || sub == 'standorte');
         match /{deep}/{deepDoc} {
           allow read: if request.auth != null;
           allow write: if isAdmin();
