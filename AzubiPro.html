@@ -1173,6 +1173,12 @@ auth.onAuthStateChanged(u=>{
           document.getElementById('hdrUser').textContent=_email.split('@')[0];
           loadData();
           _maybeOfferBio();
+          // QR für NEUEN Kurs gescannt (Kamera) während bereits eingeloggt?
+          // -> direkt zum Kurs-Beitritt führen, ohne erneuten Scan
+          if(_joinKursId){
+            var _jk=_joinKursId; _joinKursId=null;
+            setTimeout(function(){ _autoJoinScannedKurs(_jk); }, 600);
+          }
         }
       } else {
         auth.signOut();
@@ -2942,10 +2948,24 @@ function processJoinUrl(url){
   });
 }
 
-// ═══════════════════════════════════
-// BETRIEB-KANAL
-// ═══════════════════════════════════
-let _betriebInit=false;
+// QR für neuen Kurs gescannt während bereits eingeloggt -> direkt beitreten/bestätigen
+function _autoJoinScannedKurs(kursId){
+  if(!kursId||!_tnData||!db) return;
+  // Schon in diesem Kurs? -> nur freundlicher Hinweis, kein Doppel-Beitritt
+  if(_tnData.aktiverKursId===kursId || (_tnData.kursHistory||[]).some(function(h){return h.kursId===kursId;})){
+    toast('Du bist in diesem Lehrgang bereits angemeldet ✓');
+    showPage('uebl');
+    return;
+  }
+  // QR-Join-Dialog vorbereiten (liefert das benötigte Fehler-/Status-Element) und Beitritt anstoßen
+  try{ openQrJoin(); }catch(e){}
+  try{
+    var sc=document.getElementById('qrScannerArea'); if(sc) sc.style.display='none';
+    var sb=document.getElementById('qrStartBtn'); if(sb) sb.style.display='none';
+  }catch(e){}
+  processJoinUrl(kursId);
+}
+
 function initBetrieb(){
   // AG-Hinweis Banner
   const agBanner=document.getElementById('agHintBanner');
