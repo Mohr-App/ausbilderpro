@@ -1249,6 +1249,21 @@ function _bioVerify(email){
 }
 function _bioDisable(email){ try{ localStorage.removeItem(_bioKey(email)); }catch(e){} }
 
+// Erkennt iOS-Geräte (iPhone/iPad)
+function _isIOS(){
+  try{ return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }catch(e){ return false; }
+}
+// Wandelt technische WebAuthn-Fehler in verständlichen Klartext
+function _bioErrText(err){
+  var e=String(err||'');
+  if(/NotAllowedError/.test(e)){
+    if(_isIOS()) return 'Auf dem iPhone/iPad funktioniert die Fingerabdruck-/Face-ID-Anmeldung nur in der App selbst oder in Safari – nicht in einem In-App-Browser (z. B. aus WhatsApp/Mail).\n\nSo geht es:\n1. Diese Seite in Safari öffnen, ODER\n2. Über das Teilen-Symbol „Zum Home-Bildschirm" hinzufügen und die App von dort starten.';
+    return 'Die Anmeldung wurde abgebrochen oder nicht erlaubt. Bitte erneut versuchen oder mit Passwort anmelden.';
+  }
+  if(/NotSupportedError|SecurityError/.test(e)) return 'Dieses Gerät oder dieser Browser unterstützt die Fingerabdruck-Anmeldung hier nicht. Du kannst dich weiterhin mit Passwort anmelden.';
+  return e || 'Unbekannter Fehler';
+}
+
 // Status der Fingerabdruck-Karte in 'Mehr' aktualisieren
 function _refreshBioToggle(){
   var card=document.getElementById('bioToggleCard');
@@ -1259,7 +1274,11 @@ function _refreshBioToggle(){
   var st=document.getElementById('bioToggleState');
   var sub=document.getElementById('bioToggleSub');
   if(st){ st.textContent=on?'an':'aus'; st.style.background=on?'rgba(5,150,105,.12)':'var(--sur2)'; st.style.color=on?'#059669':'var(--mu)'; }
-  if(sub){ sub.textContent=on?'Beim Öffnen mit Fingerabdruck entsperren':'App per Fingerabdruck entsperren'; }
+  if(sub){
+    if(on){ sub.textContent='Beim Öffnen mit Fingerabdruck entsperren'; }
+    else if(_isIOS()){ sub.textContent='App per Fingerabdruck/Face ID entsperren · iPhone: nur in Safari / als App'; }
+    else { sub.textContent='App per Fingerabdruck entsperren'; }
+  }
 }
 
 // An-/Ausschalten über die Karte
@@ -1274,7 +1293,7 @@ function toggleBioSetting(){
   } else {
     _bioRegister(_email).then(function(res){
       if(res&&res.ok){ alert('✅ Fingerabdruck aktiviert. Beim nächsten Öffnen kannst du damit entsperren.'); }
-      else { alert('Konnte nicht aktiviert werden:\n'+((res&&res.err)||'unbekannt')+'\n\nDu kannst dich weiterhin mit Passwort anmelden.'); }
+      else { alert('Fingerabdruck konnte nicht aktiviert werden.\n\n'+_bioErrText(res&&res.err)); }
       _refreshBioToggle();
     });
   }
@@ -1329,7 +1348,7 @@ function _maybeOfferBio(){
     if(ok){
       _bioRegister(_email).then(function(res){
         if(res&&res.ok){ alert('✅ Fingerabdruck aktiviert. Beim nächsten Öffnen kannst du damit entsperren.'); }
-        else { alert('Konnte nicht aktiviert werden:\n'+((res&&res.err)||'unbekannt')+'\n\nDu kannst dich weiterhin mit Passwort anmelden.'); }
+        else { alert('Fingerabdruck konnte nicht aktiviert werden.\n\n'+_bioErrText(res&&res.err)); }
       });
     } else {
       try{ localStorage.setItem('azubiBioDeclined_'+_email,'1'); }catch(e){}
