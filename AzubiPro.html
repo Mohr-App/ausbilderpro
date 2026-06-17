@@ -357,6 +357,18 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<!-- BIOMETRIE-SPERRBILDSCHIRM (nur wenn Azubi Fingerabdruck aktiviert hat) -->
+<div class="login-wrap" id="bioLockWrap" style="display:none">
+  <div style="max-width:340px;margin:0 auto;text-align:center;padding:20px">
+    <div style="font-size:3rem;margin-bottom:8px">🔒</div>
+    <div style="font-size:1.3rem;font-weight:800;margin-bottom:6px">Azubi<span style="background:linear-gradient(135deg,#7c3aed,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Pro</span></div>
+    <div style="color:#64748b;font-size:.9rem;margin-bottom:24px" id="bioLockUser">Gesperrt</div>
+    <button id="bioUnlockBtn" onclick="bioUnlock()" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;font-weight:700;font-size:1rem;cursor:pointer;font-family:inherit">🔓 Mit Fingerabdruck entsperren</button>
+    <button onclick="bioFallbackLogin()" style="width:100%;margin-top:12px;padding:11px;border:1px solid #c4cce0;border-radius:10px;background:#fff;color:#475569;font-weight:600;font-size:.88rem;cursor:pointer;font-family:inherit">Mit Passwort anmelden</button>
+    <div id="bioLockErr" style="color:#dc2626;font-size:.8rem;margin-top:12px;min-height:1em"></div>
+  </div>
+</div>
+
 <!-- APP -->
 <div class="app" id="app">
   <div class="hdr">
@@ -1131,7 +1143,7 @@ function fillFachrichtungen(berufSelId,fachSelId){
 }
 
 // ── Auth ──
-auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(()=>{});
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
 let _registering=false; // Guard: verhindert signOut während Selbstregistrierung
 auth.onAuthStateChanged(u=>{
   if(_registering) return; // Registrierung läuft – nicht eingreifen
@@ -1150,11 +1162,17 @@ auth.onAuthStateChanged(u=>{
     findTN(_email).then(found=>{
       if(_registering) return;
       if(found){
-        document.getElementById('loginWrap').style.display='none';
-        document.getElementById('joinWrap').style.display='none';
-        document.getElementById('app').classList.add('show');
-        document.getElementById('hdrUser').textContent=_email.split('@')[0];
-        loadData();
+        // Fingerabdruck-Sperre aktiviert? -> Sperrbildschirm, sonst direkt rein + ggf. Opt-in
+        if(_bioSupported() && _bioEnabled(_email)){
+          _showBioLock();
+        } else {
+          document.getElementById('loginWrap').style.display='none';
+          document.getElementById('joinWrap').style.display='none';
+          document.getElementById('app').classList.add('show');
+          document.getElementById('hdrUser').textContent=_email.split('@')[0];
+          loadData();
+          _maybeOfferBio();
+        }
       } else {
         auth.signOut();
         showErr('Kein Teilnehmer-Konto für diese E-Mail gefunden.\nBitte kontaktiere die Verwaltung.');
@@ -1179,6 +1197,108 @@ function findTN(email){
       return true;
     }).catch(()=>false);
 }
+
+// ─────────────────────────────────────────────────────────────
+// FINGERABDRUCK / FACE-ID ENTSPERRUNG (WebAuthn, rein lokal pro Gerät)
+// Schützt NUR den App-Start. Firebase-Login (E-Mail/Passwort) bleibt die Wahrheit.
+// Bei jedem Fehler -> normaler Login. Kann niemanden aussperren.
+// ─────────────────────────────────────────────────────────────
+function _bioSupported(){
+  try{ return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create); }catch(e){ return false; }
+}
+function _bioKey(email){ return 'azubiBioCred_'+(email||'').toLowerCase(); }
+function _bioEnabled(email){
+  try{ return !!localStorage.getItem(_bioKey(email)); }catch(e){ return false; }
+}
+// Registriert einen Geräte-Passkey (nach bewusstem Opt-in)
+function _bioRegister(email){
+  if(!_bioSupported()) return Promise.resolve(false);
+  try{
+    const uidBytes=new TextEncoder().encode((email||'user').slice(0,32));
+    const challenge=new Uint8Array(32); (crypto.getRandomValues||function(a){return a;})(challenge);
+    return navigator.credentials.create({publicKey:{
+      challenge,
+      rp:{name:'AusbilderPro'},
+      user:{id:uidBytes, name:email||'user', displayName:email||'AzubiPro'},
+      pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection:{userVerification:'required'},
+      timeout:60000
+    }}).then(cred=>{
+      if(cred){ try{ localStorage.setItem(_bioKey(email),'1'); }catch(e){} return true; }
+      return false;
+    }).catch(()=>false);
+  }catch(e){ return Promise.resolve(false); }
+}
+// Fordert eine biometrische Bestätigung an (zum Entsperren)
+function _bioVerify(email){
+  if(!_bioSupported()) return Promise.resolve(false);
+  try{
+    const challenge=new Uint8Array(32); (crypto.getRandomValues||function(a){return a;})(challenge);
+    return navigator.credentials.get({publicKey:{
+      challenge,
+      userVerification:'required',
+      timeout:60000
+    }}).then(assertion=>!!assertion).catch(()=>false);
+  }catch(e){ return Promise.resolve(false); }
+}
+function _bioDisable(email){ try{ localStorage.removeItem(_bioKey(email)); }catch(e){} }
+
+// Zeigt die App (gemeinsamer Eintrittspunkt, egal ob direkt oder nach Entsperrung)
+function _enterApp(){
+  var lw=document.getElementById('loginWrap'); if(lw) lw.style.display='none';
+  var jw=document.getElementById('joinWrap'); if(jw) jw.style.display='none';
+  var bl=document.getElementById('bioLockWrap'); if(bl) bl.style.display='none';
+  document.getElementById('app').classList.add('show');
+  document.getElementById('hdrUser').textContent=_email.split('@')[0];
+  loadData();
+}
+
+// Sperrbildschirm anzeigen (App-Daten bleiben verborgen bis entsperrt)
+function _showBioLock(){
+  var lw=document.getElementById('loginWrap'); if(lw) lw.style.display='none';
+  var jw=document.getElementById('joinWrap'); if(jw) jw.style.display='none';
+  document.getElementById('app').classList.remove('show');
+  var bl=document.getElementById('bioLockWrap'); if(bl) bl.style.display='flex';
+  var u=document.getElementById('bioLockUser'); if(u) u.textContent=_email||'Gesperrt';
+  var er=document.getElementById('bioLockErr'); if(er) er.textContent='';
+  // Biometrie automatisch starten (wie große Apps)
+  setTimeout(bioUnlock, 350);
+}
+
+// Entsperren per Fingerabdruck
+function bioUnlock(){
+  var er=document.getElementById('bioLockErr'); if(er) er.textContent='';
+  _bioVerify(_email).then(function(ok){
+    if(ok){ _enterApp(); }
+    else { if(er) er.textContent='Nicht erkannt. Erneut versuchen oder mit Passwort anmelden.'; }
+  }).catch(function(){ if(er) er.textContent='Entsperren fehlgeschlagen. Bitte mit Passwort anmelden.'; });
+}
+
+// Fallback: zurück zum normalen Passwort-Login
+function bioFallbackLogin(){
+  try{ auth.signOut(); }catch(e){}
+  var bl=document.getElementById('bioLockWrap'); if(bl) bl.style.display='none';
+  var lw=document.getElementById('loginWrap'); if(lw) lw.style.display='flex';
+}
+
+// Opt-in nach erfolgreichem Login anbieten (einmalig, optional)
+function _maybeOfferBio(){
+  if(!_bioSupported()) return;            // Gerät kann es nicht -> nie anbieten
+  if(_bioEnabled(_email)) return;          // schon aktiviert
+  try{ if(localStorage.getItem('azubiBioDeclined_'+_email)) return; }catch(e){} // vorher abgelehnt
+  setTimeout(function(){
+    var ok=confirm('🔒 Möchtest du AzubiPro künftig per Fingerabdruck / Face-ID öffnen?\n\nDu bleibst angemeldet und entsperrst beim Öffnen einfach mit deinem Finger. Mit Passwort geht es weiterhin jederzeit.');
+    if(ok){
+      _bioRegister(_email).then(function(done){
+        if(done){ alert('✅ Fingerabdruck aktiviert. Beim nächsten Öffnen kannst du damit entsperren.'); }
+        else { alert('Konnte nicht aktiviert werden. Du kannst es später in den Einstellungen erneut versuchen.'); }
+      });
+    } else {
+      try{ localStorage.setItem('azubiBioDeclined_'+_email,'1'); }catch(e){}
+    }
+  }, 800);
+}
+
 
 function doLogin(){
   const e=document.getElementById('lEmail').value.trim();
