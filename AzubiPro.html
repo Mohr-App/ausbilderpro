@@ -1051,7 +1051,7 @@ const _fbCfg={
 firebase.initializeApp(_fbCfg);
 const auth=firebase.auth();
 const db=firebase.firestore();
-const AZUBI_VERSION='v230'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v231'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
 const st=firebase.storage();
 let _uid=null, _email=null, _tnId=null, _tnData=null, _kurse=[];
@@ -2951,13 +2951,19 @@ function _autoJoinScannedKurs(kursId){
   // WICHTIG: ?join= sofort aus der Adresszeile entfernen, sonst tritt der Azubi
   // bei jedem Neuladen automatisch wieder bei (Endlosschleife nach Entfernen).
   try{ window.history.replaceState({},'',window.location.pathname); }catch(e){}
-  try{ _checkinKursId=null; }catch(e){}
-  // Schon in diesem Kurs? -> nur freundlicher Hinweis, kein Doppel-Beitritt
+  // Schon in diesem Kurs? -> kein Doppel-Beitritt, aber ANWESENHEIT zuverlässig anstoßen
+  // (Folgetag-Fall: Azubi scannt am Kurstag seinen laufenden Kurs -> Check-in soll laufen)
   if(_tnData.aktiverKursId===kursId || (_tnData.kursHistory||[]).some(function(h){return h.kursId===kursId;})){
+    if(_tnData.aktiverKursId===kursId){
+      _checkinKursId=kursId;            // sicherstellen, dass der Check-in den richtigen Kurs trifft
+      try{ _tryQRCheckin(); }catch(e){} // aktiv einchecken, unabhängig vom Lade-Timing
+    }
     toast('Du bist in diesem Lehrgang bereits angemeldet ✓');
     showPage('uebl');
     return;
   }
+  // Echter Neu-Beitritt: hier ist der Check-in noch nicht relevant (erst nach Bestätigung)
+  try{ _checkinKursId=null; }catch(e){}
   // QR-Join-Dialog vorbereiten (liefert das benötigte Fehler-/Status-Element) und Beitritt anstoßen
   try{ openQrJoin(); }catch(e){}
   try{
