@@ -1051,7 +1051,7 @@ const _fbCfg={
 firebase.initializeApp(_fbCfg);
 const auth=firebase.auth();
 const db=firebase.firestore();
-const AZUBI_VERSION='v231'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v232'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
 const st=firebase.storage();
 let _uid=null, _email=null, _tnId=null, _tnData=null, _kurse=[];
@@ -1883,6 +1883,28 @@ function showWizStep(n){
   }, 60);
 }
 
+// Prüft eine E-Mail-Adresse: strenges Format + Warnung bei typischen Tippfehlern.
+// Rückgabe: {ok:true} | {ok:false, msg} | {suggest:'korrigierte@adresse'}
+function _validateEmail(raw){
+  const e=(raw||'').trim().toLowerCase();
+  if(!e) return {ok:false, msg:'Bitte E-Mail eintragen.'};
+  // Striktes Format: text@text.endung (Endung mind. 2 Buchstaben, keine Leerzeichen)
+  const re=/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/;
+  if(!re.test(e)) return {ok:false, msg:'Bitte eine gültige E-Mail-Adresse eintragen (z. B. name@gmail.com).'};
+  // Häufige Tippfehler in der Top-Level-Domain -> Korrekturvorschlag
+  const tldFix={'con':'com','cmo':'com','comm':'com','cim':'com','ocm':'com','con,':'com','co':'com','vom':'com','xom':'com','dde':'de','dee':'de','ded':'de','e':'de','net,':'net','nett':'net'};
+  const domainFix={'gmial.com':'gmail.com','gmai.com':'gmail.com','gmal.com':'gmail.com','gmail.con':'gmail.com','gmaill.com':'gmail.com','googlemail.con':'googlemail.com','hotmial.com':'hotmail.com','hotmai.com':'hotmail.com','hotmail.con':'hotmail.com','outlok.com':'outlook.com','outloo.com':'outlook.com','yahooo.com':'yahoo.com','web.de.':'web.de','gmx.de.':'gmx.de','t-online.de.':'t-online.de'};
+  const domain=e.split('@')[1]||'';
+  const local=e.split('@')[0]||'';
+  // 1) ganze Domain bekannt fehlerhaft?
+  if(domainFix[domain]) return {suggest: local+'@'+domainFix[domain]};
+  // 2) nur TLD (Teil nach letztem Punkt) fehlerhaft?
+  const parts=domain.split('.');
+  const tld=parts[parts.length-1];
+  if(tldFix[tld]){ parts[parts.length-1]=tldFix[tld]; return {suggest: local+'@'+parts.join('.')}; }
+  return {ok:true};
+}
+
 function wizValidateStep(n){
   const errEl=document.getElementById('jErr');
   errEl.textContent='';
@@ -1903,9 +1925,17 @@ function wizValidateStep(n){
   }
   // Schritt 4 (Geburtsdatum) ist optional
   if(n===5){
-    const e=(document.getElementById('jEmail').value||'').trim();
-    if(!e){ errEl.textContent='Bitte E-Mail eintragen.'; return false; }
-    if(!e.includes('@') || !e.includes('.')){ errEl.textContent='Bitte gültige E-Mail-Adresse eintragen.'; return false; }
+    const eIn=document.getElementById('jEmail');
+    const e=(eIn.value||'').trim();
+    const res=_validateEmail(e);
+    if(res.ok===false){ errEl.textContent=res.msg; return false; }
+    if(res.suggest){
+      // Tippfehler erkannt -> Korrekturvorschlag anbieten (Warnung, kein Verbot)
+      if(confirm('Meintest du vielleicht:\n\n'+res.suggest+'\n\nOK = Vorschlag übernehmen · Abbrechen = meine Eingabe behalten')){
+        eIn.value=res.suggest;
+      }
+      // Bei Ablehnung: Original behalten und durchlassen (Format ist ja gültig)
+    }
   }
   // Schritt 6 wird beim Submit validiert
   return true;
