@@ -1051,7 +1051,7 @@ const _fbCfg={
 firebase.initializeApp(_fbCfg);
 const auth=firebase.auth();
 const db=firebase.firestore();
-const AZUBI_VERSION='v233'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v234'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
 const st=firebase.storage();
 let _uid=null, _email=null, _tnId=null, _tnData=null, _kurse=[];
@@ -2009,6 +2009,14 @@ function submitJoinRegistration(){
   errEl.style.color='var(--acc)';
   errEl.textContent='Wird registriert…';
 
+  // Doppelklick-/Doppelausführungs-Schutz: verhindert doppelte globalTN-Einträge
+  // (Ursache der Sekunden-Dubletten). Button sperren + Guard setzen.
+  if(window._submittingReg) return;
+  window._submittingReg=true;
+  var _regBtn=document.getElementById('wizSubmitBtn');
+  if(_regBtn) _regBtn.disabled=true;
+  function _regDone(){ window._submittingReg=false; if(_regBtn) _regBtn.disabled=false; }
+
   _registering=true; // Auth-Listener blockieren
 
   // 1. Firebase Auth Konto erstellen ODER (falls bereits vorhanden) einloggen
@@ -2119,6 +2127,7 @@ function submitJoinRegistration(){
     window.history.replaceState({},'',window.location.pathname);
     _joinKursId=null;
     _registering=false;
+    _regDone();
     // Auth-Listener manuell triggern
     const u=auth.currentUser;
     if(u){
@@ -2136,6 +2145,7 @@ function submitJoinRegistration(){
     }
   }).catch(err=>{
     _registering=false;
+    _regDone();
     errEl.style.color='var(--bad)';
     console.error('Registrierung-Fehler:', err.code, err.message, err);
     const map={
