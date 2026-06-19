@@ -1436,8 +1436,9 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
               <div id="impDuplicateWarn" style="display:none;margin-top:6px;padding:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:6px;font-size:.68rem;color:#f59e0b"></div>
               <div style="display:flex;gap:8px;margin-top:12px">
                 <button class="btn-sm" title="← Zurück" onclick="impBackToStep2()" style="flex:1">← Zurück</button>
-                <button class="btn-sm btn-ok" id="impDoBtn" onclick="doImport()" style="flex:2" title="OK">Jetzt importieren</button>
+                <button class="btn-sm btn-ok" id="impVorschauBtn" onclick="impVorschauErstellen()" style="flex:2" title="Vorschau">Vorschau erstellen</button>
               </div>
+              <button class="btn-sm btn-ok" id="impDoBtn" onclick="doImport()" style="display:none;width:100%;margin-top:8px;background:#16a34a" title="Import starten">✓ Import jetzt starten</button>
               <div id="impProgress" style="display:none;margin-top:8px;padding:10px;background:var(--sur2);border-radius:8px;font-size:.72rem;text-align:center"></div>
             </div>
           </div>
@@ -4244,19 +4245,8 @@ function impGoToStep3(){
   let tbl='<table style="width:100%;font-size:.65rem;border-collapse:collapse">';
   tbl+='<tr style="background:var(--sur);position:sticky;top:0">'+mapped.map(f=>'<th style="padding:5px 6px;text-align:left;border-bottom:2px solid var(--brd);font-weight:700;white-space:nowrap">'+f.label+'</th>').join('')+'</tr>';
 
-  // Duplicate check
-  const nameSet=new Set();
-  const existingNames=new Set(_globalTN.map(t=>((t.vorname||'')+' '+(t.nachname||'')).toLowerCase().trim()));
-  let dupeCount=0;
-
   _impRawData.forEach((row,i)=>{
-    const vn=(row[_impMapping.vorname]||'').toString().trim();
-    const nn=(row[_impMapping.nachname]||'').toString().trim();
-    const fullName=(vn+' '+nn).toLowerCase().trim();
-    const isDupe=existingNames.has(fullName);
-    if(isDupe) dupeCount++;
-
-    tbl+='<tr style="border-bottom:1px solid var(--brd);'+(isDupe?'background:rgba(245,158,11,.08)':i%2?'background:var(--sur2)':'')+'">';
+    tbl+='<tr style="border-bottom:1px solid var(--brd);'+(i%2?'background:var(--sur2)':'')+'">';
     mapped.forEach(f=>{
       const val=(row[_impMapping[f.key]]||'').toString().trim();
       tbl+='<td style="padding:4px 6px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis">'+esc(val)+'</td>';
@@ -4267,16 +4257,136 @@ function impGoToStep3(){
   document.getElementById('impPreviewTable').innerHTML=tbl;
   document.getElementById('impCount').textContent=_impRawData.length+' Teilnehmer';
 
-  const dupeWarn=document.getElementById('impDuplicateWarn');
-  if(dupeCount){
-    dupeWarn.style.display='';
-    dupeWarn.textContent='⚠️ '+dupeCount+' Name(n) existieren bereits (gelb markiert). Sie werden trotzdem importiert – bitte prüfen.';
-  } else { dupeWarn.style.display='none'; }
+  // Zustand zuruecksetzen: Vorschau noch nicht erstellt -> Import-Button versteckt
+  const warn=document.getElementById('impDuplicateWarn'); if(warn) warn.style.display='none';
+  const doBtn=document.getElementById('impDoBtn'); if(doBtn) doBtn.style.display='none';
+  const vBtn=document.getElementById('impVorschauBtn'); if(vBtn){ vBtn.disabled=false; vBtn.style.opacity='1'; vBtn.textContent='Vorschau erstellen'; }
+  _impAnalyse=null;
+}
+
+// ── Import-Abgleich (Trockenlauf, schreibt nichts) ──────────────
+let _impAnalyse=null;
+function impVorschauErstellen(){
+  const a=impAnalysiere();
+  _impAnalyse=a;
+  // Tabelle neu einfaerben nach Kategorie
+  const mapped=IMP_FIELDS.filter(f=>_impMapping[f.key]);
+  let tbl='<table style="width:100%;font-size:.65rem;border-collapse:collapse">';
+  tbl+='<tr style="background:var(--sur);position:sticky;top:0">'+mapped.map(f=>'<th style="padding:5px 6px;text-align:left;border-bottom:2px solid var(--brd);font-weight:700;white-space:nowrap">'+f.label+'</th>').join('')+'</tr>';
+  _impRawData.forEach((row,i)=>{
+    const kat=a.perRow[i];
+    const bg = kat==='schon' ? 'background:rgba(34,197,94,.08)'
+             : kat==='tippfehler' ? 'background:rgba(245,158,11,.12)'
+             : kat==='unsicher' ? 'background:rgba(239,68,68,.08)'
+             : (i%2?'background:var(--sur2)':'');
+    tbl+='<tr style="border-bottom:1px solid var(--brd);'+bg+'">';
+    mapped.forEach(f=>{
+      const val=(row[_impMapping[f.key]]||'').toString().trim();
+      tbl+='<td style="padding:4px 6px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis">'+esc(val)+'</td>';
+    });
+    tbl+='</tr>';
+  });
+  tbl+='</table>';
+  document.getElementById('impPreviewTable').innerHTML=tbl;
+  impRenderBericht(a);
+}
+function _impNorm(s){
+  if(s==null) return '';
+  s=s.toString().trim().toLowerCase()
+     .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
+  s=s.normalize('NFKD').replace(/[\u0300-\u036f]/g,'');
+  return s.replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function _impTokens(vn,nn){
+  const set=new Set();
+  (_impNorm(vn)+' '+_impNorm(nn)).split(' ').forEach(t=>{ if(t) set.add(t); });
+  return set;
+}
+function _impGeb(s){ return s? s.toString().slice(0,10).trim() : ''; }
+function _impIsAnon(vn){ const v=(vn||'').trim(); return v.length<=3 && v.endsWith('.'); }
+function _impDatumsTeileGleich(a,b){
+  const pa=a.split('-'), pb=b.split('-');
+  if(pa.length!==3||pb.length!==3) return 0;
+  let n=0; for(let i=0;i<3;i++){ if(pa[i]&&pa[i]===pb[i]) n++; }
+  return n;
+}
+function _impTokenMatch(ta,tb){
+  if(!ta.size||!tb.size) return false;
+  let overlap=0; ta.forEach(t=>{ if(tb.has(t)) overlap++; });
+  if(overlap>=2) return true;
+  // Teilmenge in eine Richtung (z.B. "amgad" ⊂ "amgad adel maher")
+  let aSubB=true; ta.forEach(t=>{ if(!tb.has(t)) aSubB=false; });
+  let bSubA=true; tb.forEach(t=>{ if(!ta.has(t)) bSubA=false; });
+  return aSubB||bSubA;
+}
+function impAnalysiere(){
+  // Bestand-Index aufbauen (anonymisierte ausschließen)
+  const bestand=(_globalTN||[]).filter(t=>!_impIsAnon(t.vorname)).map(t=>({
+    toks:_impTokens(t.vorname,t.nachname), geb:_impGeb(t.geburtsdatum),
+    name:((t.vorname||'')+' '+(t.nachname||'')).trim()
+  }));
+  const perRow=[]; const tippfehler=[]; const unsicher=[];
+  let neu=0, schon=0, leer=0;
+  for(let i=0;i<_impRawData.length;i++){
+    const row=_impRawData[i];
+    const vn=(row[_impMapping.vorname]||'').toString().trim();
+    const nn=(row[_impMapping.nachname]||'').toString().trim();
+    if(!vn&&!nn){ perRow.push('leer'); leer++; continue; }
+    const toks=_impTokens(vn,nn);
+    const geb=_impGeb(row[_impMapping.geburtsdatum]);
+    let kat='neu', nameHitGeb=null;
+    for(const b of bestand){
+      if(!_impTokenMatch(toks,b.toks)) continue;
+      if(geb && b.geb && geb===b.geb){ kat='schon'; break; }
+      if(geb && b.geb){
+        const g=_impDatumsTeileGleich(geb,b.geb);
+        if(g>=2){ kat='tippfehler'; nameHitGeb=b; }
+        else if(kat!=='tippfehler'){ kat='unsicher'; nameHitGeb=b; }
+      }
+    }
+    perRow.push(kat);
+    if(kat==='schon') schon++;
+    else if(kat==='neu') neu++;
+    else if(kat==='tippfehler') tippfehler.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', i});
+    else if(kat==='unsicher') unsicher.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', i});
+  }
+  return {perRow, neu, schon, leer, tippfehler, unsicher, gesamt:_impRawData.length};
+}
+function impRenderBericht(a){
+  const warn=document.getElementById('impDuplicateWarn');
+  let h='<div style="font-weight:700;margin-bottom:6px">Vorschau (Trockenlauf – es wird noch nichts gespeichert)</div>';
+  h+='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.7rem">';
+  h+='<span><b>'+a.neu+'</b> neu anlegen</span>';
+  h+='<span style="color:#16a34a"><b>'+a.schon+'</b> schon vorhanden (überspringen)</span>';
+  h+='<span style="color:#d97706"><b>'+a.tippfehler.length+'</b> Tippfehler-Verdacht (Geburtsdatum)</span>';
+  h+='<span style="color:#dc2626"><b>'+a.unsicher.length+'</b> unsicher</span>';
+  if(a.leer) h+='<span style="color:var(--mu)"><b>'+a.leer+'</b> leer (übersprungen)</span>';
+  h+='</div>';
+  if(a.tippfehler.length){
+    h+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#d97706;font-size:.7rem">Tippfehler-Verdacht ('+a.tippfehler.length+') – ≥2 Datumsteile gleich</summary>';
+    h+='<div style="font-size:.66rem;margin-top:4px">'+a.tippfehler.map(t=>esc(t.name)+': Liste '+esc(t.impGeb)+' ↔ Bestand '+esc(t.bestGeb)).join('<br>')+'</div></details>';
+  }
+  if(a.unsicher.length){
+    h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#dc2626;font-size:.7rem">Unsicher ('+a.unsicher.length+') – nur listen, nichts ändern</summary>';
+    h+='<div style="font-size:.66rem;margin-top:4px">'+a.unsicher.map(t=>esc(t.name)+': Liste '+esc(t.impGeb)+' ↔ Bestand '+esc(t.bestGeb)).join('<br>')+'</div></details>';
+  }
+  warn.style.display=''; warn.style.color='var(--tx)';
+  warn.style.background='var(--sur2)'; warn.style.borderColor='var(--brd)';
+  warn.innerHTML=h;
+  // Vorschau wurde erstellt -> Import-Button einblenden, Vorschau-Button als erledigt markieren
+  const vBtn=document.getElementById('impVorschauBtn');
+  if(vBtn){ vBtn.textContent='✓ Vorschau aktualisiert'; }
+  const btn=document.getElementById('impDoBtn');
+  if(btn){ btn.style.display=''; btn.disabled=false; btn.style.opacity='1'; }
 }
 
 async function doImport(){
   const btn=document.getElementById('impDoBtn');
   const prog=document.getElementById('impProgress');
+  // Sicherung: Import nur nach erstellter Vorschau
+  if(!_impAnalyse || !_impAnalyse.perRow || _impAnalyse.perRow.length!==_impRawData.length){
+    toast('Bitte zuerst "Vorschau erstellen"','bad'); return;
+  }
   btn.disabled=true; btn.style.opacity='.5';
   prog.style.display=''; prog.textContent='⏳ Import startet…';
 
@@ -4294,10 +4404,17 @@ async function doImport(){
     return {berufGruppeId:'',beruf:val};
   }
 
-  let ok=0, fail=0;
+  let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0;
   for(let i=0;i<_impRawData.length;i++){
     const row=_impRawData[i];
+    const kat=_impAnalyse.perRow[i];
     prog.textContent='⏳ '+Math.round((i/_impRawData.length)*100)+'% – '+(i+1)+' von '+_impRawData.length;
+
+    // Kategorien aus der Vorschau beachten - nur 'neu' wird angelegt
+    if(kat==='leer'){ skipLeer++; continue; }
+    if(kat==='schon'){ skipSchon++; continue; }
+    if(kat==='unsicher'){ skipUnsicher++; continue; }
+    if(kat==='tippfehler'){ skipTippfehler++; continue; }
 
     const vn=(row[_impMapping.vorname]||'').toString().trim();
     const nn=(row[_impMapping.nachname]||'').toString().trim();
@@ -4342,11 +4459,21 @@ async function doImport(){
     }catch(err){ fail++; console.error('Import Zeile '+(i+1)+':',err); }
   }
 
-  prog.innerHTML='✅ <b>'+ok+' importiert</b>'+(fail?' · <span style="color:var(--bad)">'+fail+' fehlgeschlagen</span>':'');
+  let bericht='✅ <b>'+ok+' neu angelegt</b>';
+  if(skipSchon) bericht+=' · '+skipSchon+' schon vorhanden';
+  if(skipTippfehler) bericht+=' · <span style="color:#d97706">'+skipTippfehler+' Tippfehler-Verdacht (manuell prüfen)</span>';
+  if(skipUnsicher) bericht+=' · <span style="color:#dc2626">'+skipUnsicher+' unsicher (übersprungen)</span>';
+  if(skipLeer) bericht+=' · '+skipLeer+' leer';
+  if(fail) bericht+=' · <span style="color:var(--bad)">'+fail+' fehlgeschlagen</span>';
+  // Tippfehler-Faelle zur manuellen Korrektur auflisten
+  if(_impAnalyse.tippfehler && _impAnalyse.tippfehler.length){
+    bericht+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#d97706;font-size:.7rem">Geburtsdatum manuell prüfen ('+_impAnalyse.tippfehler.length+')</summary><div style="font-size:.66rem;margin-top:4px">'+_impAnalyse.tippfehler.map(t=>esc(t.name)+': Liste '+esc(t.impGeb)+' ↔ Bestand '+esc(t.bestGeb)).join('<br>')+'</div></details>';
+  }
+  prog.innerHTML=bericht;
   btn.disabled=false; btn.style.opacity='1';
   btn.textContent='✓ Fertig – Schließen';
   btn.onclick=()=>{ closeImportModal(); filterGlobalTN(); };
-  toast(ok+' Teilnehmer importiert ✓');
+  toast(ok+' neu importiert ✓');
 }
 
 function confirmDeleteLgart(){
