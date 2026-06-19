@@ -4281,6 +4281,8 @@ function impVorschauErstellen(){
     const bg = kat==='schon' ? 'background:rgba(34,197,94,.08)'
              : kat==='tippfehler' ? 'background:rgba(245,158,11,.12)'
              : kat==='unsicher' ? 'background:rgba(239,68,68,.08)'
+             : kat==='listdub' ? 'background:rgba(139,92,246,.10)'
+             : kat==='ghost' ? 'background:rgba(14,165,233,.10)'
              : (i%2?'background:var(--sur2)':'');
     tbl+='<tr style="border-bottom:1px solid var(--brd);'+bg+'">';
     mapped.forEach(f=>{
@@ -4341,14 +4343,21 @@ function _impTokenMatch(ta,tb){
   let bSubA=true; tb.forEach(t=>{ if(!ta.has(t)) bSubA=false; });
   return aSubB||bSubA;
 }
+function _impEmail(s){ return (s==null?'':s.toString().trim().toLowerCase()); }
+function _impFullName(vn,nn){ return _impNorm(vn)+'|'+_impNorm(nn); }
 function impAnalysiere(){
-  // Bestand-Index aufbauen (anonymisierte ausschließen)
+  // Bestand-Index aufbauen (anonymisierte ausschließen) - mit id + ausbjahr für Lehrjahr-Backfill
   const bestand=(_globalTN||[]).filter(t=>!_impIsAnon(t.vorname)).map(t=>({
-    toks:_impTokens(t.vorname,t.nachname), geb:_impGeb(t.geburtsdatum),
-    name:((t.vorname||'')+' '+(t.nachname||'')).trim()
+    id:t.id, toks:_impTokens(t.vorname,t.nachname), geb:_impGeb(t.geburtsdatum),
+    name:((t.vorname||'')+' '+(t.nachname||'')).trim(), ausbjahr:(t.ausbjahr||'').toString().trim()
   }));
-  const perRow=[]; const tippfehler=[]; const unsicher=[];
-  let neu=0, schon=0, leer=0;
+  // E-Mail-Index der ANONYMISIERTEN Pilot-TN (Ghost-Erkennung; Pilot-Mails sind individuell)
+  const anonEmail={};
+  (_globalTN||[]).forEach(t=>{ if(_impIsAnon(t.vorname)){ const e=_impEmail(t.email); if(e) anonEmail[e]=t; } });
+  // Within-List: bereits in DIESER Datei gesehene Personen (voller Name -> Datums/Mail-Mengen)
+  const seen={};
+  const perRow=[]; const tippfehler=[]; const unsicher=[]; const ghost=[]; const backfill={};
+  let neu=0, schon=0, leer=0, listdub=0;
   for(let i=0;i<_impRawData.length;i++){
     const row=_impRawData[i];
     const vn=(row[_impMapping.vorname]||'').toString().trim();
@@ -4356,15 +4365,37 @@ function impAnalysiere(){
     if(!vn&&!nn){ perRow.push('leer'); leer++; continue; }
     const toks=_impTokens(vn,nn);
     const geb=_impGeb(row[_impMapping.geburtsdatum]);
-    let kat='neu', nameHitGeb=null;
+    const em=_impMapping.email?_impEmail(row[_impMapping.email]):'';
+    const aj=_impMapping.ausbjahr?(row[_impMapping.ausbjahr]||'').toString().trim():'';
+    const fn=_impFullName(vn,nn);
+    // (1) Within-List-Dublette: voller Name gleich UND (gleiches Datum ODER gleiche E-Mail)
+    const sObj=seen[fn];
+    if(sObj && ((geb && sObj.gebs.has(geb)) || (em && sObj.emails.has(em)))){
+      perRow.push('listdub'); listdub++; continue;
+    }
+    // Bestand-Match (unverändert)
+    let kat='neu', nameHitGeb=null, hitBest=null;
     for(const b of bestand){
       if(!_impTokenMatch(toks,b.toks)) continue;
-      if(geb && b.geb && geb===b.geb){ kat='schon'; break; }
+      if(geb && b.geb && geb===b.geb){ kat='schon'; hitBest=b; break; }
       if(geb && b.geb){
         const g=_impDatumsTeileGleich(geb,b.geb);
         if(g>=2){ kat='tippfehler'; nameHitGeb=b; }
         else if(kat!=='tippfehler'){ kat='unsicher'; nameHitGeb=b; }
       }
+    }
+    // seen aktualisieren (für Folgezeilen)
+    if(!seen[fn]) seen[fn]={gebs:new Set(),emails:new Set()};
+    if(geb) seen[fn].gebs.add(geb);
+    if(em) seen[fn].emails.add(em);
+    // (2) Pilot-Ghost: noch 'neu', aber E-Mail = anonymisierter Bestand-TN
+    if(kat==='neu' && em && anonEmail[em]){
+      perRow.push('ghost'); ghost.push({name:vn+' '+nn, email:em, i});
+      continue;
+    }
+    // (3) Lehrjahr-Backfill: schon vorhanden + Liste bringt Lehrjahr + Bestand-Lehrjahr leer
+    if(kat==='schon' && aj && hitBest && hitBest.id && !hitBest.ausbjahr){
+      backfill[i]={id:hitBest.id, ausbjahr:aj, name:vn+' '+nn};
     }
     perRow.push(kat);
     if(kat==='schon') schon++;
@@ -4372,7 +4403,7 @@ function impAnalysiere(){
     else if(kat==='tippfehler') tippfehler.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', i});
     else if(kat==='unsicher') unsicher.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', i});
   }
-  return {perRow, neu, schon, leer, tippfehler, unsicher, gesamt:_impRawData.length};
+  return {perRow, neu, schon, leer, tippfehler, unsicher, listdub, ghost, backfill, gesamt:_impRawData.length};
 }
 function impRenderBericht(a){
   const warn=document.getElementById('impDuplicateWarn');
@@ -4382,6 +4413,9 @@ function impRenderBericht(a){
   h+='<span style="color:#16a34a"><b>'+a.schon+'</b> schon vorhanden (überspringen)</span>';
   h+='<span style="color:#d97706"><b>'+a.tippfehler.length+'</b> Tippfehler-Verdacht (Geburtsdatum)</span>';
   h+='<span style="color:#dc2626"><b>'+a.unsicher.length+'</b> unsicher</span>';
+  if(a.listdub) h+='<span style="color:#7c3aed"><b>'+a.listdub+'</b> Doppel in der Liste (übersprungen)</span>';
+  if(a.ghost && a.ghost.length) h+='<span style="color:#0284c7"><b>'+a.ghost.length+'</b> Pilot-TN bereits vorhanden (übersprungen)</span>';
+  if(a.backfill && Object.keys(a.backfill).length) h+='<span style="color:#16a34a"><b>'+Object.keys(a.backfill).length+'</b> Lehrjahr wird ergänzt</span>';
   if(a.leer) h+='<span style="color:var(--mu)"><b>'+a.leer+'</b> leer (übersprungen)</span>';
   h+='</div>';
   if(a.tippfehler.length){
@@ -4391,6 +4425,15 @@ function impRenderBericht(a){
   if(a.unsicher.length){
     h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#dc2626;font-size:.7rem">Unsicher ('+a.unsicher.length+') – nur listen, nichts ändern</summary>';
     h+='<div style="font-size:.66rem;margin-top:4px">'+a.unsicher.map(t=>esc(t.name)+': Liste '+esc(t.impGeb)+' ↔ Bestand '+esc(t.bestGeb)).join('<br>')+'</div></details>';
+  }
+  if(a.ghost && a.ghost.length){
+    h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#0284c7;font-size:.7rem">Pilot-TN bereits vorhanden ('+a.ghost.length+') – per E-Mail erkannt, nicht neu angelegt</summary>';
+    h+='<div style="font-size:.66rem;margin-top:4px">'+a.ghost.map(t=>esc(t.name)+' ('+esc(t.email)+')').join('<br>')+'</div></details>';
+  }
+  if(a.backfill && Object.keys(a.backfill).length){
+    const bf=Object.values(a.backfill);
+    h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#16a34a;font-size:.7rem">Lehrjahr wird ergänzt ('+bf.length+') – nur wo Bestand leer war</summary>';
+    h+='<div style="font-size:.66rem;margin-top:4px">'+bf.map(t=>esc(t.name)+' → Lehrjahr '+esc(t.ausbjahr)).join('<br>')+'</div></details>';
   }
   warn.style.display=''; warn.style.color='var(--tx)';
   warn.style.background='var(--sur2)'; warn.style.borderColor='var(--brd)';
@@ -4426,7 +4469,7 @@ async function doImport(){
     return {berufGruppeId:'',beruf:val};
   }
 
-  let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0;
+  let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0, skipListdub=0, skipGhost=0, bfDone=0;
 
   // ── Batch-Schreiben (nur ohne AzubiPro-Konten) ──────────────────
   const CHUNK=500;            // Firestore harte Grenze: max 500 Ops pro Batch
@@ -4456,7 +4499,15 @@ async function doImport(){
 
     // Kategorien aus der Vorschau beachten - nur 'neu' wird angelegt
     if(kat==='leer'){ skipLeer++; continue; }
-    if(kat==='schon'){ skipSchon++; continue; }
+    if(kat==='listdub'){ skipListdub++; continue; }
+    if(kat==='ghost'){ skipGhost++; continue; }
+    if(kat==='schon'){
+      skipSchon++;
+      // Lehrjahr-Backfill: nur wenn Bestand-Lehrjahr leer war und Liste eins mitbringt
+      const bf=_impAnalyse.backfill && _impAnalyse.backfill[i];
+      if(bf){ try{ await db.collection('globalTN').doc(bf.id).update({ausbjahr:bf.ausbjahr}); bfDone++; }catch(e){ console.warn('Lehrjahr-Backfill '+bf.id+':',e); } }
+      continue;
+    }
     if(kat==='unsicher'){ skipUnsicher++; continue; }
     if(kat==='tippfehler'){ skipTippfehler++; continue; }
 
@@ -4513,6 +4564,9 @@ async function doImport(){
 
   let bericht='✅ <b>'+ok+' neu angelegt</b>';
   if(skipSchon) bericht+=' · '+skipSchon+' schon vorhanden';
+  if(bfDone) bericht+=' · <span style="color:#16a34a">'+bfDone+' Lehrjahr ergänzt</span>';
+  if(skipListdub) bericht+=' · <span style="color:#7c3aed">'+skipListdub+' Doppel in der Liste</span>';
+  if(skipGhost) bericht+=' · <span style="color:#0284c7">'+skipGhost+' Pilot-TN vorhanden</span>';
   if(skipTippfehler) bericht+=' · <span style="color:#d97706">'+skipTippfehler+' Tippfehler-Verdacht (manuell prüfen)</span>';
   if(skipUnsicher) bericht+=' · <span style="color:#dc2626">'+skipUnsicher+' unsicher (übersprungen)</span>';
   if(skipLeer) bericht+=' · '+skipLeer+' leer';
