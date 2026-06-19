@@ -4302,7 +4302,25 @@ function _impTokens(vn,nn){
   (_impNorm(vn)+' '+_impNorm(nn)).split(' ').forEach(t=>{ if(t) set.add(t); });
   return set;
 }
-function _impGeb(s){ return s? s.toString().slice(0,10).trim() : ''; }
+function _impGeb(s){
+  if(s==null||s==='') return '';
+  // Excel-Seriennummer (Zahl = Tage seit 1899-12-30) -> YYYY-MM-DD
+  if(typeof s==='number' || (/^\d+(\.\d+)?$/.test(s.toString().trim()) && Number(s)>20000 && Number(s)<60000)){
+    const n=Math.floor(Number(s));
+    const d=new Date(Date.UTC(1899,11,30)+n*86400000);
+    if(!isNaN(d)){
+      const mm=String(d.getUTCMonth()+1).padStart(2,'0');
+      const dd=String(d.getUTCDate()).padStart(2,'0');
+      return d.getUTCFullYear()+'-'+mm+'-'+dd;
+    }
+  }
+  // bereits ein Datum (ISO oder mit Zeitanteil) -> erste 10 Zeichen
+  const str=s.toString().trim();
+  // deutsches Format TT.MM.JJJJ -> YYYY-MM-DD
+  const de=str.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if(de) return de[3]+'-'+de[2]+'-'+de[1];
+  return str.slice(0,10);
+}
 function _impIsAnon(vn){ const v=(vn||'').trim(); return v.length<=3 && v.endsWith('.'); }
 function _impDatumsTeileGleich(a,b){
   const pa=a.split('-'), pb=b.split('-');
@@ -4431,7 +4449,7 @@ async function doImport(){
       beruf:bgMatch.beruf||(row[_impMapping.beruf]||'').toString().trim(),
       berufGruppeId:bgMatch.berufGruppeId,
       ausbjahr:(row[_impMapping.ausbjahr]||'').toString().trim(),
-      geburtsdatum: (row[_impMapping.geburtsdatum]||'').toString().trim(),
+      geburtsdatum: _impGeb(row[_impMapping.geburtsdatum]),
       adresse: (row[_impMapping.adresse]||'').toString().trim(),
       plz: (row[_impMapping.plz]||'').toString().trim(),
       ort: (row[_impMapping.ort]||'').toString().trim(),
