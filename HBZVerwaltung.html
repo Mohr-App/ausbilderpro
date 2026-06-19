@@ -4425,6 +4425,28 @@ async function doImport(){
   }
 
   let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0;
+
+  // ── Batch-Schreiben (nur ohne AzubiPro-Konten) ──────────────────
+  const CHUNK=500;            // Firestore harte Grenze: max 500 Ops pro Batch
+  let batch=db.batch();
+  let pending=[];             // tnData der aktuellen, noch nicht committeten Ops
+  async function commitChunk(){
+    if(!pending.length) return;
+    const n=pending.length;
+    try{
+      await batch.commit();
+      ok+=n;
+    }catch(err){
+      // Block-Commit gescheitert -> Zeile fuer Zeile, um die kaputte zu isolieren
+      console.error('Batch-Commit ('+n+') fehlgeschlagen, Fallback row-by-row:',err);
+      for(const td of pending){
+        try{ await db.collection('globalTN').add(td); ok++; }
+        catch(e2){ fail++; console.error('Import (Fallback):',e2); }
+      }
+    }
+    batch=db.batch(); pending=[];
+  }
+
   for(let i=0;i<_impRawData.length;i++){
     const row=_impRawData[i];
     const kat=_impAnalyse.perRow[i];
@@ -4460,24 +4482,32 @@ async function doImport(){
       importiert:true
     };
 
-    try{
-      const docRef=await db.collection('globalTN').add(tnData);
-      // AzubiPro Konto erstellen
-      if(createKonto&&tnData.email){
-        try{
-          const secondApp=firebase.app('_secondaryApp')||firebase.initializeApp(firebase.app().options,'_secondaryApp');
-          const secAuth=secondApp.auth();
-          const uc=await secAuth.createUserWithEmailAndPassword(tnData.email,defaultPw);
-          await db.collection('users').doc(uc.user.uid).set({email:tnData.email,role:'azubi',tnId:docRef.id},{merge:true});
-          await secAuth.signOut();
-        }catch(authErr){
-          // Email existiert schon oder anderer Fehler – ignorieren
-          console.warn('AzubiPro Konto für '+tnData.email+':',authErr.message);
+    if(createKonto){
+      // Sequenzieller Pfad: Auth-Konten lassen sich nicht batchen
+      try{
+        const docRef=await db.collection('globalTN').add(tnData);
+        if(tnData.email){
+          try{
+            const secondApp=firebase.app('_secondaryApp')||firebase.initializeApp(firebase.app().options,'_secondaryApp');
+            const secAuth=secondApp.auth();
+            const uc=await secAuth.createUserWithEmailAndPassword(tnData.email,defaultPw);
+            await db.collection('users').doc(uc.user.uid).set({email:tnData.email,role:'azubi',tnId:docRef.id},{merge:true});
+            await secAuth.signOut();
+          }catch(authErr){
+            // Email existiert schon oder anderer Fehler – ignorieren
+            console.warn('AzubiPro Konto für '+tnData.email+':',authErr.message);
+          }
         }
-      }
-      ok++;
-    }catch(err){ fail++; console.error('Import Zeile '+(i+1)+':',err); }
+        ok++;
+      }catch(err){ fail++; console.error('Import Zeile '+(i+1)+':',err); }
+    } else {
+      // Batch-Pfad: sammeln, alle CHUNK Ops committen
+      batch.set(db.collection('globalTN').doc(), tnData);
+      pending.push(tnData);
+      if(pending.length>=CHUNK) await commitChunk();
+    }
   }
+  await commitChunk();   // Rest flushen
 
   let bericht='✅ <b>'+ok+' neu angelegt</b>';
   if(skipSchon) bericht+=' · '+skipSchon+' schon vorhanden';
