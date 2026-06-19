@@ -1051,7 +1051,7 @@ const _fbCfg={
 firebase.initializeApp(_fbCfg);
 const auth=firebase.auth();
 const db=firebase.firestore();
-const AZUBI_VERSION='v232'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v233'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
 const st=firebase.storage();
 let _uid=null, _email=null, _tnId=null, _tnData=null, _kurse=[];
@@ -1309,12 +1309,23 @@ function _enterApp(){
   var bl=document.getElementById('bioLockWrap'); if(bl) bl.style.display='none';
   document.getElementById('app').classList.add('show');
   document.getElementById('hdrUser').textContent=_email.split('@')[0];
-  loadData();
-  _maybeOfferBio();
-  // QR für NEUEN Kurs gescannt (Kamera) – auch nach Fingerabdruck-Entsperrung
-  if(_joinKursId){
-    var _jk=_joinKursId; _joinKursId=null;
-    setTimeout(function(){ _autoJoinScannedKurs(_jk); }, 600);
+  // WICHTIG: Auth-Token sicherstellen, BEVOR Firestore-Abfragen laufen.
+  // Ohne das feuert loadData() ggf. bevor das Token beim Backend gilt -> sporadisch
+  // "permission denied" beim 1. Versuch (klappt erst nach mehreren Anläufen).
+  function _startData(){
+    loadData();
+    _maybeOfferBio();
+    // QR für NEUEN Kurs gescannt (Kamera) – auch nach Fingerabdruck-Entsperrung
+    if(_joinKursId){
+      var _jk=_joinKursId; _joinKursId=null;
+      setTimeout(function(){ _autoJoinScannedKurs(_jk); }, 600);
+    }
+  }
+  var _u=auth.currentUser;
+  if(_u && _u.getIdToken){
+    _u.getIdToken().then(_startData).catch(_startData); // bei Fehler trotzdem starten (niemand aussperren)
+  } else {
+    _startData();
   }
 }
 
