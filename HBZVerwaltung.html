@@ -2723,12 +2723,13 @@ function renderTNBreakdown(){
   const berufe=new Map();
   _globalTN.forEach(t=>{
     const key=getBerufKey(t.beruf, t.berufGruppeId);
+    if(key==='andere') return;   // nicht-verwaltete Gewerke nicht im Dashboard zeigen
     const label=(BERUFE[key]?.label)||(BERUFE[key]?.name)||(t.beruf?t.beruf.split(' – ')[0].trim():'Kein Beruf');
     berufe.set(label,(berufe.get(label)||0)+1);
   });
   const berufSorted=[...berufe.entries()].sort((a,b)=>b[1]-a[1]);
-  // Gefilterte TN — ebenfalls ueber getBerufKey
-  let filtered=_globalTN;
+  // Gefilterte TN — Basis sind nur verwaltete TN
+  let filtered=_globalTN.filter(_istVerwaltet);
   if(f.beruf) filtered=filtered.filter(t=>{
     const key=getBerufKey(t.beruf, t.berufGruppeId);
     const label=(BERUFE[key]?.label)||(BERUFE[key]?.name)||(t.beruf?t.beruf.split(' – ')[0].trim():'Kein Beruf');
@@ -2800,7 +2801,7 @@ function loadDashboard(){
 
   // ── Statistiken aus globalTN berechnen (KEIN extra Firestore-Read!) ──
   updateKursTNCounts();
-  document.getElementById('statTN').textContent = _globalTN.length;
+  document.getElementById('statTN').textContent = _globalTN.filter(_istVerwaltet).length;
 
   // Wiederholer + Abwesende aus globalTN
   const absentEl=document.getElementById('dashAbsent');
@@ -3477,6 +3478,7 @@ function renderDashCharts(){
   const berufMap={};
   _globalTN.forEach(t=>{
     const key = getBerufKey(t.beruf, t.berufGruppeId);
+    if(key==='andere') return;   // nicht-verwaltete Gewerke nicht im Dashboard zeigen
     const label = (BERUFE[key]?.label) || (BERUFE[key]?.name) || (t.beruf || 'Ohne Beruf');
     berufMap[label] = (berufMap[label]||0) + 1;
   });
@@ -6639,6 +6641,9 @@ function getBerufKey(beruf, berufGruppeId){
   }
   return 'andere';
 }
+// TN gilt als "verwaltet", wenn sein Beruf zu einer konfigurierten Berufsgruppe matcht
+// (= genau die Gruppen, die die Sidebar zeigt). Alles andere ('andere') wird im Dashboard ausgeblendet.
+function _istVerwaltet(t){ return getBerufKey(t.beruf, t.berufGruppeId) !== 'andere'; }
 
 function loadBerufe(){
   db.collection('shared').doc('kursSettings').collection('berufe')
