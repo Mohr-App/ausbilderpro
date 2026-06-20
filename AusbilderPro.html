@@ -7613,7 +7613,8 @@ async function appReset(){
 // Schritt 2: Cleanup - entfernt Geister + kuerzt Vollnamen
 
 // ─── TN DETAIL ───
-// ── Schritt 3c: Ausbilder-Freigabe für selbst-verknuepfte / selbst-registrierte TN ──
+// ── Schritt 3c/3d: Ausbilder-Freigabe (+ heute anwesend) für selbst-verknuepfte / selbst-registrierte TN ──
+let _freigabeName='';
 function _tnFreigabeCheck(tnId, t){
   const box=document.getElementById('tnFreigabeBox'); if(!box||!_db) return;
   const kursId=(curInst()&&curInst().sharedKursId)||t.aktiverKursId||null;
@@ -7622,11 +7623,12 @@ function _tnFreigabeCheck(tnId, t){
     const d=s.exists?s.data():{};
     if(d.bestaetigungAngefordert && !d.bestaetigtAm){
       const name=((t.vorname||'')+' '+(t.nachname||'')).trim();
+      _freigabeName=name;
       const claim = t.verknuepftUid ? 'möchte sich mit diesem Datensatz verbinden (Selbst-Zuordnung per App)' : 'hat sich selbst per App angemeldet';
       box.innerHTML='<div style="margin-bottom:12px;padding:10px 12px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.3);border-radius:10px">'
         +'<div style="font-size:.72rem;font-weight:800;color:#dc2626;margin-bottom:6px">⏳ Wartet auf deine Freigabe</div>'
-        +'<div style="font-size:.68rem;color:#374151;margin-bottom:8px">'+esc(name)+' '+claim+'. Bestätige nur, wenn du diese Person kennst.</div>'
-        +'<button onclick="tnFreigeben(\''+tnId+'\',\''+kursId+'\')" style="width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Freigeben</button>'
+        +'<div style="font-size:.68rem;color:#374151;margin-bottom:8px">'+esc(name)+' '+claim+'. Bestätige nur, wenn du diese Person kennst. Die Freigabe trägt zugleich die heutige Anwesenheit ein.</div>'
+        +'<button onclick="tnFreigeben(\''+tnId+'\',\''+kursId+'\')" style="width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Freigeben & heute anwesend</button>'
         +'</div>';
     }
   }).catch(()=>{});
@@ -7634,9 +7636,18 @@ function _tnFreigabeCheck(tnId, t){
 function tnFreigeben(tnId, kursId){
   if(!_db||!tnId||!kursId) return;
   const von=(_auth&&_auth.currentUser&&_auth.currentUser.email)?_auth.currentUser.email.toLowerCase():'';
-  _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId)
+  const kursRef=_db.collection('shared').doc('kurse').collection('list').doc(kursId);
+  kursRef.collection('teilnehmer').doc(tnId)
     .update({bestaetigtAm:Date.now(), bestaetigtVon:von})
-    .then(()=>{ toast('✓ Freigegeben'); var m=document.getElementById('tnDetailModal'); if(m) m.classList.remove('open'); })
+    .then(()=>{
+      // Modell A: Freigabe traegt die heutige Anwesenheit ein (Azubi konnte bis hierher nicht einchecken)
+      const datum=new Date().toISOString().slice(0,10);
+      const zeit=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+      return kursRef.collection('checkins').doc(tnId+'_'+datum).set({
+        tnId, datum, zeit, name:_freigabeName||'', viaFreigabe:true, ts:Date.now()
+      },{merge:true}).catch(()=>{}); // Anwesenheit nicht fatal: Freigabe gilt auch ohne
+    })
+    .then(()=>{ toast('✓ Freigegeben & heute anwesend'); var m=document.getElementById('tnDetailModal'); if(m) m.classList.remove('open'); })
     .catch(err=>{ alert('Freigabe fehlgeschlagen: '+err.message); });
 }
 

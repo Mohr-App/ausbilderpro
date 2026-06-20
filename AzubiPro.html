@@ -3742,11 +3742,23 @@ function _onQRScanned(data){
   _checkinDone=false;
   _tryQRCheckin();
 }
+// ── Schritt 3d: QR-Anwesenheit erst nach Ausbilder-Freigabe ──
+// Liest den Kurs-Teilnehmer-Eintrag; pending (bestaetigungAngefordert && !bestaetigtAm) -> false.
+// Lesefehler -> true (nicht blockieren, damit Bestands-Azubis nie haengen).
+function _istFreigegeben(kursId){
+  if(!kursId||!_tnId) return Promise.resolve(true);
+  return db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(_tnId).get()
+    .then(s=>{ const d=s.exists?s.data():{}; return !(d.bestaetigungAngefordert && !d.bestaetigtAm); })
+    .catch(()=>true);
+}
+
 function _autoCheckinBeiRegistrierung(kursId){
   // Registrierung am QR-Code zählt als Anwesenheit für heute (ohne GPS - QR hängt ja im Kursraum)
   if(!kursId||!_tnId) return;
-  const kursRef=db.collection('shared').doc('kurse').collection('list').doc(kursId);
-  kursRef.get().then(doc=>{
+  _istFreigegeben(kursId).then(_frei=>{
+   if(!_frei) return; // pending -> Ausbilder setzt Anwesenheit bei Freigabe (Modell A)
+   const kursRef=db.collection('shared').doc('kurse').collection('list').doc(kursId);
+   kursRef.get().then(doc=>{
     if(!doc.exists) return;
     const d=doc.data();
     // QR-Anwesenheit gilt als aktiviert, wenn ein Geofence gesetzt ist ODER der GPS-Schalter bewusst gesetzt wurde
@@ -3769,14 +3781,17 @@ function _autoCheckinBeiRegistrierung(kursId){
       }).catch(()=>{});
     }).catch(()=>{});
   }).catch(()=>{});
+  }); // Ende _istFreigegeben-Gate
 }
 function _tryQRCheckin(){
   if(_checkinDone||!_checkinKursId||!_tnId||!_tnData) return;
   if(_tnData.aktiverKursId!==_checkinKursId) return; // anderer/kein Kurs -> Beitritts-Flow regelt das
-  _checkinDone=true;
   const kursId=_checkinKursId;
-  const kursRef=db.collection('shared').doc('kurse').collection('list').doc(kursId);
-  kursRef.get().then(doc=>{
+  _istFreigegeben(kursId).then(_frei=>{
+   if(!_frei){ _checkinBanner('warn','⏳ Deine Anmeldung wartet noch auf die Freigabe durch deinen Ausbilder. Sobald er bestätigt, kannst du einchecken.'); return; }
+   _checkinDone=true;
+   const kursRef=db.collection('shared').doc('kurse').collection('list').doc(kursId);
+   kursRef.get().then(doc=>{
     const qrGeo=(doc.exists&&doc.data().qrGeo)?doc.data().qrGeo:null;
     const gpsPflicht=doc.exists&&doc.data().qrGpsPflicht===true;
     const hatGeo=!!(qrGeo&&qrGeo.lat);
@@ -3819,6 +3834,7 @@ function _tryQRCheckin(){
       });
     }).catch(()=>{});
   }).catch(()=>{});
+  }); // Ende _istFreigegeben-Gate
 }
 
 function checkGeofence(gps){
