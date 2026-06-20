@@ -7624,16 +7624,18 @@ function _tnFreigabeCheck(tnId, t){
     if(d.bestaetigungAngefordert && !d.bestaetigtAm){
       const name=((t.vorname||'')+' '+(t.nachname||'')).trim();
       _freigabeName=name;
-      const claim = t.verknuepftUid ? 'möchte sich mit diesem Datensatz verbinden (Selbst-Zuordnung per App)' : 'hat sich selbst per App angemeldet';
+      const vk = t.verknuepftUid ? 1 : 0;
+      const claim = vk ? 'möchte sich mit diesem Datensatz verbinden (Selbst-Zuordnung per App)' : 'hat sich selbst per App angemeldet';
       box.innerHTML='<div style="margin-bottom:12px;padding:10px 12px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.3);border-radius:10px">'
         +'<div style="font-size:.72rem;font-weight:800;color:#dc2626;margin-bottom:6px">⏳ Wartet auf deine Freigabe</div>'
         +'<div style="font-size:.68rem;color:#374151;margin-bottom:8px">'+esc(name)+' '+claim+'. Bestätige nur, wenn du diese Person kennst. Die Freigabe trägt zugleich die heutige Anwesenheit ein.</div>'
-        +'<button onclick="tnFreigeben(\''+tnId+'\',\''+kursId+'\')" style="width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Freigeben & heute anwesend</button>'
+        +'<button onclick="tnFreigeben(\''+tnId+'\',\''+kursId+'\','+vk+')" style="width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Freigeben & heute anwesend</button>'
+        +'<button onclick="tnAblehnen(\''+tnId+'\',\''+kursId+'\','+vk+')" style="width:100%;margin-top:6px;padding:9px;background:#fff;border:1.5px solid rgba(239,68,68,.4);border-radius:8px;color:#dc2626;font-size:.76rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Ablehnen</button>'
         +'</div>';
     }
   }).catch(()=>{});
 }
-function tnFreigeben(tnId, kursId){
+function tnFreigeben(tnId, kursId, istVerknuepft){
   if(!_db||!tnId||!kursId) return;
   const von=(_auth&&_auth.currentUser&&_auth.currentUser.email)?_auth.currentUser.email.toLowerCase():'';
   const kursRef=_db.collection('shared').doc('kurse').collection('list').doc(kursId);
@@ -7647,8 +7649,32 @@ function tnFreigeben(tnId, kursId){
         tnId, datum, zeit, name:_freigabeName||'', viaFreigabe:true, ts:Date.now()
       },{merge:true}).catch(()=>{}); // Anwesenheit nicht fatal: Freigabe gilt auch ohne
     })
+    .then(()=>{
+      // Verknuepfung als freigegeben markieren -> schuetzt aktiven Azubi vor spaeterem Un-Claim
+      if(istVerknuepft){
+        return _db.collection('globalTN').doc(tnId).update({verknuepftFreigegebenAm:Date.now()}).catch(()=>{});
+      }
+    })
     .then(()=>{ toast('✓ Freigegeben & heute anwesend'); var m=document.getElementById('tnDetailModal'); if(m) m.classList.remove('open'); })
     .catch(err=>{ alert('Freigabe fehlgeschlagen: '+err.message); });
+}
+function tnAblehnen(tnId, kursId, istVerknuepft){
+  if(!_db||!tnId||!kursId) return;
+  const msg = istVerknuepft
+    ? 'Verknüpfung ablehnen?\n\nDie Selbst-Zuordnung wird zurückgesetzt – der Datensatz wird wieder frei und der abgelehnte Zugang verliert den Zugriff. Der TN wird aus diesem Kurs entfernt.'
+    : 'Diesen selbst angemeldeten TN aus dem Kurs entfernen?\n\nDas Azubi-Konto bleibt bestehen, nur die Kurszuordnung wird entfernt.';
+  if(!confirm(msg)) return;
+  const kursRef=_db.collection('shared').doc('kurse').collection('list').doc(kursId);
+  let p=Promise.resolve();
+  if(istVerknuepft){
+    // Claim am globalTN zuruecksetzen (Rule erlaubt nur, wenn noch NICHT freigegeben)
+    p=_db.collection('globalTN').doc(tnId).update({
+      verknuepftUid:null, verknuepftAm:null, email:null, bestaetigungAngefordert:null
+    });
+  }
+  p.then(()=>kursRef.collection('teilnehmer').doc(tnId).delete().catch(()=>{}))
+    .then(()=>{ toast('✕ Abgelehnt'); var m=document.getElementById('tnDetailModal'); if(m) m.classList.remove('open'); })
+    .catch(err=>{ alert('Ablehnen fehlgeschlagen: '+err.message+'\n\n(Hinweis: bereits freigegebene Verknüpfungen lassen sich nicht zurücksetzen.)'); });
 }
 
 function openTnDetail(tnId){

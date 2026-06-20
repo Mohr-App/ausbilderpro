@@ -139,6 +139,16 @@ service cloud.firestore {
         && (!('verknuepftUid' in resource.data) || resource.data.verknuepftUid == null)
         && request.resource.data.verknuepftUid == request.auth.uid
         && request.resource.data.email == request.auth.token.email;
+      // Schritt 3c – Ausbilder-Freigabe markiert die Verknuepfung als freigegeben (schuetzt vor spaeterem Un-Claim)
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verknuepftFreigegebenAm'])
+        && resource.data.verknuepftUid != null;
+      // Schritt 3c – Ablehnen: Claim einer NOCH NICHT freigegebenen Verknuepfung zuruecksetzen
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verknuepftUid','verknuepftAm','email','bestaetigungAngefordert'])
+        && resource.data.verknuepftUid != null
+        && (!('verknuepftFreigegebenAm' in resource.data) || resource.data.verknuepftFreigegebenAm == null)
+        && request.resource.data.verknuepftUid == null;
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'wiederholer']);
       allow update: if request.auth != null
