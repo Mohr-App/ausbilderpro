@@ -4346,17 +4346,22 @@ function _impTokenMatch(ta,tb){
 function _impEmail(s){ return (s==null?'':s.toString().trim().toLowerCase()); }
 function _impFullName(vn,nn){ return _impNorm(vn)+'|'+_impNorm(nn); }
 function impAnalysiere(){
-  // Bestand-Index aufbauen (anonymisierte ausschließen) - mit id + ausbjahr für Lehrjahr-Backfill
+  // Felder, die beim Abgleich von der VP-Liste korrigiert werden (VP heilig). NIE: email/Kontakt/Kurs/Login.
+  const _ABGLEICH_FELDER=['vorname','nachname','firma','beruf','adresse','plz','ort'];
+  const _impNormCmp=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  // Bestand-Index aufbauen (anonymisierte ausschließen) - mit id + Stammdaten für Lehrjahr-Backfill + VP-Abgleich
   const bestand=(_globalTN||[]).filter(t=>!_impIsAnon(t.vorname)).map(t=>({
     id:t.id, toks:_impTokens(t.vorname,t.nachname), geb:_impGeb(t.geburtsdatum),
-    name:((t.vorname||'')+' '+(t.nachname||'')).trim(), ausbjahr:(t.ausbjahr||'').toString().trim()
+    name:((t.vorname||'')+' '+(t.nachname||'')).trim(), ausbjahr:(t.ausbjahr||'').toString().trim(),
+    vorname:(t.vorname||''), nachname:(t.nachname||''), firma:(t.firma||''), beruf:(t.beruf||''),
+    adresse:(t.adresse||''), plz:(t.plz||'').toString(), ort:(t.ort||'')
   }));
   // E-Mail-Index der ANONYMISIERTEN Pilot-TN (Ghost-Erkennung; Pilot-Mails sind individuell)
   const anonEmail={};
   (_globalTN||[]).forEach(t=>{ if(_impIsAnon(t.vorname)){ const e=_impEmail(t.email); if(e) anonEmail[e]=t; } });
   // Within-List: bereits in DIESER Datei gesehene Personen (voller Name -> Datums/Mail-Mengen)
   const seen={};
-  const perRow=[]; const tippfehler=[]; const unsicher=[]; const ghost=[]; const backfill={};
+  const perRow=[]; const tippfehler=[]; const unsicher=[]; const ghost=[]; const backfill={}; const abgleich={};
   let neu=0, schon=0, leer=0, listdub=0;
   for(let i=0;i<_impRawData.length;i++){
     const row=_impRawData[i];
@@ -4397,13 +4402,25 @@ function impAnalysiere(){
     if(kat==='schon' && aj && hitBest && hitBest.id && !hitBest.ausbjahr){
       backfill[i]={id:hitBest.id, ausbjahr:aj, name:vn+' '+nn};
     }
+    // (4) VP-Abgleich: schon vorhanden -> abweichende Stammdaten auf VP-Stand korrigieren (VP heilig)
+    if(kat==='schon' && hitBest && hitBest.id){
+      const changed={}, vorher={};
+      _ABGLEICH_FELDER.forEach(f=>{
+        if(_impMapping[f]==null) return;
+        const impVal=(row[_impMapping[f]]||'').toString().trim();
+        if(!impVal) return;                       // VP leert nie ein Feld
+        const bestVal=(hitBest[f]||'').toString();
+        if(_impNormCmp(impVal)!==_impNormCmp(bestVal)){ changed[f]=impVal; vorher[f]=bestVal; }
+      });
+      if(Object.keys(changed).length) abgleich[i]={id:hitBest.id, name:vn+' '+nn, fields:changed, vorher:vorher};
+    }
     perRow.push(kat);
     if(kat==='schon') schon++;
     else if(kat==='neu') neu++;
     else if(kat==='tippfehler') tippfehler.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', i});
     else if(kat==='unsicher') unsicher.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', i});
   }
-  return {perRow, neu, schon, leer, tippfehler, unsicher, listdub, ghost, backfill, gesamt:_impRawData.length};
+  return {perRow, neu, schon, leer, tippfehler, unsicher, listdub, ghost, backfill, abgleich, gesamt:_impRawData.length};
 }
 function impRenderBericht(a){
   const warn=document.getElementById('impDuplicateWarn');
@@ -4416,6 +4433,7 @@ function impRenderBericht(a){
   if(a.listdub) h+='<span style="color:#7c3aed"><b>'+a.listdub+'</b> Doppel in der Liste (übersprungen)</span>';
   if(a.ghost && a.ghost.length) h+='<span style="color:#0284c7"><b>'+a.ghost.length+'</b> Pilot-TN bereits vorhanden (übersprungen)</span>';
   if(a.backfill && Object.keys(a.backfill).length) h+='<span style="color:#16a34a"><b>'+Object.keys(a.backfill).length+'</b> Lehrjahr wird ergänzt</span>';
+  if(a.abgleich && Object.keys(a.abgleich).length) h+='<span style="color:#0d9488"><b>'+Object.keys(a.abgleich).length+'</b> an VP angeglichen</span>';
   if(a.leer) h+='<span style="color:var(--mu)"><b>'+a.leer+'</b> leer (übersprungen)</span>';
   h+='</div>';
   if(a.tippfehler.length){
@@ -4434,6 +4452,15 @@ function impRenderBericht(a){
     const bf=Object.values(a.backfill);
     h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#16a34a;font-size:.7rem">Lehrjahr wird ergänzt ('+bf.length+') – nur wo Bestand leer war</summary>';
     h+='<div style="font-size:.66rem;margin-top:4px">'+bf.map(t=>esc(t.name)+' → Lehrjahr '+esc(t.ausbjahr)).join('<br>')+'</div></details>';
+  }
+  if(a.abgleich && Object.keys(a.abgleich).length){
+    const FL={vorname:'Vorname',nachname:'Nachname',firma:'Betrieb',beruf:'Beruf',adresse:'Adresse',plz:'PLZ',ort:'Ort'};
+    const ab=Object.values(a.abgleich);
+    h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#0d9488;font-size:.7rem">An VP angeglichen ('+ab.length+') – Stammdaten auf Listen-Stand korrigiert (Login/Kontakt/Kurs bleiben)</summary>';
+    h+='<div style="font-size:.66rem;margin-top:4px">'+ab.map(t=>{
+      const fl=Object.keys(t.fields).map(f=>(FL[f]||f)+': '+esc(t.vorher[f]||'–')+' → '+esc(t.fields[f])).join(', ');
+      return '<b>'+esc(t.name)+'</b> – '+fl;
+    }).join('<br>')+'</div></details>';
   }
   warn.style.display=''; warn.style.color='var(--tx)';
   warn.style.background='var(--sur2)'; warn.style.borderColor='var(--brd)';
@@ -4469,7 +4496,7 @@ async function doImport(){
     return {berufGruppeId:'',beruf:val};
   }
 
-  let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0, skipListdub=0, skipGhost=0, bfDone=0;
+  let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0, skipListdub=0, skipGhost=0, bfDone=0, abgleichDone=0;
 
   // ── Batch-Schreiben (nur ohne AzubiPro-Konten) ──────────────────
   const CHUNK=500;            // Firestore harte Grenze: max 500 Ops pro Batch
@@ -4503,9 +4530,17 @@ async function doImport(){
     if(kat==='ghost'){ skipGhost++; continue; }
     if(kat==='schon'){
       skipSchon++;
-      // Lehrjahr-Backfill: nur wenn Bestand-Lehrjahr leer war und Liste eins mitbringt
+      // VP-Abgleich (Stammdaten) + Lehrjahr-Backfill (nur wenn leer) als EIN Update
       const bf=_impAnalyse.backfill && _impAnalyse.backfill[i];
-      if(bf){ try{ await db.collection('globalTN').doc(bf.id).update({ausbjahr:bf.ausbjahr}); bfDone++; }catch(e){ console.warn('Lehrjahr-Backfill '+bf.id+':',e); } }
+      const ab=_impAnalyse.abgleich && _impAnalyse.abgleich[i];
+      const upd={};
+      if(ab) Object.assign(upd, ab.fields);
+      if(bf) upd.ausbjahr=bf.ausbjahr;
+      const zielId=(ab&&ab.id)||(bf&&bf.id);
+      if(zielId && Object.keys(upd).length){
+        try{ await db.collection('globalTN').doc(zielId).update(upd); if(bf) bfDone++; if(ab) abgleichDone++; }
+        catch(e){ console.warn('VP-Abgleich/Backfill '+zielId+':',e); }
+      }
       continue;
     }
     if(kat==='unsicher'){ skipUnsicher++; continue; }
@@ -4565,6 +4600,7 @@ async function doImport(){
   let bericht='✅ <b>'+ok+' neu angelegt</b>';
   if(skipSchon) bericht+=' · '+skipSchon+' schon vorhanden';
   if(bfDone) bericht+=' · <span style="color:#16a34a">'+bfDone+' Lehrjahr ergänzt</span>';
+  if(abgleichDone) bericht+=' · <span style="color:#0d9488">'+abgleichDone+' an VP angeglichen</span>';
   if(skipListdub) bericht+=' · <span style="color:#7c3aed">'+skipListdub+' Doppel in der Liste</span>';
   if(skipGhost) bericht+=' · <span style="color:#0284c7">'+skipGhost+' Pilot-TN vorhanden</span>';
   if(skipTippfehler) bericht+=' · <span style="color:#d97706">'+skipTippfehler+' Tippfehler-Verdacht (manuell prüfen)</span>';
