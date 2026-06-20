@@ -1991,6 +1991,46 @@ document.addEventListener('keydown', e=>{
 });
 
 
+// ── 3a: "Wir haben dich gefunden" – Match-Erkennung (nur lesend, KEINE Verknuepfung) ──
+let _linkTnId = null;
+let _foundYouResolve = null;
+function _fyNrm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function _fyTokset(vn,nn){ return _fyNrm((vn||'')+' '+(nn||'')).split(' ').filter(t=>t.length>1); }
+function _fyNameMatch(aVn,aNn,bVn,bNn){
+  const A=new Set(_fyTokset(aVn,aNn)); const B=_fyTokset(bVn,bNn);
+  if(!B.length || !A.size) return false;
+  let shared=0; B.forEach(t=>{ if(A.has(t)) shared++; });
+  const minLen=Math.min(A.size, B.length);
+  return shared>=Math.min(2, minLen);
+}
+function _azubiFindMatch(vn,nn,geb){
+  if(!geb) return Promise.resolve(null);
+  return db.collection('globalTN').where('geburtsdatum','==',geb).get().then(snap=>{
+    const hits=[];
+    snap.forEach(d=>{
+      const x=d.data();
+      if(x.verknuepftUid) return;          // schon beansprucht
+      if(x.selfRegistered===true) return;  // bereits ein Selbst-Konto
+      if(_fyNameMatch(vn,nn,x.vorname,x.nachname)) hits.push({id:d.id, vorname:x.vorname||'', nachname:x.nachname||'', beruf:(x.beruf||x.berufGruppe||''), firma:(x.firma||'')});
+    });
+    return hits.length===1 ? hits[0] : null;   // 0 oder 2+ -> Behelfsbruecke (kein Match)
+  }).catch(e=>{ console.warn('[3a] Match-Check fehlgeschlagen:', e); return null; });
+}
+function _azubiShowFoundYou(m){
+  return new Promise(res=>{
+    _foundYouResolve=res;
+    document.getElementById('fyName').textContent=((m.vorname||'')+' '+(m.nachname||'')).trim();
+    document.getElementById('fyBeruf').textContent=m.beruf||'—';
+    document.getElementById('fyFirma').textContent=m.firma||'—';
+    document.getElementById('foundYouModal').style.display='flex';
+  });
+}
+function _fyAnswer(istIch){
+  document.getElementById('foundYouModal').style.display='none';
+  const r=_foundYouResolve; _foundYouResolve=null;
+  if(r) r(!!istIch);
+}
+
 function submitJoinRegistration(){
   let vorname=(document.getElementById('jVorname').value||'').trim();
   let nachname=(document.getElementById('jNachname').value||'').trim();
@@ -2072,6 +2112,19 @@ function submitJoinRegistration(){
     // WICHTIG: Auf vollstaendige Auth-Token-Propagation warten bevor Firestore-Operationen.
     // cred.user.getIdToken(true) erzwingt frischen Token + wartet bis er beim Backend gilt.
     return cred.user.getIdToken(true).then(()=>{
+      // 3a: Abgleich gegen Bestand (jetzt eingeloggt -> globalTN lesbar). NUR Erkennung, keine Verknuepfung.
+      return _azubiFindMatch(vorname, nachname, geburtsdatum);
+    }).then(match=>{
+      if(match){
+        return _azubiShowFoundYou(match).then(istIch=>{
+          _linkTnId = istIch ? match.id : null;
+          console.log('[3a] Match:', match, '| das bin ich:', istIch, '| _linkTnId:', _linkTnId, '(3a: noch keine Verknuepfung – normale Neu-Anlage)');
+        });
+      } else {
+        _linkTnId = null;
+        console.log('[3a] kein eindeutiger Match – normale Neu-Anlage');
+      }
+    }).then(()=>{
       // Kursinfo für History laden
       return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get();
     }).then(kDoc=>{
@@ -7125,5 +7178,21 @@ window.addEventListener('load',()=>{
 });
 
 </script>
+<!-- 3a: "Wir haben dich gefunden" Modal (schliesst NICHT per Overlay-Klick, nur ueber Buttons) -->
+<div id="foundYouModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;align-items:center;justify-content:center;padding:18px">
+  <div style="background:#fff;border-radius:16px;max-width:380px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Sora',sans-serif">
+    <div style="background:linear-gradient(135deg,#2563eb,#059669);color:#fff;padding:16px 18px;font-size:1.05rem;font-weight:800">🔗 Wir haben dich gefunden!</div>
+    <div style="padding:18px">
+      <div style="font-size:.8rem;color:#475569;margin-bottom:12px">Dein Bildungszentrum hat dich bereits hinterlegt. Bist du das?</div>
+      <div style="background:#f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:16px">
+        <div style="font-size:1rem;font-weight:800;color:#111827" id="fyName">—</div>
+        <div style="font-size:.78rem;color:#475569;margin-top:4px">Beruf: <span id="fyBeruf">—</span></div>
+        <div style="font-size:.78rem;color:#475569">Betrieb: <span id="fyFirma">—</span></div>
+      </div>
+      <button onclick="_fyAnswer(true)" style="width:100%;padding:12px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:8px">✓ Ja, das bin ich</button>
+      <button onclick="_fyAnswer(false)" style="width:100%;padding:12px;background:#e5e7eb;color:#374151;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Das bin ich nicht</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
