@@ -7126,6 +7126,14 @@ function openTNProfile(tnId){
   } else {
     html+='<div class="profile-field"><span class="pf-label">DSGVO</span><span style="color:#ef4444;font-weight:600">⚠ Keine Zustimmung</span></div>';
   }
+  // Schritt 3 – Selbst-Verknuepfung: Status + Admin-Reset (VP schreibt als Admin)
+  if(t.verknuepftUid){
+    const frei = t.verknuepftFreigegebenAm
+      ? ('freigegeben am '+new Date(t.verknuepftFreigegebenAm).toLocaleDateString('de-DE'))
+      : 'wartet auf Ausbilder-Freigabe';
+    html+='<div class="profile-field"><span class="pf-label">Verknüpfung</span><span style="color:#0d9488;font-weight:600">🔗 '+esc(frei)+'</span></div>';
+    html+='<button class="btn-sm btn-bad" onclick="tnVerknuepfungReset(\''+tnId+'\')" style="margin-top:6px;font-size:.65rem;padding:5px 10px" title="Selbst-Verknuepfung zuruecksetzen (Admin)">🔓 Verknüpfung zurücksetzen</button>';
+  }
   if(t.verkuerzer||t.wiederholer){
     html+='<div class="profile-field"><span class="pf-label">Sonderstatus</span><span>'+
       (t.verkuerzer?'<span style="background:rgba(99,102,241,.12);color:#6366f1;padding:2px 7px;border-radius:8px;font-size:.7rem;font-weight:700">Verkuerzer</span> ':'')+
@@ -7289,6 +7297,22 @@ function loadTNProfileAttendance(tnId, kursId){
           '</div>'+
         '</div>';
     }).catch(()=>{});
+}
+function tnVerknuepfungReset(tnId){
+  const t=_globalTN.find(x=>x.id===tnId); if(!t) return;
+  const nm=((t.vorname||'')+' '+(t.nachname||'')).trim();
+  if(!confirm('Verknüpfung von "'+nm+'" zurücksetzen?\n\nDer Datensatz wird wieder frei: Login (E-Mail) und Claim des aktuell verknüpften Kontos werden entfernt. Der richtige Azubi kann sich danach neu verknüpfen.\n\nStammdaten, Noten und Anwesenheit bleiben erhalten.')) return;
+  const del=firebase.firestore.FieldValue.delete();
+  db.collection('globalTN').doc(tnId).update({
+    verknuepftUid: del,
+    verknuepftAm: del,
+    verknuepftFreigegebenAm: del,
+    email: del,
+    bestaetigungAngefordert: del
+  }).then(()=>{
+    toast('🔓 Verknüpfung zurückgesetzt – Datensatz ist wieder frei');
+    closeTNModal();
+  }).catch(err=>{ toast('Fehler: '+err.message,'bad'); });
 }
 function closeTNModal(){document.getElementById('tnProfileModal').classList.remove('open');}
 
