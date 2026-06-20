@@ -2130,14 +2130,40 @@ function submitJoinRegistration(){
     }).then(kDoc=>{
       const kd=kDoc.exists?kDoc.data():{};
       _kursNameForMail = kd.name||kd.lehrgangsart||'Lehrgang';
-      tnData.kursHistory=[{
+      const _kh={
         kursId: _joinKursId,
         kursName: _kursNameForMail,
         von: kd.von||'',
         bis: kd.bis||'',
         addedAt: Date.now()
-      }];
-      // Direkt neuen TN anlegen (kein where-Query mehr - Rules erlauben create einfacher als update von vielen Feldern)
+      };
+      if(_linkTnId){
+        // 3b: VERKNUEPFEN mit bestehendem Bestand-TN statt Neu-Anlage.
+        // Variante A: Stammdaten (Name/Beruf/Betrieb/Geb/Lehrjahr) bleiben UNVERAENDERT –
+        // nur Login/Kontakt/Kurs + Claim-Marker werden gesetzt. Login-Mail = email (findTN!).
+        const linkData={
+          email: email,
+          kontaktEmail: email,
+          kontaktTelefon: telefon,
+          aktiverKursId: _joinKursId,
+          kursHistory: firebase.firestore.FieldValue.arrayUnion(_kh),
+          verknuepftUid: uid,
+          verknuepftAm: Date.now(),
+          bestaetigungAngefordert: true,
+          dsgvoZustimmung: tnData.dsgvoZustimmung
+        };
+        return db.collection('globalTN').doc(_linkTnId).update(linkData)
+          .then(()=>{ console.log('[3b] verknuepft mit Bestand-TN', _linkTnId); return {id:_linkTnId}; })
+          .catch(err=>{
+            // Behelfsbruecke: Rules lehnen ab / Datensatz inzwischen beansprucht -> normal neu anlegen
+            console.warn('[3b] Verknuepfung fehlgeschlagen -> Behelfsbruecke (Neu-Anlage):', err);
+            _linkTnId=null;
+            tnData.kursHistory=[_kh];
+            return db.collection('globalTN').add(tnData);
+          });
+      }
+      // Kein Match / "das bin ich nicht": Behelfsbruecke = neuer TN wie bisher
+      tnData.kursHistory=[_kh];
       return db.collection('globalTN').add(tnData);
     }).then(ref=>{
       // 3. In Kurs-TN-Subcollection eintragen — vorher pruefen ob schon ein (manueller) TN

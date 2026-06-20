@@ -130,6 +130,15 @@ service cloud.firestore {
       allow delete: if request.auth != null;
       // Selbstregistrierung + manuelles Anlegen
       allow create: if request.auth != null;
+      // Schritt 3 – Selbst-Verknuepfung (Claim) eines UNBEANSPRUCHTEN Bestand-TN:
+      // nur auf eigene UID, nur mit eigener Login-Mail, nur diese Felder, nur wenn noch frei.
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['email','kontaktEmail','kontaktTelefon','aktiverKursId','kursHistory','verknuepftUid','verknuepftAm','bestaetigungAngefordert','dsgvoZustimmung']
+        )
+        && (!('verknuepftUid' in resource.data) || resource.data.verknuepftUid == null)
+        && request.resource.data.verknuepftUid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email;
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'wiederholer']);
       allow update: if request.auth != null
