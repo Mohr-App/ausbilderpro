@@ -7613,6 +7613,33 @@ async function appReset(){
 // Schritt 2: Cleanup - entfernt Geister + kuerzt Vollnamen
 
 // ─── TN DETAIL ───
+// ── Schritt 3c: Ausbilder-Freigabe für selbst-verknuepfte / selbst-registrierte TN ──
+function _tnFreigabeCheck(tnId, t){
+  const box=document.getElementById('tnFreigabeBox'); if(!box||!_db) return;
+  const kursId=(curInst()&&curInst().sharedKursId)||t.aktiverKursId||null;
+  if(!kursId) return;
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId).get().then(s=>{
+    const d=s.exists?s.data():{};
+    if(d.bestaetigungAngefordert && !d.bestaetigtAm){
+      const name=((t.vorname||'')+' '+(t.nachname||'')).trim();
+      const claim = t.verknuepftUid ? 'möchte sich mit diesem Datensatz verbinden (Selbst-Zuordnung per App)' : 'hat sich selbst per App angemeldet';
+      box.innerHTML='<div style="margin-bottom:12px;padding:10px 12px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.3);border-radius:10px">'
+        +'<div style="font-size:.72rem;font-weight:800;color:#dc2626;margin-bottom:6px">⏳ Wartet auf deine Freigabe</div>'
+        +'<div style="font-size:.68rem;color:#374151;margin-bottom:8px">'+esc(name)+' '+claim+'. Bestätige nur, wenn du diese Person kennst.</div>'
+        +'<button onclick="tnFreigeben(\''+tnId+'\',\''+kursId+'\')" style="width:100%;padding:10px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Freigeben</button>'
+        +'</div>';
+    }
+  }).catch(()=>{});
+}
+function tnFreigeben(tnId, kursId){
+  if(!_db||!tnId||!kursId) return;
+  const von=(_auth&&_auth.currentUser&&_auth.currentUser.email)?_auth.currentUser.email.toLowerCase():'';
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId)
+    .update({bestaetigtAm:Date.now(), bestaetigtVon:von})
+    .then(()=>{ toast('✓ Freigegeben'); var m=document.getElementById('tnDetailModal'); if(m) m.classList.remove('open'); })
+    .catch(err=>{ alert('Freigabe fehlgeschlagen: '+err.message); });
+}
+
 function openTnDetail(tnId){
   if(!_db||!tnId) return;
   document.getElementById('tnDetailTitle').textContent='👤 Teilnehmer';
@@ -7628,6 +7655,7 @@ function openTnDetail(tnId){
       +'<div style="width:48px;height:48px;border-radius:50%;background:rgba(59,130,246,.15);display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;color:var(--acc);flex-shrink:0;border:2px solid rgba(59,130,246,.3)">'+esc(init)+'</div>'
       +'<div><div style="font-size:1rem;font-weight:800;color:var(--tx)">'+esc(name)+'</div>'
       +'<div style="font-size:.7rem;color:var(--mu)">'+(t.beruf||'')+(t.ausbjahr?' · '+t.ausbjahr+'. Lehrjahr':'')+'</div></div></div>';
+    html+='<div id="tnFreigabeBox"></div>';
     function field(label,val,icon){
       if(!val) return '';
       return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(59,130,246,.03);border:1px solid rgba(59,130,246,.08);border-radius:8px;margin-bottom:5px">'
@@ -7684,6 +7712,7 @@ function openTnDetail(tnId){
     }
     html+='<button title="✕ Aus Kurs entfernen" onclick="deleteTnKomplett(\''+tnId+'\');document.getElementById(\'tnDetailModal\').classList.remove(\'open\')" style="margin-top:12px;width:100%;padding:8px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:8px;color:#dc2626;font-size:.7rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✕ Aus Kurs entfernen</button>';
     document.getElementById('tnDetailBody').innerHTML=html;
+    try{ _tnFreigabeCheck(tnId, t); }catch(e){ console.warn('Freigabe-Check:',e); }
   }).catch(err=>{
     document.getElementById('tnDetailBody').innerHTML='<div class="pool-empty">Fehler: '+esc(err.message)+'</div>';
   });
