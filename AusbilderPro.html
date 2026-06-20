@@ -7614,7 +7614,7 @@ async function appReset(){
 
 // ─── TN DETAIL ───
 // ── Schritt 3c/3d: Ausbilder-Freigabe (+ heute anwesend) für selbst-verknuepfte / selbst-registrierte TN ──
-let _freigabeName='';
+let _freigabeName='', _freigabeGeb='', _freigabeFirma='';
 function _tnFreigabeCheck(tnId, t){
   const box=document.getElementById('tnFreigabeBox'); if(!box||!_db) return;
   const kursId=(curInst()&&curInst().sharedKursId)||t.aktiverKursId||null;
@@ -7623,7 +7623,7 @@ function _tnFreigabeCheck(tnId, t){
     const d=s.exists?s.data():{};
     if(d.bestaetigungAngefordert && !d.bestaetigtAm){
       const name=((t.vorname||'')+' '+(t.nachname||'')).trim();
-      _freigabeName=name;
+      _freigabeName=name; _freigabeGeb=t.geburtsdatum||''; _freigabeFirma=t.firma||'';
       const vk = t.verknuepftUid ? 1 : 0;
       const claim = vk ? 'möchte sich mit diesem Datensatz verbinden (Selbst-Zuordnung per App)' : 'hat sich selbst per App angemeldet';
       box.innerHTML='<div style="margin-bottom:12px;padding:10px 12px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.3);border-radius:10px">'
@@ -7637,6 +7637,14 @@ function _tnFreigabeCheck(tnId, t){
 }
 function tnFreigeben(tnId, kursId, istVerknuepft){
   if(!_db||!tnId||!kursId) return;
+  if(istVerknuepft){
+    const ok=confirm('Verknüpfung freigeben?\n\nDu bestätigst, dass DIESE Person dein Azubi ist:\n\n'
+      +(_freigabeName||'?')+'\n'
+      +'geb. '+(_freigabeGeb?fmtDE(_freigabeGeb):'?')+'\n'
+      +(_freigabeFirma||'')+'\n\n'
+      +'Nur freigeben, wenn du sicher bist. Eine falsche Freigabe ist später nur über die Verwaltung korrigierbar.');
+    if(!ok) return;
+  }
   const von=(_auth&&_auth.currentUser&&_auth.currentUser.email)?_auth.currentUser.email.toLowerCase():'';
   const kursRef=_db.collection('shared').doc('kurse').collection('list').doc(kursId);
   kursRef.collection('teilnehmer').doc(tnId)
