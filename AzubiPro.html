@@ -181,26 +181,30 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="login-sub">Lehrgang beitreten</div>
     <div id="joinKursInfo" style="margin-bottom:12px;padding:10px 14px;background:rgba(16,185,129,.08);border:1.5px solid rgba(16,185,129,.25);border-radius:10px;font-size:.78rem;text-align:center"></div>
 
-    <!-- INSTALL-HINWEIS (kontextsensitiv für iOS / Android / Desktop) -->
-    <div id="joinInstallHint" style="display:none;margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(5,150,105,.06));border:1.5px solid rgba(37,99,235,.2);border-radius:10px;font-size:.72rem;line-height:1.5;color:var(--tx)">
-      <div style="font-weight:700;color:#2563eb;margin-bottom:4px">📱 Tipp: AzubiPro aufs Handy</div>
-      <div id="joinInstallHintBody" style="color:var(--mu)"></div>
-      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-        <button id="joinInstallBtn" onclick="joinDoInstall()" style="background:#2563eb;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:.68rem;font-weight:700;cursor:pointer;display:none">＋ Aufs Handy hinzufügen</button>
-        <button onclick="joinDismissInstall()" style="background:transparent;color:var(--mu);border:1px solid var(--brd);padding:6px 12px;border-radius:6px;font-size:.66rem;cursor:pointer">Später</button>
-      </div>
-    </div>
-
     <!-- LOGIN (oben - schnell für bestehende User) -->
     <div id="joinLoginSection">
-      <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px;text-align:center">Bereits ein Konto?</div>
-      <div><label class="fl">E-Mail</label><input class="fi" type="email" id="jLoginEmail" placeholder="deine@email.de" autocomplete="email"></div>
-      <div style="margin-top:6px"><label class="fl">Passwort</label><div style="position:relative;margin-bottom:10px"><input class="fi" type="password" id="jLoginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitJoinLogin()" style="padding-right:40px;box-sizing:border-box;margin-bottom:0"><button type="button" id="jLoginPassEye" title="Anzeigen / Verbergen" onclick="togglePwVis('jLoginPass','jLoginPassEye')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:1.05rem;padding:4px;line-height:1">&#128065;</button></div></div>
-      <div class="err" id="jLoginErr"></div>
-      <button class="btn" onclick="submitJoinLogin()" style="margin-top:8px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Anmelden & beitreten">Anmelden & Lehrgang beitreten</button>
-      <div style="margin-top:14px;border-top:1px solid var(--brd);padding-top:12px;text-align:center">
-        <div style="font-size:.68rem;color:var(--mu);font-weight:700;margin-bottom:8px">Noch kein Konto?</div>
-        <button class="btn" onclick="startJoinWizard()" style="background:linear-gradient(135deg,#059669,#10b981)" title="Schritt-für-Schritt-Registrierung starten">✨ Jetzt registrieren</button>
+      <!-- AUSWAHL: erstes Mal vs. schon dagewesen -->
+      <div id="joinChoice">
+        <button class="btn" onclick="startJoinWizard()" style="background:linear-gradient(135deg,#059669,#10b981)" title="Zum ersten Mal hier">✨ Erstes Mal hier</button>
+        <button class="btn" onclick="joinShowLogin()" style="margin-top:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Schon mal hier gewesen">Schon mal hier gewesen</button>
+        <div style="font-size:.66rem;color:var(--mu);text-align:center;margin-top:12px;line-height:1.5">Neu hier? Tippe „Erstes Mal hier" – wir richten alles für dich ein.</div>
+      </div>
+      <!-- LOGIN-FORMULAR (nur nach „schon dagewesen") -->
+      <div id="joinLoginForm" style="display:none">
+        <div><label class="fl">E-Mail</label><input class="fi" type="email" id="jLoginEmail" placeholder="deine@email.de" autocomplete="email"></div>
+        <div style="margin-top:6px"><label class="fl">Passwort</label><div style="position:relative;margin-bottom:10px"><input class="fi" type="password" id="jLoginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitJoinLogin()" style="padding-right:40px;box-sizing:border-box;margin-bottom:0"><button type="button" id="jLoginPassEye" title="Anzeigen / Verbergen" onclick="togglePwVis('jLoginPass','jLoginPassEye')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:1.05rem;padding:4px;line-height:1">&#128065;</button></div></div>
+        <div class="err" id="jLoginErr"></div>
+        <button class="btn" onclick="submitJoinLogin()" style="margin-top:8px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Anmelden & beitreten">Anmelden & Lehrgang beitreten</button>
+        <button onclick="joinBackToChoice()" style="margin-top:10px;width:100%;background:none;border:none;color:var(--mu);font-size:.72rem;cursor:pointer;text-decoration:underline">← zurück</button>
+      </div>
+      <!-- INSTALL-HINWEIS unten, dezent -->
+      <div id="joinInstallHint" style="display:none;margin-top:16px;padding:12px 14px;background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(5,150,105,.06));border:1.5px solid rgba(37,99,235,.2);border-radius:10px;font-size:.72rem;line-height:1.5;color:var(--tx)">
+        <div style="font-weight:700;color:#2563eb;margin-bottom:4px">📱 Tipp: AzubiPro aufs Handy</div>
+        <div id="joinInstallHintBody" style="color:var(--mu)"></div>
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+          <button id="joinInstallBtn" onclick="joinDoInstall()" style="background:#2563eb;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:.68rem;font-weight:700;cursor:pointer;display:none">＋ Aufs Handy hinzufügen</button>
+          <button onclick="joinDismissInstall()" style="background:transparent;color:var(--mu);border:1px solid var(--brd);padding:6px 12px;border-radius:6px;font-size:.66rem;cursor:pointer">Später</button>
+        </div>
       </div>
     </div>
 
@@ -1870,9 +1874,21 @@ function startJoinWizard(){
   showWizStep(1);
 }
 
+function joinShowLogin(){
+  var c=document.getElementById('joinChoice'); if(c) c.style.display='none';
+  var f=document.getElementById('joinLoginForm'); if(f) f.style.display='block';
+  var e=document.getElementById('jLoginEmail'); if(e) e.focus();
+}
+function joinBackToChoice(){
+  var f=document.getElementById('joinLoginForm'); if(f) f.style.display='none';
+  var c=document.getElementById('joinChoice'); if(c) c.style.display='block';
+}
 function wizCancel(){
   document.getElementById('joinWizard').style.display='none';
   document.getElementById('joinLoginSection').style.display='block';
+  // zurueck zur Auswahl (nicht direkt ins Login-Formular)
+  var c=document.getElementById('joinChoice'); if(c) c.style.display='block';
+  var f=document.getElementById('joinLoginForm'); if(f) f.style.display='none';
   // Felder NICHT leeren - falls User abgebrochen ist und nochmal versucht
 }
 
