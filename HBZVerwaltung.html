@@ -1207,6 +1207,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             </div>
             <div class="scard-body" onclick="event.stopPropagation()">
               <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px">Test-Accounts und deren gesamte Daten löschen: globalTN + Sub-Collections (Zeiterfassung, Aufträge, Urlaub, Meldungen, Dokumente, FirmaHistorie, Messages, Baustellen) + users-Doc + Sub-Collections (data, belege, courseDocs, files, seatDocs) + Kurs-Teilnahmen. Auth-Account muss danach manuell in der Firebase Console gelöscht werden.</div>
+              <input type="text" id="cleanupSearch" oninput="filterCleanupList()" placeholder="🔍 Nach Name oder E-Mail suchen…" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:8px 10px;border:1px solid var(--brd);border-radius:8px;font-size:.74rem;font-family:'Sora',sans-serif">
               <div id="cleanupList" style="max-height:300px;overflow-y:auto"><div class="empty">Lädt...</div></div>
               <!-- Zusatz-Optionen -->
               <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;padding:8px 10px;background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.12);border-radius:6px">
@@ -3196,7 +3197,7 @@ function loadCleanupList(){
       const label=roleLabels[a.role]||a.role;
       const isSelf=key===_uid;
       const displayName=a.tnName||a.name;
-      html+='<label style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid rgba(0,0,0,.04);cursor:'+(isSelf?'not-allowed':'pointer')+';opacity:'+(isSelf?'.5':'1')+'">'
+      html+='<label data-search="'+esc(((displayName||'')+' '+(a.email||'')).toLowerCase())+'" style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid rgba(0,0,0,.04);cursor:'+(isSelf?'not-allowed':'pointer')+';opacity:'+(isSelf?'.5':'1')+'">'
         +'<input type="checkbox" class="cleanup-cb" value="'+esc(key)+'" data-uid="'+esc(a.uid)+'" data-tnid="'+esc(a.tnId||'')+'" data-email="'+esc(a.email||'')+'"'+(isSelf?' disabled':'')+' onchange="updateCleanupBtn()" style="accent-color:#ef4444;width:16px;height:16px">'
         +'<span style="padding:2px 6px;background:'+col+'15;color:'+col+';border-radius:4px;font-size:.52rem;font-weight:700;min-width:60px;text-align:center">'+label+'</span>'
         +'<span style="flex:1;font-size:.72rem;font-weight:600">'+esc(displayName)+'</span>'
@@ -3205,7 +3206,25 @@ function loadCleanupList(){
         +'</label>';
     });
     el.innerHTML=html;
+    filterCleanupList();
   }).catch(err=>{el.innerHTML='<div class="empty" style="color:#ef4444">Fehler: '+err.message+'</div>';});
+}
+
+function filterCleanupList(){
+  const q=(document.getElementById('cleanupSearch')?.value||'').trim().toLowerCase();
+  const rows=document.querySelectorAll('#cleanupList label');
+  let sicht=0;
+  rows.forEach(r=>{
+    const hit=!q||(r.getAttribute('data-search')||'').includes(q);
+    r.style.display=hit?'flex':'none';
+    if(hit) sicht++;
+  });
+  const el=document.getElementById('cleanupList');
+  let hint=document.getElementById('cleanupNoHit');
+  if(q && sicht===0){
+    if(!hint){ hint=document.createElement('div'); hint.id='cleanupNoHit'; hint.className='empty'; el.appendChild(hint); }
+    hint.textContent='Kein Treffer für „'+q+'"';
+  } else if(hint){ hint.remove(); }
 }
 
 function updateCleanupBtn(){
