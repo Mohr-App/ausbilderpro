@@ -2020,6 +2020,14 @@ document.addEventListener('keydown', e=>{
 let _linkTnId = null;
 let _foundYouResolve = null;
 function _fyNrm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function _normGeb(s){
+  s=String(s||'').trim(); if(!s) return '';
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);            // ISO YYYY-M-D
+  if(m) return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  m=s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);              // DD.MM.YYYY
+  if(m) return m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);
+  return s;
+}
 function _fyTokset(vn,nn){ return _fyNrm((vn||'')+' '+(nn||'')).split(' ').filter(t=>t.length>1); }
 function _fyNameMatch(aVn,aNn,bVn,bNn){
   const A=new Set(_fyTokset(aVn,aNn)); const B=_fyTokset(bVn,bNn);
@@ -2052,6 +2060,20 @@ function _azubiShowFoundYou(m){
     document.getElementById('foundYouModal').style.display='flex';
   });
 }
+let _noMatchResolve = null;
+function _azubiShowNoMatch(vn,nn,geb){
+  return new Promise(res=>{
+    _noMatchResolve=res;
+    document.getElementById('nmName').textContent=((vn||'')+' '+(nn||'')).trim();
+    document.getElementById('nmGeb').textContent= geb ? geb.split('-').reverse().join('.') : '—';
+    document.getElementById('noMatchModal').style.display='flex';
+  });
+}
+function _nmAnswer(weiter){
+  document.getElementById('noMatchModal').style.display='none';
+  const r=_noMatchResolve; _noMatchResolve=null;
+  if(r) r(weiter);
+}
 function _fyAnswer(istIch){
   document.getElementById('foundYouModal').style.display='none';
   const r=_foundYouResolve; _foundYouResolve=null;
@@ -2067,7 +2089,7 @@ function submitJoinRegistration(){
   const beruf=fachSel&&fachSel.value?fachSel.value:(berufSel?berufSel.value:'');
   const berufGruppe=berufSel?berufSel.value:'';
   const ausbjahr=document.getElementById('jLehrjahr').value||'';
-  const geburtsdatum=(document.getElementById('jGeburt').value||'').trim();
+  const geburtsdatum=_normGeb(document.getElementById('jGeburt').value||'');
   const email=(document.getElementById('jEmail').value||'').trim().toLowerCase();
   const telefon=(document.getElementById('jTelefon').value||'').trim();
   const passwort=document.getElementById('jPasswort').value||'';
@@ -2075,7 +2097,15 @@ function submitJoinRegistration(){
   errEl.textContent='';
 
   if(!vorname||!nachname){errEl.textContent='Bitte Vor- und Nachname eingeben';return;}
+  if(!beruf){errEl.textContent='Bitte Beruf auswählen';return;}
   if(!firma){errEl.textContent='Bitte Betrieb angeben';return;}
+  // Geburtsdatum ist Pflicht – ohne ihn kann die Zuordnung (Match) nicht funktionieren.
+  // Finale Schranke unabhängig von der Schritt-Navigation (alter Cache / Enter / Direktaufruf).
+  if(!geburtsdatum){errEl.textContent='Bitte Geburtsdatum eintragen';return;}
+  {
+    const _d=new Date(geburtsdatum);
+    if(isNaN(_d.getTime())||_d>new Date()||_d.getFullYear()<1900){errEl.textContent='Bitte ein gültiges Geburtsdatum eintragen';return;}
+  }
   if(!email){errEl.textContent='Bitte E-Mail eingeben';return;}
   if(passwort.length<6){errEl.textContent='Passwort muss mindestens 6 Zeichen haben';return;}
   if(!document.getElementById('jDsgvo')?.checked){errEl.textContent='Bitte Datenschutzerklärung und Nutzungsbedingungen zustimmen';return;}
@@ -2148,8 +2178,14 @@ function submitJoinRegistration(){
           console.log('[3a] Match:', match, '| das bin ich:', istIch, '| _linkTnId:', _linkTnId, '(3a: noch keine Verknuepfung – normale Neu-Anlage)');
         });
       } else {
-        _linkTnId = null;
-        console.log('[3a] kein eindeutiger Match – normale Neu-Anlage');
+        // Kein Treffer -> Kontrolldialog: Name/Geburtsdatum prüfen (Tippfehler abfangen)
+        return _azubiShowNoMatch(vorname, nachname, geburtsdatum).then(weiter=>{
+          if(!weiter){
+            const ab=new Error('zurueck-korrigieren'); ab.code='custom/zurueck-korrigieren'; throw ab;
+          }
+          _linkTnId = null;
+          console.log('[3a] kein Match – Azubi bestätigt Fortfahren – Behelfsbrücke');
+        });
       }
     }).then(()=>{
       // Kursinfo für History laden
@@ -2260,6 +2296,15 @@ function submitJoinRegistration(){
   }).catch(err=>{
     _registering=false;
     _regDone();
+    if(err && err.code==='custom/zurueck-korrigieren'){
+      // Azubi will Name/Geburtsdatum korrigieren. Auth-Konto bleibt bestehen und wird
+      // bei korrigierter Wiederholung über den email-already-in-use -> signIn-Pfad wiederverwendet.
+      _wizStep=1; showWizStep(1);
+      errEl.style.color='var(--bad)';
+      errEl.textContent='Bitte Name und Geburtsdatum prüfen und erneut absenden.';
+      var _vn=document.getElementById('jVorname'); if(_vn) _vn.focus();
+      return;
+    }
     errEl.style.color='var(--bad)';
     console.error('Registrierung-Fehler:', err.code, err.message, err);
     const map={
@@ -7261,6 +7306,20 @@ window.addEventListener('load',()=>{
       <label style="display:flex;gap:8px;align-items:flex-start;font-size:.74rem;color:#374151;margin-bottom:12px;cursor:pointer;line-height:1.4"><input type="checkbox" id="fyConfirmChk" onchange="var b=document.getElementById('fyYesBtn');b.disabled=!this.checked;b.style.opacity=this.checked?'1':'.5'" style="margin-top:2px;flex-shrink:0"><span>Ich bestätige, dass dies meine echten Daten sind und ich diese Person bin.</span></label>
       <button id="fyYesBtn" onclick="_fyAnswer(true)" disabled style="width:100%;padding:12px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:8px;opacity:.5">✓ Ja, das bin ich</button>
       <button onclick="_fyAnswer(false)" style="width:100%;padding:12px;background:#e5e7eb;color:#374151;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Das bin ich nicht</button>
+    </div>
+  </div>
+</div>
+<div id="noMatchModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;align-items:center;justify-content:center;padding:18px">
+  <div style="background:#fff;border-radius:16px;max-width:380px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Sora',sans-serif">
+    <div style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;padding:16px 18px;font-size:1.05rem;font-weight:800">⚠️ Nicht in der Liste gefunden</div>
+    <div style="padding:18px">
+      <div style="font-size:.8rem;color:#475569;margin-bottom:12px">Wir konnten dich nicht in der Teilnehmerliste finden. Bitte prüfe, ob <b>Name</b> und <b>Geburtsdatum</b> genau stimmen – schon ein Tippfehler verhindert die Zuordnung.</div>
+      <div style="background:#f1f5f9;border-radius:10px;padding:12px 14px;margin-bottom:16px">
+        <div style="font-size:1rem;font-weight:800;color:#111827" id="nmName">—</div>
+        <div style="font-size:.78rem;color:#475569;margin-top:4px">geb. <span id="nmGeb">—</span></div>
+      </div>
+      <button onclick="_nmAnswer(false)" style="width:100%;padding:12px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:8px">‹ Zurück &amp; korrigieren</button>
+      <button onclick="_nmAnswer(true)" style="width:100%;padding:12px;background:#e5e7eb;color:#374151;border:none;border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Trotzdem fortfahren (ich bin nicht in der Liste)</button>
     </div>
   </div>
 </div>
