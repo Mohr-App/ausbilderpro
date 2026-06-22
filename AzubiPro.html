@@ -1762,7 +1762,9 @@ function submitJoinLogin(){
             kontaktTelefon: tnData.kontaktTelefon||'',
             status: 'active',
             addedAt: Date.now(),
-            bestaetigungAngefordert: true
+            bestaetigungAngefordert: true,
+            kenntnisAm: Date.now(),
+            kenntnisVon: (tnData.kontaktEmail||tnData.email||'').toLowerCase()
           },{merge:true});
       }).then(()=>{
         errEl.style.color='var(--acc)';
@@ -2278,6 +2280,8 @@ function submitJoinRegistration(){
           status: 'active',
           selfRegistered: true,
           bestaetigungAngefordert: true,
+          kenntnisAm: Date.now(),
+          kenntnisVon: email,
           addedAt: Date.now()
         });
         return _kursTnCol.doc(ref.id).set(neu,{merge:true}).then(()=>{
@@ -3134,41 +3138,46 @@ function processJoinUrl(url){
       errEl.style.color='var(--bad)';errEl.textContent='Du bist bereits in diesem Kurs eingetragen';
       return;
     }
-    // Kurshistorie updaten
-    const histEntry={kursId, kursName:kd.name||kd.lehrgangsart||'Lehrgang', von:kd.von||'', bis:kd.bis||'', addedAt:Date.now()};
-    const hist=(_tnData.kursHistory||[]).slice();
-    hist.push(histEntry);
-    return db.collection('globalTN').doc(_tnId).update({
-      aktiverKursId: kursId,
-      kursHistory: hist,
-      wunschSitzplatz: ''
-    }).then(()=>{
-      // In Kurs-TN eintragen
-      return db.collection('shared').doc('kurse').collection('list').doc(kursId)
-        .collection('teilnehmer').doc(_tnId).set({
-          vorname:_tnData.vorname||'',
-          nachname:_tnData.nachname||'',
-          firma:_tnData.firma||'',
-          beruf:_tnData.beruf||'',
-          ausbjahr:_tnData.ausbjahr||'',
-          kontaktEmail:_tnData.kontaktEmail||_tnData.email||'',
-          kontaktTelefon:_tnData.kontaktTelefon||'',
-          status:'active',
-          addedAt:Date.now(),
-          selfRegistered:true,
-          bestaetigungAngefordert:true
-        },{merge:true});
-    }).then(()=>{
-      _tnData.aktiverKursId=kursId;
-      _tnData.kursHistory=hist;
-      _tnData.wunschSitzplatz='';
-      closeQrJoin();
-      toast('✓ Lehrgang beigetreten: '+(kd.name||kd.lehrgangsart||'Kurs'));
-      loadKurse();
-      maybeStartWelcome(kursId);
-      _autoCheckinBeiRegistrierung(kursId);
+    // Schritt 0: bestehender Azubi muss den neuen Lehrgang bestätigen, BEVOR er beitritt
+    _courseConfirmShow(kd).then(ja=>{
+      if(!ja){ errEl.style.color='var(--mu)'; errEl.textContent='Beitritt abgebrochen.'; return; }
+      // Kurshistorie updaten
+      const histEntry={kursId, kursName:kd.name||kd.lehrgangsart||'Lehrgang', von:kd.von||'', bis:kd.bis||'', addedAt:Date.now()};
+      const hist=(_tnData.kursHistory||[]).slice();
+      hist.push(histEntry);
+      db.collection('globalTN').doc(_tnId).update({
+        aktiverKursId: kursId,
+        kursHistory: hist,
+        wunschSitzplatz: ''
+      }).then(()=>{
+        // In Kurs-TN eintragen (kenntnisAm: Azubi hat den Lehrgang gerade bestätigt)
+        return db.collection('shared').doc('kurse').collection('list').doc(kursId)
+          .collection('teilnehmer').doc(_tnId).set({
+            vorname:_tnData.vorname||'',
+            nachname:_tnData.nachname||'',
+            firma:_tnData.firma||'',
+            beruf:_tnData.beruf||'',
+            ausbjahr:_tnData.ausbjahr||'',
+            kontaktEmail:_tnData.kontaktEmail||_tnData.email||'',
+            kontaktTelefon:_tnData.kontaktTelefon||'',
+            status:'active',
+            addedAt:Date.now(),
+            selfRegistered:true,
+            bestaetigungAngefordert:true,
+            kenntnisAm:Date.now(),
+            kenntnisVon:_email
+          },{merge:true});
+      }).then(()=>{
+        _tnData.aktiverKursId=kursId;
+        _tnData.kursHistory=hist;
+        _tnData.wunschSitzplatz='';
+        closeQrJoin();
+        toast('✓ Lehrgang beigetreten: '+(kd.name||kd.lehrgangsart||'Kurs'));
+        loadKurse();
+        _autoCheckinBeiRegistrierung(kursId);
       // Willkommens-Mail an Azubi + Info-Mail an AG (wie beim Ausbilder-manualTNAdd)
       _sendKursBeitrittMails(kd, kursId);
+    });
     });
   }).catch(err=>{
     errEl.style.color='var(--bad)';
@@ -6647,13 +6656,42 @@ function highlightSitzplatzHint(){
   setTimeout(clear, 12000);
 }
 function maybeStartWelcome(kursId){
-  // Pro Kurs einmal zeigen (nicht nur einmal pro Geraet) - so kommt der Wizard bei jedem neuen Kurs
+  // Pro Kurs einmal: serverseitig an kenntnisAm gebunden (geraeteuebergreifend).
+  // kenntnisAm gesetzt -> Kurs bereits bestaetigt -> kein Wizard (Fall 3).
   const kid=kursId||_tnData?.aktiverKursId||'';
-  let seen=false;
-  try{ seen=localStorage.getItem('wcSeen_'+(_tnId||_email)+'_'+kid)==='1'; }catch(e){}
-  if(!seen){ setTimeout(()=>startWelcomeWizard(kid), 400); }
+  if(!kid){ return; }
+  const _localGate=()=>{
+    let seen=false;
+    try{ seen=localStorage.getItem('wcSeen_'+(_tnId||_email)+'_'+kid)==='1'; }catch(e){}
+    if(!seen){ setTimeout(()=>startWelcomeWizard(kid), 400); }
+  };
+  if(!db||!_tnId){ _localGate(); return; }
+  db.collection('shared').doc('kurse').collection('list').doc(kid).collection('teilnehmer').doc(_tnId).get()
+    .then(s=>{ const d=s.exists?s.data():{}; if(d.kenntnisAm){ return; } _localGate(); })
+    .catch(()=>{ _localGate(); });
 }
 function showWelcomeAgain(){ startWelcomeWizard(_tnData?.aktiverKursId||null); }
+
+// ── Kompakte Kurs-Bestätigung (Fall 2: bestehender Azubi tritt neuem Kurs bei) ──
+let _courseConfirmResolve=null;
+function _courseConfirmShow(kd){
+  return new Promise(resolve=>{
+    _courseConfirmResolve=resolve;
+    const box=document.getElementById('ccmKursBox');
+    if(box){
+      box.innerHTML='<div style="font-weight:800;font-size:.92rem;color:#0f172a">'+esc(kd.name||kd.lehrgangsart||'Lehrgang')+'</div>'
+        +((kd.von||kd.bis)?'<div style="font-size:.7rem;color:#64748b;margin-top:4px;font-family:\'JetBrains Mono\',monospace">'+fmtDE(kd.von)+' – '+fmtDE(kd.bis)+'</div>':'')
+        +(kd.ausbilderName?'<div style="font-size:.68rem;color:#64748b;margin-top:2px">Ausbilder: '+esc(kd.ausbilderName)+'</div>':'');
+    }
+    const m=document.getElementById('courseConfirmModal');
+    if(m) m.style.display='flex';
+  });
+}
+function _courseConfirmAnswer(ja){
+  const m=document.getElementById('courseConfirmModal'); if(m) m.style.display='none';
+  const r=_courseConfirmResolve; _courseConfirmResolve=null;
+  if(r) r(!!ja);
+}
 
 function confirmKurs(kursId, kursName){
   if(!confirm('Hiermit bestätige ich, dass ich den Lehrgang "'+kursName+'" zur Kenntnis genommen habe.')) return;
@@ -7341,6 +7379,17 @@ window.addEventListener('load',()=>{
       </div>
       <button onclick="_nmAnswer(false)" style="width:100%;padding:12px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:8px">‹ Zurück &amp; korrigieren</button>
       <button onclick="_nmAnswer(true)" style="width:100%;padding:12px;background:#e5e7eb;color:#374151;border:none;border-radius:10px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Trotzdem fortfahren (ich bin nicht in der Liste)</button>
+    </div>
+  </div>
+</div>
+<div id="courseConfirmModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;align-items:center;justify-content:center;padding:18px">
+  <div style="background:#fff;border-radius:16px;max-width:380px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Sora',sans-serif">
+    <div style="background:linear-gradient(135deg,#2563eb,#059669);color:#fff;padding:16px 18px;font-size:1.05rem;font-weight:800">Lehrgang bestätigen</div>
+    <div style="padding:18px">
+      <div style="font-size:.8rem;color:#475569;margin-bottom:12px">Du besuchst diesen Lehrgang:</div>
+      <div id="ccmKursBox" style="background:#f1f5f9;border-radius:12px;padding:14px;text-align:center;margin-bottom:16px"></div>
+      <button onclick="_courseConfirmAnswer(true)" style="width:100%;padding:12px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:8px">✓ Ja, das ist mein Lehrgang</button>
+      <button onclick="_courseConfirmAnswer(false)" style="width:100%;padding:11px;background:#fff;border:1.5px solid rgba(239,68,68,.4);border-radius:10px;color:#dc2626;font-size:.8rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Das ist nicht mein Lehrgang</button>
     </div>
   </div>
 </div>
