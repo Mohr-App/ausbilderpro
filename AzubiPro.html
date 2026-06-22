@@ -6265,7 +6265,7 @@ function loadKurse(){
     let html='';
 
     // Unbestätigte Kurse ganz oben
-    const unconfirmed=_kurse.filter(k=>!k._tnDoc?.bestaetigtAm && (k.von>=today || (k.von&&k.bis&&today>=k.von&&today<=k.bis)));
+    const unconfirmed=_kurse.filter(k=>!k._tnDoc?.kenntnisAm && (k.von>=today || (k.von&&k.bis&&today>=k.von&&today<=k.bis)));
     // Roter Punkt am UEBL-Nav-Button
     const badge=document.getElementById('navUeblBadge');
     if(badge){
@@ -6361,7 +6361,7 @@ function loadKurse(){
       let st='beendet', stLabel='Beendet';
       if(k.von&&k.bis&&today>=k.von&&today<=k.bis){ st='laufend'; stLabel='● Laufend'; }
       else if(k.von&&k.von>today){ st='geplant'; stLabel='◐ Geplant'; }
-      const confirmed=!!k._tnDoc?.bestaetigtAm;
+      const confirmed=!!k._tnDoc?.kenntnisAm;
       html+='<div class="hist-item" style="cursor:pointer" title="Kursdetails öffnen" onclick="showKursDetail(\''+k.id+'\')">';
       html+='<div class="hist-dot" style="background:'+(st==='laufend'?'#10b981':st==='geplant'?'#3b82f6':'#94a3b8')+'"></div>';
       html+='<div style="flex:1"><div class="hist-name">'+esc(k.name||k.lehrgangsart||'?')+(confirmed?'':' ⚠️')+'</div>';
@@ -6580,7 +6580,7 @@ function wcNav(dir){
 function wcConfirmKurs(){
   if(!_wcKursId||!_tnId){ _wcConfirmed=true; _wcAfterConfirm(); return; }
   const ref=db.collection('shared').doc('kurse').collection('list').doc(_wcKursId).collection('teilnehmer').doc(_tnId);
-  ref.set({bestaetigtAm:Date.now(),bestaetigtVon:_email},{merge:true})
+  ref.set({kenntnisAm:Date.now(),kenntnisVon:_email},{merge:true})
     .then(()=>{ _wcConfirmed=true; _wcAfterConfirm(); })
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
@@ -6639,14 +6639,14 @@ function confirmKurs(kursId, kursName){
   if(!_tnId){toast('Fehler: TN nicht zugeordnet','bad');return;}
   const ref=db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(_tnId);
-  ref.update({bestaetigtAm:Date.now(),bestaetigtVon:_email})
+  ref.update({kenntnisAm:Date.now(),kenntnisVon:_email})
     .then(()=>{
       toast('✅ Bestätigt');
       loadKurse();
     })
     .catch(()=>{
       // Doc existiert noch nicht → set
-      ref.set({bestaetigtAm:Date.now(),bestaetigtVon:_email},{merge:true})
+      ref.set({kenntnisAm:Date.now(),kenntnisVon:_email},{merge:true})
         .then(()=>{ toast('✅ Bestätigt'); loadKurse(); })
         .catch(err=>toast('Fehler: '+err.message,'bad'));
     });

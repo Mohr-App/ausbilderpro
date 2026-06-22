@@ -4900,7 +4900,7 @@ function openModal(id){
               +'<div style="flex:1;min-width:0"><div style="font-size:.5rem;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+esc(label)+'</div>'
               +'<div style="font-size:.76rem;color:var(--tx);font-weight:600;word-break:break-word">'+esc(String(val))+'</div></div></div>';
           }
-          let h='<div style="font-size:.58rem;font-weight:700;color:var(--mu);letter-spacing:.06em;margin-bottom:6px">REGISTRIERUNGSDATEN</div>';
+          let h='<div id="seatFreigabeBox"></div><div style="font-size:.58rem;font-weight:700;color:var(--mu);letter-spacing:.06em;margin-bottom:6px">REGISTRIERUNGSDATEN</div>';
           // Typ-Badge: per App registriert vs manuell angelegt
           if(t.selfRegistered===true){
             h+='<div style="margin-bottom:8px;padding:7px 10px;background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.3);border-radius:8px;font-size:.68rem;font-weight:700;color:#059669">✅ Per App registriert (aktives Azubi-Konto)</div>';
@@ -4960,6 +4960,7 @@ function openModal(id){
             h+='<button title="🔧 Admin: Status zurücksetzen" onclick="adminResetTN(\''+resolvedTnId+'\')" style="margin-top:6px;width:100%;padding:8px;background:rgba(124,58,237,.08);border:1.5px solid rgba(124,58,237,.3);border-radius:8px;color:#7c3aed;font-size:.7rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">🔧 Admin: Status zurücksetzen</button>';
           }
           fsInfo.innerHTML=h;
+          try{ _tnFreigabeCheck(resolvedTnId, t, 'seatFreigabeBox'); }catch(e){}
         }).catch(()=>{fsInfo.innerHTML='';fsInfo.style.display='none';});
       } else {
         fsInfo.style.display='none';
@@ -7615,8 +7616,8 @@ async function appReset(){
 // ─── TN DETAIL ───
 // ── Schritt 3c/3d: Ausbilder-Freigabe (+ heute anwesend) für selbst-verknuepfte / selbst-registrierte TN ──
 let _freigabeName='', _freigabeGeb='', _freigabeFirma='';
-function _tnFreigabeCheck(tnId, t){
-  const box=document.getElementById('tnFreigabeBox'); if(!box||!_db) return;
+function _tnFreigabeCheck(tnId, t, boxId){
+  const box=document.getElementById(boxId||'tnFreigabeBox'); if(!box||!_db) return;
   const kursId=(curInst()&&curInst().sharedKursId)||t.aktiverKursId||null;
   if(!kursId) return;
   _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId).get().then(s=>{
@@ -7663,7 +7664,7 @@ function tnFreigeben(tnId, kursId, istVerknuepft){
         return _db.collection('globalTN').doc(tnId).update({verknuepftFreigegebenAm:Date.now()}).catch(()=>{});
       }
     })
-    .then(()=>{ toast('✓ Freigegeben & heute anwesend'); var m=document.getElementById('tnDetailModal'); if(m) m.classList.remove('open'); })
+    .then(()=>{ toast('✓ Freigegeben & heute anwesend'); var m=document.getElementById('tnDetailModal'); if(m) m.classList.remove('open'); var ov=document.getElementById('ov'); if(ov) ov.classList.remove('open'); })
     .catch(err=>{ alert('Freigabe fehlgeschlagen: '+err.message); });
 }
 function tnAblehnen(tnId, kursId, istVerknuepft){
@@ -7681,7 +7682,7 @@ function tnAblehnen(tnId, kursId, istVerknuepft){
     });
   }
   p.then(()=>kursRef.collection('teilnehmer').doc(tnId).delete().catch(()=>{}))
-    .then(()=>{ toast('✕ Abgelehnt'); var m=document.getElementById('tnDetailModal'); if(m) m.classList.remove('open'); })
+    .then(()=>{ toast('✕ Abgelehnt'); var m=document.getElementById('tnDetailModal'); if(m) m.classList.remove('open'); var ov=document.getElementById('ov'); if(ov) ov.classList.remove('open'); })
     .catch(err=>{ alert('Ablehnen fehlgeschlagen: '+err.message+'\n\n(Hinweis: bereits freigegebene Verknüpfungen lassen sich nicht zurücksetzen.)'); });
 }
 
