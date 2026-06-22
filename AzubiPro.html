@@ -3194,12 +3194,16 @@ function _autoJoinScannedKurs(kursId){
   // Schon in diesem Kurs? -> kein Doppel-Beitritt, aber ANWESENHEIT zuverlässig anstoßen
   // (Folgetag-Fall: Azubi scannt am Kurstag seinen laufenden Kurs -> Check-in soll laufen)
   if(_tnData.aktiverKursId===kursId || (_tnData.kursHistory||[]).some(function(h){return h.kursId===kursId;})){
-    if(_tnData.aktiverKursId===kursId){
-      _checkinKursId=kursId;            // sicherstellen, dass der Check-in den richtigen Kurs trifft
-      try{ _tryQRCheckin(); }catch(e){} // aktiv einchecken, unabhängig vom Lade-Timing
-    }
-    toast('Du bist in diesem Lehrgang bereits angemeldet ✓');
-    showPage('uebl');
+    // Erst Lehrgang bestaetigen (kenntnisAm), DANN einchecken - auch bei vom Ausbilder vorsortierten TN.
+    _ensureKenntnis(kursId).then(function(ok){
+      if(!ok){ showPage('uebl'); return; } // abgelehnt -> kein Check-in
+      if(_tnData.aktiverKursId===kursId){
+        _checkinKursId=kursId;            // sicherstellen, dass der Check-in den richtigen Kurs trifft
+        try{ _tryQRCheckin(); }catch(e){} // aktiv einchecken, unabhängig vom Lade-Timing
+      }
+      toast('Du bist in diesem Lehrgang angemeldet ✓');
+      showPage('uebl');
+    });
     return;
   }
   // Echter Neu-Beitritt: hier ist der Check-in noch nicht relevant (erst nach Bestätigung)
@@ -6697,6 +6701,28 @@ function _courseConfirmAnswer(ja){
   const m=document.getElementById('courseConfirmModal'); if(m) m.style.display='none';
   const r=_courseConfirmResolve; _courseConfirmResolve=null;
   if(r) r(!!ja);
+}
+
+// Erzwingt die Lehrgangs-Kenntnisnahme, BEVOR es weitergeht (z.B. Check-in).
+// kenntnisAm gesetzt -> sofort true. Fehlt -> Dialog; "Ja" setzt kenntnisAm + schickt
+// die Willkommens-Mail (einmalig pro Kurs) und liefert true, "Nein" liefert false.
+function _ensureKenntnis(kursId){
+  if(!kursId||!_tnId||!db) return Promise.resolve(true);
+  const tnRef=db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(_tnId);
+  return tnRef.get().then(s=>{
+    const d=s.exists?s.data():{};
+    if(d.kenntnisAm) return true; // schon bestaetigt -> weiter, keine Mail
+    return db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(kc=>{
+      const kd=kc.exists?kc.data():{};
+      return _courseConfirmShow(kd).then(ja=>{
+        if(!ja) return false;
+        return tnRef.set({kenntnisAm:Date.now(),kenntnisVon:_email},{merge:true}).then(()=>{
+          try{ _sendKursBeitrittMails(kd, kursId); }catch(e){}
+          return true;
+        });
+      });
+    });
+  }).catch(()=>true); // Lesefehler -> nicht blockieren
 }
 
 function confirmKurs(kursId, kursName){
