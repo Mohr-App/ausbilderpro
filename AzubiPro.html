@@ -3847,8 +3847,14 @@ function _onQRScanned(data){
 // Lesefehler -> true (nicht blockieren, damit Bestands-Azubis nie haengen).
 function _istFreigegeben(kursId){
   if(!kursId||!_tnId) return Promise.resolve(true);
-  return db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(_tnId).get()
-    .then(s=>{ const d=s.exists?s.data():{}; return !(d.bestaetigungAngefordert && !d.bestaetigtAm); })
+  // Globaler Schalter: ist die Ausbilder-Freigabe NICHT verpflichtend (Default), reicht die Kenntnisnahme -> Einchecken frei.
+  return db.collection('shared').doc('kursSettings').get()
+    .then(cfg=>{
+      const pflicht = cfg.exists && cfg.data().freigabePflicht === true;
+      if(!pflicht) return true;
+      return db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(_tnId).get()
+        .then(s=>{ const d=s.exists?s.data():{}; return !(d.bestaetigungAngefordert && !d.bestaetigtAm); });
+    })
     .catch(()=>true);
 }
 

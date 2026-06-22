@@ -1098,6 +1098,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
               <div class="fg"><label class="fl">Standard-Kurstage pro Lehrgang</label><input class="fi" id="defaultKurstageInp" type="number" min="1" max="30" value="5" placeholder="5" style="max-width:100px" onclick="event.stopPropagation()"></div>
               <div style="font-size:.58rem;color:var(--mu);margin-top:4px">Berufsschultage werden automatisch abgezogen.</div>
               <button class="btn-sm btn-ok" onclick="event.stopPropagation();saveKursSettings()" style="width:100%;margin-top:6px;font-size:.72rem" title="OK">💾 Kurseinstellungen speichern</button>
+              <div style="border-top:1px solid var(--brd);margin:12px 0 8px"></div>
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer" onclick="event.stopPropagation()">
+                <input type="checkbox" id="freigabePflichtChk" onchange="event.stopPropagation();saveFreigabePflicht()" style="margin-top:2px;flex:none">
+                <span><span style="font-weight:700;font-size:.72rem">Ausbilder-Freigabe vor dem Einchecken verpflichtend</span><br><span style="font-size:.58rem;color:var(--mu)">Aus (Standard): Azubis können nach eigener Lehrgangs-Bestätigung sofort einchecken. An: Einchecken erst nach Freigabe durch den Ausbilder.</span></span>
+              </label>
             </div>
           </div>
 
@@ -1685,6 +1690,8 @@ function loadHVKontakt(){
     if(e) e.value=d.hvEmail||'';
     if(kt) kt.value=d.defaultKurstage||5;
     _defaultKurstage=d.defaultKurstage||5;
+    const fp=document.getElementById('freigabePflichtChk');
+    if(fp) fp.checked = (d.freigabePflicht===true);
   }).catch(()=>{});
 }
 function saveHVKontakt(){
@@ -1699,6 +1706,12 @@ function saveKursSettings(){
   const defaultKurstage=parseInt(document.getElementById('defaultKurstageInp')?.value)||5;
   db.collection('shared').doc('kursSettings').set({defaultKurstage},{merge:true})
     .then(()=>toast('Kurseinstellungen gespeichert ✓'))
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+function saveFreigabePflicht(){
+  const an=document.getElementById('freigabePflichtChk')?.checked===true;
+  db.collection('shared').doc('kursSettings').set({freigabePflicht:an},{merge:true})
+    .then(()=>toast(an?'Ausbilder-Freigabe ist jetzt verpflichtend ✓':'Ausbilder-Freigabe ist jetzt optional ✓'))
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 function showChangelog(){
