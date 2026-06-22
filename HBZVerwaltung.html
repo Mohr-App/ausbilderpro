@@ -1103,6 +1103,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                 <input type="checkbox" id="freigabePflichtChk" onchange="event.stopPropagation();saveFreigabePflicht()" style="margin-top:2px;flex:none">
                 <span><span style="font-weight:700;font-size:.72rem">Ausbilder-Freigabe vor dem Einchecken verpflichtend</span><br><span style="font-size:.58rem;color:var(--mu)">Aus (Standard): Azubis können nach eigener Lehrgangs-Bestätigung sofort einchecken. An: Einchecken erst nach Freigabe durch den Ausbilder.</span></span>
               </label>
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-top:10px" onclick="event.stopPropagation()">
+                <input type="checkbox" id="transferMailChk" onchange="event.stopPropagation();saveTransferMail()" style="margin-top:2px;flex:none">
+                <span><span style="font-weight:700;font-size:.72rem">E-Mails beim Zuweisen an Ausbilder verschicken</span><br><span style="font-size:.58rem;color:var(--mu)">Aus (Standard): beim Übertragen eines Kurses gehen keine E-Mails raus (Azubi + AG erhalten ihre Info erst bei der Lehrgangs-Bestätigung). An: Azubi- und AG-Mail sofort beim Zuweisen.</span></span>
+              </label>
             </div>
           </div>
 
@@ -1692,6 +1696,9 @@ function loadHVKontakt(){
     _defaultKurstage=d.defaultKurstage||5;
     const fp=document.getElementById('freigabePflichtChk');
     if(fp) fp.checked = (d.freigabePflicht===true);
+    _transferMail = (d.transferMail===true);
+    const tm=document.getElementById('transferMailChk');
+    if(tm) tm.checked = _transferMail;
   }).catch(()=>{});
 }
 function saveHVKontakt(){
@@ -1712,6 +1719,13 @@ function saveFreigabePflicht(){
   const an=document.getElementById('freigabePflichtChk')?.checked===true;
   db.collection('shared').doc('kursSettings').set({freigabePflicht:an},{merge:true})
     .then(()=>toast(an?'Ausbilder-Freigabe ist jetzt verpflichtend ✓':'Ausbilder-Freigabe ist jetzt optional ✓'))
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+function saveTransferMail(){
+  const an=document.getElementById('transferMailChk')?.checked===true;
+  _transferMail=an;
+  db.collection('shared').doc('kursSettings').set({transferMail:an},{merge:true})
+    .then(()=>toast(an?'E-Mails beim Zuweisen sind jetzt aktiv ✓':'E-Mails beim Zuweisen sind jetzt aus ✓'))
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 function showChangelog(){
@@ -1743,6 +1757,7 @@ let _userRole = null;
 let _email = null;
 let _kurse = [];
 let _defaultKurstage = 5;
+let _transferMail = false;
 let _csvData = [];
 let _selectedKursId = null;
 
@@ -9123,9 +9138,11 @@ function transferEntwurf(kursId){
   confirmMsg+='Folgende Aktionen werden ausgelöst:\n';
   confirmMsg+='• TN werden dem Ausbilder zugeordnet\n';
   confirmMsg+='• App-Benachrichtigung in AzubiPro\n';
-  if(mailCount>0) confirmMsg+='• Willkommens-E-Mail an '+mailCount+' Azubi(s) mit Kurs-Info, App-Link und Installations-Anleitung\n';
-  if(noMailCount>0) confirmMsg+='• '+noMailCount+' TN haben keine E-Mail hinterlegt — keine Mail an diese\n';
-  if(firmenSet.size>0) confirmMsg+='• Info-E-Mail an die Arbeitgeber von '+firmenSet.size+' Firma(n) (sofern registriert)\n';
+  if(_transferMail===true){
+    if(mailCount>0) confirmMsg+='• Willkommens-E-Mail an '+mailCount+' Azubi(s) mit Kurs-Info, App-Link und Installations-Anleitung\n';
+    if(noMailCount>0) confirmMsg+='• '+noMailCount+' TN haben keine E-Mail hinterlegt — keine Mail an diese\n';
+    if(firmenSet.size>0) confirmMsg+='• Info-E-Mail an die Arbeitgeber von '+firmenSet.size+' Firma(n) (sofern registriert)\n';
+  }
   confirmMsg+='\nFortfahren?';
   if(!confirm(confirmMsg)) return;
 
@@ -9246,9 +9263,11 @@ function bldUebertragen(){
   _bldConfirmMsg+='• Neuer Kurs wird angelegt\n';
   _bldConfirmMsg+='• TN werden dem Ausbilder zugeordnet\n';
   _bldConfirmMsg+='• App-Benachrichtigung in AzubiPro\n';
-  if(_bldMailCount>0) _bldConfirmMsg+='• Willkommens-E-Mail an '+_bldMailCount+' Azubi(s) mit Kurs-Info, App-Link und Installations-Anleitung\n';
-  if(_bldNoMailCount>0) _bldConfirmMsg+='• '+_bldNoMailCount+' TN haben keine E-Mail hinterlegt — keine Mail an diese\n';
-  if(_bldFirmenSet.size>0) _bldConfirmMsg+='• Info-E-Mail an die Arbeitgeber von '+_bldFirmenSet.size+' Firma(n) (sofern registriert)\n';
+  if(_transferMail===true){
+    if(_bldMailCount>0) _bldConfirmMsg+='• Willkommens-E-Mail an '+_bldMailCount+' Azubi(s) mit Kurs-Info, App-Link und Installations-Anleitung\n';
+    if(_bldNoMailCount>0) _bldConfirmMsg+='• '+_bldNoMailCount+' TN haben keine E-Mail hinterlegt — keine Mail an diese\n';
+    if(_bldFirmenSet.size>0) _bldConfirmMsg+='• Info-E-Mail an die Arbeitgeber von '+_bldFirmenSet.size+' Firma(n) (sofern registriert)\n';
+  }
   _bldConfirmMsg+='\nFortfahren?';
   if(!confirm(_bldConfirmMsg)) return;
 
@@ -9384,6 +9403,8 @@ function closeAc(dropId){ document.getElementById(dropId).classList.remove('open
 // Schickt jedem TN eine personalisierte Kurs-Zuweisungs-Mail mit App-Link, Installations-Anleitung und Datenschutz-Info
 function notifyTNByEmail(tnIds, kursName, von, bis, ausbilderName){
   if(!db||!tnIds||!tnIds.length) return;
+  // Globaler Schalter: standardmaessig KEINE Mails beim Zuweisen (Azubi+AG erhalten Info erst bei Lehrgangs-Bestaetigung)
+  if(_transferMail!==true) return;
   // TN-Daten zusammensammeln (mit E-Mail)
   const recipients=[];
   tnIds.forEach(id=>{
