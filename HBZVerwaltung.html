@@ -1114,6 +1114,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
               <input type="file" id="bnFileIn" accept=".json" style="display:none" onchange="bnLoadMapping(this.files[0])">
               <div id="bnPreview" style="display:none;margin-top:8px;padding:10px;background:var(--sur2);border-radius:8px;font-size:.66rem;white-space:pre-wrap"></div>
               <button id="bnWriteBtn" class="btn-sm btn-ok" onclick="event.stopPropagation();bnWrite()" style="width:100%;margin-top:6px;font-size:.7rem;display:none">✅ Jetzt schreiben</button>
+              <div style="border-top:1px solid var(--brd);margin:12px 0 8px"></div>
+              <div style="font-weight:700;font-size:.72rem;margin-bottom:4px">🗂 Nicht-mehr-in-Liste verwalten</div>
+              <div style="font-size:.58rem;color:var(--mu);margin-bottom:8px">Zeigt alle als „nicht mehr in Liste" markierten TN und erlaubt das Zurücksetzen. Das Markieren selbst passiert im Import-Trockenlauf.</div>
+              <button class="btn-sm" onclick="event.stopPropagation();fehltVerwalten()" style="width:100%;font-size:.7rem">🗂 Markierte TN anzeigen</button>
             </div>
           </div>
 
@@ -1734,6 +1738,89 @@ function saveTransferMail(){
   db.collection('shared').doc('kursSettings').set({transferMail:an},{merge:true})
     .then(()=>toast(an?'E-Mails beim Zuweisen sind jetzt aktiv ✓':'E-Mails beim Zuweisen sind jetzt aus ✓'))
     .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// ── "Nicht mehr in der Liste": Übersicht / Export / reversible Markierung ──
+let _fehltListe=[];
+function _fehltKursName(kursId){
+  if(!kursId) return '';
+  const k=(_kurse||[]).find(x=>x.id===kursId);
+  return k?(k.name||k.lehrgangsart||''):'';
+}
+function fehltShow(){
+  const body=document.getElementById('fehltBody');
+  if(!_fehltListe.length){ body.innerHTML='<div style="color:var(--mu)">Keine.</div>'; }
+  else{
+    body.innerHTML='<div style="margin-bottom:8px;color:var(--mu);font-size:.66rem">'+_fehltListe.length+' früher importierte TN, die in der geladenen Liste fehlen:</div>'
+      + _fehltListe.map(f=>{
+        const kn=_fehltKursName(f.kursId);
+        return '<div style="padding:6px 0;border-bottom:1px solid var(--brd)"><b>'+esc(f.name)+'</b>'
+          +'<div style="font-size:.64rem;color:var(--mu)">'+esc(f.geb||'– kein Geb')+(f.firma?' · '+esc(f.firma):'')+(kn?' · '+esc(kn):'')+(f.bereitsMarkiert?' · <span style="color:#d97706">bereits markiert</span>':'')+'</div></div>';
+      }).join('');
+  }
+  document.getElementById('fehltModal').classList.add('open');
+}
+function fehltExport(){
+  if(!_fehltListe.length){ toast('Nichts zu exportieren','bad'); return; }
+  const rows=[['Name','Geburtsdatum','Betrieb','Kurs']].concat(
+    _fehltListe.map(f=>[f.name, f.geb||'', f.firma||'', _fehltKursName(f.kursId)])
+  );
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  try{ navigator.clipboard.writeText(csv); }catch(e){}
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='nicht-mehr-in-liste_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast('CSV exportiert + in Zwischenablage kopiert ✓');
+}
+async function fehltMarkieren(){
+  if(!_fehltListe.length){ toast('Nichts zu markieren','bad'); return; }
+  if(!confirm(_fehltListe.length+' TN als „nicht mehr in Liste" markieren?\n\nReversibel – es wird nur ein Etikett gesetzt, nichts gelöscht. Verknüpfung, Kurs, Historie und Login bleiben unberührt.')) return;
+  const stand=new Date().toISOString().slice(0,10);
+  let done=0;
+  for(let i=0;i<_fehltListe.length;i+=450){
+    const chunk=_fehltListe.slice(i,i+450);
+    const batch=db.batch();
+    chunk.forEach(f=>batch.update(db.collection('globalTN').doc(f.id),{nichtInListe:{stand,ts:Date.now()}}));
+    try{ await batch.commit(); done+=chunk.length; }catch(e){ console.warn('fehlt markieren:',e); }
+  }
+  toast(done+' TN markiert ✓');
+  _fehltListe.forEach(f=>f.bereitsMarkiert=true);
+  fehltShow();
+}
+// Verwalten/Zurücksetzen aller markierten TN (Einstellungen)
+function fehltVerwalten(){
+  const marked=(_globalTN||[]).filter(t=>t.nichtInListe).map(t=>({
+    id:t.id, name:((t.vorname||'')+' '+(t.nachname||'')).trim(),
+    geb:t.geburtsdatum||'', firma:t.firma||'', stand:(t.nichtInListe&&t.nichtInListe.stand)||''
+  })).sort((a,b)=>a.name.localeCompare(b.name));
+  const body=document.getElementById('fehltBody');
+  if(!marked.length){ body.innerHTML='<div style="color:var(--mu)">Aktuell sind keine TN als „nicht mehr in Liste" markiert.</div>'; }
+  else{
+    body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="color:var(--mu);font-size:.66rem">'+marked.length+' markierte TN</span>'
+      +'<button class="btn-sm" onclick="fehltResetAlle()" style="font-size:.64rem">Alle zurücksetzen</button></div>'
+      + marked.map(m=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--brd)"><div><b>'+esc(m.name)+'</b><div style="font-size:.64rem;color:var(--mu)">'+esc(m.geb||'–')+(m.firma?' · '+esc(m.firma):'')+(m.stand?' · markiert '+esc(m.stand):'')+'</div></div>'
+        +'<button class="btn-sm" onclick="fehltReset(\''+m.id+'\')" style="font-size:.62rem">Zurücksetzen</button></div>').join('');
+  }
+  document.getElementById('fehltModal').classList.add('open');
+}
+function fehltReset(id){
+  db.collection('globalTN').doc(id).update({nichtInListe:firebase.firestore.FieldValue.delete()})
+    .then(()=>{ const t=(_globalTN||[]).find(x=>x.id===id); if(t) delete t.nichtInListe; toast('Markierung entfernt ✓'); fehltVerwalten(); })
+    .catch(e=>toast('Fehler: '+e.message,'bad'));
+}
+async function fehltResetAlle(){
+  const marked=(_globalTN||[]).filter(t=>t.nichtInListe);
+  if(!marked.length) return;
+  if(!confirm('Bei allen '+marked.length+' TN die Markierung entfernen?')) return;
+  let done=0;
+  for(let i=0;i<marked.length;i+=450){
+    const chunk=marked.slice(i,i+450);
+    const batch=db.batch();
+    chunk.forEach(t=>batch.update(db.collection('globalTN').doc(t.id),{nichtInListe:firebase.firestore.FieldValue.delete()}));
+    try{ await batch.commit(); chunk.forEach(t=>delete t.nichtInListe); done+=chunk.length; }catch(e){ console.warn('reset alle:',e); }
+  }
+  toast(done+' Markierungen entfernt ✓'); fehltVerwalten();
 }
 
 // ── Betriebsnamen-Korrektur (Firma-Feld: Nummer -> echter Name aus Mapping-Datei) ──
@@ -4480,6 +4567,7 @@ function impAnalysiere(){
   // Within-List: bereits in DIESER Datei gesehene Personen (voller Name -> Datums/Mail-Mengen)
   const seen={};
   const perRow=[]; const tippfehler=[]; const unsicher=[]; const ghost=[]; const backfill={}; const abgleich={};
+  const matchedBestandIds=new Set(); // alle Bestands-TN, die von einer Listenzeile getroffen wurden
   let neu=0, schon=0, leer=0, listdub=0;
   for(let i=0;i<_impRawData.length;i++){
     const row=_impRawData[i];
@@ -4507,6 +4595,10 @@ function impAnalysiere(){
         else if(kat!=='tippfehler'){ kat='unsicher'; nameHitGeb=b; }
       }
     }
+    // Getroffene Bestands-IDs merken (auch Namens-Treffer mit abweichendem Geb gelten als "in Liste vorhanden",
+    // damit sie nicht faelschlich als "nicht mehr in Liste" auftauchen)
+    if(hitBest && hitBest.id) matchedBestandIds.add(hitBest.id);
+    if(nameHitGeb && nameHitGeb.id) matchedBestandIds.add(nameHitGeb.id);
     // seen aktualisieren (für Folgezeilen)
     if(!seen[fn]) seen[fn]={gebs:new Set(),emails:new Set()};
     if(geb) seen[fn].gebs.add(geb);
@@ -4527,7 +4619,23 @@ function impAnalysiere(){
     else if(kat==='tippfehler') tippfehler.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', i});
     else if(kat==='unsicher') unsicher.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', i});
   }
-  return {perRow, neu, schon, leer, tippfehler, unsicher, listdub, ghost, backfill, abgleich, gesamt:_impRawData.length};
+  // "Nicht mehr in der Liste": frueher importierte Bestands-TN, die von KEINER Listenzeile getroffen wurden.
+  // Nur importiert:true (manuell/Test/Selbstregistrierer bleiben aussen vor). Rein informativ.
+  const fehlt=[];
+  (_globalTN||[]).forEach(t=>{
+    if(t.importiert!==true) return;
+    if(matchedBestandIds.has(t.id)) return;
+    fehlt.push({
+      id:t.id,
+      name:((t.vorname||'')+' '+(t.nachname||'')).trim(),
+      geb:t.geburtsdatum||'',
+      firma:t.firma||'',
+      kursId:t.aktiverKursId||'',
+      bereitsMarkiert:!!t.nichtInListe
+    });
+  });
+  fehlt.sort((a,b)=>a.name.localeCompare(b.name));
+  return {perRow, neu, schon, leer, tippfehler, unsicher, listdub, ghost, backfill, abgleich, fehlt, gesamt:_impRawData.length};
 }
 function impRenderBericht(a){
   const warn=document.getElementById('impDuplicateWarn');
@@ -4569,6 +4677,13 @@ function impRenderBericht(a){
       return '<b>'+esc(t.name)+'</b> – '+fl;
     }).join('<br>')+'</div></details>';
   }
+  if(a.fehlt && a.fehlt.length){
+    _fehltListe=a.fehlt;
+    h+='<div style="margin-top:10px;padding:8px 10px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.3);border-radius:8px;font-size:.7rem">';
+    h+='<b>'+a.fehlt.length+'</b> früher importierte TN sind <b>nicht</b> in dieser Liste ';
+    h+='<button onclick="fehltShow()" style="margin-left:6px;padding:3px 10px;background:var(--acc);color:#fff;border:none;border-radius:6px;font-size:.66rem;font-weight:700;cursor:pointer">Übersicht & markieren</button>';
+    h+='<div style="font-size:.6rem;color:var(--mu);margin-top:4px">Nur aussagekräftig, wenn dies die vollständige Lehrlingsliste ist.</div></div>';
+  } else { _fehltListe=[]; }
   warn.style.display=''; warn.style.color='var(--tx)';
   warn.style.background='var(--sur2)'; warn.style.borderColor='var(--brd)';
   warn.innerHTML=h;
@@ -10508,6 +10623,20 @@ window.addEventListener('load',()=>{
 <div class="modal" style="max-width:480px">
 <div class="mhd"><div class="mtit">📋 Was ist neu?</div><button class="xcls" onclick="document.getElementById('changelogModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
 <div class="mbdy" style="max-height:60vh;overflow-y:auto"><div id="changelogBody"></div></div>
+</div>
+</div>
+
+<div class="ov" id="fehltModal">
+<div class="modal" style="max-width:560px">
+<div class="mhd"><div class="mtit">🗂 Nicht mehr in der Liste</div><button class="xcls" onclick="document.getElementById('fehltModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
+<div class="mbdy" style="max-height:64vh;overflow-y:auto">
+<div style="padding:8px 10px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.3);border-radius:8px;font-size:.68rem;margin-bottom:10px">⚠ Nur aussagekräftig, wenn die geladene Datei die <b>vollständige</b> aktuelle Lehrlingsliste ist. Bei einer Teilliste erscheinen hier fälschlich aktive TN. Markieren ist <b>reversibel</b> – es wird nichts gelöscht, nur ein Etikett gesetzt.</div>
+<div id="fehltBody" style="font-size:.72rem"></div>
+</div>
+<div style="display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--brd);flex-wrap:wrap">
+<button class="btn-sm" onclick="fehltExport()" style="font-size:.7rem">📋 Exportieren (CSV)</button>
+<button class="btn-sm btn-ok" onclick="fehltMarkieren()" style="font-size:.7rem">Als „nicht mehr in Liste" markieren</button>
+</div>
 </div>
 </div>
 
