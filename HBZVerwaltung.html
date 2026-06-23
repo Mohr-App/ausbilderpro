@@ -4520,18 +4520,7 @@ function impAnalysiere(){
     if(kat==='schon' && aj && hitBest && hitBest.id && !hitBest.ausbjahr){
       backfill[i]={id:hitBest.id, ausbjahr:aj, name:vn+' '+nn};
     }
-    // (4) VP-Abgleich: schon vorhanden -> abweichende Stammdaten auf VP-Stand korrigieren (VP heilig)
-    if(kat==='schon' && hitBest && hitBest.id){
-      const changed={}, vorher={};
-      _ABGLEICH_FELDER.forEach(f=>{
-        if(_impMapping[f]==null) return;
-        const impVal=(row[_impMapping[f]]||'').toString().trim();
-        if(!impVal) return;                       // VP leert nie ein Feld
-        const bestVal=(hitBest[f]||'').toString();
-        if(_impNormCmp(impVal)!==_impNormCmp(bestVal)){ changed[f]=impVal; vorher[f]=bestVal; }
-      });
-      if(Object.keys(changed).length) abgleich[i]={id:hitBest.id, name:vn+' '+nn, fields:changed, vorher:vorher};
-    }
+    // VP-Abgleich entfernt: bestehende TN werden NICHT mehr in Stammdaten ueberschrieben (Verknuepfung/Kurs/Konto bleiben sowieso unberuehrt). Nur leeres Lehrjahr wird ergaenzt (s.o.).
     perRow.push(kat);
     if(kat==='schon') schon++;
     else if(kat==='neu') neu++;
@@ -4648,16 +4637,12 @@ async function doImport(){
     if(kat==='ghost'){ skipGhost++; continue; }
     if(kat==='schon'){
       skipSchon++;
-      // VP-Abgleich (Stammdaten) + Lehrjahr-Backfill (nur wenn leer) als EIN Update
+      // Bestehende TN: NUR leeres Lehrjahr ergaenzen. Stammdaten werden NICHT ueberschrieben;
+      // Verknuepfung (verknuepftUid), Kurs, Historie und Login-Konto bleiben unberuehrt.
       const bf=_impAnalyse.backfill && _impAnalyse.backfill[i];
-      const ab=_impAnalyse.abgleich && _impAnalyse.abgleich[i];
-      const upd={};
-      if(ab) Object.assign(upd, ab.fields);
-      if(bf) upd.ausbjahr=bf.ausbjahr;
-      const zielId=(ab&&ab.id)||(bf&&bf.id);
-      if(zielId && Object.keys(upd).length){
-        try{ await db.collection('globalTN').doc(zielId).update(upd); if(bf) bfDone++; if(ab) abgleichDone++; }
-        catch(e){ console.warn('VP-Abgleich/Backfill '+zielId+':',e); }
+      if(bf && bf.id){
+        try{ await db.collection('globalTN').doc(bf.id).update({ausbjahr:bf.ausbjahr}); bfDone++; }
+        catch(e){ console.warn('Lehrjahr-Backfill '+bf.id+':',e); }
       }
       continue;
     }
