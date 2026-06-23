@@ -4291,7 +4291,7 @@ function impAutoMap(){
     nachname:['nachname','last','lastname','last_name','name','nname','family','surname'],
     email:['email','e-mail','mail','e_mail','emailadresse'],
     tel:['tel','telefon','phone','mobile','mobil','handy','telefonnummer'],
-    firma:['firma','betrieb','company','unternehmen','arbeitgeber','ausbildungsbetrieb'],
+    firma:['firma','betriebname','betrieb','company','unternehmen','arbeitgeber','ausbildungsbetrieb'],
     beruf:['beruf','fachrichtung','profession','ausbildungsberuf','berufsbez'],
     ausbjahr:['ausbjahr','lehrjahr','jahr','year','ausbildungsjahr','lj'],
     berufGruppeId:['berufsgruppe','berufgruppe','gewerk','branche'],
@@ -4304,7 +4304,10 @@ function impAutoMap(){
   _impHeaders.forEach(h=>{
     const hl=h.toLowerCase().replace(/[^a-zäöü0-9]/g,'');
     for(const[key,syns] of Object.entries(synonyms)){
-      if(!_impMapping[key]&&syns.some(s=>hl.includes(s)||s.includes(hl))){
+      if(_impMapping[key]) continue;
+      // Nummern-Spalten (z.B. "Betriebsnummer", "Berufsnummer") nie als Firma/Beruf erkennen
+      if((key==='firma'||key==='beruf') && hl.includes('nummer')) continue;
+      if(syns.some(s=>hl.includes(s)||s.includes(hl))){
         _impMapping[key]=h;
         break;
       }
