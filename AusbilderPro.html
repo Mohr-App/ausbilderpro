@@ -2581,8 +2581,8 @@ async function syncSeatGradesFromFirestore(){
           if(sync.werkzeugStatus && seat.werkzeugStatus!==sync.werkzeugStatus){seat.werkzeugStatus=sync.werkzeugStatus;changed=true;}
           if(sync.werkzeugFehlt && seat.werkzeugFehlt!==sync.werkzeugFehlt){seat.werkzeugFehlt=sync.werkzeugFehlt;changed=true;}
           if(sync.bemerkung && seat.bemerkung!==sync.bemerkung){seat.bemerkung=sync.bemerkung;changed=true;}
-          // Lehrgangs-Bestätigung: rot markieren wenn angefordert aber noch nicht bestätigt
-          const _unbest = !!sync.bestaetigungAngefordert && !sync.bestaetigtAm;
+          // Lehrgangs-Bestätigung: rot markieren nur wenn Freigabe-Pflicht AN ist
+          const _unbest = _freigabePflicht && !!sync.bestaetigungAngefordert && !sync.bestaetigtAm;
           if(seat._unbestaetigt!==_unbest){seat._unbestaetigt=_unbest;changed=true;}
           if(changed) anyChanged=true;
         })
@@ -7615,9 +7615,25 @@ async function appReset(){
 
 // ─── TN DETAIL ───
 // ── Schritt 3c/3d: Ausbilder-Freigabe (+ heute anwesend) für selbst-verknuepfte / selbst-registrierte TN ──
+let _freigabePflicht=false; // globaler Schalter (shared/kursSettings.freigabePflicht), Default aus
+function _watchFreigabePflicht(){
+  if(!_db) return;
+  try{
+    _db.collection('shared').doc('kursSettings').onSnapshot(s=>{
+      const an = s.exists && s.data().freigabePflicht===true;
+      if(an!==_freigabePflicht){
+        _freigabePflicht=an;
+        // Sitze + Pool neu zeichnen, damit rote 'unbestätigt'-Markierung sofort passt
+        try{ if(typeof renderSeats==='function' && curInst()) renderSeats(); }catch(e){}
+        try{ if(typeof loadPool==='function') loadPool(); }catch(e){}
+      }
+    }, ()=>{});
+  }catch(e){}
+}
 let _freigabeName='', _freigabeGeb='', _freigabeFirma='';
 function _tnFreigabeCheck(tnId, t, boxId){
   const box=document.getElementById(boxId||'tnFreigabeBox'); if(!box||!_db) return;
+  if(!_freigabePflicht){ box.innerHTML=''; return; } // Freigabe-Pflicht aus -> keine Freigabe-Box
   const kursId=(curInst()&&curInst().sharedKursId)||t.aktiverKursId||null;
   if(!kursId) return;
   _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId).get().then(s=>{
@@ -11408,7 +11424,7 @@ function loadPool(){
         card.dataset.ausbjahr=d.ausbjahr||'';
         const urlConf=getTnUrlaubConflict(doc.id);
         const isPending=!!_tnPending[doc.id];
-        const isUnbestaetigt = !!d.bestaetigungAngefordert && !d.bestaetigtAm;
+        const isUnbestaetigt = _freigabePflicht && !!d.bestaetigungAngefordert && !d.bestaetigtAm;
         if(isPending){ card.style.opacity='.5'; card.style.borderColor='rgba(239,68,68,.4)'; card.draggable=false; }
         else if(isUnbestaetigt){ card.classList.add('pool-card-unbestaetigt'); }
         card.innerHTML='<div class="pool-avatar"'+(isPending?' style="background:rgba(239,68,68,.2);color:#ef4444"':'')+'>'+initials+'</div>'
@@ -12343,6 +12359,8 @@ function _loginNotifyCheck(user,appName){
     _dataOwner=null; // Reset bis Daten geladen sind
     // Sicherheits-Mail bei Anmeldung auf neuem Geraet/Browser
     setTimeout(()=>{try{_loginNotifyCheck(user,'AusbilderPro');}catch(e){}}, 1500);
+    // Globaler Schalter 'Ausbilder-Freigabe verpflichtend' live mitlesen (Default aus)
+    setTimeout(()=>{try{_watchFreigabePflicht();}catch(e){}}, 800);
     // Sig+Stempel: auto-sync local nach cloud falls noch nicht geschehen
     setTimeout(()=>{try{_ensureSigStempelCloudSync();}catch(e){}}, 2000);
     // Cross-Ausbilder Noten-Sync nach Initialdaten-Load (3s damit Firestore Subscription Time hat)
