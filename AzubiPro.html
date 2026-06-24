@@ -2092,14 +2092,17 @@ function _fyNameMatch(aVn,aNn,bVn,bNn){
 function _azubiFindMatch(vn,nn,geb){
   if(!geb) return Promise.resolve(null);
   return db.collection('globalTN').where('geburtsdatum','==',geb).get().then(snap=>{
-    const hits=[];
+    const free=[];          // Name+Geb passen UND noch frei
+    let linkedMatch=false;  // Name+Geb passen, aber schon verknuepft/selbst-registriert
     snap.forEach(d=>{
       const x=d.data();
-      if(x.verknuepftUid) return;          // schon beansprucht
-      if(x.selfRegistered===true) return;  // bereits ein Selbst-Konto
-      if(_fyNameMatch(vn,nn,x.vorname,x.nachname)) hits.push({id:d.id, vorname:x.vorname||'', nachname:x.nachname||'', beruf:(x.beruf||x.berufGruppe||''), firma:(x.firma||'')});
+      if(!_fyNameMatch(vn,nn,x.vorname,x.nachname)) return;
+      if(x.verknuepftUid || x.selfRegistered===true){ linkedMatch=true; return; }
+      free.push({id:d.id, vorname:x.vorname||'', nachname:x.nachname||'', beruf:(x.beruf||x.berufGruppe||''), firma:(x.firma||'')});
     });
-    return hits.length===1 ? hits[0] : null;   // 0 oder 2+ -> Behelfsbruecke (kein Match)
+    if(free.length===1) return free[0];               // genau ein freier Treffer
+    if(free.length===0 && linkedMatch) return {alreadyLinked:true}; // nur schon belegte Treffer
+    return null;   // 0 Treffer oder 2+ frei (mehrdeutig) -> Behelfsbruecke
   }).catch(e=>{ console.warn('[3a] Match-Check fehlgeschlagen:', e); return null; });
 }
 function _azubiShowFoundYou(m){
@@ -2225,6 +2228,11 @@ function submitJoinRegistration(){
       // 3a: Abgleich gegen Bestand (jetzt eingeloggt -> globalTN lesbar). NUR Erkennung, keine Verknuepfung.
       return _azubiFindMatch(vorname, nachname, geburtsdatum);
     }).then(match=>{
+      if(match && match.alreadyLinked){
+        // Name+Geburtsdatum passen, aber TN ist bereits mit einem Konto verknuepft.
+        // KEIN 'Trotzdem fortfahren' -> Azubi soll sich einloggen statt Dublette anzulegen.
+        const ab=new Error('schon-belegt'); ab.code='custom/schon-belegt'; throw ab;
+      }
       if(match){
         return _azubiShowFoundYou(match).then(istIch=>{
           _linkTnId = istIch ? match.id : null;
@@ -2355,6 +2363,16 @@ function submitJoinRegistration(){
   }).catch(err=>{
     _registering=false;
     _regDone();
+    if(err && err.code==='custom/schon-belegt'){
+      // TN bereits verknuepft -> kein Neu-Eintrag, sondern Azubi zum Login leiten.
+      try{ if(typeof joinBackToChoice==='function') joinBackToChoice(); }catch(e){}
+      try{ if(typeof joinShowLogin==='function') joinShowLogin(); }catch(e){}
+      var _jle=document.getElementById('jLoginErr');
+      if(_jle){ _jle.style.color='var(--bad)'; _jle.textContent='Du bist bereits registriert – bitte hier einloggen (oder „Passwort vergessen" nutzen).'; }
+      var _jli=document.getElementById('jLoginEmail'); var _jwe=document.getElementById('jEmail');
+      if(_jli && _jwe && _jwe.value && !_jli.value) _jli.value=_jwe.value.trim();
+      return;
+    }
     if(err && err.code==='custom/zurueck-korrigieren'){
       // Azubi will Name/Geburtsdatum korrigieren. Auth-Konto bleibt bestehen und wird
       // bei korrigierter Wiederholung über den email-already-in-use -> signIn-Pfad wiederverwendet.
