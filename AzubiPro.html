@@ -1656,7 +1656,7 @@ function _watchFreigabePflicht(){
       +'<div style="font-size:.68rem;color:var(--mu);margin-top:4px;font-family:\'JetBrains Mono\',monospace">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div>'
       +(k.ausbilderName?'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">Ausbilder: '+esc(k.ausbilderName)+'</div>':'');
   }).catch(()=>{
-    infoEl.innerHTML='<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Registriere dich um dem Lehrgang beizutreten.</div>';
+    infoEl.innerHTML='<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Melde dich an oder registriere dich für den Lehrgang.</div>';
   });
   // Screen-Umschaltung übernimmt der Auth-Handler (je nach Login-Status):
   // nicht eingeloggt -> Join-/Registrierungs-Screen, eingeloggt -> _autoJoinScannedKurs.
@@ -1949,14 +1949,22 @@ function joinConfirmKursNo(){
   var c=document.getElementById('joinChoice'); if(c) c.style.display='block';
 }
 
+let _joinInfoSaved=null;
 function joinShowLogin(){
   var c=document.getElementById('joinChoice'); if(c) c.style.display='none';
   var f=document.getElementById('joinLoginForm'); if(f) f.style.display='block';
+  var i=document.getElementById('joinKursInfo');
+  if(i){
+    if(_joinInfoSaved===null) _joinInfoSaved=i.innerHTML;
+    i.innerHTML='<div style="font-weight:800;font-size:.88rem">🔑 Anmelden</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Melde dich mit deinem Konto an, um dem Lehrgang beizutreten.</div>';
+  }
   var e=document.getElementById('jLoginEmail'); if(e) e.focus();
 }
 function joinBackToChoice(){
   var f=document.getElementById('joinLoginForm'); if(f) f.style.display='none';
   var c=document.getElementById('joinChoice'); if(c) c.style.display='block';
+  var i=document.getElementById('joinKursInfo');
+  if(i && _joinInfoSaved!==null){ i.innerHTML=_joinInfoSaved; _joinInfoSaved=null; }
 }
 function wizCancel(){
   document.getElementById('joinWizard').style.display='none';
