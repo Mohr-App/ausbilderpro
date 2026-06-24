@@ -1183,6 +1183,7 @@ auth.onAuthStateChanged(u=>{
   if(u){
     _uid=u.uid;
     _email=u.email.toLowerCase();
+    _watchFreigabePflicht();
     // Admin-Launcher-Check
     _checkAdminShowLauncher(u.uid);
     // Stefan-Whitelist: Zeige Admin-Info mit App-Links
@@ -1624,6 +1625,19 @@ function showErr(m){ const el=document.getElementById('lErr'); el.style.color='v
 
 // ── SELF-REGISTRATION (QR Join) ──
 let _joinKursId=null;
+// Globaler Freigabe-Pflicht-Status (aus shared/kursSettings). Steuert, ob bei Verknuepfung
+// 'bestaetigungAngefordert' gesetzt wird. Default false (Pflicht aus -> kein Flag).
+let _freigabePflichtCache=false;
+let _freigabePflichtUnsub=null;
+function _watchFreigabePflicht(){
+  if(_freigabePflichtUnsub) return;
+  try{
+    _freigabePflichtUnsub=db.collection('shared').doc('kursSettings').onSnapshot(
+      d=>{ _freigabePflichtCache = !!(d.exists && d.data().freigabePflicht===true); },
+      ()=>{}
+    );
+  }catch(e){}
+}
 (function checkJoinParam(){
   const params=new URLSearchParams(window.location.search);
   const joinId=params.get('join');
@@ -1792,7 +1806,7 @@ function submitJoinLogin(){
             kontaktTelefon: tnData.kontaktTelefon||'',
             status: 'active',
             addedAt: Date.now(),
-            bestaetigungAngefordert: true,
+            bestaetigungAngefordert: _freigabePflichtCache===true,
             kenntnisAm: Date.now(),
             kenntnisVon: (tnData.kontaktEmail||tnData.email||'').toLowerCase()
           },{merge:true});
@@ -2225,6 +2239,11 @@ function submitJoinRegistration(){
     // WICHTIG: Auf vollstaendige Auth-Token-Propagation warten bevor Firestore-Operationen.
     // cred.user.getIdToken(true) erzwingt frischen Token + wartet bis er beim Backend gilt.
     return cred.user.getIdToken(true).then(()=>{
+      // Freigabe-Pflicht-Status frisch laden (Timing-Sicherheit fuer das bestaetigungAngefordert-Flag)
+      return db.collection('shared').doc('kursSettings').get()
+        .then(d=>{ _freigabePflichtCache = !!(d.exists && d.data().freigabePflicht===true); })
+        .catch(()=>{});
+    }).then(()=>{
       // 3a: Abgleich gegen Bestand (jetzt eingeloggt -> globalTN lesbar). NUR Erkennung, keine Verknuepfung.
       return _azubiFindMatch(vorname, nachname, geburtsdatum);
     }).then(match=>{
@@ -2274,7 +2293,7 @@ function submitJoinRegistration(){
           kursHistory: firebase.firestore.FieldValue.arrayUnion(_kh),
           verknuepftUid: uid,
           verknuepftAm: Date.now(),
-          bestaetigungAngefordert: true,
+          bestaetigungAngefordert: _freigabePflichtCache===true,
           dsgvoZustimmung: tnData.dsgvoZustimmung
         };
         return db.collection('globalTN').doc(_linkTnId).update(linkData)
@@ -2318,7 +2337,7 @@ function submitJoinRegistration(){
           kontaktTelefon: telefon,
           status: 'active',
           selfRegistered: true,
-          bestaetigungAngefordert: true,
+          bestaetigungAngefordert: _freigabePflichtCache===true,
           kenntnisAm: Date.now(),
           kenntnisVon: email,
           addedAt: Date.now()
@@ -3215,7 +3234,7 @@ function processJoinUrl(url){
             status:'active',
             addedAt:Date.now(),
             selfRegistered:true,
-            bestaetigungAngefordert:true,
+            bestaetigungAngefordert:_freigabePflichtCache===true,
             kenntnisAm:Date.now(),
             kenntnisVon:_email
           },{merge:true});
