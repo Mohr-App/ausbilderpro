@@ -718,8 +718,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div id="checkinHistToday" style="font-size:.84rem;font-weight:800;margin-bottom:8px"></div>
         <div id="checkinHistList" style="font-size:.72rem;color:var(--tx)"></div>
       </div>
-      <button onclick="openQrJoin()" title="Nur wenn du einem zusätzlichen Lehrgang beitrittst" style="width:100%;margin-bottom:4px;padding:9px;background:transparent;border:1.5px solid var(--brd);border-radius:12px;cursor:pointer;color:var(--mu);font-size:.74rem;font-weight:700;font-family:'Sora',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="14" y2="21"/><line x1="18" y1="14" x2="18" y2="18"/><line x1="14" y1="18" x2="18" y2="18"/><line x1="21" y1="14" x2="21" y2="21"/></svg>
+      <button onclick="openQrJoin()" title="Nur wenn du einem zusätzlichen Lehrgang beitrittst" style="width:100%;margin-bottom:4px;padding:11px;background:rgba(124,58,237,.06);border:2px solid #7c3aed;border-radius:12px;cursor:pointer;color:#7c3aed;font-size:.8rem;font-weight:800;font-family:'Sora',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="14" y2="21"/><line x1="18" y1="14" x2="18" y2="18"/><line x1="14" y1="18" x2="18" y2="18"/><line x1="21" y1="14" x2="21" y2="21"/></svg>
         + Weiteren Lehrgang beitreten
       </button>
       <div style="text-align:center;font-size:.6rem;color:var(--mu);margin-bottom:12px">Nur für einen zusätzlichen Kurs – nicht zum Einchecken</div>
@@ -6445,27 +6445,43 @@ function loadKurse(){
       html+='</div>';
     }
 
-    // Alle Kurse als Liste (ohne den hervorgehobenen oben)
-    const listeKurse=_kurse.filter(k=>{
+    // Alle Kurse als Liste (ohne den hervorgehobenen oben), getrennt nach aktuell/geplant und beendet
+    const restKurse=_kurse.filter(k=>{
       if(highlight && k.id===highlight.id && !unconfirmed.find(u=>u.id===k.id)) return false;
       return true;
     });
-    if(listeKurse.length){
-    html+='<div class="card"><div class="card-title">📅 Weitere Lehrgänge ('+listeKurse.length+')</div>';
-    listeKurse.forEach(k=>{
+    const istVergangen=k=>k.bis && today>k.bis;
+    const aktuelleListe=restKurse.filter(k=>!istVergangen(k));
+    const vergangene=restKurse.filter(istVergangen);
+
+    const histItem=(k)=>{
       let st='beendet', stLabel='Beendet';
       if(k.von&&k.bis&&today>=k.von&&today<=k.bis){ st='laufend'; stLabel='● Laufend'; }
       else if(k.von&&k.von>today){ st='geplant'; stLabel='◐ Geplant'; }
       const confirmed=!!k._tnDoc?.kenntnisAm;
-      html+='<div class="hist-item" style="cursor:pointer" title="Kursdetails öffnen" onclick="showKursDetail(\''+k.id+'\')">';
-      html+='<div class="hist-dot" style="background:'+(st==='laufend'?'#10b981':st==='geplant'?'#3b82f6':'#94a3b8')+'"></div>';
-      html+='<div style="flex:1"><div class="hist-name">'+esc(k.name||k.lehrgangsart||'?')+(confirmed?'':' ⚠️')+'</div>';
-      html+='<div class="hist-dates">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div></div>';
-      html+='<span class="kurs-countdown kurs-status-'+st+'" style="font-size:.55rem">'+stLabel+'</span>';
-      if(k._tnDoc&&k._tnDoc.werkzeugStatus==='fehlt') html+='<span style="font-size:.5rem;color:#dc2626;font-weight:700;margin-left:4px">🔧</span>';
+      let s='<div class="hist-item" style="cursor:pointer" title="Kursdetails öffnen" onclick="showKursDetail(\''+k.id+'\')">';
+      s+='<div class="hist-dot" style="background:'+(st==='laufend'?'#10b981':st==='geplant'?'#3b82f6':'#94a3b8')+'"></div>';
+      s+='<div style="flex:1"><div class="hist-name">'+esc(k.name||k.lehrgangsart||'?')+(confirmed?'':' ⚠️')+'</div>';
+      s+='<div class="hist-dates">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div></div>';
+      s+='<span class="kurs-countdown kurs-status-'+st+'" style="font-size:.55rem">'+stLabel+'</span>';
+      if(k._tnDoc&&k._tnDoc.werkzeugStatus==='fehlt') s+='<span style="font-size:.5rem;color:#dc2626;font-weight:700;margin-left:4px">🔧</span>';
+      s+='</div>';
+      return s;
+    };
+
+    if(aktuelleListe.length){
+      html+='<div class="card"><div class="card-title">📅 Weitere Lehrgänge ('+aktuelleListe.length+')</div>';
+      aktuelleListe.forEach(k=>{ html+=histItem(k); });
       html+='</div>';
-    });
-    html+='</div>';
+    }
+
+    if(vergangene.length){
+      html+='<button onclick="var d=document.getElementById(\'vergangeneKurseBox\');var open=d.style.display!==\'none\';d.style.display=open?\'none\':\'block\';this.querySelector(\'.vk-arrow\').textContent=open?\'▾\':\'▴\';" '
+        +'style="width:100%;margin-top:4px;padding:11px 14px;background:var(--sur2);border:1px solid var(--brd);border-radius:12px;cursor:pointer;color:var(--tx);font-size:.78rem;font-weight:700;font-family:\'Sora\',sans-serif;display:flex;align-items:center;justify-content:space-between" title="Vergangene Kurse anzeigen/verbergen">'
+        +'<span>🗂 Vergangene Kurse ('+vergangene.length+')</span><span class="vk-arrow" style="color:var(--mu)">▾</span></button>';
+      html+='<div id="vergangeneKurseBox" style="display:none;margin-top:6px"><div class="card">';
+      vergangene.forEach(k=>{ html+=histItem(k); });
+      html+='</div></div>';
     }
 
     el.innerHTML=html;
