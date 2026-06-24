@@ -3709,11 +3709,21 @@ let _standorte = []; // [{id,name,strasse,plz,ort,gebaeude,hinweis}]
 let _raeume = []; // [{id,name}]
 let _kursForm = { ausbId: null, lgartId: null }; // selected in modal
 
+let _freigabePflicht=false;       // globaler Freigabe-Pflicht-Status (Cache)
+let _freigabePflichtUnsub=null;
 function loadKursSettings() {
   // Ensure the parent doc exists (avoids permission errors on subcollections)
   db.collection('shared').doc('kursSettings')
     .set({initialized: true}, {merge: true})
     .catch(e => console.warn('kursSettings init:', e.message));
+
+  // Globalen Freigabe-Pflicht-Status live cachen (fuer die Verknuepfungs-Anzeige im TN-Profil)
+  if(!_freigabePflichtUnsub){
+    _freigabePflichtUnsub = db.collection('shared').doc('kursSettings').onSnapshot(
+      d=>{ _freigabePflicht = !!(d.exists && d.data().freigabePflicht===true); },
+      ()=>{}
+    );
+  }
 
   db.collection('shared').doc('kursSettings').collection('ausbilder')
     .orderBy('name').onSnapshot(snap => {
@@ -7395,7 +7405,7 @@ function openTNProfile(tnId){
   if(t.verknuepftUid){
     const frei = t.verknuepftFreigegebenAm
       ? ('freigegeben am '+new Date(t.verknuepftFreigegebenAm).toLocaleDateString('de-DE'))
-      : 'wartet auf Ausbilder-Freigabe';
+      : (_freigabePflicht ? 'wartet auf Ausbilder-Freigabe' : 'verknüpft');
     html+='<div class="profile-field"><span class="pf-label">Verknüpfung</span><span style="color:#0d9488;font-weight:600">🔗 '+esc(frei)+'</span></div>';
     html+='<button class="btn-sm btn-bad" onclick="tnVerknuepfungReset(\''+tnId+'\')" style="margin-top:6px;font-size:.65rem;padding:5px 10px" title="Selbst-Verknuepfung zuruecksetzen (Admin)">🔓 Verknüpfung zurücksetzen</button>';
   }
