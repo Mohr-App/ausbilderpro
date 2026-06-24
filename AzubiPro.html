@@ -205,6 +205,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="margin-top:6px"><label class="fl">Passwort</label><div style="position:relative;margin-bottom:10px"><input class="fi" type="password" id="jLoginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitJoinLogin()" style="padding-right:40px;box-sizing:border-box;margin-bottom:0"><button type="button" id="jLoginPassEye" title="Anzeigen / Verbergen" onclick="togglePwVis('jLoginPass','jLoginPassEye')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:1.05rem;padding:4px;line-height:1">&#128065;</button></div></div>
         <div class="err" id="jLoginErr"></div>
         <button class="btn" onclick="submitJoinLogin()" style="margin-top:8px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Anmelden & beitreten">Anmelden & Lehrgang beitreten</button>
+        <button class="btn" onclick="doResetJoin()" title="Passwort vergessen" style="background:var(--sur2);box-shadow:none;color:var(--mu);font-size:.7rem;padding:9px;margin-top:6px">Passwort vergessen</button>
       </div>
       <!-- SCHRITT 0: KURS BESTÄTIGEN (vor dem Wizard) -->
       <div id="joinConfirmKurs" style="display:none">
@@ -1419,8 +1420,27 @@ function doReset(){
   const e=document.getElementById('lEmail').value.trim();
   if(!e){showErr('Bitte zuerst E-Mail eingeben');return;}
   auth.sendPasswordResetEmail(e)
-    .then(()=>{document.getElementById('lErr').style.color='var(--acc)';showErr('✓ Reset-Mail gesendet');})
-    .catch(()=>showErr('Fehler beim Senden'));
+    .then(()=>{document.getElementById('lErr').style.color='var(--acc)';showErr('✓ Reset-Mail gesendet – prüfe dein Postfach');})
+    .catch(err=>showErr(_pwErrMsg(err)));
+}
+// Passwort-Reset aus dem Beitritts-Login (eigenes E-Mail-/Fehlerfeld)
+function doResetJoin(){
+  const e=(document.getElementById('jLoginEmail').value||'').trim();
+  const errEl=document.getElementById('jLoginErr');
+  if(!errEl) return;
+  if(!e){ errEl.style.color='var(--bad)'; errEl.textContent='Bitte zuerst E-Mail eingeben'; return; }
+  auth.sendPasswordResetEmail(e)
+    .then(()=>{ errEl.style.color='var(--acc)'; errEl.textContent='✓ Reset-Mail gesendet – prüfe dein Postfach'; })
+    .catch(err=>{ errEl.style.color='var(--bad)'; errEl.textContent=_pwErrMsg(err); });
+}
+// Klare Firebase-Auth-Fehlermeldungen (wie AusbilderPro)
+function _pwErrMsg(e){
+  const c=e&&e.code;
+  if(c==='auth/user-not-found') return 'Kein Konto mit dieser E-Mail';
+  if(c==='auth/invalid-email') return 'Ungültige E-Mail-Adresse';
+  if(c==='auth/too-many-requests') return 'Zu viele Versuche – kurz warten';
+  if(c==='auth/missing-email') return 'Bitte zuerst E-Mail eingeben';
+  return (e&&e.message)||'Fehler beim Senden';
 }
 function doLogout(){ if(confirm('Wirklich abmelden?')) auth.signOut(); }
 
@@ -2231,6 +2251,7 @@ function submitJoinRegistration(){
           email: email,
           kontaktEmail: email,
           kontaktTelefon: telefon,
+          ausbjahr: ausbjahr,
           aktiverKursId: _joinKursId,
           kursHistory: firebase.firestore.FieldValue.arrayUnion(_kh),
           verknuepftUid: uid,
