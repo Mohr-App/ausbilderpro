@@ -4381,6 +4381,8 @@ function impAutoMap(){
     firma:['firma','betriebname','betrieb','company','unternehmen','arbeitgeber','ausbildungsbetrieb'],
     beruf:['beruf','fachrichtung','profession','ausbildungsberuf','berufsbez'],
     ausbjahr:['ausbjahr','lehrjahr','jahr','year','ausbildungsjahr','lj'],
+    anfang:['anfang','ausbildungsbeginn','vertragsbeginn','lehrbeginn'],
+    endeVorgesehen:['vorgesehenesende','lehrzeitende','lehrzeitendedatum'],
     berufGruppeId:['berufsgruppe','berufgruppe','gewerk','branche'],
     geburtsdatum:['geburtsdatum','birthday','dob','geb','geboren','geb_datum'],
     adresse:['adresse','strasse','street','straße','address','str'],
@@ -4394,6 +4396,8 @@ function impAutoMap(){
       if(_impMapping[key]) continue;
       // Nummern-Spalten (z.B. "Betriebsnummer", "Berufsnummer") nie als Firma/Beruf erkennen
       if((key==='firma'||key==='beruf') && hl.includes('nummer')) continue;
+      // 'Vorgesehenes Ende' nur ueber 'vorgesehen'/'lehrzeit' fangen, nie das nackte 'Ende' (tatsaechliches Ende)
+      if(key==='endeVorgesehen' && !(hl.includes('vorgesehen')||hl.includes('lehrzeit'))) continue;
       if(syns.some(s=>hl.includes(s)||s.includes(hl))){
         _impMapping[key]=h;
         break;
@@ -4533,6 +4537,25 @@ function _impGeb(s){
   return str.slice(0,10);
 }
 function _impIsAnon(vn){ const v=(vn||'').trim(); return v.length<=3 && v.endsWith('.'); }
+// Lehrjahr aus Anfang (+ vorgesehenem Ende) schaetzen. Rueckgabe '1'..'4' oder ''.
+// Verkuerzung am Ende steckt im Datum (Zaehlung ab Anfang stimmt). Vorne uebersprungen (~2 Jahre Dauer) -> Start im 2. LJ.
+function _impLehrjahr(anfangISO, endeISO){
+  if(!anfangISO) return '';
+  const a=new Date(anfangISO+'T00:00:00Z'); if(isNaN(a)) return '';
+  let elapsed=(Date.now()-a.getTime())/(365.25*86400000);
+  if(elapsed<0) elapsed=0;
+  let startLJ=1;
+  if(endeISO){
+    const e=new Date(endeISO+'T00:00:00Z');
+    if(!isNaN(e)){
+      const dauer=(e.getTime()-a.getTime())/(365.25*86400000);
+      if(dauer>0 && dauer<=2.2) startLJ=2; // vorne uebersprungen
+    }
+  }
+  let lj=startLJ+Math.floor(elapsed);
+  if(lj<1) lj=1; if(lj>4) lj=4;
+  return String(lj);
+}
 function _impDatumsTeileGleich(a,b){
   const pa=a.split('-'), pb=b.split('-');
   if(pa.length!==3||pb.length!==3) return 0;
@@ -4559,7 +4582,8 @@ function impAnalysiere(){
     id:t.id, toks:_impTokens(t.vorname,t.nachname), geb:_impGeb(t.geburtsdatum),
     name:((t.vorname||'')+' '+(t.nachname||'')).trim(), ausbjahr:(t.ausbjahr||'').toString().trim(),
     vorname:(t.vorname||''), nachname:(t.nachname||''), firma:(t.firma||''), beruf:(t.beruf||''),
-    adresse:(t.adresse||''), plz:(t.plz||'').toString(), ort:(t.ort||'')
+    adresse:(t.adresse||''), plz:(t.plz||'').toString(), ort:(t.ort||''),
+    anfang:(t.anfang||''), endeVorgesehen:(t.endeVorgesehen||'')
   }));
   // E-Mail-Index der ANONYMISIERTEN Pilot-TN (Ghost-Erkennung; Pilot-Mails sind individuell)
   const anonEmail={};
@@ -4577,7 +4601,10 @@ function impAnalysiere(){
     const toks=_impTokens(vn,nn);
     const geb=_impGeb(row[_impMapping.geburtsdatum]);
     const em=_impMapping.email?_impEmail(row[_impMapping.email]):'';
-    const aj=_impMapping.ausbjahr?(row[_impMapping.ausbjahr]||'').toString().trim():'';
+    const _anfang=_impMapping.anfang?_impGeb(row[_impMapping.anfang]):'';
+    const _endeV=_impMapping.endeVorgesehen?_impGeb(row[_impMapping.endeVorgesehen]):'';
+    const ajManuell=_impMapping.ausbjahr?(row[_impMapping.ausbjahr]||'').toString().trim():'';
+    const aj=ajManuell||_impLehrjahr(_anfang,_endeV);
     const fn=_impFullName(vn,nn);
     // (1) Within-List-Dublette: voller Name gleich UND (gleiches Datum ODER gleiche E-Mail)
     const sObj=seen[fn];
@@ -4608,11 +4635,15 @@ function impAnalysiere(){
       perRow.push('ghost'); ghost.push({name:vn+' '+nn, email:em, i});
       continue;
     }
-    // (3) Lehrjahr-Backfill: schon vorhanden + Liste bringt Lehrjahr + Bestand-Lehrjahr leer
-    if(kat==='schon' && aj && hitBest && hitBest.id && !hitBest.ausbjahr){
-      backfill[i]={id:hitBest.id, ausbjahr:aj, name:vn+' '+nn};
+    // (3) Backfill: schon vorhanden -> leeres Lehrjahr + fehlende Datumsfelder ergaenzen (nie ueberschreiben)
+    if(kat==='schon' && hitBest && hitBest.id){
+      const bfUpd={};
+      if(aj && !hitBest.ausbjahr) bfUpd.ausbjahr=aj;
+      if(_anfang && !hitBest.anfang) bfUpd.anfang=_anfang;
+      if(_endeV && !hitBest.endeVorgesehen) bfUpd.endeVorgesehen=_endeV;
+      if(Object.keys(bfUpd).length) backfill[i]=Object.assign({id:hitBest.id, name:vn+' '+nn}, bfUpd);
     }
-    // VP-Abgleich entfernt: bestehende TN werden NICHT mehr in Stammdaten ueberschrieben (Verknuepfung/Kurs/Konto bleiben sowieso unberuehrt). Nur leeres Lehrjahr wird ergaenzt (s.o.).
+    // VP-Abgleich entfernt: bestehende TN werden NICHT mehr in Stammdaten ueberschrieben (Verknuepfung/Kurs/Konto bleiben sowieso unberuehrt). Nur leeres Lehrjahr/Daten werden ergaenzt (s.o.).
     perRow.push(kat);
     if(kat==='schon') schon++;
     else if(kat==='neu') neu++;
@@ -4665,8 +4696,11 @@ function impRenderBericht(a){
   }
   if(a.backfill && Object.keys(a.backfill).length){
     const bf=Object.values(a.backfill);
-    h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#16a34a;font-size:.7rem">Lehrjahr wird ergänzt ('+bf.length+') – nur wo Bestand leer war</summary>';
-    h+='<div style="font-size:.66rem;margin-top:4px">'+bf.map(t=>esc(t.name)+' → Lehrjahr '+esc(t.ausbjahr)).join('<br>')+'</div></details>';
+    h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#16a34a;font-size:.7rem">Lehrjahr/Daten werden ergänzt ('+bf.length+') – nur wo im Bestand leer</summary>';
+    h+='<div style="font-size:.66rem;margin-top:4px">'+bf.map(t=>{
+      const teile=[]; if(t.ausbjahr) teile.push('Lehrjahr '+t.ausbjahr); if(t.anfang) teile.push('Beginn '+t.anfang); if(t.endeVorgesehen) teile.push('Ende '+t.endeVorgesehen);
+      return esc(t.name)+' → '+teile.join(', ');
+    }).join('<br>')+'</div></details>';
   }
   if(a.abgleich && Object.keys(a.abgleich).length){
     const FL={vorname:'Vorname',nachname:'Nachname',firma:'Betrieb',beruf:'Beruf',adresse:'Adresse',plz:'PLZ',ort:'Ort'};
@@ -4752,12 +4786,18 @@ async function doImport(){
     if(kat==='ghost'){ skipGhost++; continue; }
     if(kat==='schon'){
       skipSchon++;
-      // Bestehende TN: NUR leeres Lehrjahr ergaenzen. Stammdaten werden NICHT ueberschrieben;
+      // Bestehende TN: NUR leeres Lehrjahr + fehlende Datumsfelder ergaenzen. Stammdaten unangetastet;
       // Verknuepfung (verknuepftUid), Kurs, Historie und Login-Konto bleiben unberuehrt.
       const bf=_impAnalyse.backfill && _impAnalyse.backfill[i];
       if(bf && bf.id){
-        try{ await db.collection('globalTN').doc(bf.id).update({ausbjahr:bf.ausbjahr}); bfDone++; }
-        catch(e){ console.warn('Lehrjahr-Backfill '+bf.id+':',e); }
+        const upd={};
+        if(bf.ausbjahr) upd.ausbjahr=bf.ausbjahr;
+        if(bf.anfang) upd.anfang=bf.anfang;
+        if(bf.endeVorgesehen) upd.endeVorgesehen=bf.endeVorgesehen;
+        if(Object.keys(upd).length){
+          try{ await db.collection('globalTN').doc(bf.id).update(upd); bfDone++; }
+          catch(e){ console.warn('Backfill '+bf.id+':',e); }
+        }
       }
       continue;
     }
@@ -4769,6 +4809,9 @@ async function doImport(){
     if(!vn&&!nn){ fail++; continue; }
 
     const bgMatch=matchBerufGruppe(row[_impMapping.berufGruppeId]||row[_impMapping.beruf]||'');
+    const _anfang=_impMapping.anfang?_impGeb(row[_impMapping.anfang]):'';
+    const _endeV=_impMapping.endeVorgesehen?_impGeb(row[_impMapping.endeVorgesehen]):'';
+    const _ajManuell=(row[_impMapping.ausbjahr]||'').toString().trim();
 
     const tnData={
       vorname: vn,
@@ -4778,7 +4821,9 @@ async function doImport(){
       firma:(row[_impMapping.firma]||'').toString().trim(),
       beruf:bgMatch.beruf||(row[_impMapping.beruf]||'').toString().trim(),
       berufGruppeId:bgMatch.berufGruppeId,
-      ausbjahr:(row[_impMapping.ausbjahr]||'').toString().trim(),
+      ausbjahr:_ajManuell||_impLehrjahr(_anfang,_endeV),
+      anfang:_anfang,
+      endeVorgesehen:_endeV,
       geburtsdatum: _impGeb(row[_impMapping.geburtsdatum]),
       adresse: (row[_impMapping.adresse]||'').toString().trim(),
       plz: (row[_impMapping.plz]||'').toString().trim(),
@@ -7335,6 +7380,8 @@ function openTNProfile(tnId){
     '<div class="profile-field"><span class="pf-label">Telefon</span><span>'+(t.tel||'–')+'</span></div>'+
     ((t.adresse||t.plz||t.ort)?'<div class="profile-field"><span class="pf-label">Adresse</span><span>'+esc((t.adresse||'')+(t.plz||t.ort?', ':'')+(t.plz||'')+' '+(t.ort||'')).trim()+'</span></div>':'')+
     '<div class="profile-field"><span class="pf-label">Lehrjahr</span><span>'+(t.ausbjahr?t.ausbjahr+'. Jahr':'–')+'</span></div>'+
+    (t.anfang?'<div class="profile-field"><span class="pf-label">Ausbildungsbeginn</span><span>'+fmtDE(t.anfang)+'</span></div>':'')+
+    (t.endeVorgesehen?'<div class="profile-field"><span class="pf-label">Vorgesehenes Ende</span><span>'+fmtDE(t.endeVorgesehen)+'</span></div>':'')+
     '<div class="profile-field"><span class="pf-label">Aktiver Kurs</span><span style="color:#22c55e;font-weight:600">'+esc(aktKurs)+'</span></div>';
   // DSGVO Zustimmung
   const dsgvo=t.dsgvoZustimmung;
