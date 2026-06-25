@@ -502,6 +502,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="card-title">📅 Kurshistorie</div>
         <div id="profilHist"><div class="empty">Keine Historie</div></div>
       </div>
+      <div class="card">
+        <div class="card-title">📧 E-Mail-Adresse</div>
+        <div id="profilEmailAnzeige" style="font-size:.8rem;font-weight:600;word-break:break-word;margin-bottom:8px">–</div>
+        <button class="btn" title="E-Mail-Adresse korrigieren" onclick="startEmailKorrektur()" style="background:var(--sur2);color:var(--acc);box-shadow:none;font-size:.74rem;padding:9px">E-Mail korrigieren</button>
+        <div style="font-size:.62rem;color:var(--mu);margin-top:6px;line-height:1.4">Falsche Login-E-Mail? Hier änderst du sie selbst – du bekommst dann einen Bestätigungslink an die neue Adresse.</div>
+      </div>
       <button class="btn" title="Abmelden" onclick="doLogout()" style="background:var(--sur2);color:var(--bad);box-shadow:none;margin-top:8px">Abmelden</button>
     </div>
 
@@ -708,6 +714,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="font-size:1.05rem;font-weight:800;color:var(--tx);margin-top:2px" id="ueblHeaderSub">Übersicht & Kontakt</div>
       </div>
       <div id="sitzplatzPopup"></div>
+      <div id="emailUnbestHint" style="display:none;margin-bottom:12px;padding:11px 13px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:12px;font-size:.74rem;color:var(--tx);line-height:1.45">
+        📧 Bitte bestätige deine E-Mail – wir haben dir einen Link geschickt. <span style="color:var(--mu)">Stimmt die Adresse nicht?</span>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button onclick="resendEmailVerification()" title="Bestätigungs-Mail erneut senden" style="flex:1;padding:7px;background:var(--sur2);border:1px solid var(--brd);border-radius:9px;font-size:.68rem;font-weight:700;color:var(--tx);cursor:pointer;font-family:'Sora',sans-serif">Erneut senden</button>
+          <button onclick="showPage('profil')" title="E-Mail korrigieren" style="flex:1;padding:7px;background:var(--sur2);border:1px solid var(--brd);border-radius:9px;font-size:.68rem;font-weight:700;color:var(--acc);cursor:pointer;font-family:'Sora',sans-serif">E-Mail korrigieren</button>
+        </div>
+      </div>
       <button id="qrCheckinBtn" onclick="openQRScanner()" title="Anwesenheit: QR-Code im Kursraum scannen (nur vor Ort möglich)" style="width:100%;margin-bottom:4px;padding:16px;background:linear-gradient(135deg,#2563eb,#059669);border:none;border-radius:14px;cursor:pointer;color:#fff;font-size:.95rem;font-weight:800;font-family:'Sora',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 4px 14px rgba(37,99,235,.3)">
         <span style="display:flex;align-items:center;gap:8px">📡 Anwesenheit – QR scannen</span>
         <span style="font-size:.64rem;font-weight:600;opacity:.9">Hier checkst du dich anwesend</span>
@@ -1230,8 +1243,26 @@ function findTN(email){
       if(snap.empty) return false;
       _tnId=snap.docs[0].id;
       _tnData=snap.docs[0].data();
+      try{ _syncEmailStatus(); }catch(e){}
       return true;
     }).catch(()=>false);
+}
+// Spiegelt den Auth-Verifizierungsstatus in den Datensatz (fuer den AusbilderPro-Marker)
+// und gleicht die Daten-E-Mail an die verifizierte Auth-Adresse an (nach Selbstkorrektur).
+function _syncEmailStatus(){
+  const u=auth.currentUser;
+  if(!u || !_tnId || !_tnData) return;
+  if(u.emailVerified===true){
+    const upd={};
+    if(_tnData.emailBestaetigt!==true) upd.emailBestaetigt=true;
+    const authMail=(u.email||'').toLowerCase();
+    if(authMail && (_tnData.email||'').toLowerCase()!==authMail){ upd.email=authMail; upd.kontaktEmail=authMail; }
+    if(Object.keys(upd).length){
+      db.collection('globalTN').doc(_tnId).update(upd)
+        .then(()=>{ Object.assign(_tnData, upd); })
+        .catch(e=>console.warn('E-Mail-Status-Sync:', e&&e.code));
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2235,6 +2266,7 @@ function submitJoinRegistration(){
       aktiverKursId: _joinKursId,
       selfRegistered: true,
       registeredAt: Date.now(),
+      emailCheckAktiv: true,
       dsgvoZustimmung: {
         datenschutz: true,
         nutzungsbedingungen: true,
@@ -2302,7 +2334,8 @@ function submitJoinRegistration(){
           verknuepftUid: uid,
           verknuepftAm: Date.now(),
           bestaetigungAngefordert: _freigabePflichtCache===true,
-          dsgvoZustimmung: tnData.dsgvoZustimmung
+          dsgvoZustimmung: tnData.dsgvoZustimmung,
+          emailCheckAktiv: true
         };
         return db.collection('globalTN').doc(_linkTnId).update(linkData)
           .then(()=>{ console.log('[3b] verknuepft mit Bestand-TN', _linkTnId); return {id:_linkTnId}; })
@@ -2364,6 +2397,8 @@ function submitJoinRegistration(){
   }).then(()=>{
     errEl.style.color='var(--acc)';
     errEl.textContent='✓ Registrierung erfolgreich!';
+    // Bestätigungsmail an die neue Adresse (best-effort, blockiert nichts). Nur Neu-Registrierte.
+    try{ const _cu=auth.currentUser; if(_cu && !_cu.emailVerified) _cu.sendEmailVerification().catch(()=>{}); }catch(e){}
     // URL bereinigen
     window.history.replaceState({},'',window.location.pathname);
     const _regKursId=_joinKursId; // vor dem Nullen sichern (für Auto-Checkin)
@@ -6306,6 +6341,42 @@ function loadHVKontakt(){
   }).catch(()=>{ el.innerHTML='<div class="empty">Kontaktdaten nicht verfügbar</div>'; });
 }
 
+// E-Mail-Verifizierungs-Hinweis (nur neu Registrierte + noch nicht bestätigt) + Profil-Anzeige aktualisieren
+function refreshEmailHint(){
+  const u=auth.currentUser;
+  const hint=document.getElementById('emailUnbestHint');
+  if(hint) hint.style.display=(u && _tnData && _tnData.emailCheckAktiv===true && u.emailVerified!==true) ? 'block' : 'none';
+  const an=document.getElementById('profilEmailAnzeige');
+  if(an && u){ an.textContent=u.email||(_tnData&&_tnData.email)||'–'; }
+}
+// Bestätigungs-Mail erneut senden
+function resendEmailVerification(){
+  const u=auth.currentUser;
+  if(!u) return;
+  u.sendEmailVerification()
+    .then(()=>alert('Bestätigungs-Mail gesendet – prüfe dein Postfach (auch Spam).'))
+    .catch(e=>alert(e&&e.code==='auth/too-many-requests'?'Zu viele Versuche – bitte kurz warten.':'Konnte nicht senden – versuch es später nochmal.'));
+}
+// E-Mail selbst korrigieren: Bestätigungslink an neue Adresse (Auth-E-Mail aendert sich nach Klick)
+function startEmailKorrektur(){
+  const u=auth.currentUser;
+  if(!u){ alert('Bitte zuerst einloggen.'); return; }
+  const neu=(prompt('Neue E-Mail-Adresse eingeben:', u.email||'')||'').trim().toLowerCase();
+  if(!neu) return;
+  if(!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(neu)){ alert('Bitte eine gültige E-Mail-Adresse eingeben.'); return; }
+  if(neu===(u.email||'').toLowerCase()){ alert('Das ist bereits deine aktuelle Adresse.'); return; }
+  u.verifyBeforeUpdateEmail(neu)
+    .then(()=>alert('Wir haben einen Bestätigungslink an '+neu+' geschickt.\n\nÖffne ihn in deinem Postfach – danach ist deine E-Mail aktualisiert. Bis dahin gilt weiter die alte Adresse.'))
+    .catch(e=>{
+      const c=e&&e.code;
+      if(c==='auth/requires-recent-login'){ alert('Aus Sicherheitsgründen: bitte einmal ab- und wieder anmelden und dann erneut „E-Mail korrigieren".'); }
+      else if(c==='auth/invalid-email'){ alert('Ungültige E-Mail-Adresse.'); }
+      else if(c==='auth/email-already-in-use'){ alert('Diese Adresse wird bereits verwendet.'); }
+      else if(c==='auth/too-many-requests'){ alert('Zu viele Versuche – bitte kurz warten.'); }
+      else { alert('Konnte nicht ändern: '+(c||(e&&e.message)||'Fehler')); }
+    });
+}
+
 function loadCheckinHistory(){
   const card=document.getElementById('checkinHistCard');
   const todayEl=document.getElementById('checkinHistToday');
@@ -6342,6 +6413,7 @@ function loadKurse(){
   const el=document.getElementById('homeKurse');
   if(!_tnData) return;
   try{ loadCheckinHistory(); }catch(e){}
+  try{ refreshEmailHint(); }catch(e){}
 
   // Alle Kurse aus kursHistory + aktiverKursId
   const kursIds=new Set();

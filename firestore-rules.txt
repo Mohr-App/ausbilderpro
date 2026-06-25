@@ -135,11 +135,21 @@ service cloud.firestore {
       allow delete: if request.auth != null;
       // Selbstregistrierung + manuelles Anlegen
       allow create: if request.auth != null;
+      // Verknuepfter Azubi: Verifizierungs-Status in den Datensatz spiegeln (fuer Ausbilder-Marker)
+      allow update: if request.auth != null
+        && resource.data.verknuepftUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['emailBestaetigt']);
+      // Verknuepfter Azubi: eigene E-Mail an seine VERIFIZIERTE Auth-Adresse angleichen (nach Selbstkorrektur)
+      allow update: if request.auth != null
+        && resource.data.verknuepftUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email','kontaktEmail','emailBestaetigt'])
+        && request.resource.data.email == request.auth.token.email;
       // Schritt 3 – Selbst-Verknuepfung (Claim) eines UNBEANSPRUCHTEN Bestand-TN:
       // nur auf eigene UID, nur mit eigener Login-Mail, nur diese Felder, nur wenn noch frei.
+      // ausbjahr: der Azubi gibt sein Lehrjahr bei der Anmeldung an und korrigiert damit den Import-Schaetzwert.
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-          ['email','kontaktEmail','kontaktTelefon','aktiverKursId','kursHistory','verknuepftUid','verknuepftAm','bestaetigungAngefordert','dsgvoZustimmung']
+          ['email','kontaktEmail','kontaktTelefon','aktiverKursId','kursHistory','verknuepftUid','verknuepftAm','bestaetigungAngefordert','dsgvoZustimmung','ausbjahr','emailCheckAktiv']
         )
         && (!('verknuepftUid' in resource.data) || resource.data.verknuepftUid == null)
         && request.resource.data.verknuepftUid == request.auth.uid
