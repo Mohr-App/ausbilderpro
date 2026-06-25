@@ -718,7 +718,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         📧 Bitte bestätige deine E-Mail – wir haben dir einen Link geschickt. <span style="color:var(--mu)">Stimmt die Adresse nicht?</span>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button onclick="resendEmailVerification()" title="Bestätigungs-Mail erneut senden" style="flex:1;padding:7px;background:var(--sur2);border:1px solid var(--brd);border-radius:9px;font-size:.68rem;font-weight:700;color:var(--tx);cursor:pointer;font-family:'Sora',sans-serif">Erneut senden</button>
-          <button onclick="showPage('profil')" title="E-Mail korrigieren" style="flex:1;padding:7px;background:var(--sur2);border:1px solid var(--brd);border-radius:9px;font-size:.68rem;font-weight:700;color:var(--acc);cursor:pointer;font-family:'Sora',sans-serif">E-Mail korrigieren</button>
+          <button onclick="startEmailKorrektur()" title="E-Mail korrigieren" style="flex:1;padding:7px;background:var(--sur2);border:1px solid var(--brd);border-radius:9px;font-size:.68rem;font-weight:700;color:var(--acc);cursor:pointer;font-family:'Sora',sans-serif">E-Mail korrigieren</button>
         </div>
       </div>
       <button id="qrCheckinBtn" onclick="openQRScanner()" title="Anwesenheit: QR-Code im Kursraum scannen (nur vor Ort möglich)" style="width:100%;margin-bottom:4px;padding:16px;background:linear-gradient(135deg,#2563eb,#059669);border:none;border-radius:14px;cursor:pointer;color:#fff;font-size:.95rem;font-weight:800;font-family:'Sora',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 4px 14px rgba(37,99,235,.3)">
@@ -1238,14 +1238,29 @@ auth.onAuthStateChanged(u=>{
 });
 
 function findTN(email){
-  return db.collection('globalTN').where('email','==',email).limit(1).get()
-    .then(snap=>{
-      if(snap.empty) return false;
-      _tnId=snap.docs[0].id;
-      _tnData=snap.docs[0].data();
+  const uid=(auth.currentUser&&auth.currentUser.uid)||_uid;
+  // 1) Stabile Suche über die Konto-UID (übersteht E-Mail-Änderungen)
+  const byUid = uid
+    ? db.collection('globalTN').where('verknuepftUid','==',uid).limit(1).get()
+        .then(s=> s.empty ? null : s.docs[0])
+        .catch(()=>null)
+    : Promise.resolve(null);
+  return byUid.then(doc=>{
+    if(doc){
+      _tnId=doc.id; _tnData=doc.data();
       try{ _syncEmailStatus(); }catch(e){}
       return true;
-    }).catch(()=>false);
+    }
+    // 2) Fallback: Suche über E-Mail (z.B. Bestand-TN vor erster Verknüpfung)
+    return db.collection('globalTN').where('email','==',email).limit(1).get()
+      .then(snap=>{
+        if(snap.empty) return false;
+        _tnId=snap.docs[0].id;
+        _tnData=snap.docs[0].data();
+        try{ _syncEmailStatus(); }catch(e){}
+        return true;
+      }).catch(()=>false);
+  });
 }
 // Spiegelt den Auth-Verifizierungsstatus in den Datensatz (fuer den AusbilderPro-Marker)
 // und gleicht die Daten-E-Mail an die verifizierte Auth-Adresse an (nach Selbstkorrektur).
@@ -2267,6 +2282,8 @@ function submitJoinRegistration(){
       selfRegistered: true,
       registeredAt: Date.now(),
       emailCheckAktiv: true,
+      verknuepftUid: uid,
+      verknuepftAm: Date.now(),
       dsgvoZustimmung: {
         datenschutz: true,
         nutzungsbedingungen: true,
@@ -6365,12 +6382,29 @@ function startEmailKorrektur(){
   if(!neu) return;
   if(!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(neu)){ alert('Bitte eine gültige E-Mail-Adresse eingeben.'); return; }
   if(neu===(u.email||'').toLowerCase()){ alert('Das ist bereits deine aktuelle Adresse.'); return; }
+  _doEmailUpdate(u, neu);
+}
+function _doEmailUpdate(u, neu){
   u.verifyBeforeUpdateEmail(neu)
     .then(()=>alert('Wir haben einen Bestätigungslink an '+neu+' geschickt.\n\nÖffne ihn in deinem Postfach – danach ist deine E-Mail aktualisiert. Bis dahin gilt weiter die alte Adresse.'))
     .catch(e=>{
       const c=e&&e.code;
-      if(c==='auth/requires-recent-login'){ alert('Aus Sicherheitsgründen: bitte einmal ab- und wieder anmelden und dann erneut „E-Mail korrigieren".'); }
-      else if(c==='auth/invalid-email'){ alert('Ungültige E-Mail-Adresse.'); }
+      if(c==='auth/requires-recent-login'){
+        // Nahtlose Re-Authentifizierung per Passwort, ohne sichtbares Ab-/Anmelden
+        const pw=prompt('Zur Sicherheit bitte einmal dein aktuelles Passwort eingeben:');
+        if(!pw) return;
+        const cred=firebase.auth.EmailAuthProvider.credential(u.email, pw);
+        u.reauthenticateWithCredential(cred)
+          .then(()=>_doEmailUpdate(u, neu))
+          .catch(re=>{
+            const rc=re&&re.code;
+            if(rc==='auth/wrong-password'||rc==='auth/invalid-credential') alert('Passwort stimmt nicht. Bitte erneut versuchen.');
+            else if(rc==='auth/too-many-requests') alert('Zu viele Versuche – bitte kurz warten.');
+            else alert('Konnte nicht bestätigen: '+(rc||(re&&re.message)||'Fehler'));
+          });
+        return;
+      }
+      if(c==='auth/invalid-email'){ alert('Ungültige E-Mail-Adresse.'); }
       else if(c==='auth/email-already-in-use'){ alert('Diese Adresse wird bereits verwendet.'); }
       else if(c==='auth/too-many-requests'){ alert('Zu viele Versuche – bitte kurz warten.'); }
       else { alert('Konnte nicht ändern: '+(c||(e&&e.message)||'Fehler')); }
