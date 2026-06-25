@@ -3353,7 +3353,7 @@ function loadCleanupList(){
     // globalTN collection
     tnSnap.forEach(doc=>{
       const d=doc.data();
-      const uid=d.uid||'';
+      const uid=d.uid||d.verknuepftUid||'';
       if(uid&&accounts.has(uid)){
         accounts.get(uid).tnId=doc.id;
         accounts.get(uid).tnName=((d.vorname||'')+' '+(d.nachname||'')).trim();
@@ -4593,14 +4593,15 @@ function impAnalysiere(){
     name:((t.vorname||'')+' '+(t.nachname||'')).trim(), ausbjahr:(t.ausbjahr||'').toString().trim(),
     vorname:(t.vorname||''), nachname:(t.nachname||''), firma:(t.firma||''), beruf:(t.beruf||''),
     adresse:(t.adresse||''), plz:(t.plz||'').toString(), ort:(t.ort||''),
-    anfang:(t.anfang||''), endeVorgesehen:(t.endeVorgesehen||'')
+    anfang:(t.anfang||''), endeVorgesehen:(t.endeVorgesehen||''),
+    selfRegistered:(t.selfRegistered===true)
   }));
   // E-Mail-Index der ANONYMISIERTEN Pilot-TN (Ghost-Erkennung; Pilot-Mails sind individuell)
   const anonEmail={};
   (_globalTN||[]).forEach(t=>{ if(_impIsAnon(t.vorname)){ const e=_impEmail(t.email); if(e) anonEmail[e]=t; } });
   // Within-List: bereits in DIESER Datei gesehene Personen (voller Name -> Datums/Mail-Mengen)
   const seen={};
-  const perRow=[]; const tippfehler=[]; const unsicher=[]; const ghost=[]; const backfill={}; const abgleich={};
+  const perRow=[]; const tippfehler=[]; const unsicher=[]; const ghost=[]; const backfill={}; const abgleich={}; const promote={};
   const matchedBestandIds=new Set(); // alle Bestands-TN, die von einer Listenzeile getroffen wurden
   let neu=0, schon=0, leer=0, listdub=0;
   for(let i=0;i<_impRawData.length;i++){
@@ -4615,6 +4616,11 @@ function impAnalysiere(){
     const _endeV=_impMapping.endeVorgesehen?_impGeb(row[_impMapping.endeVorgesehen]):'';
     const ajManuell=_impMapping.ausbjahr?(row[_impMapping.ausbjahr]||'').toString().trim():'';
     const aj=ajManuell||_impLehrjahr(_anfang,_endeV);
+    const _firma=_impMapping.firma?(row[_impMapping.firma]||'').toString().trim():'';
+    const _beruf=_impMapping.beruf?(row[_impMapping.beruf]||'').toString().trim():'';
+    const _adresse=_impMapping.adresse?(row[_impMapping.adresse]||'').toString().trim():'';
+    const _plz=_impMapping.plz?(row[_impMapping.plz]||'').toString().trim():'';
+    const _ort=_impMapping.ort?(row[_impMapping.ort]||'').toString().trim():'';
     const fn=_impFullName(vn,nn);
     // (1) Within-List-Dublette: voller Name gleich UND (gleiches Datum ODER gleiche E-Mail)
     const sObj=seen[fn];
@@ -4652,6 +4658,19 @@ function impAnalysiere(){
       if(_anfang && !hitBest.anfang) bfUpd.anfang=_anfang;
       if(_endeV && !hitBest.endeVorgesehen) bfUpd.endeVorgesehen=_endeV;
       if(Object.keys(bfUpd).length) backfill[i]=Object.assign({id:hitBest.id, name:vn+' '+nn}, bfUpd);
+      // (3b) Loser Selbst-Eintrag -> offizielle Liste gewinnt (Name/Firma/Beruf/Adresse), Lehrjahr bleibt vom TN,
+      //      Eintrag wird befoerdert (selfRegistered:false). Konto/Kurs/Anwesenheit/E-Mail bleiben unberuehrt.
+      if(hitBest.selfRegistered){
+        const ov={};
+        if(vn && vn!==hitBest.vorname) ov.vorname=vn;
+        if(nn && nn!==hitBest.nachname) ov.nachname=nn;
+        if(_firma && _firma!==hitBest.firma) ov.firma=_firma;
+        if(_beruf && _beruf!==hitBest.beruf) ov.beruf=_beruf;
+        if(_adresse && _adresse!==hitBest.adresse) ov.adresse=_adresse;
+        if(_plz && _plz!==hitBest.plz) ov.plz=_plz;
+        if(_ort && _ort!==hitBest.ort) ov.ort=_ort;
+        promote[i]=Object.assign({id:hitBest.id, name:vn+' '+nn}, ov, {selfRegistered:false});
+      }
     }
     // VP-Abgleich entfernt: bestehende TN werden NICHT mehr in Stammdaten ueberschrieben (Verknuepfung/Kurs/Konto bleiben sowieso unberuehrt). Nur leeres Lehrjahr/Daten werden ergaenzt (s.o.).
     perRow.push(kat);
@@ -4676,7 +4695,7 @@ function impAnalysiere(){
     });
   });
   fehlt.sort((a,b)=>a.name.localeCompare(b.name));
-  return {perRow, neu, schon, leer, tippfehler, unsicher, listdub, ghost, backfill, abgleich, fehlt, gesamt:_impRawData.length};
+  return {perRow, neu, schon, leer, tippfehler, unsicher, listdub, ghost, backfill, abgleich, promote, fehlt, gesamt:_impRawData.length};
 }
 function impRenderBericht(a){
   const warn=document.getElementById('impDuplicateWarn');
@@ -4689,6 +4708,7 @@ function impRenderBericht(a){
   if(a.listdub) h+='<span style="color:#7c3aed"><b>'+a.listdub+'</b> Doppel in der Liste (übersprungen)</span>';
   if(a.ghost && a.ghost.length) h+='<span style="color:#0284c7"><b>'+a.ghost.length+'</b> Pilot-TN bereits vorhanden (übersprungen)</span>';
   if(a.backfill && Object.keys(a.backfill).length) h+='<span style="color:#16a34a"><b>'+Object.keys(a.backfill).length+'</b> Lehrjahr wird ergänzt</span>';
+  if(a.promote && Object.keys(a.promote).length) h+='<span style="color:#16a34a"><b>'+Object.keys(a.promote).length+'</b> lose Einträge werden mit Liste abgeglichen</span>';
   if(a.abgleich && Object.keys(a.abgleich).length) h+='<span style="color:#0d9488"><b>'+Object.keys(a.abgleich).length+'</b> an VP angeglichen</span>';
   if(a.leer) h+='<span style="color:var(--mu)"><b>'+a.leer+'</b> leer (übersprungen)</span>';
   h+='</div>';
@@ -4703,6 +4723,14 @@ function impRenderBericht(a){
   if(a.ghost && a.ghost.length){
     h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#0284c7;font-size:.7rem">Pilot-TN bereits vorhanden ('+a.ghost.length+') – per E-Mail erkannt, nicht neu angelegt</summary>';
     h+='<div style="font-size:.66rem;margin-top:4px">'+a.ghost.map(t=>esc(t.name)+' ('+esc(t.email)+')').join('<br>')+'</div></details>';
+  }
+  if(a.promote && Object.keys(a.promote).length){
+    const pr=Object.values(a.promote);
+    h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#16a34a;font-size:.7rem">Lose Einträge → mit Liste abgeglichen &amp; befördert ('+pr.length+') – Lehrjahr & Konto bleiben</summary>';
+    h+='<div style="font-size:.66rem;margin-top:4px">'+pr.map(t=>{
+      const teile=[]; if(t.vorname||t.nachname) teile.push('Name'); if(t.firma) teile.push('Firma'); if(t.beruf) teile.push('Beruf'); if(t.adresse||t.plz||t.ort) teile.push('Adresse');
+      return esc(t.name)+(teile.length?' ('+teile.join(', ')+')':' (befördert)');
+    }).join('<br>')+'</div></details>';
   }
   if(a.backfill && Object.keys(a.backfill).length){
     const bf=Object.values(a.backfill);
@@ -4762,7 +4790,7 @@ async function doImport(){
     return {berufGruppeId:'',beruf:val};
   }
 
-  let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0, skipListdub=0, skipGhost=0, bfDone=0, abgleichDone=0;
+  let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0, skipListdub=0, skipGhost=0, bfDone=0, abgleichDone=0, promoDone=0;
 
   // ── Batch-Schreiben (nur ohne AzubiPro-Konten) ──────────────────
   const CHUNK=500;            // Firestore harte Grenze: max 500 Ops pro Batch
@@ -4808,6 +4836,16 @@ async function doImport(){
           try{ await db.collection('globalTN').doc(bf.id).update(upd); bfDone++; }
           catch(e){ console.warn('Backfill '+bf.id+':',e); }
         }
+      }
+      // Loser Selbst-Eintrag -> offizielle Liste gewinnt (Name/Firma/Beruf/Adresse), Lehrjahr bleibt,
+      // Eintrag wird befoerdert. Konto/Kurs/Anwesenheit/E-Mail unberuehrt.
+      const pr=_impAnalyse.promote && _impAnalyse.promote[i];
+      if(pr && pr.id){
+        const pupd={};
+        ['vorname','nachname','firma','beruf','adresse','plz','ort'].forEach(f=>{ if(pr[f]!==undefined) pupd[f]=pr[f]; });
+        pupd.selfRegistered=false;
+        try{ await db.collection('globalTN').doc(pr.id).update(pupd); promoDone++; }
+        catch(e){ console.warn('Promote '+pr.id+':',e); }
       }
       continue;
     }
@@ -4873,6 +4911,7 @@ async function doImport(){
   let bericht='✅ <b>'+ok+' neu angelegt</b>';
   if(skipSchon) bericht+=' · '+skipSchon+' schon vorhanden';
   if(bfDone) bericht+=' · <span style="color:#16a34a">'+bfDone+' Lehrjahr ergänzt</span>';
+  if(promoDone) bericht+=' · <span style="color:#16a34a">'+promoDone+' lose Einträge mit Liste abgeglichen</span>';
   if(abgleichDone) bericht+=' · <span style="color:#0d9488">'+abgleichDone+' an VP angeglichen</span>';
   if(skipListdub) bericht+=' · <span style="color:#7c3aed">'+skipListdub+' Doppel in der Liste</span>';
   if(skipGhost) bericht+=' · <span style="color:#0284c7">'+skipGhost+' Pilot-TN vorhanden</span>';
