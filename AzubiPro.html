@@ -1997,7 +1997,13 @@ function startJoinWizard(){
 }
 function joinConfirmKursYes(){
   var s=document.getElementById('joinConfirmKurs'); if(s) s.style.display='none';
-  var info=document.getElementById('joinKursInfo'); if(info) info.style.display='';
+  var info=document.getElementById('joinKursInfo');
+  if(info){
+    info.style.display='';
+    if(_joinInfoSaved===null) _joinInfoSaved=info.innerHTML;   // Original (mit Untertitel) sichern
+    var nm=(_joinKursName||'').trim();
+    info.innerHTML='<div style="font-weight:800;font-size:.88rem">'+esc(nm||'Lehrgang')+'</div>'; // im Wizard nur der Kursname
+  }
   _wizStep = 1;
   document.getElementById('joinLoginSection').style.display='none';
   document.getElementById('joinWizard').style.display='block';
@@ -2033,6 +2039,7 @@ function wizCancel(){
   var c=document.getElementById('joinChoice'); if(c) c.style.display='block';
   var f=document.getElementById('joinLoginForm'); if(f) f.style.display='none';
   var ck=document.getElementById('joinConfirmKurs'); if(ck) ck.style.display='none';
+  var info=document.getElementById('joinKursInfo'); if(info && _joinInfoSaved!==null){ info.innerHTML=_joinInfoSaved; _joinInfoSaved=null; } // Untertitel auf Auswahl-Screen wieder zeigen
   // Felder NICHT leeren - falls User abgebrochen ist und nochmal versucht
 }
 
