@@ -1671,6 +1671,7 @@ function showErr(m){ const el=document.getElementById('lErr'); el.style.color='v
 
 // ── SELF-REGISTRATION (QR Join) ──
 let _joinKursId=null;
+let _joinKursName='';   // Kursname aus dem Beitritts-Link (Variante 4)
 // Globaler Freigabe-Pflicht-Status (aus shared/kursSettings). Steuert, ob bei Verknuepfung
 // 'bestaetigungAngefordert' gesetzt wird. Default false (Pflicht aus -> kein Flag).
 let _freigabePflichtCache=false;
@@ -1689,11 +1690,14 @@ function _watchFreigabePflicht(){
   const joinId=params.get('join');
   if(!joinId) return;
   _joinKursId=joinId;
+  _joinKursName=(params.get('k')||'').trim();   // Kursname aus dem QR/Link (Variante 4) – für Anzeige vor Login
   const infoEl=document.getElementById('joinKursInfo');
   // Kursinfo laden (braucht Auth – versuchen, bei Fehler trotzdem Registrierung erlauben)
   db.collection('shared').doc('kurse').collection('list').doc(joinId).get().then(doc=>{
     if(!doc.exists){
-      infoEl.innerHTML='<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Kurs-ID: '+esc(joinId.substring(0,8))+'…</div>';
+      infoEl.innerHTML = _joinKursName
+        ? '<div style="font-weight:800;font-size:.88rem">'+esc(_joinKursName)+'</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Wähle unten, ob du dich anmeldest oder das erste Mal startest.</div>'
+        : '<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Kurs-ID: '+esc(joinId.substring(0,8))+'…</div>';
       return;
     }
     const k=doc.data();
@@ -1702,7 +1706,9 @@ function _watchFreigabePflicht(){
       +'<div style="font-size:.68rem;color:var(--mu);margin-top:4px;font-family:\'JetBrains Mono\',monospace">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div>'
       +(k.ausbilderName?'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">Ausbilder: '+esc(k.ausbilderName)+'</div>':'');
   }).catch(()=>{
-    infoEl.innerHTML='<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Wähle unten, ob du dich anmeldest oder das erste Mal startest.</div>';
+    infoEl.innerHTML = _joinKursName
+      ? '<div style="font-weight:800;font-size:.88rem">'+esc(_joinKursName)+'</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Wähle unten, ob du dich anmeldest oder das erste Mal startest.</div>'
+      : '<div style="font-weight:700">Lehrgang beitreten</div><div style="font-size:.62rem;color:var(--mu);margin-top:4px">Wähle unten, ob du dich anmeldest oder das erste Mal startest.</div>';
   });
   // Screen-Umschaltung übernimmt der Auth-Handler (je nach Login-Status):
   // nicht eingeloggt -> Join-/Registrierungs-Screen, eingeloggt -> _autoJoinScannedKurs.

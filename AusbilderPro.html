@@ -8141,9 +8141,9 @@ function openQRModal(){
   if(!inst||!inst.sharedKursId){toast('Kein Kurs verknüpft','bad');return;}
   const kursId=inst.sharedKursId;
   const baseUrl=window.location.origin+window.location.pathname.replace('AusbilderPro.html','AzubiPro.html');
-  const joinUrl=baseUrl+'?join='+kursId;
-  const qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=250x250&data='+encodeURIComponent(joinUrl);
   const kursName=S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs';
+  const joinUrl=baseUrl+'?join='+kursId+'&k='+encodeURIComponent(kursName);
+  const qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=250x250&data='+encodeURIComponent(joinUrl);
   const dates=instLabel(inst);
 
   const body=document.getElementById('qrBody');
@@ -8166,7 +8166,8 @@ function copyQRLink(){
   const inst=curInst();
   if(!inst||!inst.sharedKursId) return;
   const baseUrl=window.location.origin+window.location.pathname.replace('AusbilderPro.html','AzubiPro.html');
-  const joinUrl=baseUrl+'?join='+inst.sharedKursId;
+  const kursName=S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs';
+  const joinUrl=baseUrl+'?join='+inst.sharedKursId+'&k='+encodeURIComponent(kursName);
   navigator.clipboard.writeText(joinUrl).then(()=>toast('Link kopiert ✓')).catch(()=>{
     prompt('Link kopieren:',joinUrl);
   });
@@ -8177,9 +8178,9 @@ function printQR(){
   if(!inst||!inst.sharedKursId) return;
   const kursId=inst.sharedKursId;
   const baseUrl=window.location.origin+window.location.pathname.replace('AusbilderPro.html','AzubiPro.html');
-  const joinUrl=baseUrl+'?join='+kursId;
-  const qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=400x400&data='+encodeURIComponent(joinUrl);
   const kursName=S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs';
+  const joinUrl=baseUrl+'?join='+kursId+'&k='+encodeURIComponent(kursName);
+  const qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=400x400&data='+encodeURIComponent(joinUrl);
   const dates=instLabel(inst);
 
   const w=window.open('','_blank');
@@ -8220,7 +8221,7 @@ let _qrAttCurKursId=null;
 function _qrAttUrl(kursId){
   // Derselbe Link wie der Kurs-Registrierungs-QR: AzubiPro entscheidet beim Oeffnen
   // (nicht im Kurs -> Beitritt; schon im Kurs -> Check-in mit GPS-Pruefung)
-  return window.location.origin+window.location.pathname.replace('AusbilderPro.html','AzubiPro.html')+'?join='+kursId;
+  return window.location.origin+window.location.pathname.replace('AusbilderPro.html','AzubiPro.html')+'?join='+kursId+'&k='+encodeURIComponent(S.kats[S.curKat]?S.kats[S.curKat].label:'');
 }
 function openQRAttModal(){
   const inst=curInst();
