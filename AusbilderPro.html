@@ -2136,6 +2136,8 @@ function persist(){
   showSaveInd();
   // Cloud-Sync (hook wird von Firebase-Block gesetzt)
   if(typeof window._fbSaveHook === 'function') window._fbSaveHook();
+  // Sitzplatz-Marker (📧) nach Aenderungen live nachziehen (entprellt, mit Schleifenschutz)
+  try{ if(typeof _scheduleSeatSync==='function') _scheduleSeatSync(); }catch(e){}
   // Auto-Export deaktiviert (Stefan: nervig, nicht benoetigt - Daten liegen in Firestore)
 }
 
@@ -5155,6 +5157,16 @@ function resolveAllPoolTnIds(){
 // ─── SEAT-NAMES SYNC: Sitzplatz-Namen aus globalTN aktualisieren ───
 // Gleicht lokalen seat.name/seat.company mit aktuellem Firestore-Stand ab.
 // Lookup über seat.poolTnId → globalTN/{tnId}. Firestore = Wahrheit.
+// Live-Sitzplatz-Sync: entprellt + Schleifenschutz. Faengt Drag/Swap/Zuweisung (ueber persist)
+// und Statusaenderungen (E-Mail bestaetigt) beim Zurueckkommen in die App ab.
+let _seatSyncTimer=null, _lastSeatSync=0;
+function _scheduleSeatSync(){
+  if(Date.now()-_lastSeatSync < 1500) return; // gerade gesynct -> kein Re-Trigger (verhindert Schleife)
+  if(_seatSyncTimer) clearTimeout(_seatSyncTimer);
+  _seatSyncTimer=setTimeout(()=>{ _seatSyncTimer=null; try{ syncSeatNamesFromFirestore(); }catch(e){} }, 1000);
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') _scheduleSeatSync(); });
+window.addEventListener('focus', _scheduleSeatSync);
 function syncSeatNamesFromFirestore(){
   if(_demoMode) return;
   if(!_db) return;
@@ -5168,6 +5180,7 @@ function syncSeatNamesFromFirestore(){
     });
   });
   if(!tnIds.size) return;
+  _lastSeatSync=Date.now();
   // Hole alle relevanten globalTN-Docs (parallel, einzeln um nicht alle 71 zu laden)
   const promises=[...tnIds].map(tnId=>
     _db.collection('globalTN').doc(tnId).get()

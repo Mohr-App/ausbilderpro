@@ -2967,6 +2967,7 @@ function loadData(){
         || newData.status!==_tnData?.status;
       _tnData=newData;
       try{ _tryQRCheckin(); }catch(e){}
+      try{ refreshEmailHint(); }catch(e){}
       if(changed){
         loadKurse();
         checkBenachrichtigungen();
@@ -2976,6 +2977,21 @@ function loadData(){
   }
 }
 let _tnDocUnsub=null;
+
+// Beim Zurückkommen in die App (aus dem Mail-Tab) den Auth-Status frisch holen –
+// ohne Neuladen, ohne erneutes Anmelden. Nur relevant, solange E-Mail noch unbestätigt.
+let _lastAuthRefresh=0;
+function _refreshAuthStatusOnReturn(){
+  const u=auth.currentUser;
+  if(!u) return;
+  if(!(_tnData && _tnData.emailCheckAktiv===true && u.emailVerified!==true && _tnData.emailBestaetigt!==true)) return;
+  const now=Date.now();
+  if(now-_lastAuthRefresh < 3000) return; // Debounce
+  _lastAuthRefresh=now;
+  u.reload().then(()=>{ try{ _syncEmailStatus(); }catch(e){} try{ refreshEmailHint(); }catch(e){} }).catch(()=>{});
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') _refreshAuthStatusOnReturn(); });
+window.addEventListener('focus', _refreshAuthStatusOnReturn);
 
 function checkSitzplatzPopup(){
   // Popup entfernt – Sitzplatz wird jetzt direkt in der Kurs-Karte angezeigt
@@ -6362,7 +6378,7 @@ function loadHVKontakt(){
 function refreshEmailHint(){
   const u=auth.currentUser;
   const hint=document.getElementById('emailUnbestHint');
-  if(hint) hint.style.display=(u && _tnData && _tnData.emailCheckAktiv===true && u.emailVerified!==true) ? 'block' : 'none';
+  if(hint) hint.style.display=(u && _tnData && _tnData.emailCheckAktiv===true && u.emailVerified!==true && _tnData.emailBestaetigt!==true) ? 'block' : 'none';
   const an=document.getElementById('profilEmailAnzeige');
   if(an && u){ an.textContent=u.email||(_tnData&&_tnData.email)||'–'; }
 }
