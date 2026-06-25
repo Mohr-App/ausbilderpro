@@ -1701,6 +1701,7 @@ function _watchFreigabePflicht(){
       return;
     }
     const k=doc.data();
+    _joinKursName = k.name||k.lehrgangsart||_joinKursName||'';
     infoEl.innerHTML=
       '<div style="font-weight:800;font-size:.88rem">'+esc(k.name||k.lehrgangsart||'Lehrgang')+'</div>'
       +'<div style="font-size:.68rem;color:var(--mu);margin-top:4px;font-family:\'JetBrains Mono\',monospace">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div>'
@@ -1986,11 +1987,17 @@ function startJoinWizard(){
   var c=document.getElementById('joinChoice'); if(c) c.style.display='none';
   var info=document.getElementById('joinKursInfo');
   var box=document.getElementById('joinConfirmKursBox');
-  if(box) box.innerHTML = (info && info.innerHTML.trim()) ? info.innerHTML : '<div style="font-weight:800;font-size:.88rem">Lehrgang beitreten</div>';
+  // In dieser Ansicht nur den Kursnamen zeigen (kein doppelter "Waehle unten..."-Text)
+  var nm=(_joinKursName||'').trim();
+  if(box) box.innerHTML = nm
+    ? '<div style="font-weight:800;font-size:1.05rem">'+esc(nm)+'</div>'
+    : '<div style="font-weight:800;font-size:1.05rem">Lehrgang beitreten</div>';
+  if(info) info.style.display='none'; // grünen Kopf-Kasten hier ausblenden -> Kurs steht nur einmal
   var s=document.getElementById('joinConfirmKurs'); if(s) s.style.display='block';
 }
 function joinConfirmKursYes(){
   var s=document.getElementById('joinConfirmKurs'); if(s) s.style.display='none';
+  var info=document.getElementById('joinKursInfo'); if(info) info.style.display='';
   _wizStep = 1;
   document.getElementById('joinLoginSection').style.display='none';
   document.getElementById('joinWizard').style.display='block';
@@ -1998,6 +2005,7 @@ function joinConfirmKursYes(){
 }
 function joinConfirmKursNo(){
   var s=document.getElementById('joinConfirmKurs'); if(s) s.style.display='none';
+  var info=document.getElementById('joinKursInfo'); if(info) info.style.display='';
   var c=document.getElementById('joinChoice'); if(c) c.style.display='block';
 }
 
