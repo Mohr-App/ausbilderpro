@@ -4506,6 +4506,9 @@ function mkSeat(id,seats){
     if(d.fehlInfo){
       meldHtml+='<div title="Wegen Fehlen informiert am '+fmtD(d.fehlInfo.date)+'" style="position:absolute;top:3px;left:3px;font-size:.8rem;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">📣</div>';
     }
+    if(d.emailUnbestaetigt){
+      meldHtml+='<div title="E-Mail noch nicht bestätigt – Adresse evtl. falsch" style="position:absolute;bottom:3px;right:3px;font-size:.78rem;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">📧</div>';
+    }
     el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
   }
   return el;
@@ -5190,6 +5193,12 @@ function syncSeatNamesFromFirestore(){
           // Firma synchronisieren
           if(tn.firma!==undefined && seat.company!==tn.firma){
             seat.company=tn.firma||'';
+            changed=true;
+          }
+          // E-Mail-unbestaetigt-Marker: nur fuer neu registrierte (emailCheckAktiv) + noch nicht bestaetigt
+          const unbest=!!(tn.emailCheckAktiv===true && tn.emailBestaetigt!==true);
+          if(seat.emailUnbestaetigt!==unbest){
+            seat.emailUnbestaetigt=unbest;
             changed=true;
           }
         });
