@@ -4601,7 +4601,7 @@ function impAnalysiere(){
   (_globalTN||[]).forEach(t=>{ if(_impIsAnon(t.vorname)){ const e=_impEmail(t.email); if(e) anonEmail[e]=t; } });
   // Within-List: bereits in DIESER Datei gesehene Personen (voller Name -> Datums/Mail-Mengen)
   const seen={};
-  const perRow=[]; const tippfehler=[]; const unsicher=[]; const ghost=[]; const backfill={}; const abgleich={}; const promote={};
+  const perRow=[]; const tippfehler=[]; const unsicher=[]; const ghost=[]; const backfill={}; const abgleich={}; const promote={}; const gebFix={};
   const matchedBestandIds=new Set(); // alle Bestands-TN, die von einer Listenzeile getroffen wurden
   let neu=0, schon=0, leer=0, listdub=0;
   for(let i=0;i<_impRawData.length;i++){
@@ -4627,10 +4627,14 @@ function impAnalysiere(){
     if(sObj && ((geb && sObj.gebs.has(geb)) || (em && sObj.emails.has(em)))){
       perRow.push('listdub'); listdub++; continue;
     }
-    // Bestand-Match (unverändert)
+    // Bestand-Match. Nachname-Pflicht: ein Treffer zaehlt nur, wenn mind. ein Nachname-Token
+    // der Liste im Bestands-Namen vorkommt. Verhindert Falsch-Treffer ueber gemeinsame Vornamen
+    // (z.B. "Ali Reza"), durch die echte Neue faelschlich als "unsicher" uebersprungen wurden.
+    const nnToks=_impNorm(nn).split(' ').filter(Boolean);
     let kat='neu', nameHitGeb=null, hitBest=null;
     for(const b of bestand){
       if(!_impTokenMatch(toks,b.toks)) continue;
+      if(nnToks.length && !nnToks.some(t=>b.toks.has(t))) continue; // Nachname muss passen
       if(geb && b.geb && geb===b.geb){ kat='schon'; hitBest=b; break; }
       if(geb && b.geb){
         const g=_impDatumsTeileGleich(geb,b.geb);
@@ -4676,7 +4680,11 @@ function impAnalysiere(){
     perRow.push(kat);
     if(kat==='schon') schon++;
     else if(kat==='neu') neu++;
-    else if(kat==='tippfehler') tippfehler.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', i});
+    else if(kat==='tippfehler'){
+      tippfehler.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', id:nameHitGeb?nameHitGeb.id:null, i});
+      // Liste hat Hoheit: Geburtsdatum wird beim Import auf den Listen-Wert korrigiert
+      if(nameHitGeb && nameHitGeb.id && geb) gebFix[i]={id:nameHitGeb.id, geb:geb, name:vn+' '+nn};
+    }
     else if(kat==='unsicher') unsicher.push({name:vn+' '+nn, impGeb:geb, bestGeb:nameHitGeb?nameHitGeb.geb:'', i});
   }
   // "Nicht mehr in der Liste": frueher importierte Bestands-TN, die von KEINER Listenzeile getroffen wurden.
@@ -4695,7 +4703,7 @@ function impAnalysiere(){
     });
   });
   fehlt.sort((a,b)=>a.name.localeCompare(b.name));
-  return {perRow, neu, schon, leer, tippfehler, unsicher, listdub, ghost, backfill, abgleich, promote, fehlt, gesamt:_impRawData.length};
+  return {perRow, neu, schon, leer, tippfehler, unsicher, listdub, ghost, backfill, abgleich, promote, gebFix, fehlt, gesamt:_impRawData.length};
 }
 function impRenderBericht(a){
   const warn=document.getElementById('impDuplicateWarn');
@@ -4703,7 +4711,7 @@ function impRenderBericht(a){
   h+='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.7rem">';
   h+='<span><b>'+a.neu+'</b> neu anlegen</span>';
   h+='<span style="color:#16a34a"><b>'+a.schon+'</b> schon vorhanden (überspringen)</span>';
-  h+='<span style="color:#d97706"><b>'+a.tippfehler.length+'</b> Tippfehler-Verdacht (Geburtsdatum)</span>';
+  h+='<span style="color:#16a34a"><b>'+a.tippfehler.length+'</b> Geburtsdatum wird auf Liste korrigiert</span>';
   h+='<span style="color:#dc2626"><b>'+a.unsicher.length+'</b> unsicher</span>';
   if(a.listdub) h+='<span style="color:#7c3aed"><b>'+a.listdub+'</b> Doppel in der Liste (übersprungen)</span>';
   if(a.ghost && a.ghost.length) h+='<span style="color:#0284c7"><b>'+a.ghost.length+'</b> Pilot-TN bereits vorhanden (übersprungen)</span>';
@@ -4713,8 +4721,8 @@ function impRenderBericht(a){
   if(a.leer) h+='<span style="color:var(--mu)"><b>'+a.leer+'</b> leer (übersprungen)</span>';
   h+='</div>';
   if(a.tippfehler.length){
-    h+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#d97706;font-size:.7rem">Tippfehler-Verdacht ('+a.tippfehler.length+') – ≥2 Datumsteile gleich</summary>';
-    h+='<div style="font-size:.66rem;margin-top:4px">'+a.tippfehler.map(t=>esc(t.name)+': Liste '+esc(t.impGeb)+' ↔ Bestand '+esc(t.bestGeb)).join('<br>')+'</div></details>';
+    h+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#16a34a;font-size:.7rem">Geburtsdatum → auf Liste korrigiert ('+a.tippfehler.length+') – ≥2 Datumsteile gleich</summary>';
+    h+='<div style="font-size:.66rem;margin-top:4px">'+a.tippfehler.map(t=>esc(t.name)+': Bestand '+esc(t.bestGeb)+' → Liste '+esc(t.impGeb)).join('<br>')+'</div></details>';
   }
   if(a.unsicher.length){
     h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#dc2626;font-size:.7rem">Unsicher ('+a.unsicher.length+') – nur listen, nichts ändern</summary>';
@@ -4790,7 +4798,7 @@ async function doImport(){
     return {berufGruppeId:'',beruf:val};
   }
 
-  let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0, skipListdub=0, skipGhost=0, bfDone=0, abgleichDone=0, promoDone=0;
+  let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0, skipListdub=0, skipGhost=0, bfDone=0, abgleichDone=0, promoDone=0, gebFixDone=0;
 
   // ── Batch-Schreiben (nur ohne AzubiPro-Konten) ──────────────────
   const CHUNK=500;            // Firestore harte Grenze: max 500 Ops pro Batch
@@ -4850,7 +4858,15 @@ async function doImport(){
       continue;
     }
     if(kat==='unsicher'){ skipUnsicher++; continue; }
-    if(kat==='tippfehler'){ skipTippfehler++; continue; }
+    if(kat==='tippfehler'){
+      // Liste hat Hoheit: Geburtsdatum auf den Listen-Wert korrigieren (Name + >=2 Datumsteile gleich -> selbe Person)
+      const gf=_impAnalyse.gebFix && _impAnalyse.gebFix[i];
+      if(gf && gf.id && gf.geb){
+        try{ await db.collection('globalTN').doc(gf.id).update({geburtsdatum:gf.geb}); gebFixDone++; }
+        catch(e){ console.warn('GebFix '+gf.id+':',e); skipTippfehler++; }
+      } else { skipTippfehler++; }
+      continue;
+    }
 
     const vn=(row[_impMapping.vorname]||'').toString().trim();
     const nn=(row[_impMapping.nachname]||'').toString().trim();
@@ -4915,13 +4931,14 @@ async function doImport(){
   if(abgleichDone) bericht+=' · <span style="color:#0d9488">'+abgleichDone+' an VP angeglichen</span>';
   if(skipListdub) bericht+=' · <span style="color:#7c3aed">'+skipListdub+' Doppel in der Liste</span>';
   if(skipGhost) bericht+=' · <span style="color:#0284c7">'+skipGhost+' Pilot-TN vorhanden</span>';
-  if(skipTippfehler) bericht+=' · <span style="color:#d97706">'+skipTippfehler+' Tippfehler-Verdacht (manuell prüfen)</span>';
+  if(gebFixDone) bericht+=' · <span style="color:#16a34a">'+gebFixDone+' Geburtsdaten auf Liste korrigiert</span>';
+  if(skipTippfehler) bericht+=' · <span style="color:#d97706">'+skipTippfehler+' Geburtsdatum nicht korrigierbar (prüfen)</span>';
   if(skipUnsicher) bericht+=' · <span style="color:#dc2626">'+skipUnsicher+' unsicher (übersprungen)</span>';
   if(skipLeer) bericht+=' · '+skipLeer+' leer';
   if(fail) bericht+=' · <span style="color:var(--bad)">'+fail+' fehlgeschlagen</span>';
-  // Tippfehler-Faelle zur manuellen Korrektur auflisten
+  // Korrigierte Geburtsdaten auflisten (Transparenz)
   if(_impAnalyse.tippfehler && _impAnalyse.tippfehler.length){
-    bericht+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#d97706;font-size:.7rem">Geburtsdatum manuell prüfen ('+_impAnalyse.tippfehler.length+')</summary><div style="font-size:.66rem;margin-top:4px">'+_impAnalyse.tippfehler.map(t=>esc(t.name)+': Liste '+esc(t.impGeb)+' ↔ Bestand '+esc(t.bestGeb)).join('<br>')+'</div></details>';
+    bericht+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#16a34a;font-size:.7rem">Geburtsdatum auf Liste korrigiert ('+_impAnalyse.tippfehler.length+')</summary><div style="font-size:.66rem;margin-top:4px">'+_impAnalyse.tippfehler.map(t=>esc(t.name)+': Bestand '+esc(t.bestGeb)+' → Liste '+esc(t.impGeb)).join('<br>')+'</div></details>';
   }
   prog.innerHTML=bericht;
   btn.disabled=false; btn.style.opacity='1';
