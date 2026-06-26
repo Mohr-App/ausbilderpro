@@ -4400,20 +4400,26 @@ function impAutoMap(){
     ort:['ort','stadt','city','wohnort'],
     notizen:['notizen','bemerkung','notes','kommentar','anmerkung']
   };
-  _impHeaders.forEach(h=>{
-    const hl=h.toLowerCase().replace(/[^a-zäöü0-9]/g,'');
-    for(const[key,syns] of Object.entries(synonyms)){
-      if(_impMapping[key]) continue;
-      // Nummern-Spalten (z.B. "Betriebsnummer", "Berufsnummer") nie als Firma/Beruf erkennen
-      if((key==='firma'||key==='beruf') && hl.includes('nummer')) continue;
-      // 'Vorgesehenes Ende' nur ueber 'vorgesehen'/'lehrzeit' fangen, nie das nackte 'Ende' (tatsaechliches Ende)
-      if(key==='endeVorgesehen' && !(hl.includes('vorgesehen')||hl.includes('lehrzeit'))) continue;
-      if(syns.some(s=>hl.includes(s)||s.includes(hl))){
-        _impMapping[key]=h;
-        break;
+  // Zuordnung in 3 Stufen, exakte Treffer zuerst. Verhindert, dass "Name" ueber 'vorname'.includes('name')
+  // faelschlich als Vorname erkannt wird ("Name"=Nachname, "Vorname"=Vorname).
+  const _used=new Set();
+  const _pass=(matchFn)=>{
+    _impHeaders.forEach(h=>{
+      if(_used.has(h)) return;
+      const hl=h.toLowerCase().replace(/[^a-zäöü0-9]/g,'');
+      for(const[key,syns] of Object.entries(synonyms)){
+        if(_impMapping[key]) continue;
+        // Nummern-Spalten (z.B. "Betriebsnummer", "Berufsnummer") nie als Firma/Beruf erkennen
+        if((key==='firma'||key==='beruf') && hl.includes('nummer')) continue;
+        // 'Vorgesehenes Ende' nur ueber 'vorgesehen'/'lehrzeit' fangen, nie das nackte 'Ende' (tatsaechliches Ende)
+        if(key==='endeVorgesehen' && !(hl.includes('vorgesehen')||hl.includes('lehrzeit'))) continue;
+        if(matchFn(hl,syns)){ _impMapping[key]=h; _used.add(h); break; }
       }
-    }
-  });
+    });
+  };
+  _pass((hl,syns)=>syns.some(s=>s===hl));          // 1) exakt
+  _pass((hl,syns)=>syns.some(s=>hl.includes(s)));  // 2) Kopf enthaelt Synonym (z.B. "Betrieb Name 1" -> firma)
+  _pass((hl,syns)=>syns.some(s=>s.includes(hl)));  // 3) Synonym enthaelt Kopf (Kurzformen) - zuletzt, am unschaerfsten
 }
 
 function impGoToStep2(){
