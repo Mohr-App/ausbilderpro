@@ -1035,16 +1035,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:18px">
 
-
-          <!-- WARTUNG: Vertauschte Namen korrigieren (temporaer) -->
-          <div class="card" style="border:1.5px dashed #f59e0b">
-            <div style="font-size:.85rem;font-weight:700;margin-bottom:4px">🔧 Vertauschte Namen korrigieren <span style="font-size:.6rem;color:var(--mu);font-weight:500">(temporär)</span></div>
-            <div style="font-size:.65rem;color:var(--mu);margin-bottom:10px">Lädt die offizielle Lehrlingsliste und gleicht sie mit der Datenbank ab. Findet Einträge, bei denen Vor- und Nachname <b>eindeutig</b> vertauscht sind (spiegelverkehrt bei gleichem Geburtsdatum), und tauscht nur diese zwei Felder. Konto, Kurs, Anwesenheit, Geburtsdatum bleiben unberührt. Dry-Run zuerst – nichts wird ohne Bestätigung geschrieben.</div>
-            <input type="file" id="swapFileIn" accept=".csv,.xlsx,.xls,.tsv" style="display:none" onchange="swapHandleFile(this.files[0])">
-            <button class="btn-sm" onclick="document.getElementById('swapFileIn').click()" style="font-size:.72rem;padding:7px 12px">Liste laden &amp; prüfen (Dry-Run)</button>
-            <div id="swapInfo" style="display:none;margin-top:10px;font-size:.72rem"></div>
-          </div>
-
           <!-- VERWALTUNG MITARBEITER KARTE -->
           <div class="card scard" title="Auf-/Zuklappen" onclick="toggleSCard(this)">
             <div class="scard-hdr">
@@ -1685,10 +1675,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 311';
+const APP_VERSION = 'Build 312';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 312', d:'26.06.2026', items:['🧹 Wartungs-Tool „Vertauschte Namen korrigieren" wieder entfernt (Einmal-Aufräumung erledigt)']},
   {v:'Build 311', d:'26.06.2026', items:['✏️ „Stefan Mohr" → „S. Mohr" in allen App-Oberflächen (Rechtstexte behalten den vollständigen Namen)','📋 Changelog auf Build-Schema umgestellt und Änderungen seit Mai nachgetragen']},
   {v:'Build 310', d:'26.06.2026', items:['🔢 Sichtbare Versionsnummer: aktuelle Build-Nummer oben in den Einstellungen und im Footer (statt fester „v2.9.0") – zeigt sofort, ob der aktuelle Stand geladen ist']},
   {v:'Build 309', d:'26.06.2026', items:['🔧 Wartungs-Tool „Vertauschte Namen korrigieren" (Einstellungen): gleicht die offizielle Liste ab und zieht eindeutig vertauschte Vor-/Nachnamen gerade (Dry-Run zuerst, nur Namensfelder)']},
@@ -4437,73 +4428,6 @@ function impAutoMap(){
   _pass((hl,syns)=>syns.some(s=>s===hl));          // 1) exakt
   _pass((hl,syns)=>syns.some(s=>hl.includes(s)));  // 2) Kopf enthaelt Synonym (z.B. "Betrieb Name 1" -> firma)
   _pass((hl,syns)=>syns.some(s=>s.includes(hl)));  // 3) Synonym enthaelt Kopf (Kurzformen) - zuletzt, am unschaerfsten
-}
-
-// ===== WARTUNG (temporaer): vertauschte Vor-/Nachnamen gegen die offizielle Liste korrigieren =====
-let _swapFix=[];
-function _swapHdr(headers, cands){
-  const nrm=s=>s.toLowerCase().replace(/[^a-zäöü0-9]/g,'');
-  for(const c of cands){ const h=headers.find(x=>nrm(x)===c); if(h) return h; }
-  return null;
-}
-function swapHandleFile(file){
-  if(!file) return;
-  const info=document.getElementById('swapInfo'); info.style.display=''; info.innerHTML='Lese '+esc(file.name)+'…';
-  const ext=file.name.split('.').pop().toLowerCase();
-  if(ext==='csv'||ext==='tsv'||ext==='txt'){
-    const r=new FileReader();
-    r.onload=e=>{ const res=Papa.parse(e.target.result,{header:true,skipEmptyLines:true,dynamicTyping:false}); swapAnalyse(res.data||[], res.meta.fields||Object.keys((res.data&&res.data[0])||{})); };
-    r.readAsText(file,'UTF-8');
-  } else if(ext==='xlsx'||ext==='xls'){
-    const r=new FileReader();
-    r.onload=e=>{ try{ const wb=XLSX.read(e.target.result,{type:'array',codepage:65001}); const ws=wb.Sheets[wb.SheetNames[0]]; const json=XLSX.utils.sheet_to_json(ws,{defval:''}); swapAnalyse(json||[], Object.keys((json&&json[0])||{})); }catch(err){ info.innerHTML='❌ Fehler: '+err.message; } };
-    r.readAsArrayBuffer(file);
-  } else { info.innerHTML='❌ Nicht unterstütztes Format: .'+ext; }
-}
-function swapAnalyse(rows, headers){
-  const info=document.getElementById('swapInfo');
-  const hNn=_swapHdr(headers,['name','nachname']);
-  const hVn=_swapHdr(headers,['vorname']);
-  const hGeb=_swapHdr(headers,['geburtsdatum','geb','geburtstag']);
-  if(!hNn||!hVn||!hGeb){ info.innerHTML='❌ Spalten <b>Name</b>, <b>Vorname</b> und <b>Geburtsdatum</b> nicht gefunden.'; return; }
-  // offizielle Liste nach Geburtsdatum indexieren (Name=Nachname, Vorname=Vorname = Wahrheit)
-  const liste={};
-  rows.forEach(r=>{
-    const geb=_impGeb(r[hGeb]); if(!geb) return;
-    (liste[geb]=liste[geb]||[]).push({vn:_impNorm(r[hVn]), nn:_impNorm(r[hNn]), vnR:(r[hVn]||'').toString().trim(), nnR:(r[hNn]||'').toString().trim()});
-  });
-  _swapFix=[];
-  (_globalTN||[]).forEach(t=>{
-    const geb=_impGeb(t.geburtsdatum); if(!geb) return;
-    const cands=liste[geb]; if(!cands||!cands.length) return;
-    const dvn=_impNorm(t.vorname), dnn=_impNorm(t.nachname);
-    if(!dvn||!dnn) return;
-    if(cands.some(c=>c.vn===dvn && c.nn===dnn)) return;            // schon richtig
-    const sw=cands.find(c=>c.vn===dnn && c.nn===dvn);              // exakt vertauscht
-    if(sw) _swapFix.push({id:t.id, dbVn:t.vorname||'', dbNn:t.nachname||'', neuVn:sw.vnR, neuNn:sw.nnR, geb});
-  });
-  let h='<b>'+_swapFix.length+'</b> eindeutig vertauschte Namen gefunden <span style="color:var(--mu)">(Dry-Run – nichts gespeichert)</span>.';
-  if(_swapFix.length){
-    h+='<div style="max-height:240px;overflow:auto;margin-top:8px;border:1px solid var(--brd);border-radius:8px;padding:8px">'+
-      _swapFix.map(s=>esc(s.dbVn)+' '+esc(s.dbNn)+'  →  <b>'+esc(s.neuVn)+' '+esc(s.neuNn)+'</b>').join('<br>')+'</div>';
-    h+='<button class="btn-sm" style="margin-top:10px;background:#dc2626;color:#fff;font-size:.72rem;padding:7px 12px" onclick="swapApply()">'+_swapFix.length+' Namen jetzt korrigieren</button>';
-  }
-  info.innerHTML=h;
-}
-async function swapApply(){
-  if(!_swapFix.length) return;
-  if(!confirm('Bei '+_swapFix.length+' Einträgen Vor-/Nachname tauschen?\n\nNur diese zwei Felder werden geändert. Konto, Kurs, Anwesenheit, Geburtsdatum bleiben unberührt.')) return;
-  const info=document.getElementById('swapInfo');
-  let ok=0, fail=0, skip=0;
-  for(const s of _swapFix){
-    const cur=(_globalTN||[]).find(t=>t.id===s.id);
-    // Sicherheits-Re-Check: nur tauschen, wenn der aktuelle Stand noch dem Dry-Run entspricht
-    if(!cur || _impNorm(cur.vorname)!==_impNorm(s.dbVn) || _impNorm(cur.nachname)!==_impNorm(s.dbNn)){ skip++; continue; }
-    try{ await db.collection('globalTN').doc(s.id).update({vorname:s.neuVn, nachname:s.neuNn}); ok++; }
-    catch(e){ fail++; console.warn('SwapFix '+s.id+':',e); }
-  }
-  info.innerHTML='✅ <b>'+ok+'</b> Namen korrigiert'+(skip?' · '+skip+' übersprungen (zwischenzeitlich geändert)':'')+(fail?' · <span style="color:var(--bad)">'+fail+' fehlgeschlagen</span>':'')+'.';
-  _swapFix=[];
 }
 
 function impGoToStep2(){
