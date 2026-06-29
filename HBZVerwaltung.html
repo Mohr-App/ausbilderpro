@@ -1675,11 +1675,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 317';
+const APP_VERSION = 'Build 318';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
-  {v:'Build 317', d:'29.06.2026', items:['📄 Teilnahmebescheinigung jetzt 1:1 wie in AusbilderPro (KHS-Logo, „DAS HANDWERK", korrektes Layout & Unterschrift-Position, Stempel) – read-only, nur unterschriebene Bescheinigungen, Unterschrift + Stempel sichtbar']},
+  {v:'Build 318', d:'29.06.2026', items:['🗑️ Sicheres Löschen: Eine Datei wird erst dann aus der Liste entfernt, wenn sie wirklich aus dem Speicher gelöscht wurde. Schlägt das Löschen fehl, bleibt der Eintrag stehen und es gibt eine Fehlermeldung (keine „Waisen"-Dateien mehr)']},
   {v:'Build 312', d:'26.06.2026', items:['🧹 Wartungs-Tool „Vertauschte Namen korrigieren" wieder entfernt (Einmal-Aufräumung erledigt)']},
   {v:'Build 311', d:'26.06.2026', items:['✏️ „Stefan Mohr" → „S. Mohr" in allen App-Oberflächen (Rechtstexte behalten den vollständigen Namen)','📋 Changelog auf Build-Schema umgestellt und Änderungen seit Mai nachgetragen']},
   {v:'Build 310', d:'26.06.2026', items:['🔢 Sichtbare Versionsnummer: aktuelle Build-Nummer oben in den Einstellungen und im Footer (statt fester „v2.9.0") – zeigt sofort, ob der aktuelle Stand geladen ist']},
@@ -6101,11 +6101,18 @@ function loadKdDocs(kursId){
 
 function kdDocsDelete(docId,storagePath,kursId){
   if(!confirm('Dokument wirklich löschen?')) return;
-  firebase.storage().ref(storagePath).delete().catch(()=>{});
-  db.collection('shared').doc('kurse').collection('list').doc(kursId)
-    .collection('dokumente').doc(docId).delete()
-    .then(()=>loadKdDocs(kursId))
-    .catch(err=>toast('Fehler: '+err.message,'bad'));
+  function _finish(){
+    db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('dokumente').doc(docId).delete()
+      .then(()=>loadKdDocs(kursId))
+      .catch(err=>toast('Eintrag konnte nicht gelöscht werden: '+(err.code||err.message),'bad'));
+  }
+  firebase.storage().ref(storagePath).delete()
+    .then(_finish)
+    .catch(err=>{
+      if(err && err.code==='storage/object-not-found'){ _finish(); }
+      else { toast('Datei konnte nicht gelöscht werden ('+(err.code||err.message)+') – Eintrag bleibt bestehen','bad'); }
+    });
 }
 
 function toggleArchiveKurs(){
@@ -7963,10 +7970,17 @@ function loadTNProfileDocs(tnId){
 
 function tnDocsDelete(docId, storagePath, tnId){
   if(!confirm('Dokument wirklich löschen?')) return;
-  firebase.storage().ref(storagePath).delete().catch(()=>{});
-  db.collection('globalTN').doc(tnId).collection('dokumente').doc(docId).delete()
-    .then(()=>loadTNProfileDocs(tnId))
-    .catch(err=>toast('Fehler: '+err.message,'bad'));
+  function _finish(){
+    db.collection('globalTN').doc(tnId).collection('dokumente').doc(docId).delete()
+      .then(()=>loadTNProfileDocs(tnId))
+      .catch(err=>toast('Eintrag konnte nicht gelöscht werden: '+(err.code||err.message),'bad'));
+  }
+  firebase.storage().ref(storagePath).delete()
+    .then(_finish)
+    .catch(err=>{
+      if(err && err.code==='storage/object-not-found'){ _finish(); }
+      else { toast('Datei konnte nicht gelöscht werden ('+(err.code||err.message)+') – Eintrag bleibt bestehen','bad'); }
+    });
 }
 
 // ── KURSHISTORIE NACHTRAGEN ──

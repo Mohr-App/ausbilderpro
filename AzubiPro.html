@@ -7234,10 +7234,17 @@ function myDocsHandleUpload(e){
 
 function myDocsDelete(docId, storagePath){
   if(!confirm('Dokument löschen?')) return;
-  st.ref(storagePath).delete().catch(()=>{});
-  db.collection('globalTN').doc(_tnId).collection('dokumente').doc(docId).delete()
-    .then(()=>{ toast('Gelöscht'); loadMyDocs(); })
-    .catch(err=>toast('Fehler','bad'));
+  function _finish(){
+    db.collection('globalTN').doc(_tnId).collection('dokumente').doc(docId).delete()
+      .then(()=>{ toast('Gelöscht'); loadMyDocs(); })
+      .catch(err=>toast('Eintrag konnte nicht gelöscht werden','bad'));
+  }
+  st.ref(storagePath).delete()
+    .then(_finish)
+    .catch(err=>{
+      if(err && err.code==='storage/object-not-found'){ _finish(); }
+      else { toast('Datei konnte nicht gelöscht werden ('+(err.code||err.message)+')','bad'); }
+    });
 }
 
 // ── Profil ──

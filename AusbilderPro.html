@@ -12381,27 +12381,32 @@ function docsDelete(fileDocId, storagePath, scope){
   if(!confirm('Dokument wirklich löschen?')) return;
   const inst=curInst();
   const kursId = inst ? inst.sharedKursId : null;
-  _st.ref(storagePath).delete().catch(()=>{});
-  if(scope==='course' && kursId){
-    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-      .collection('dokumente').doc(fileDocId).delete()
-      .then(()=> docsLoadList(scope));
-  } else if(scope==='seat'){
-    const seatData = inst?.seats[curSeat];
-    const tnId = seatData?.poolTnId || null;
-    if(tnId){
-      _db.collection('globalTN').doc(tnId).collection('dokumente').doc(fileDocId).delete()
-        .then(()=> docsLoadList(scope));
+  function _finishDelete(){
+    let p;
+    if(scope==='course' && kursId){
+      p=_db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('dokumente').doc(fileDocId).delete();
+    } else if(scope==='seat'){
+      const seatData = inst?.seats[curSeat];
+      const tnId = seatData?.poolTnId || null;
+      if(tnId){
+        p=_db.collection('globalTN').doc(tnId).collection('dokumente').doc(fileDocId).delete();
+      } else {
+        const docId = S.curKat+'_'+S.curInst+'_'+curSeat;
+        p=_db.collection('users').doc(_fbUid).collection('seatDocs').doc(docId).collection('files').doc(fileDocId).delete();
+      }
     } else {
-      const docId = S.curKat+'_'+S.curInst+'_'+curSeat;
-      _db.collection('users').doc(_fbUid).collection('seatDocs').doc(docId).collection('files').doc(fileDocId).delete()
-        .then(()=> docsLoadList(scope));
+      const docId = S.curKat+'_'+S.curInst;
+      p=_db.collection('users').doc(_fbUid).collection('courseDocs').doc(docId).collection('files').doc(fileDocId).delete();
     }
-  } else {
-    const docId = S.curKat+'_'+S.curInst;
-    _db.collection('users').doc(_fbUid).collection('courseDocs').doc(docId).collection('files').doc(fileDocId).delete()
-      .then(()=> docsLoadList(scope));
+    p.then(()=> docsLoadList(scope)).catch(e=> toast('Eintrag konnte nicht gelöscht werden: '+(e.code||e.message),'bad'));
   }
+  _st.ref(storagePath).delete()
+    .then(_finishDelete)
+    .catch(err=>{
+      if(err && err.code==='storage/object-not-found'){ _finishDelete(); }
+      else { toast('Datei konnte nicht gelöscht werden ('+(err.code||err.message)+') – Eintrag bleibt bestehen','bad'); }
+    });
 }
 
 function selInstAndOpenDocs(kid,iid,e){
