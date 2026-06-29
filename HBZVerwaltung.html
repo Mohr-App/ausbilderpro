@@ -1675,10 +1675,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 312';
+const APP_VERSION = 'Build 313';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 313', d:'29.06.2026', items:['☎ Import übernimmt jetzt die Betriebs-Telefonnummern (Betrieb Telefon 1 + 2, kombiniert) – bei neuen und bestehenden TN (Liste hat Hoheit)','🏢 Firma-Reparatur: steht im Bestand nur eine Betriebsnummer, wird sie beim Abgleich durch den echten Betriebsnamen aus der Liste ersetzt','📋 Import-Vorschau zeigt Telefon- und Firma-Korrekturen getrennt an']},
   {v:'Build 312', d:'26.06.2026', items:['🧹 Wartungs-Tool „Vertauschte Namen korrigieren" wieder entfernt (Einmal-Aufräumung erledigt)']},
   {v:'Build 311', d:'26.06.2026', items:['✏️ „Stefan Mohr" → „S. Mohr" in allen App-Oberflächen (Rechtstexte behalten den vollständigen Namen)','📋 Changelog auf Build-Schema umgestellt und Änderungen seit Mai nachgetragen']},
   {v:'Build 310', d:'26.06.2026', items:['🔢 Sichtbare Versionsnummer: aktuelle Build-Nummer oben in den Einstellungen und im Footer (statt fester „v2.9.0") – zeigt sofort, ob der aktuelle Stand geladen ist']},
@@ -4597,6 +4598,14 @@ function _impTokenMatch(ta,tb){
 }
 function _impEmail(s){ return (s==null?'':s.toString().trim().toLowerCase()); }
 function _impFullName(vn,nn){ return _impNorm(vn)+'|'+_impNorm(nn); }
+// Betrieb-Telefon: alle "Betrieb Telefon"-Spalten (1 + 2) der Zeile kombiniert (unabhaengig vom Feld-Mapping)
+function _impBetriebTel(row){
+  if(!Array.isArray(_impHeaders)) return '';
+  const hits=_impHeaders.filter(h=>{const x=String(h).toLowerCase().replace(/[^a-zäöü0-9]/g,'');return x.includes('betrieb')&&x.includes('telefon');});
+  return hits.map(h=>(row[h]||'').toString().trim()).filter(Boolean).join(' · ');
+}
+// reine Nummer (z.B. Betriebsnummer "1221820-00") – enthaelt Ziffern, sonst nur Ziffern/Trenner
+function _impIstNummer(s){ s=String(s||'').trim(); return s!=='' && /\d/.test(s) && /^[\d\s\-\/\.]+$/.test(s); }
 function impAnalysiere(){
   // Felder, die beim Abgleich von der VP-Liste korrigiert werden (VP heilig). NIE: email/Kontakt/Kurs/Login.
   const _ABGLEICH_FELDER=['vorname','nachname','firma','beruf','adresse','plz','ort'];
@@ -4608,6 +4617,7 @@ function impAnalysiere(){
     vorname:(t.vorname||''), nachname:(t.nachname||''), firma:(t.firma||''), beruf:(t.beruf||''),
     adresse:(t.adresse||''), plz:(t.plz||'').toString(), ort:(t.ort||''),
     anfang:(t.anfang||''), endeVorgesehen:(t.endeVorgesehen||''),
+    betriebTelefon:(t.betriebTelefon||''),
     selfRegistered:(t.selfRegistered===true)
   }));
   // E-Mail-Index der ANONYMISIERTEN Pilot-TN (Ghost-Erkennung; Pilot-Mails sind individuell)
@@ -4675,6 +4685,11 @@ function impAnalysiere(){
       if(aj && !hitBest.ausbjahr) bfUpd.ausbjahr=aj;
       if(_anfang && !hitBest.anfang) bfUpd.anfang=_anfang;
       if(_endeV && !hitBest.endeVorgesehen) bfUpd.endeVorgesehen=_endeV;
+      // Betrieb-Telefon: Liste hat Hoheit – setzen, wenn vorhanden und abweichend
+      const _betTel=_impBetriebTel(row);
+      if(_betTel && _betTel!==hitBest.betriebTelefon) bfUpd.betriebTelefon=_betTel;
+      // Firma = reine Betriebsnummer (Altbestand) -> echten Namen aus Liste setzen
+      if(_firma && !_impIstNummer(_firma) && _impIstNummer(hitBest.firma)) bfUpd.firma=_firma;
       if(Object.keys(bfUpd).length) backfill[i]=Object.assign({id:hitBest.id, name:vn+' '+nn}, bfUpd);
       // (3b) Loser Selbst-Eintrag -> offizielle Liste gewinnt (Name/Firma/Beruf/Adresse), Lehrjahr bleibt vom TN,
       //      Eintrag wird befoerdert (selfRegistered:false). Konto/Kurs/Anwesenheit/E-Mail bleiben unberuehrt.
@@ -4729,7 +4744,15 @@ function impRenderBericht(a){
   h+='<span style="color:#dc2626"><b>'+a.unsicher.length+'</b> unsicher</span>';
   if(a.listdub) h+='<span style="color:#7c3aed"><b>'+a.listdub+'</b> Doppel in der Liste (übersprungen)</span>';
   if(a.ghost && a.ghost.length) h+='<span style="color:#0284c7"><b>'+a.ghost.length+'</b> Pilot-TN bereits vorhanden (übersprungen)</span>';
-  if(a.backfill && Object.keys(a.backfill).length) h+='<span style="color:#16a34a"><b>'+Object.keys(a.backfill).length+'</b> Lehrjahr wird ergänzt</span>';
+  if(a.backfill && Object.keys(a.backfill).length){
+    const _bfv=Object.values(a.backfill);
+    const _ljN=_bfv.filter(b=>b.ausbjahr||b.anfang||b.endeVorgesehen).length;
+    const _telN=_bfv.filter(b=>b.betriebTelefon!==undefined).length;
+    const _firmaN=_bfv.filter(b=>b.firma!==undefined).length;
+    if(_ljN) h+='<span style="color:#16a34a"><b>'+_ljN+'</b> Lehrjahr/Daten ergänzt</span>';
+    if(_telN) h+='<span style="color:#16a34a"><b>'+_telN+'</b> Betrieb-Telefon ergänzt</span>';
+    if(_firmaN) h+='<span style="color:#16a34a"><b>'+_firmaN+'</b> Firma korrigiert (Nummer → Name)</span>';
+  }
   if(a.promote && Object.keys(a.promote).length) h+='<span style="color:#16a34a"><b>'+Object.keys(a.promote).length+'</b> lose Einträge werden mit Liste abgeglichen</span>';
   if(a.abgleich && Object.keys(a.abgleich).length) h+='<span style="color:#0d9488"><b>'+Object.keys(a.abgleich).length+'</b> an VP angeglichen</span>';
   if(a.leer) h+='<span style="color:var(--mu)"><b>'+a.leer+'</b> leer (übersprungen)</span>';
@@ -4756,10 +4779,10 @@ function impRenderBericht(a){
   }
   if(a.backfill && Object.keys(a.backfill).length){
     const bf=Object.values(a.backfill);
-    h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#16a34a;font-size:.7rem">Lehrjahr/Daten werden ergänzt ('+bf.length+') – nur wo im Bestand leer</summary>';
+    h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#16a34a;font-size:.7rem">Daten werden ergänzt/korrigiert ('+bf.length+') – Lehrjahr/Daten nur wo leer, Telefon &amp; Firma laut Liste</summary>';
     h+='<div style="font-size:.66rem;margin-top:4px">'+bf.map(t=>{
-      const teile=[]; if(t.ausbjahr) teile.push('Lehrjahr '+t.ausbjahr); if(t.anfang) teile.push('Beginn '+t.anfang); if(t.endeVorgesehen) teile.push('Ende '+t.endeVorgesehen);
-      return esc(t.name)+' → '+teile.join(', ');
+      const teile=[]; if(t.ausbjahr) teile.push('Lehrjahr '+t.ausbjahr); if(t.anfang) teile.push('Beginn '+t.anfang); if(t.endeVorgesehen) teile.push('Ende '+t.endeVorgesehen); if(t.betriebTelefon!==undefined) teile.push('☎ '+t.betriebTelefon); if(t.firma!==undefined) teile.push('Firma → '+t.firma);
+      return esc(t.name)+' → '+esc(teile.join(', '));
     }).join('<br>')+'</div></details>';
   }
   if(a.abgleich && Object.keys(a.abgleich).length){
@@ -4854,6 +4877,8 @@ async function doImport(){
         if(bf.ausbjahr) upd.ausbjahr=bf.ausbjahr;
         if(bf.anfang) upd.anfang=bf.anfang;
         if(bf.endeVorgesehen) upd.endeVorgesehen=bf.endeVorgesehen;
+        if(bf.betriebTelefon!==undefined) upd.betriebTelefon=bf.betriebTelefon;
+        if(bf.firma!==undefined) upd.firma=bf.firma;
         if(Object.keys(upd).length){
           try{ await db.collection('globalTN').doc(bf.id).update(upd); bfDone++; }
           catch(e){ console.warn('Backfill '+bf.id+':',e); }
@@ -4906,6 +4931,7 @@ async function doImport(){
       adresse: (row[_impMapping.adresse]||'').toString().trim(),
       plz: (row[_impMapping.plz]||'').toString().trim(),
       ort: (row[_impMapping.ort]||'').toString().trim(),
+      betriebTelefon: _impBetriebTel(row),
       notizen:(row[_impMapping.notizen]||'').toString().trim(),
       createdAt:Date.now(),
       importiert:true
