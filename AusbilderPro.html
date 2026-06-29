@@ -467,6 +467,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .sdot-k::before{content:"K";}
 .sdot-bs{background:#8b5cf6;}
 .sdot-bs::before{content:"B";}
+/* Symbol-Badges (📣 Fehlen-informiert, 📧 Mail unbestätigt) inline in der Anwesenheits-Reihe */
+.sdot.sdot-emoji{background:transparent;box-shadow:none;width:auto;min-width:13px;height:13px;font-size:11px;color:inherit;}
+.sdot.sdot-emoji::before{content:none;}
+.sdot.sdot-fehl{filter:drop-shadow(0 1px 2px rgba(0,0,0,.25));}
 .seat.hl{border-color:var(--acc2)!important;animation:phl 1.2s ease-in-out 3;}
 @keyframes phl{0%,100%{box-shadow:0 0 0 2px rgba(245,158,11,.28);}50%{box-shadow:0 0 0 9px rgba(245,158,11,.44),0 4px 24px rgba(245,158,11,.3);}}
 
@@ -4444,7 +4448,13 @@ function mkSeat(id,seats){
     const dayMap=new Map();
     att.forEach(a=>{ if(a.date) dayMap.set(a.date,attCfg(a).dot); });
     const dotsHtml=[...dayMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).slice(-14).map(([date,cls])=>'<div class="sdot '+cls+'" title="'+fmtD(date)+'"></div>').join('');
-    if(dotsHtml) el.innerHTML+='<div class="sdots-row">'+dotsHtml+'</div>';
+    const _today=new Date().toISOString().slice(0,10);
+    // 📧 unbestaetigte Mail: dauerhaftes Kennzeichen am Reihenanfang (wird NICHT durch Anwesenheit ersetzt)
+    const emailDot=d.emailUnbestaetigt?'<div class="sdot sdot-emoji" title="E-Mail noch nicht bestätigt – Adresse evtl. falsch">📧</div>':'';
+    // 📣 Fehlen-informiert: am Heute-Platz (rechts); der echte Anwesenheits-Badge ersetzt es, sobald der Tag eingetragen ist
+    const fehlDot=(d.fehlInfo && !dayMap.has(_today))?'<div class="sdot sdot-emoji sdot-fehl" title="Wegen Fehlen informiert am '+fmtD(d.fehlInfo.date)+' – verschwindet, sobald die Anwesenheit für den Tag eingetragen ist">📣</div>':'';
+    const rowHtml=emailDot+dotsHtml+fehlDot;
+    if(rowHtml) el.innerHTML+='<div class="sdots-row">'+rowHtml+'</div>';
     // grades - Reihenfolge identisch zum Noten-Reiter (FIXED nicht-geloeschte zuerst, dann custom in Definitions-Reihenfolge)
     let g='';
     const inst2=curInst();
@@ -4506,10 +4516,10 @@ function mkSeat(id,seats){
       meldHtml='<div title="Gemeldet: '+esc(d.offeneMeldung.label||'')+' – noch nicht eingetragen" style="position:absolute;top:3px;right:3px;font-size:1rem;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">'+oi+'</div>';
     }
     if(d.fehlInfo){
-      meldHtml+='<div title="Wegen Fehlen informiert am '+fmtD(d.fehlInfo.date)+'" style="position:absolute;top:3px;left:3px;font-size:.8rem;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">📣</div>';
+      /* 📣 jetzt in der Anwesenheits-Reihe am Heute-Platz (siehe oben) */
     }
     if(d.emailUnbestaetigt){
-      meldHtml+='<div title="E-Mail noch nicht bestätigt – Adresse evtl. falsch" style="position:absolute;bottom:3px;right:3px;font-size:.78rem;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">📧</div>';
+      /* 📧 jetzt am Anfang der Anwesenheits-Reihe (siehe oben) */
     }
     el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
   }
