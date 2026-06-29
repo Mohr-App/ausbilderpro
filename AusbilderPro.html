@@ -6736,7 +6736,7 @@ async function insertSigStempelBulk(){
     if(result.sig){
       area.innerHTML='<div class="sig-canvas-wrap signed"><img src="'+result.sig+'" class="sig-img"><button class="btn-remove-overlay no-print" onclick="removeSigBulk(\\''+tnId+'\\')" title="Unterschrift entfernen">✕</button></div>';
       if(window.opener&&window.opener._saveBescheinigungSignature){
-        window.opener._saveBescheinigungSignature(window._kursId,tnId,result.sig);
+        window.opener._saveBescheinigungSignature(window._kursId,tnId,result.sig,result.stempel);
       }
     }
   });
@@ -10112,7 +10112,7 @@ async function sendBescheinigung(){
     if(!window.opener._saveBescheinigungSignature){
       throw new Error('Bitte AusbilderPro im Hauptfenster neu laden');
     }
-    await window.opener._saveBescheinigungSignature(window._kursId,window._tnId,sigToSave);
+    await window.opener._saveBescheinigungSignature(window._kursId,window._tnId,sigToSave,window._loadedStempel);
     // 2. PDF aus .page generieren
     btn.textContent='Erstelle PDF…';
     document.body.classList.add('pdf-mode');
@@ -13726,11 +13726,12 @@ window._markBescheinigungAusgestelltBulk=function(kursId,tnIds,art){
   });
   return batch.commit().catch(err=>console.error('Ausgestellt-Mark bulk:',err));
 };
-window._saveBescheinigungSignature=function(kursId,tnId,signatureData){
+window._saveBescheinigungSignature=function(kursId,tnId,signatureData,stempelData){
   if(!_db||!kursId||!tnId) return Promise.reject(new Error('Missing kursId/tnId'));
   // JSON-Roundtrip + lokales Object stellt sicher dass es 100% plain ist
   const data=JSON.parse(JSON.stringify({
     bescheinigungSignatur:String(signatureData||''),
+    bescheinigungStempel:String(stempelData||''),
     bescheinigungDatum:Date.now()
   }));
   return _db.collection('shared').doc('kurse').collection('list').doc(String(kursId)).collection('teilnehmer').doc(String(tnId)).set(data,{merge:true});
