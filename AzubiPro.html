@@ -450,10 +450,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div class="page" id="page-docs">
       <div style="font-size:1rem;font-weight:800;margin-bottom:14px">📁 Dokumente</div>
       <div class="card">
-        <div class="card-title">📋 Kursunterlagen</div>
-        <div id="docsKurs"><div class="empty">Kursunterlagen erscheinen hier wenn du einem Kurs zugewiesen bist.</div></div>
-      </div>
-      <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <div class="card-title" style="margin-bottom:0">🏭 Vom Betrieb</div>
           <label for="azSendToAGFileIn" id="azSendToAGWrap" style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(99,102,241,.3);border-radius:6px;background:rgba(99,102,241,.08);color:#6366f1;cursor:pointer;font-weight:700" title="Dokument an Betrieb senden">📤 Upload</label>
@@ -7100,26 +7096,7 @@ function renderKursDetail(k){
     html+='</div>';
   }
 
-  // Kurs-Dokumente
-  html+='<div class="card"><div class="card-title">📁 Kursunterlagen</div><div id="kdDocs"><div class="empty">Lädt…</div></div></div>';
-
   el.innerHTML=html;
-
-  // Docs laden
-  if(!k.id){document.getElementById('kdDocs').innerHTML='<div class="empty">Keine Kurs-ID</div>';return;}
-  db.collection('shared').doc('kurse').collection('list').doc(k.id)
-    .collection('dokumente').orderBy('ts','desc').get()
-    .then(snap=>{
-      const docsEl=document.getElementById('kdDocs');
-      if(snap.empty){ docsEl.innerHTML='<div class="empty">Keine Unterlagen vorhanden</div>'; return; }
-      docsEl.innerHTML='';
-      snap.forEach(doc=>{
-        const d=doc.data();
-        docsEl.innerHTML+=renderDocItem(d, false);
-      });
-    }).catch(()=>{
-      document.getElementById('kdDocs').innerHTML='<div class="empty" style="color:var(--bad)">Fehler beim Laden</div>';
-    });
 }
 
 function renderDocItem(d, canDelete, docId, tnId){
@@ -7139,23 +7116,7 @@ function renderDocItem(d, canDelete, docId, tnId){
 
 // ── Dokumente Page ──
 function loadDocs(){
-  loadKursDocs();
   loadMyDocs();
-}
-
-function loadKursDocs(){
-  const el=document.getElementById('docsKurs');
-  if(!_tnData?.aktiverKursId){ el.innerHTML='<div class="empty">Kein aktiver Kurs zugewiesen</div>'; return; }
-  el.innerHTML='<div class="empty">Lädt…</div>';
-  db.collection('shared').doc('kurse').collection('list').doc(_tnData.aktiverKursId)
-    .collection('dokumente').orderBy('ts','desc').get()
-    .then(snap=>{
-      if(snap.empty){ el.innerHTML='<div class="empty">Keine Kursunterlagen vorhanden</div>'; return; }
-      el.innerHTML='';
-      snap.forEach(doc=>{
-        el.innerHTML+=renderDocItem(doc.data(), false);
-      });
-    }).catch(()=>{ el.innerHTML='<div class="empty" style="color:var(--bad)">Fehler beim Laden</div>'; });
 }
 
 function loadMyDocs(){
