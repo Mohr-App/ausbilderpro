@@ -12954,31 +12954,30 @@ init();
 // PWA Service Worker mit AUTO-UPDATE (ohne nervigen Banner)
 if('serviceWorker' in navigator){
   let _swRefreshing=false;
-  // Wenn ein neuer SW aktiv wird, reload (genau 1x)
+  // Reload NUR, wenn der User das Update bewusst per Hinweis angewendet hat – kein Auto-Reload mehr
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(!window._userAppliedUpdate) return;
     if(_swRefreshing) return;
     _swRefreshing=true;
-    console.log('[SW] Neuer SW aktiv – lade neu');
-    setTimeout(()=>location.reload(), 200);
+    setTimeout(()=>location.reload(), 150);
   });
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('./sw.js')
       .then(reg=>{
-        console.log('SW registriert');
-        // Bei Update gefunden: still im Hintergrund anwenden
+        // Falls schon eine neue Version wartet (z.B. nach 'Später'): dezenten Hinweis zeigen
+        if(reg.waiting && navigator.serviceWorker.controller) _showUpdateBanner();
+        // Update gefunden: NICHT automatisch anwenden – nur dezenten Hinweis zeigen
         reg.addEventListener('updatefound', ()=>{
           const newWorker=reg.installing;
           if(!newWorker) return;
           newWorker.addEventListener('statechange', ()=>{
             if(newWorker.state==='installed' && navigator.serviceWorker.controller){
-              // Neue Version verfügbar - auto applicieren wenn User idle
-              _autoApplyUpdate();
+              _showUpdateBanner();
             }
           });
         });
-        // Sofort einen Update-Check beim Start
+        // Update-Checks (nur Erkennung – loesen KEINEN Reload aus)
         try{ reg.update(); }catch(e){}
-        // Periodischer Update-Check alle 10 Minuten
         setInterval(()=>{ try{reg.update();}catch(e){} }, 10*60*1000);
       })
       .catch(e=>console.warn('SW Fehler:',e));
@@ -13028,12 +13027,12 @@ function _showUpdateBanner(){
   }catch(e){}
   const b=document.createElement('div');
   b.id='updateBanner';
-  b.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#2563eb,#059669);color:#fff;padding:12px 18px;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.3);z-index:99999;display:flex;align-items:center;gap:10px;font-family:Sora,sans-serif;font-weight:600;font-size:.85rem;animation:updateBannerIn .4s ease';
-  b.innerHTML='<span>✨ Neue Version</span>'
-    +'<button onclick="_applyUpdate()" style="background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.4);color:#fff;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;font-size:inherit">Aktualisieren</button>'
-    +'<button onclick="_dismissUpdateBanner()" title="Später (30 Min nicht mehr fragen)" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.9);padding:6px 9px;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;font-size:1rem;line-height:1">×</button>';
+  b.style.cssText='position:fixed;bottom:12px;right:12px;background:rgba(71,85,105,.92);color:#fff;padding:5px 8px 5px 10px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.18);z-index:99999;display:flex;align-items:center;gap:6px;font-family:Sora,sans-serif;font-weight:600;font-size:.68rem;opacity:.72;transition:opacity .2s;animation:updateBannerIn .35s ease';
+  b.onmouseenter=()=>{b.style.opacity='1';}; b.onmouseleave=()=>{b.style.opacity='.72';};
+  b.innerHTML='<span onclick="_applyUpdate()" title="Neue Version laden" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">↻ Update</span>'
+    +'<button onclick="_dismissUpdateBanner()" title="Später (30 Min nicht mehr fragen)" style="background:none;border:none;color:rgba(255,255,255,.7);padding:0 0 0 2px;cursor:pointer;font-size:.85rem;line-height:1">×</button>';
   const st=document.createElement('style');
-  st.textContent='@keyframes updateBannerIn{from{opacity:0;transform:translate(-50%,30px)}to{opacity:1;transform:translate(-50%,0)}}';
+  st.textContent='@keyframes updateBannerIn{from{opacity:0;transform:translateY(12px)}to{opacity:.72;transform:translateY(0)}}';
   document.head.appendChild(st);
   document.body.appendChild(b);
 }
@@ -13043,6 +13042,8 @@ function _dismissUpdateBanner(){
   try{ sessionStorage.setItem('ausb_update_dismiss', Date.now().toString()); }catch(e){}
 }
 function _applyUpdate(){
+  window._userAppliedUpdate=true; // erlaubt den einen gewollten Reload via controllerchange
+  const b=document.getElementById('updateBanner'); if(b) b.remove();
   navigator.serviceWorker.getRegistration().then(reg=>{
     if(reg && reg.waiting){
       // Sage dem wartenden SW dass er aktiv werden soll
