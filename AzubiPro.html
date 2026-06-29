@@ -462,7 +462,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div id="docsAG" style="margin-top:6px"><div class="empty">Keine Dokumente vom Betrieb</div></div>
       </div>
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div class="card-title" style="margin-bottom:0">📎 Meine Dokumente</div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div class="card-title" style="margin-bottom:0">📎 Meine Unterlagen</div></div>
         <button class="upload-btn" onclick="myDocsUpload()" title="Eigene Dokumente hochladen">📁 Upload</button>
         <input type="file" id="myDocsFileIn" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" style="display:none" onchange="myDocsHandleUpload(event)" multiple>
         <div id="docsMy" style="margin-top:10px"><div class="empty">Noch keine eigenen Dokumente</div></div>
@@ -7127,10 +7127,11 @@ function renderDocItem(d, canDelete, docId, tnId){
   const size=d.size>1024*1024?(d.size/1024/1024).toFixed(1)+' MB':Math.round(d.size/1024)+' KB';
   const date=new Date(d.ts).toLocaleDateString('de-DE');
   const uploader=d.uploadedBy?d.uploadedBy.split('@')[0]:'';
+  const vonAusb=d.vonRolle==='ausbilder'?' · <span style="color:#2563eb;font-weight:700">📤 vom Ausbilder</span>':'';
   return '<div class="doc-item">'
     +'<div class="doc-icon">'+icon+'</div>'
     +'<div class="doc-info"><div class="doc-name">'+esc(d.name)+'</div>'
-    +'<div class="doc-meta">'+size+' · '+date+(uploader?' · '+esc(uploader):'')+'</div></div>'
+    +'<div class="doc-meta">'+size+' · '+date+(uploader?' · '+esc(uploader):'')+vonAusb+'</div></div>'
     +'<button class="doc-btn" onclick="window.open(\''+esc(d.url)+'\',\'_blank\')" title="Öffnen">Öffnen</button>'
     +(canDelete?'<button class="doc-del" onclick="myDocsDelete(\''+docId+'\',\''+esc(d.path)+'\')" title="Löschen">🗑</button>':'')
     +'</div>';

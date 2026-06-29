@@ -1565,7 +1565,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" title="📁 Datei hochladen" onclick="docsUpload('file','course')" style="flex:1">📁 Datei hochladen</button>
         <button class="tbtn" title="📷 Kamera" onclick="docsUpload('cam','course')" style="flex:1">📷 Kamera</button>
       </div>
-      <input type="file" id="docsFileInCourse" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="docsHandleUpload(event,'course')">
+      <input type="file" id="docsFileInCourse" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" style="display:none" onchange="docsHandleUpload(event,'course')">
       <input type="file" id="docsCamInCourse" accept="image/*" capture="environment" style="display:none" onchange="docsHandleUpload(event,'course')">
       <div id="docsListCourse" style="display:flex;flex-direction:column;gap:6px">
         <div style="color:var(--mu);font-size:.75rem;text-align:center;padding:20px">Keine Dokumente vorhanden</div>
@@ -1899,11 +1899,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="tp-section">
           <div class="tp-section-hd">📁 Hochladen</div>
           <div style="display:flex;gap:8px">
-            <button class="tbtn" title="📁 Datei hochladen" onclick="docsUpload('file','seat')" style="flex:1;font-size:.75rem">📁 Datei hochladen</button>
-            <button class="tbtn" title="📷 Kamera" onclick="docsUpload('cam','seat')" style="flex:1;font-size:.75rem">📷 Kamera</button>
+            <button class="tbtn" title="📁 Datei hochladen" onclick="docsUpload('file','seat')" style="flex:1;font-size:.75rem">📁 Datei an TN senden</button>
           </div>
-          <input type="file" id="docsFileInSeat" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="docsHandleUpload(event,'seat')">
-          <input type="file" id="docsCamInSeat" accept="image/*" capture="environment" style="display:none" onchange="docsHandleUpload(event,'seat')">
+          <input type="file" id="docsFileInSeat" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" style="display:none" onchange="docsHandleUpload(event,'seat')">
         </div>
         <div class="tp-section">
           <div class="tp-section-hd">📋 Vorhandene Dateien</div>
@@ -12306,6 +12304,7 @@ function docsHandleUpload(e, scope){
           name: file.name, url, path, size: file.size, type: file.type, ts: Date.now(),
           uploadedBy: _auth.currentUser?.email||'', uploadedByUid: _fbUid
         };
+        if(isTnShared) meta.vonRolle = 'ausbilder';
         if(isShared){
           _db.collection('shared').doc('kurse').collection('list').doc(kursId)
             .collection('dokumente').add(meta)
