@@ -9293,16 +9293,30 @@ function generateTNListeAusbilder(){
   _db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(doc=>{
     if(!doc.exists){toast('Kurs nicht gefunden','bad');return;}
     const kurs=doc.data();
-    const seats=Object.values(inst.seats||{}).filter(s=>s&&s.name);
-    const tns=seats.map(s=>({name:s.name,poolTnId:s.poolTnId}));
-    // Alphabetisch nach Nachname sortieren
-    tns.sort((a,b)=>{
-      const pa=a.name.split(/\s+/), pb=b.name.split(/\s+/);
-      const na=pa[pa.length-1]||'', nb=pb[pb.length-1]||'';
-      return na.localeCompare(nb,'de');
-    });
-    if(!tns.length){toast('Keine TN platziert','bad');return;}
-    openTNListeWindowAusbilder(kurs, tns);
+    // Alle Kurs-TN = Sitzplätze + Pool (von Verena zugewiesen, ggf. noch nicht platziert)
+    _db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
+      const map=new Map();
+      // 1) Kurs-Mitglieder aus globalTN (deckt Pool UND platzierte ab)
+      snap.forEach(g=>{
+        const t=g.data();
+        const nm=((t.vorname||'')+' '+(t.nachname||'')).trim();
+        if(nm) map.set(g.id,{name:nm,poolTnId:g.id});
+      });
+      // 2) Sitzplätze ergänzen (z.B. direkt am Sitz angelegte TN ohne aktiverKursId)
+      Object.values(inst.seats||{}).filter(s=>s&&s.name).forEach(s=>{
+        if(s.poolTnId){ if(!map.has(s.poolTnId)) map.set(s.poolTnId,{name:s.name,poolTnId:s.poolTnId}); }
+        else if(![...map.values()].some(v=>v.name===s.name)){ map.set('seat:'+s.name,{name:s.name,poolTnId:null}); }
+      });
+      const tns=[...map.values()];
+      // Alphabetisch nach Nachname sortieren
+      tns.sort((a,b)=>{
+        const pa=a.name.split(/\s+/), pb=b.name.split(/\s+/);
+        const na=pa[pa.length-1]||'', nb=pb[pb.length-1]||'';
+        return na.localeCompare(nb,'de');
+      });
+      if(!tns.length){toast('Keine TN im Kurs','bad');return;}
+      openTNListeWindowAusbilder(kurs, tns);
+    }).catch(err=>toast('Fehler: '+err.message,'bad'));
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
