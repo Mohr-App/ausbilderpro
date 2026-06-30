@@ -1091,6 +1091,8 @@ const _fbCfg={
 };
 firebase.initializeApp(_fbCfg);
 const auth=firebase.auth();
+auth.languageCode='de';
+const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
 const AZUBI_VERSION='v234'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
@@ -1472,7 +1474,7 @@ function togglePwVis(id,btnId){
 function doReset(){
   const e=document.getElementById('lEmail').value.trim();
   if(!e){showErr('Bitte zuerst E-Mail eingeben');return;}
-  auth.sendPasswordResetEmail(e)
+  auth.sendPasswordResetEmail(e, _acs)
     .then(()=>{document.getElementById('lErr').style.color='var(--acc)';showErr('✓ Reset-Mail gesendet – prüfe dein Postfach');})
     .catch(err=>showErr(_pwErrMsg(err)));
 }
@@ -1482,7 +1484,7 @@ function doResetJoin(){
   const errEl=document.getElementById('jLoginErr');
   if(!errEl) return;
   if(!e){ errEl.style.color='var(--bad)'; errEl.textContent='Bitte zuerst E-Mail eingeben'; return; }
-  auth.sendPasswordResetEmail(e)
+  auth.sendPasswordResetEmail(e, _acs)
     .then(()=>{ errEl.style.color='var(--acc)'; errEl.textContent='✓ Reset-Mail gesendet – prüfe dein Postfach'; })
     .catch(err=>{ errEl.style.color='var(--bad)'; errEl.textContent=_pwErrMsg(err); });
 }
@@ -2432,7 +2434,7 @@ function submitJoinRegistration(){
     errEl.style.color='var(--acc)';
     errEl.textContent='✓ Registrierung erfolgreich!';
     // Bestätigungsmail an die neue Adresse (best-effort, blockiert nichts). Nur Neu-Registrierte.
-    try{ const _cu=auth.currentUser; if(_cu && !_cu.emailVerified) _cu.sendEmailVerification().catch(()=>{}); }catch(e){}
+    try{ const _cu=auth.currentUser; if(_cu && !_cu.emailVerified) _cu.sendEmailVerification(_acs).catch(()=>{}); }catch(e){}
     // URL bereinigen
     window.history.replaceState({},'',window.location.pathname);
     const _regKursId=_joinKursId; // vor dem Nullen sichern (für Auto-Checkin)
@@ -6403,7 +6405,7 @@ function refreshEmailHint(){
 function resendEmailVerification(){
   const u=auth.currentUser;
   if(!u) return;
-  u.sendEmailVerification()
+  u.sendEmailVerification(_acs)
     .then(()=>alert('Bestätigungs-Mail gesendet – prüfe dein Postfach (auch Spam).'))
     .catch(e=>alert(e&&e.code==='auth/too-many-requests'?'Zu viele Versuche – bitte kurz warten.':'Konnte nicht senden – versuch es später nochmal.'));
 }
@@ -6418,7 +6420,7 @@ function startEmailKorrektur(){
   _doEmailUpdate(u, neu);
 }
 function _doEmailUpdate(u, neu){
-  u.verifyBeforeUpdateEmail(neu)
+  u.verifyBeforeUpdateEmail(neu, _acs)
     .then(()=>alert('Wir haben einen Bestätigungslink an '+neu+' geschickt.\n\nÖffne ihn in deinem Postfach – danach ist deine E-Mail aktualisiert. Bis dahin gilt weiter die alte Adresse.'))
     .catch(e=>{
       const c=e&&e.code;

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>AusbilderPro – Konto</title>
+<style>
+  :root{ --acc:#2563eb; --acc2:#059669; --tx:#1e293b; --mu:#64748b; --brd:#e2e8f0; --bad:#dc2626; }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+       font-family:'Sora',system-ui,-apple-system,sans-serif;background:#f1f5f9;color:var(--tx)}
+  .card{width:100%;max-width:420px;background:#fff;border:1px solid var(--brd);border-radius:18px;
+        overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+  .head{background:linear-gradient(135deg,var(--acc),var(--acc2));padding:26px 24px;color:#fff;text-align:center}
+  .head .name{font-size:1.15rem;font-weight:800;letter-spacing:.01em}
+  .head .sub{font-size:.72rem;opacity:.9;margin-top:2px}
+  .body{padding:26px 24px 28px;text-align:center}
+  .ico{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+       font-size:1.7rem;font-weight:800;margin:0 auto 14px}
+  .ico.ok{background:rgba(5,150,105,.12);color:var(--acc2)}
+  .ico.bad{background:rgba(220,38,38,.1);color:var(--bad)}
+  .spin{width:42px;height:42px;border:4px solid var(--brd);border-top-color:var(--acc);border-radius:50%;
+        margin:6px auto 16px;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  h1{font-size:1.12rem;font-weight:800;margin:0 0 8px}
+  p{font-size:.86rem;color:var(--mu);line-height:1.5;margin:0 0 18px}
+  .btn{display:inline-block;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;
+       text-decoration:none;font-weight:700;font-size:.9rem;padding:12px 22px;border-radius:11px;border:none;cursor:pointer}
+  .btn:disabled{opacity:.6;cursor:default}
+  input{width:100%;padding:12px 14px;border:1px solid var(--brd);border-radius:11px;font-size:.95rem;
+        margin-bottom:10px;font-family:inherit;color:var(--tx)}
+  input:focus{outline:none;border-color:var(--acc)}
+  .msg{font-size:.78rem;color:var(--bad);min-height:1em;margin-bottom:10px;text-align:left}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="head">
+      <div class="name">AusbilderPro</div>
+      <div class="sub">Konto-Bestätigung</div>
+    </div>
+    <div class="body" id="content">
+      <div class="spin"></div>
+      <p>Einen Moment…</p>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script>
+  var _cfg={
+    apiKey:"AIzaSyCI5hJLj22FTiAJoVIPis7VhoQqJiMLAZQ",
+    authDomain:"ausbilderpro.firebaseapp.com",
+    projectId:"ausbilderpro",
+    storageBucket:"ausbilderpro.firebasestorage.app",
+    messagingSenderId:"937082794250",
+    appId:"1:937082794250:web:eb99bc41d8f39908df8af3"
+  };
+  firebase.initializeApp(_cfg);
+  var auth=firebase.auth();
+  auth.languageCode='de';
+
+  var q=new URLSearchParams(location.search);
+  var mode=q.get('mode');
+  var oobCode=q.get('oobCode');
+  var cont=q.get('continueUrl')||'';
+  var C=document.getElementById('content');
+
+  // Nur Weiterleitungen auf die eigene Domain zulassen (kein Open-Redirect)
+  function target(def){
+    try{ if(cont && new URL(cont).origin==='https://ausbilderpro.de') return cont; }catch(e){}
+    return def;
+  }
+  function ok(title,msg,to){
+    C.innerHTML='<div class="ico ok">&#10003;</div><h1>'+title+'</h1><p>'+msg+'</p>'+
+      '<a class="btn" href="'+to+'">Weiter zur App</a>';
+    setTimeout(function(){ location.href=to; },2200);
+  }
+  function fail(title,msg,to){
+    C.innerHTML='<div class="ico bad">!</div><h1>'+title+'</h1><p>'+msg+'</p>'+
+      '<a class="btn" href="'+to+'">Zur App</a>';
+  }
+
+  var APP='https://ausbilderpro.de/AzubiPro.html';
+  var HOME='https://ausbilderpro.de/';
+
+  if(!mode||!oobCode){
+    fail('Ungültiger Link','Dieser Link ist unvollständig oder bereits abgelaufen.',HOME);
+  } else if(mode==='verifyEmail'){
+    auth.applyActionCode(oobCode).then(function(){
+      ok('E-Mail bestätigt','Deine E-Mail-Adresse wurde bestätigt. Du wirst automatisch weitergeleitet…',target(APP));
+    }).catch(function(){
+      fail('Link abgelaufen','Dieser Bestätigungslink ist nicht mehr gültig. Bitte fordere in der App einen neuen an.',target(APP));
+    });
+  } else if(mode==='verifyAndChangeEmail'){
+    auth.applyActionCode(oobCode).then(function(){
+      ok('E-Mail geändert','Deine neue E-Mail-Adresse ist jetzt aktiv. Du wirst weitergeleitet…',target(APP));
+    }).catch(function(){
+      fail('Link abgelaufen','Dieser Link ist nicht mehr gültig.',target(APP));
+    });
+  } else if(mode==='recoverEmail'){
+    auth.applyActionCode(oobCode).then(function(){
+      ok('Änderung rückgängig gemacht','Die E-Mail-Änderung wurde rückgängig gemacht.',HOME);
+    }).catch(function(){
+      fail('Link abgelaufen','Dieser Link ist nicht mehr gültig.',HOME);
+    });
+  } else if(mode==='resetPassword'){
+    auth.verifyPasswordResetCode(oobCode).then(function(email){
+      C.innerHTML='<h1>Neues Passwort</h1><p>für '+email+'</p>'+
+        '<input id="pw" type="password" placeholder="Neues Passwort" autocomplete="new-password">'+
+        '<input id="pw2" type="password" placeholder="Passwort wiederholen" autocomplete="new-password">'+
+        '<div class="msg" id="m"></div>'+
+        '<button class="btn" id="go" style="width:100%">Passwort speichern</button>';
+      var m=document.getElementById('m');
+      document.getElementById('go').onclick=function(){
+        var p=document.getElementById('pw').value, p2=document.getElementById('pw2').value;
+        if(p.length<6){ m.textContent='Bitte mindestens 6 Zeichen.'; return; }
+        if(p!==p2){ m.textContent='Die Passwörter stimmen nicht überein.'; return; }
+        var btn=this; btn.disabled=true; m.textContent='';
+        auth.confirmPasswordReset(oobCode,p).then(function(){
+          ok('Passwort geändert','Du kannst dich jetzt mit dem neuen Passwort anmelden.',target(HOME));
+        }).catch(function(){
+          btn.disabled=false; m.textContent='Fehler – der Link ist evtl. abgelaufen.';
+        });
+      };
+    }).catch(function(){
+      fail('Link abgelaufen','Dieser Link zum Zurücksetzen ist nicht mehr gültig. Bitte fordere einen neuen an.',HOME);
+    });
+  } else {
+    fail('Aktion unbekannt','Diese Aktion wird nicht unterstützt.',HOME);
+  }
+  </script>
+</body>
+</html>
