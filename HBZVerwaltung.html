@@ -917,6 +917,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <button class="btn-sm" title="Alle Bescheinigungen als PDF" onclick="generateAlleBescheinigungen()" style="font-size:.72rem;padding:6px 10px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">📄 Bescheinigungen</button>
           <button class="btn-sm" title="Kurs heute als ausgefallen markieren" onclick="kursAusfallVerwaltung()" style="font-size:.72rem;padding:6px 10px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#ef4444">Ausfall</button>
           <button class="btn-sm" id="kdLabelsBtn" title="Custom-Noten-Labels manuell setzen (nur wenn Dahm/Ausbilder noch nicht gesynct hat)" onclick="openLabelEditor()" style="font-size:.72rem;padding:6px 10px;background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25);color:#d97706;display:none">✏ Labels</button>
+          <button class="btn-sm" id="kdReopenBtn" title="Kurs wieder öffnen (nur Admin)" onclick="reopenKurs()" style="font-size:.72rem;padding:6px 10px;background:rgba(5,150,105,.12);border-color:rgba(5,150,105,.35);color:#047857;display:none">🔓 Wieder öffnen</button>
           <button class="btn-sm" id="kdArchiveBtn" title="📦 Archivieren" onclick="toggleArchiveKurs()" style="font-size:.72rem;padding:6px 10px">📦 Archivieren</button>
           <button class="btn-sm btn-bad" title="🗑 Löschen" onclick="deleteSelectedKurs()" style="font-size:.72rem;padding:6px 10px">🗑 Löschen</button>
         </div>
@@ -1675,11 +1676,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 319';
+const APP_VERSION = 'Build 320';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
-  {v:'Build 319', d:'29.06.2026', items:['🏷️ Kurs-Dokumente klar als interner Kanal beschriftet: „Kurs-Dokumente · an/von Ausbilder" (in AusbilderPro entsprechend „an/von Verwaltung") – nur Austausch Verwaltung ↔ Ausbilder, nicht für Teilnehmer']},
+  {v:'Build 320', d:'29.06.2026', items:['🔒 Kurs abschließen: Ausbilder kann einen Kurs in AusbilderPro abschließen → danach schreibgeschützt (keine Noten/Anwesenheit/Sitzplatz/Bescheinigungen/Dokumente mehr änderbar). Status wird hier im Kursdetail angezeigt; „🔓 Wieder öffnen" nur für Admin']},
   {v:'Build 312', d:'26.06.2026', items:['🧹 Wartungs-Tool „Vertauschte Namen korrigieren" wieder entfernt (Einmal-Aufräumung erledigt)']},
   {v:'Build 311', d:'26.06.2026', items:['✏️ „Stefan Mohr" → „S. Mohr" in allen App-Oberflächen (Rechtstexte behalten den vollständigen Namen)','📋 Changelog auf Build-Schema umgestellt und Änderungen seit Mai nachgetragen']},
   {v:'Build 310', d:'26.06.2026', items:['🔢 Sichtbare Versionsnummer: aktuelle Build-Nummer oben in den Einstellungen und im Footer (statt fester „v2.9.0") – zeigt sofort, ob der aktuelle Stand geladen ist']},
@@ -5831,6 +5832,16 @@ function closeArchiveModal(){
   if(m) m.remove();
 }
 
+function reopenKurs(){
+  if(_userRole!=='admin'){ toast('Nur ein Admin kann einen Kurs wieder öffnen.'); return; }
+  const kursId=_selectedKursId; if(!kursId) return;
+  if(!confirm('Kurs wieder öffnen?\n\nDanach sind in AusbilderPro wieder Änderungen möglich (Noten, Anwesenheit, Sitzplatz …).')) return;
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .update({abgeschlossen:false, abgeschlossenAm:'', abgeschlossenVon:''})
+    .then(()=>{ const k=_kurse.find(x=>x.id===kursId); if(k){ k.abgeschlossen=false; k.abgeschlossenAm=''; k.abgeschlossenVon=''; } toast('🔓 Kurs wieder geöffnet'); showKursDetail(kursId); })
+    .catch(e=>toast('Fehler: '+(e.code||e.message),'bad'));
+}
+
 function showKursDetail(kursId){
   // Alte Listener abmelden
   if(_kdUnsubTN){ _kdUnsubTN(); _kdUnsubTN=null; }
@@ -5875,6 +5886,9 @@ function showKursDetail(kursId){
     archBtn.style.opacity=kursLaeuft?'.4':'1';
     archBtn.title=kursLaeuft?'Erst nach Kursende ('+fmtDE(k.bis)+') verfügbar':'';
   }
+  if(subEl && k.abgeschlossen) subEl.innerHTML += ' &middot; <span style="color:#b91c1c;font-weight:700">🔒 Abgeschlossen'+(k.abgeschlossenAm?' '+new Date(k.abgeschlossenAm).toLocaleDateString('de-DE'):'')+'</span>';
+  const _reopenBtn=document.getElementById('kdReopenBtn');
+  if(_reopenBtn) _reopenBtn.style.display=(k.abgeschlossen && _userRole==='admin')?'inline-flex':'none';
 
   const wrap=document.getElementById('kdTNList');
   wrap.innerHTML='<div class="empty">Lädt…</div>';

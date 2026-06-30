@@ -2527,6 +2527,7 @@ async function syncSeatGradesFromFirestore(){
     const kursSnap = await _db.collection('shared').doc('kurse').collection('list').doc(kursId).get();
     if(kursSnap.exists){
       const kd = kursSnap.data()||{};
+      inst.abgeschlossen = !!kd.abgeschlossen; inst.abgeschlossenAm = kd.abgeschlossenAm||''; inst.abgeschlossenVon = kd.abgeschlossenVon||'';
       const cloudGrades = kd.customGrades||{};
       const localGrades = inst.customGrades||[];
       // Wenn Cloud customGrades hat aber lokal leer/unvollständig: importieren
@@ -3544,6 +3545,24 @@ function saveNewInst(){
 // ─── MAIN ───
 function curInst(){ return S.curKat&&S.curInst?S.kats[S.curKat]?.instances[S.curInst]:null; }
 function curSeats(){ const i=curInst();return i?i.seats:{};  }
+function kursGesperrt(inst){ inst=inst||curInst(); return !!(inst && inst.abgeschlossen); }
+function lockGuard(){ if(kursGesperrt()){ toast('🔒 Kurs ist abgeschlossen – keine Änderungen möglich'); return true; } return false; }
+function kursAbschliessen(){
+  const inst=curInst(); if(!inst) return;
+  if(inst.abgeschlossen){ toast('Kurs ist abgeschlossen. Wieder öffnen kann nur ein Admin in VerwaltungPro.'); return; }
+  if(!confirm('Diesen Kurs wirklich abschließen?\n\nDanach sind KEINE Änderungen mehr möglich (Noten, Anwesenheit, Sitzplatz, Bemerkungen, Bescheinigungen, Dokumente).\n\nNur ein Admin kann den Kurs in VerwaltungPro wieder öffnen.')) return;
+  const am=new Date().toISOString();
+  const von=(_auth&&_auth.currentUser?_auth.currentUser.email:'')||'';
+  inst.abgeschlossen=true; inst.abgeschlossenAm=am; inst.abgeschlossenVon=von;
+  persist();
+  if(inst.sharedKursId && _db){
+    _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
+      .update({abgeschlossen:true, abgeschlossenAm:am, abgeschlossenVon:von})
+      .catch(e=>toast('Cloud-Status nicht gespeichert: '+(e.code||e.message)));
+  }
+  toast('🔒 Kurs abgeschlossen – jetzt schreibgeschützt');
+  renderAll();
+}
 
 function renderMain(){
   const el=document.getElementById('mainArea');
@@ -3592,7 +3611,12 @@ function renderMain(){
     }
     return;
   }
+  const _lock=kursGesperrt(inst);
+  const _lockBtn=inst.abgeschlossen
+    ? '<div class="ka-divider"></div><button class="tbtn main-docs-btn ka-del" onclick="kursAbschliessen()" title="Nur ein Admin kann den Kurs in VerwaltungPro wieder öffnen" style="opacity:.9">🔒 Abgeschlossen'+(inst.abgeschlossenAm?' '+new Date(inst.abgeschlossenAm).toLocaleDateString('de-DE'):'')+'</button>'
+    : '<div class="ka-divider"></div><button class="tbtn main-docs-btn ka-orange" onclick="kursAbschliessen()" title="Kurs abschließen – danach schreibgeschützt">🔒 Kurs abschließen</button>';
   el.innerHTML=
+    (_lock?'<div style="margin:8px 0;padding:10px 14px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.4);border-radius:10px;font-size:.74rem;font-weight:700;color:#b91c1c;line-height:1.5">🔒 Kurs abgeschlossen — schreibgeschützt. Änderungen sind nicht möglich. Wieder öffnen kann nur ein Admin in VerwaltungPro.</div>':'')+
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button></div></div>'
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="kursact-close" onclick="toggleKursActions()" title="Schließen" aria-label="Schließen">✕</button>'
@@ -3609,6 +3633,7 @@ function renderMain(){
     +'<button class="tbtn main-docs-btn ka-warn" onclick="ausbilderKommtSpaeter()" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
     +'<button class="tbtn main-docs-btn ka-orange" onclick="kursAusfall()" title="Kurs für heute als ausgefallen markieren">⚠️ Ausfall</button>'
     +'<button class="tbtn main-docs-btn ka-del" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Lehrgang löschen (30 Tage im Papierkorb)">🗑 Löschen</button>'
+    +_lockBtn
     +'</div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
@@ -4216,7 +4241,7 @@ async function refreshAllSeatNamesFromGlobalTN(){
   console.log('Refresh-Ergebnis:', {updated, alreadyOk, missing, total: allJobs.length});
 }
 
-function markAlleAnwesend(){
+function markAlleAnwesend(){ if(lockGuard())return;
   const inst=curInst(); if(!inst) return;
   const today=new Date().toISOString().slice(0,10);
   if(!confirm('✓ Alle Schüler für heute als anwesend markieren?\n\nDatum: '+new Date(today).toLocaleDateString('de-DE')+'\n\nHinweis: Schüler die heute schon einen anderen Status haben (Berufsschule, Krank, ...) werden NICHT überschrieben.')) return;
@@ -4242,7 +4267,7 @@ function markAlleAnwesend(){
   toast(msg);
 }
 
-function markBerufsschultag(){
+function markBerufsschultag(){ if(lockGuard())return;
   const inst=curInst(); if(!inst) return;
   const today=new Date().toISOString().slice(0,10);
   if(!confirm('🎓 Berufsschultag für alle Schüler eintragen?\n\nDatum: '+new Date(today).toLocaleDateString('de-DE'))) return;
@@ -5416,7 +5441,7 @@ function toggleSubField(which){
   inp.disabled=!chk.checked;
   if(!chk.checked) inp.value='';
 }
-function addAtt(){
+function addAtt(){ if(lockGuard())return;
   const date=getDateFromSelects(),note=document.getElementById('aNote').value;
   if(!date){alert('Bitte Datum wählen.');return;}
   // Wenn kein Status gewählt: Modal öffnen statt nur Alert
@@ -5783,7 +5808,7 @@ function delPhoto(){
   loadPhotoPreview(null);
 }
 
-function saveSeat(){
+function saveSeat(){ if(lockGuard())return;
   if(!curSeat||!S.curKat||!S.curInst)return;
   // Warn if user has selected date+status but not yet added the entry
   const dateVal=getDateFromSelects();
@@ -6581,7 +6606,7 @@ function toggleNachweis(tnId,val){
     window.opener._saveBescheinigungData(window._kursId,tnId,'bescheinigungNachweis',newVal);
   }
 }
-function setAllNachweis(val){
+function setAllNachweis(val){ if(lockGuard())return;
   var yesAll=document.querySelectorAll('.rb-yes');
   var noAll=document.querySelectorAll('.rb-no');
   yesAll.forEach(function(r){r.classList.toggle('checked',val==='yes');});
@@ -6609,7 +6634,7 @@ function toggleStandort(tnId,ort){
     window.opener._saveBescheinigungData(window._kursId,tnId,'bescheinigungStandort',ort);
   }
 }
-function setAllStandort(ort){
+function setAllStandort(ort){ if(lockGuard())return;
   var bonnAll=document.querySelectorAll('.cb-bonn');
   var siegAll=document.querySelectorAll('.cb-sieg');
   bonnAll.forEach(function(r){r.classList.toggle('checked',ort==='bonn');});
@@ -7967,7 +7992,7 @@ function openTnDetailFromSeat(){
   if(d.poolTnId) openTnDetail(d.poolTnId);
 }
 
-function deleteTnKomplett(tnId){
+function deleteTnKomplett(tnId){ if(lockGuard())return;
   if(!tnId||!_db) return;
   const inst=curInst();
   const kursId=inst?.sharedKursId;
@@ -8463,7 +8488,7 @@ function _qrLateMins(zeit){ // 'HH:MM' → Minuten nach 7:30 (0 wenn puenktlich)
   return Math.max(0, m-(7*60+30));
 }
 
-function openManualTNModal(){
+function openManualTNModal(){ if(lockGuard())return;
   document.getElementById('mtVorname').value='';
   document.getElementById('mtNachname').value='';
   document.getElementById('mtBetrieb').value='';
@@ -8992,7 +9017,7 @@ function _aktionDatumPreview(){
   prev.innerHTML=text;
 }
 
-function kursAusfall(){
+function kursAusfall(){ if(lockGuard())return;
   const inst=curInst();if(!inst)return;
   const kursId=inst.sharedKursId;
   if(!kursId||!_db){toast('Kein verknüpfter Kurs','bad');return;}
@@ -9205,7 +9230,7 @@ async function showAktionsVerlauf(){
   body.innerHTML=html;
 }
 
-function ausbilderKommtSpaeter(){
+function ausbilderKommtSpaeter(){ if(lockGuard())return;
   const inst=curInst();if(!inst)return;
   const kursId=inst.sharedKursId;
   if(!kursId||!_db){toast('Kein verknüpfter Kurs','bad');return;}
@@ -9905,7 +9930,7 @@ setTimeout(()=>{
   else if(rows>=11) block.classList.add('noten-xs');
   else if(rows>=8) block.classList.add('noten-sm');
 },50);
-function toggleStandort(ort){
+function toggleStandort(ort){ if(lockGuard())return;
   var bonn=document.querySelector('.cb-bonn');
   var sieg=document.querySelector('.cb-sieg');
   if(!bonn||!sieg)return;
@@ -9915,7 +9940,7 @@ function toggleStandort(ort){
     window.opener._saveBescheinigungData(window._kursId,window._tnId,'bescheinigungStandort',ort);
   }
 }
-function toggleNachweis(val){
+function toggleNachweis(val){ if(lockGuard())return;
   var yes=document.querySelector('.rb-yes');
   var no=document.querySelector('.rb-no');
   if(!yes||!no)return;
@@ -12255,7 +12280,7 @@ function docsUpload(type, scope){
   document.getElementById(id).click();
 }
 
-function docsHandleUpload(e, scope){
+function docsHandleUpload(e, scope){ if(lockGuard())return;
   const file = e.target.files[0];
   if(!file || !_fbUid) return;
   e.target.value = '';
@@ -12377,7 +12402,7 @@ function docsLoadList(scope){
     .catch(() => { listEl.innerHTML='<div style="color:var(--bad);font-size:.75rem;text-align:center;padding:12px">Fehler beim Laden</div>'; });
 }
 
-function docsDelete(fileDocId, storagePath, scope){
+function docsDelete(fileDocId, storagePath, scope){ if(lockGuard())return;
   if(!confirm('Dokument wirklich löschen?')) return;
   const inst=curInst();
   const kursId = inst ? inst.sharedKursId : null;
@@ -13730,7 +13755,7 @@ window._markBescheinigungAusgestelltBulk=function(kursId,tnIds,art){
   });
   return batch.commit().catch(err=>console.error('Ausgestellt-Mark bulk:',err));
 };
-window._saveBescheinigungSignature=function(kursId,tnId,signatureData,stempelData){
+window._saveBescheinigungSignature=function(kursId,tnId,signatureData,stempelData){ if(lockGuard())return;
   if(!_db||!kursId||!tnId) return Promise.reject(new Error('Missing kursId/tnId'));
   // JSON-Roundtrip + lokales Object stellt sicher dass es 100% plain ist
   const data=JSON.parse(JSON.stringify({
