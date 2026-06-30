@@ -3549,8 +3549,8 @@ function kursGesperrt(inst){ inst=inst||curInst(); return !!(inst && inst.abgesc
 function lockGuard(){ if(kursGesperrt()){ toast('🔒 Kurs ist abgeschlossen – keine Änderungen möglich'); return true; } return false; }
 function kursAbschliessen(){
   const inst=curInst(); if(!inst) return;
-  if(inst.abgeschlossen){ toast('Kurs ist abgeschlossen. Wieder öffnen kann nur ein Admin in VerwaltungPro.'); return; }
-  if(!confirm('Diesen Kurs wirklich abschließen?\n\nDanach sind KEINE Änderungen mehr möglich (Noten, Anwesenheit, Sitzplatz, Bemerkungen, Bescheinigungen, Dokumente).\n\nNur ein Admin kann den Kurs in VerwaltungPro wieder öffnen.')) return;
+  if(inst.abgeschlossen){ toast('Kurs ist abgeschlossen.'); return; }
+  if(!confirm('Diesen Kurs wirklich abschließen?\n\nDanach sind KEINE Änderungen mehr möglich (Noten, Anwesenheit, Sitzplatz, Bemerkungen, Bescheinigungen, Dokumente).')) return;
   const am=new Date().toISOString();
   const von=(_auth&&_auth.currentUser?_auth.currentUser.email:'')||'';
   inst.abgeschlossen=true; inst.abgeschlossenAm=am; inst.abgeschlossenVon=von;
@@ -3613,10 +3613,10 @@ function renderMain(){
   }
   const _lock=kursGesperrt(inst);
   const _lockBtn=inst.abgeschlossen
-    ? '<div class="ka-divider"></div><button class="tbtn main-docs-btn ka-del" onclick="kursAbschliessen()" title="Nur ein Admin kann den Kurs in VerwaltungPro wieder öffnen" style="opacity:.9">🔒 Abgeschlossen'+(inst.abgeschlossenAm?' '+new Date(inst.abgeschlossenAm).toLocaleDateString('de-DE'):'')+'</button>'
+    ? '<div class="ka-divider"></div><button class="tbtn main-docs-btn ka-g" onclick="kursAbschliessen()" title="Kurs ist abgeschlossen" style="opacity:.95">Kurs abgeschlossen'+(inst.abgeschlossenAm?' am '+new Date(inst.abgeschlossenAm).toLocaleDateString('de-DE'):'')+' ✓</button>'
     : '<div class="ka-divider"></div><button class="tbtn main-docs-btn ka-orange" onclick="kursAbschliessen()" title="Kurs abschließen – danach schreibgeschützt">🔒 Kurs abschließen</button>';
   el.innerHTML=
-    (_lock?'<div style="margin:8px 0;padding:10px 14px;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.4);border-radius:10px;font-size:.74rem;font-weight:700;color:#b91c1c;line-height:1.5">🔒 Kurs abgeschlossen — schreibgeschützt. Änderungen sind nicht möglich. Wieder öffnen kann nur ein Admin in VerwaltungPro.</div>':'')+
+    (_lock?'<div style="margin:8px 0;padding:10px 14px;background:rgba(5,150,105,.10);border:1.5px solid rgba(5,150,105,.4);border-radius:10px;font-size:.74rem;font-weight:700;color:#047857;line-height:1.5">✓ Kurs abgeschlossen — schreibgeschützt, keine Änderungen möglich.</div>':'')+
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button></div></div>'
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="kursact-close" onclick="toggleKursActions()" title="Schließen" aria-label="Schließen">✕</button>'
