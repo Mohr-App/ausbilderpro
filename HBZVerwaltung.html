@@ -736,31 +736,26 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="page-title">Dashboard</div>
         <div class="page-sub" id="dashDate"></div>
 
-        <!-- Stats -->
-        <div class="grid3" id="statsGrid" style="margin-bottom:20px">
-          <div class="stat-card" onclick="toggleKurseBreakdown('all')" style="cursor:pointer" title="Klicken für Aufschlüsselung">
-            <div class="stat-num" id="statKurse">–</div><div class="stat-label">Kurse gesamt <span style="font-size:.55rem;color:var(--acc)">▼</span></div>
-          </div>
-          <div class="stat-card" onclick="toggleTNBreakdown()" style="cursor:pointer" title="Klicken für Aufschlüsselung">
-            <div class="stat-num" id="statTN">–</div><div class="stat-label">Teilnehmer gesamt <span style="font-size:.55rem;color:var(--acc)">▼</span></div>
-          </div>
-          <div class="stat-card" onclick="toggleKurseBreakdown('aktiv')" style="cursor:pointer" title="Klicken für Aufschlüsselung">
-            <div class="stat-num" id="statAktiv">–</div><div class="stat-label">Aktive Kurse <span style="font-size:.55rem;color:var(--acc)">▼</span></div>
-          </div>
+        <!-- Kennzahlen -->
+        <div id="statsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px">
+          <div class="stat-card"><div class="stat-num" id="statAktiv" style="color:#059669">–</div><div class="stat-label"><span style="color:#22c55e">●</span> Läuft jetzt</div></div>
+          <div class="stat-card"><div class="stat-num" id="statGeplant" style="color:#2563eb">–</div><div class="stat-label"><span style="color:#2563eb">●</span> Geplant (kommt noch)</div></div>
+          <div class="stat-card"><div class="stat-num" id="statKurse">–</div><div class="stat-label">Kurse gesamt</div></div>
+          <div class="stat-card"><div class="stat-num" id="statTN">–</div><div class="stat-label">Teilnehmer gesamt</div></div>
         </div>
-        <div id="kurseBreakdownPanel" style="display:none;margin-bottom:20px"></div>
-        <div id="tnBreakdownPanel" style="display:none;margin-bottom:20px"></div>
+        <div id="kurseBreakdownPanel" style="display:none"></div>
+        <div id="tnBreakdownPanel" style="display:none"></div>
 
-        <!-- CHARTS -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px" id="dashCharts">
-          <div class="card" style="margin:0;padding:14px">
-            <div class="card-title"><span class="card-icon blue" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span>Kurs-Status</div>
-            <div style="max-height:200px;display:flex;justify-content:center"><canvas id="chartKursStatus"></canvas></div>
-          </div>
-          <div class="card" style="margin:0;padding:14px">
-            <div class="card-title"><span class="card-icon green" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="2" width="4" height="19"/></svg></span>Teilnehmer nach Beruf</div>
-            <div style="max-height:200px"><canvas id="chartBeruf"></canvas></div>
-          </div>
+        <!-- Läuft gerade -->
+        <div class="card" style="margin:0 0 16px;padding:16px 18px">
+          <div class="card-title" style="margin-bottom:4px"><span class="card-icon green" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>Läuft gerade <span id="dashAktivCnt" style="font-size:.62rem;color:var(--mu);font-weight:600;margin-left:6px"></span></div>
+          <div id="dashAktivListe"><div class="empty" style="font-size:.72rem;color:var(--mu);padding:8px 4px">Lädt…</div></div>
+        </div>
+
+        <!-- Als Nächstes -->
+        <div class="card" style="margin:0 0 16px;padding:16px 18px">
+          <div class="card-title" style="margin-bottom:4px"><span class="card-icon blue" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>Als Nächstes <span style="font-size:.62rem;color:var(--mu);font-weight:600;margin-left:6px">geplant</span></div>
+          <div id="dashNaechstesListe"><div class="empty" style="font-size:.72rem;color:var(--mu);padding:8px 4px">Lädt…</div></div>
         </div>
 
         <!-- Kursfortschritt Warnung -->
@@ -1676,11 +1671,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 321';
+const APP_VERSION = 'Build 322';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
-  {v:'Build 321', d:'01.07.2026', items:['📊 Dashboard „Kurse gesamt": Ausbilder-Dubletten behoben – Kurse desselben Ausbilders werden über ID/E-Mail/Namen zusammengefasst (z. B. „Stefan Mohr 6"+"4" → ein Chip)','🌳 Ausbilder-Übersicht (Sidebar): TN-Zahl je Lehrgang, TN-Summe je Lehrgangsart und je Ausbilder, globale TN-Gesamtzahl oben; Datum enger am Kurs (TN-Zahl = historisch „waren", ohne No-Shows)']},
+  {v:'Build 322', d:'01.07.2026', items:['🏠 Dashboard neu & selbsterklärend: 4 klare Kennzahlen (Läuft jetzt · Geplant · Kurse gesamt · Teilnehmer gesamt) + Listen „Läuft gerade" und „Als Nächstes" (klickbar, mit TN-Zahl). Diagramme & Chip-Aufschlüsselungen entfernt; operative Listen (Nicht angetreten, Kurs wiederholen, Aktivitäten …) bleiben']},
   {v:'Build 312', d:'26.06.2026', items:['🧹 Wartungs-Tool „Vertauschte Namen korrigieren" wieder entfernt (Einmal-Aufräumung erledigt)']},
   {v:'Build 311', d:'26.06.2026', items:['✏️ „Stefan Mohr" → „S. Mohr" in allen App-Oberflächen (Rechtstexte behalten den vollständigen Namen)','📋 Changelog auf Build-Schema umgestellt und Änderungen seit Mai nachgetragen']},
   {v:'Build 310', d:'26.06.2026', items:['🔢 Sichtbare Versionsnummer: aktuelle Build-Nummer oben in den Einstellungen und im Footer (statt fester „v2.9.0") – zeigt sofort, ob der aktuelle Stand geladen ist']},
@@ -3019,6 +3014,21 @@ function updateKursTNCounts(){
   });
 }
 
+function _renderDashKursListe(elId, kurse, dotColor){
+  const el=document.getElementById(elId); if(!el) return;
+  if(!kurse.length){ el.innerHTML='<div class="empty" style="font-size:.72rem;color:var(--mu);padding:8px 4px">Keine Kurse.</div>'; return; }
+  el.innerHTML = kurse.map(k=>{
+    const tn=_kursTNHist[k.id]||0;
+    const nm=esc(k.name||k.lehrgangsart||'Kurs');
+    const ausb=k.ausbilderName?' · '+esc(k.ausbilderName):'';
+    return '<div onclick="showKursDetail(\''+k.id+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--brd);cursor:pointer;border-radius:6px" onmouseover="this.style.background=\'var(--sur2)\'" onmouseout="this.style.background=\'\'">'
+      +'<span style="width:9px;height:9px;border-radius:50%;background:'+dotColor+';flex-shrink:0"></span>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nm+'</div><div style="font-size:.68rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+ausb+'</div></div>'
+      +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.68rem;font-weight:700;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;padding:2px 8px;border-radius:8px;white-space:nowrap">'+tn+' TN</span>'
+      +'<span style="color:#cbd5e1;font-weight:700">›</span>'
+      +'</div>';
+  }).join('');
+}
 function loadDashboard(){
   const dd=document.getElementById('dashDate');
   if(dd) dd.textContent='Stand: '+new Date().toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
@@ -3031,6 +3041,14 @@ function loadDashboard(){
   // ── Statistiken aus globalTN berechnen (KEIN extra Firestore-Read!) ──
   updateKursTNCounts();
   document.getElementById('statTN').textContent = _globalTN.filter(_istVerwaltet).length;
+
+  // ── Neues Dashboard: Kennzahl "Geplant" + Listen "Läuft gerade" / "Als Nächstes" ──
+  const _aktivKurse=_kurse.filter(k=>!k.archiviert&&!k.entwurf&&k.von&&k.bis&&k.von<=today&&k.bis>=today).sort((a,b)=>(a.von||'').localeCompare(b.von||''));
+  const _geplantKurse=_kurse.filter(k=>!k.archiviert&&!k.entwurf&&k.von&&k.von>today).sort((a,b)=>(a.von||'').localeCompare(b.von||''));
+  const _sg=document.getElementById('statGeplant'); if(_sg) _sg.textContent=_geplantKurse.length;
+  const _ac=document.getElementById('dashAktivCnt'); if(_ac) _ac.textContent=_aktivKurse.length+' '+(_aktivKurse.length===1?'Kurs':'Kurse');
+  _renderDashKursListe('dashAktivListe', _aktivKurse, '#22c55e');
+  _renderDashKursListe('dashNaechstesListe', _geplantKurse.slice(0,10), '#2563eb');
 
   // Wiederholer + Abwesende aus globalTN
   const absentEl=document.getElementById('dashAbsent');
