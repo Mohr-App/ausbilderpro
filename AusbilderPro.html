@@ -3572,6 +3572,7 @@ function nextUpcomingInst(){
   }));
   return best;
 }
+function _fmtDauer(m){ m=parseInt(m)||0; if(m<=0) return '0 Min'; const h=Math.floor(m/60), mm=m%60; if(h>0) return h+' Std'+(mm?' '+mm+' Min':''); return mm+' Min'; }
 function instDotStyle(inst, isAktiv, startStr, today){
   if(isAktiv) return ' style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4)"';
   if(startStr>today){
@@ -6362,6 +6363,8 @@ function generateAlleBescheinigungenAusbilder(){
       const praxis=sync.noten_praxis||s.praxis||'';
       const fehltage=(sync.attAbsentE||0)+(sync.attAbsentU||0)+(sync.attSick||0);
       const verspaetungen=sync.attLate||0;
+      const verspMin=(s.attendance||[]).reduce((sum,e)=> sum + (e && e.type==='present' ? (parseInt(e.lateMins)||0) : 0), 0);
+      const verspZeit=_fmtDauer(verspMin);
       const bemerkung=sync.bemerkung||s.bemerkung||'';
       const wasSignedA=!!(sync.bescheinigungSignatur||'');
       const ausgA=sync.bescheinigungAusgestellt||null;
@@ -6398,7 +6401,7 @@ function generateAlleBescheinigungenAusbilder(){
         }
       });
       // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-      notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num">${verspaetungen}</span></span></div>`);
+      notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span></span></span></div>`);
       if(bemerkung){
         notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
       }
@@ -6588,10 +6591,14 @@ body.pdf-mode .stempel-slot,body.pdf-mode .sig-canvas-wrap{cursor:default !impor
 @media print{.no-print,.btn-remove-overlay{display:none !important;}}
 body.pdf-mode .btn-remove-overlay{display:none !important;}
 body.fz-blank .fz-num{visibility:hidden;}
+.vz-time,.vz-lbl-time{display:none;}
+body.fz-zeit .vz-count,body.fz-zeit .vz-lbl-count{display:none;}
+body.fz-zeit .vz-time,body.fz-zeit .vz-lbl-time{display:inline;}
 </style></head><body>
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="printAllCert()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
   <div style="margin:6px 0;font-size:12px;color:#334155"><label style="cursor:pointer;user-select:none"><input type="checkbox" onchange="toggleFehlzeitenBlank(this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen (Fehltage &amp; Verspätungen handschriftlich eintragen)</label></div>
+  <div style="margin:6px 0;font-size:12px;color:#334155"><label style="cursor:pointer;user-select:none"><input type="checkbox" onchange="toggleVerspaetungZeit(this.checked)" style="vertical-align:middle;margin-right:5px">🕐 Verspätung als tatsächliche Zeit anzeigen (Minuten statt Anzahl)</label></div>
   <div style="margin:8px 0;display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:center">
     <span style="font-size:11px;color:#475569;align-self:center;margin-right:4px"><b>Standort:</b></span>
     <button class="bulk-btn bulk-btn-standort" onclick="setAllStandort('bonn')">Alle HBZ Bonn</button>
@@ -6612,6 +6619,7 @@ ${pages}
 window._kursId='${kursId}';
 function lockGuard(){ try{ return !!(window.opener && window.opener.kursGesperrt && window.opener.kursGesperrt()); }catch(e){ return false; } }
 function toggleFehlzeitenBlank(on){ document.body.classList.toggle('fz-blank', on); }
+function toggleVerspaetungZeit(on){ document.body.classList.toggle('fz-zeit', on); }
 function toggleNachweis(tnId,val){
   var yes=document.querySelector('.rb-yes[data-tn="'+tnId+'"]');
   var no=document.querySelector('.rb-no[data-tn="'+tnId+'"]');
