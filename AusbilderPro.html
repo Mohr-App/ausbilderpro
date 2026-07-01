@@ -6398,7 +6398,7 @@ function generateAlleBescheinigungenAusbilder(){
         }
       });
       // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-      notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage}</span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short">${verspaetungen}</span></div>`);
+      notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num">${verspaetungen}</span></span></div>`);
       if(bemerkung){
         notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
       }
@@ -6587,9 +6587,11 @@ body.pdf-mode .stempel-slot,body.pdf-mode .sig-canvas-wrap{cursor:default !impor
 .btn-remove-overlay{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:#ef4444;color:#fff;cursor:pointer;font-weight:900;font-size:.7rem;box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:10;line-height:0;display:flex;align-items:center;justify-content:center;}
 @media print{.no-print,.btn-remove-overlay{display:none !important;}}
 body.pdf-mode .btn-remove-overlay{display:none !important;}
+body.fz-blank .fz-num{visibility:hidden;}
 </style></head><body>
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="printAllCert()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
+  <div style="margin:6px 0;font-size:12px;color:#334155"><label style="cursor:pointer;user-select:none"><input type="checkbox" onchange="toggleFehlzeitenBlank(this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen (Fehltage &amp; Verspätungen handschriftlich eintragen)</label></div>
   <div style="margin:8px 0;display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:center">
     <span style="font-size:11px;color:#475569;align-self:center;margin-right:4px"><b>Standort:</b></span>
     <button class="bulk-btn bulk-btn-standort" onclick="setAllStandort('bonn')">Alle HBZ Bonn</button>
@@ -6608,6 +6610,8 @@ body.pdf-mode .btn-remove-overlay{display:none !important;}
 ${pages}
 <script>
 window._kursId='${kursId}';
+function lockGuard(){ try{ return !!(window.opener && window.opener.kursGesperrt && window.opener.kursGesperrt()); }catch(e){ return false; } }
+function toggleFehlzeitenBlank(on){ document.body.classList.toggle('fz-blank', on); }
 function toggleNachweis(tnId,val){
   var yes=document.querySelector('.rb-yes[data-tn="'+tnId+'"]');
   var no=document.querySelector('.rb-no[data-tn="'+tnId+'"]');
