@@ -9648,6 +9648,8 @@ function generateBescheinigungAusbilder(){
     const heute=new Date().toLocaleDateString('de-DE');
     const fehltage=(sync.attAbsentE||0)+(sync.attAbsentU||0)+(sync.attSick||0);
     const verspaetungen=sync.attLate||0;
+    const verspMin=(d.attendance||[]).reduce((sum,e)=> sum + (e && e.type==='present' ? (parseInt(e.lateMins)||0) : 0), 0);
+    const verspZeit=_fmtDauer(verspMin);
     const bemerkung=sync.bemerkung||d.bemerkung||'';
     const wasSigned=!!(sync.bescheinigungSignatur||'');
     const ausg=sync.bescheinigungAusgestellt||null;
@@ -9682,7 +9684,7 @@ function generateBescheinigungAusbilder(){
       }
     });
     // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-    notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage}</span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short">${verspaetungen}</span></div>`);
+    notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span></span></span></div>`);
     if(bemerkung){
       notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
     }
@@ -9798,11 +9800,19 @@ body.pdf-mode .hinweis-row{margin:4mm 0;}
 body.pdf-mode .stempel-slot,body.pdf-mode .sig-canvas-wrap{cursor:default !important;}
 .btn-clear-sig{background:none;border:1px solid #ccc!important;color:#666;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;}
 .status-msg{text-align:center;padding:8px;border-radius:8px;font-size:13px;font-weight:600;margin:8px 0;font-family:'Segoe UI',Arial,sans-serif;}
+body.fz-blank .fz-num{visibility:hidden;}
+.vz-time,.vz-lbl-time{display:none;}
+body.fz-zeit .vz-count,body.fz-zeit .vz-lbl-count{display:none;}
+body.fz-zeit .vz-time,body.fz-zeit .vz-lbl-time{display:inline;}
 </style></head><body>
 <div class="action-bar no-print">
   <button class="btn-print" onclick="printCert()" title="Drucken">🖨 Drucken</button>
   <button class="btn-default" id="btnInsertDefault" title="Hinterlegte Unterschrift und Stempel einfügen" onclick="insertDefaultSigStempel()">📝 Unterschrift & Stempel</button>
   <button class="btn-send" id="btnSend" title="Bescheinigung als PDF per E-Mail an den Azubi senden" onclick="sendBescheinigung()">📧 Per E-Mail senden</button>
+</div>
+<div class="no-print" style="text-align:center;margin:2px 0 6px;font-size:12px;color:#334155">
+  <label style="cursor:pointer;user-select:none;margin:0 8px"><input type="checkbox" onchange="document.body.classList.toggle('fz-blank',this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen</label>
+  <label style="cursor:pointer;user-select:none;margin:0 8px"><input type="checkbox" onchange="document.body.classList.toggle('fz-zeit',this.checked)" style="vertical-align:middle;margin-right:5px">🕐 Verspätung als tatsächliche Zeit</label>
 </div>
 <div id="statusArea" class="no-print">${ausgTxt?'<div class="status-msg" style="background:#dcfce7;color:#166534">'+ausgTxt+'</div>':''}</div>
 
