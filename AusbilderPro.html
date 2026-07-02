@@ -3142,6 +3142,7 @@ function linkHBZKurs(kursId, kursData, targetKatId){
   ];
   // Notenkategorien: nutze ausbilder-eigene Default-Konfiguration (aus Profil)
   const _defaultGrades=_getAusbilderDefaultGrades();
+  const _hasDef = Array.isArray(_defaultGrades) && _defaultGrades.length>0;
   S.kats[targetKatId].instances[instId]={
     sD:von.d, sM:von.m, sY:von.y,
     eD:bis.d, eM:bis.m, eY:bis.y,
@@ -3149,9 +3150,9 @@ function linkHBZKurs(kursId, kursData, targetKatId){
     sharedKursId: kursId,
     werkzeug: kursData.werkzeug||[],
     berufsschultage: kursData.berufsschultage||[],
-    // Keine Standardnoten - nur die ausbilder-eigenen Defaults (oder leer beim ersten Mal)
-    deletedFixedGrades:['fuehrung','mitarbeit','praxis'],
-    customGrades:_defaultGrades
+    // Mit eigenem Default: dessen Noten (feste ausblenden). OHNE Default: Standard Führung/Mitarbeit/Praxis behalten – nie leer!
+    deletedFixedGrades: _hasDef ? ['fuehrung','mitarbeit','praxis'] : [],
+    customGrades: _hasDef ? _defaultGrades : []
   };
   S.curKat=targetKatId;
   S.curInst=instId;
@@ -5348,6 +5349,8 @@ function _getAusbilderDefaultGrades(){
 }
 function _setAusbilderDefaultGrades(grades){
   const clean=JSON.parse(JSON.stringify(grades||[]));
+  // Schutz: einen vorhandenen, nicht-leeren Standard NICHT durch eine leere Liste überschreiben (verhindert versehentliches „Noten weg")
+  if(clean.length===0){ const _ex=_getAusbilderDefaultGrades(); if(Array.isArray(_ex)&&_ex.length>0) return; }
   try{
     const p=getAusbilderProfil();
     p.defaultGrades=clean;
@@ -5399,6 +5402,7 @@ function renderGradesTab(d){
       +'<input type="text" id="newGradeName" placeholder="z.B. Führung" maxlength="20" style="padding:7px 10px;border:1px solid #93c5fd;border-radius:6px;font-size:.78rem;background:#fff;font-family:inherit;width:160px" onkeydown="if(event.key===\'Enter\'){addCustomGrade();}">'
       +'<button onclick="addCustomGrade()" style="padding:7px 14px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit">+ Anlegen</button>'
       +'</div>'
+      +'<div style="margin-top:10px"><button onclick="restoreStandardGrades()" style="padding:6px 12px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.25);color:#2563eb;border-radius:6px;font-weight:700;font-size:.74rem;cursor:pointer;font-family:inherit" title="Legt die üblichen Noten Führung, Mitarbeit und Praxis an">Standard-Noten (Führung · Mitarbeit · Praxis) anlegen</button></div>'
       +(_hasDef?'<div style="margin-top:12px;padding-top:12px;border-top:1px dashed #93c5fd"><button onclick="applyDefaultGradesToCurrentKurs()" style="padding:7px 14px;background:#059669;color:#fff;border:none;border-radius:6px;font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit" title="Übernimmt deine gespeicherte Standard-Noten-Konfiguration für diesen Kurs">⤵ Meine Standard-Noten übernehmen</button></div>':'')
       +'</div>';
     updGrades();
@@ -5435,6 +5439,15 @@ function addCustomGrade(){
   renderGradesTab(d);
 }
 
+function restoreStandardGrades(){
+  const inst=curInst(); if(!inst) return;
+  inst.deletedFixedGrades=[];
+  persist();
+  try{ syncCustomGradesToCloud(); }catch(e){}
+  const d=curSeats()[curSeat]||{};
+  renderGradesTab(d);
+  toast('✓ Standard-Noten (Führung, Mitarbeit, Praxis) angelegt');
+}
 function applyDefaultGradesToCurrentKurs(){
   const inst=curInst(); if(!inst) return;
   const def=_getAusbilderDefaultGrades();
