@@ -1682,12 +1682,33 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
 </div>
 
+<style>
+.seat-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:18px 8px;background:var(--sur2,#f8fafc);border:1px solid var(--brd,#e2e8f0);border-radius:14px;cursor:pointer;font-family:'Sora',sans-serif;font-size:.8rem;font-weight:700;color:var(--tx,#0f172a);text-align:center;transition:.12s;line-height:1.2}
+.seat-tile:hover,.seat-tile:active{background:#fff;border-color:var(--acc,#2563eb)}
+.seat-tile .ic{font-size:1.6rem;line-height:1}
+</style>
 <!-- SEAT MODAL -->
 <div class="ov" id="ov">
   <div class="modal">
-    <div class="mhd"><div class="mtit" id="mtit">Sitzplatz</div><button class="xcls" onclick="safeCloseModal()" title="Schließen">✕</button></div>
+    <div class="mhd"><button class="xcls" id="seatBackBtn" onclick="seatShowMenu()" title="Zurück zur Übersicht" style="display:none;margin-right:auto">←</button><div class="mtit" id="mtit">Sitzplatz</div><button class="xcls" onclick="safeCloseModal()" title="Schließen">✕</button></div>
     <div class="mbdy">
-      <div class="tabs">
+      <div id="seatMenu" style="padding:2px 0 4px">
+        <div style="font-size:.62rem;font-weight:700;color:var(--mu,#64748b);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px">Was möchtest du bearbeiten?</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <button class="seat-tile" onclick="stab('info')"><span class="ic">📋</span>Person</button>
+          <button class="seat-tile" onclick="stab('grades')"><span class="ic">📊</span>Noten</button>
+          <button class="seat-tile" onclick="stab('att')"><span class="ic">📅</span>Anwesenheit</button>
+          <button class="seat-tile" onclick="stab('docs');docsLoadList('seat')"><span class="ic">📎</span>Dokumente</button>
+          <button class="seat-tile" onclick="stab('hist')" style="grid-column:1/-1"><span class="ic">📋</span>Historie</button>
+        </div>
+        <button id="seatMenuBesch" onclick="generateBescheinigungAusbilder()" style="display:none;width:100%;margin-top:10px;padding:14px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.28);border-radius:12px;color:#4f46e5;font-weight:800;font-size:.82rem;cursor:pointer;font-family:'Sora',sans-serif">📄 Teilnahmebescheinigung erstellen</button>
+        <div id="seatMenuActions" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed var(--brd,#e2e8f0);gap:8px;flex-wrap:wrap">
+          <button onclick="markSeatAsWdh()" style="flex:1;min-width:100px;padding:9px;border-radius:9px;font-size:.68rem;font-weight:700;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);color:#d97706;cursor:pointer;font-family:'Sora',sans-serif">↩ Wiederholer</button>
+          <button onclick="markSeatAsAbsent()" style="flex:1;min-width:100px;padding:9px;border-radius:9px;font-size:.68rem;font-weight:700;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);color:#ef4444;cursor:pointer;font-family:'Sora',sans-serif">🚫 Nicht angetreten</button>
+          <button onclick="clearSeat()" style="flex:1;min-width:100px;padding:9px;border-radius:9px;font-size:.68rem;font-weight:700;background:var(--sur2,#f8fafc);border:1px solid var(--brd,#e2e8f0);color:var(--mu,#64748b);cursor:pointer;font-family:'Sora',sans-serif">🗑 Platz leeren</button>
+        </div>
+      </div>
+      <div class="tabs" style="display:none">
         <button class="tab active" onclick="stab('info')" title="Name, Betrieb, Beruf, Notizen">📋 Person</button>
         <button class="tab" onclick="stab('grades')" title="Führung, Mitarbeit, Praxis bewerten">📊 Noten</button>
         <button class="tab" onclick="stab('att')" title="Anwesenheit pro Tag erfassen">📅 Anwesenheit</button>
@@ -1934,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v757';
+const APP_VERSION = 'v758';
 const APP_BUILD = '2026-07-02';
 const CHANGELOG = [
+  {v:'v758', d:'02.07.2026', items:['👤 Teilnehmer-Modal neu: startet mit einer Button-Übersicht (Person · Noten · Anwesenheit · Dokumente · Historie) statt Reiter; ein Klick öffnet den Bereich, „← Zurück" führt zur Übersicht. Bescheinigung + Status-Aktionen (Wiederholer/Nicht angetreten/Platz leeren) direkt in der Übersicht']},
   {v:'v757', d:'02.07.2026', items:['🔒 „Kurs abschließen" als eigener Button direkt neben „Aktionen" (Schreibsperre für abgeschlossene Kurse)','📊 Noten-Vorlage pro Ausbilder: eigene Notennamen werden konto-weit gespeichert und automatisch auf neue Kurse übernommen – geräteübergreifend; mit „★ als Standard speichern", „übernehmen" und „Vorlage zurücksetzen" (Wizard)','🩺 Bescheinigung: Option „Fehlzeiten leer lassen" und „Verspätung als tatsächliche Zeit"','🔢 Versionsanzeige vereinheitlicht']},
   {v:'v2.7.6', d:'13.05.2026', items:['🎨 Sidebar-Rahmen dezenter (Border 5px → 3px, 3px → 2px; Tints weicher)','📄 Lehrgang-Zeilen (Datumsangaben) jetzt als weiße Karten mit dezentem Rahmen auf dem getönten Kategorie-Hintergrund — Desktop + Mobile']},
   {v:'v2.7.5', d:'13.05.2026', items:['🎨 Sidebar im VP-Stil: Section-Header „📚 Lehrgangsarten" jetzt sticky + fett, Lehrgangsart-Blöcke mit farbigem 3px Bottom-Border und 10px Abstand zwischen den Blöcken (Desktop + Mobile)']},
@@ -5141,6 +5163,7 @@ function openModal(id){
   // Docs tab laden wenn aktiv
   document.querySelector('.tab[onclick="stab(\'docs\')"]').onclick = ()=>{ stab('docs'); docsLoadList('seat'); };
   document.getElementById('ov').classList.add('open');
+  seatShowMenu();
   // Auto-resolve poolTnId wenn Name vorhanden aber keine ID
   resolvePoolTnId(id, d);
 }
@@ -5308,7 +5331,19 @@ function safeCloseModal(){
   closeModal();
 }
 function closeModal(){document.getElementById('ov').classList.remove('open');curSeat=null;_modalSnapshot=null;}
+function seatShowMenu(){
+  const menu=document.getElementById('seatMenu'); if(menu) menu.style.display='';
+  document.querySelectorAll('#ov .tp').forEach(x=>x.classList.remove('active'));
+  const bb=document.getElementById('seatBackBtn'); if(bb) bb.style.display='none';
+  ['btnSaveSeat','btnBescheinigung','btnAbsentSeat','btnWdhSeat','btnClearSeat'].forEach(id=>{const e=document.getElementById(id); if(e) e.style.display='none';});
+  const occ=(()=>{ const inst=curInst(); if(!inst||!curSeat) return false; const s=inst.seats&&inst.seats[curSeat]; return !!(s&&s.name); })();
+  const acts=document.getElementById('seatMenuActions'); if(acts) acts.style.display=occ?'flex':'none';
+  const bt=document.getElementById('btnBescheinigung');
+  const besch=document.getElementById('seatMenuBesch'); if(besch) besch.style.display=(occ && bt && bt.dataset.show==='1')?'':'none';
+  const mb=document.querySelector('#ov .mbdy'); if(mb) mb.scrollTop=0;
+}
 function stab(t){
+  { const _m=document.getElementById('seatMenu'); if(_m)_m.style.display='none'; const _b=document.getElementById('seatBackBtn'); if(_b)_b.style.display=''; }
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.tp').forEach(x=>x.classList.remove('active'));
   document.querySelector('.tab[onclick="stab(\''+t+'\')"]').classList.add('active');
