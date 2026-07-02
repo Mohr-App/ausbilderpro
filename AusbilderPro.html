@@ -3148,8 +3148,8 @@ function linkHBZKurs(kursId, kursData, targetKatId){
     sharedKursId: kursId,
     werkzeug: kursData.werkzeug||[],
     berufsschultage: kursData.berufsschultage||[],
-    // Mit Vorlage: exakt deren Konfig (feste + eigene). OHNE Vorlage: Standard Führung/Mitarbeit/Praxis – nie leer!
-    deletedFixedGrades: _hasTpl ? _tpl.deletedFixed.slice() : [],
+    // Mit Vorlage: exakt deren Konfig (feste + eigene). OHNE Vorlage: leer → Noten-Wizard (bei 0 starten).
+    deletedFixedGrades: _hasTpl ? _tpl.deletedFixed.slice() : ['fuehrung','mitarbeit','praxis'],
     customGrades: _hasTpl ? JSON.parse(JSON.stringify(_tpl.custom)) : []
   };
   S.curKat=targetKatId;
@@ -5374,11 +5374,24 @@ function _setGradeTemplate(custom, deletedFixed, manual){
   try{ if(_db&&_fbUid&&!_demoMode){ const payload={defaultGrades:c, defaultDeletedFixed:df}; if(manual) payload.defaultGradesManual=true; _db.collection('users').doc(_fbUid).set(payload,{merge:true}).catch(e=>console.warn('grade-tpl cloud:',e&&e.code)); } }catch(e){}
 }
 function resetGradeDefault(){
-  if(!confirm('Deine Noten-Vorlage zurücksetzen?\n\nNeue Kurse starten dann wieder mit den Standard-Noten (Führung/Mitarbeit/Praxis), bis du eine neue Vorlage speicherst.')) return;
+  const inst=curInst();
+  let kursHatWerte=false;
+  if(inst){ kursHatWerte=Object.values(inst.seats||{}).some(s=>{ if(!s) return false; if(['fuehrung','mitarbeit','praxis'].some(id=>s[id])) return true; if(s.extraGrades&&Object.values(s.extraGrades).some(v=>v)) return true; return false; }); }
+  const msg = kursHatWerte
+    ? 'Vorlage zurücksetzen und diesen Kurs auf 0 Noten setzen?\n\nACHTUNG: In diesem Kurs sind bereits Noten-Werte eingetragen – die gehen dabei verloren. Danach startet der Noten-Wizard bei 0.'
+    : 'Vorlage zurücksetzen?\n\nDie gespeicherte Vorlage wird gelöscht und dieser Kurs auf 0 Noten gesetzt – der Noten-Wizard startet neu.';
+  if(!confirm(msg)) return;
   try{ const prof=getAusbilderProfil(); prof.defaultGrades=[]; prof.defaultDeletedFixed=['fuehrung','mitarbeit','praxis']; prof.defaultGradesManual=false; localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(prof)); }catch(e){}
   try{ if(_db && _fbUid && !_demoMode){ _db.collection('users').doc(_fbUid).set({defaultGrades:[],defaultDeletedFixed:['fuehrung','mitarbeit','praxis'],defaultGradesManual:false},{merge:true}).catch(()=>{}); } }catch(e){}
-  const inst=curInst(); if(inst){ const d=curSeats()[curSeat]||{}; renderGradesTab(d); }
-  toast('↺ Noten-Vorlage zurückgesetzt');
+  if(inst){
+    inst.customGrades=[];
+    inst.deletedFixedGrades=['fuehrung','mitarbeit','praxis'];
+    Object.values(inst.seats||{}).forEach(s=>{ if(!s) return; ['fuehrung','mitarbeit','praxis'].forEach(id=>{ if(s[id]!==undefined) delete s[id]; }); if(s.extraGrades) s.extraGrades={}; });
+    persist();
+    try{ syncCustomGradesToCloud(); }catch(e){}
+    const d=curSeats()[curSeat]||{}; renderGradesTab(d);
+  }
+  toast('↺ Zurückgesetzt – Noten-Wizard startet bei 0');
 }
 // Automatik: jüngster Kurs (mit eigenen Noten) gibt die Vorlage vor – NUR wenn keine bewusste Vorlage gesetzt ist
 function _kursStartKey(inst){ return (inst.sY||0)*10000+(inst.sM||0)*100+(inst.sD||0); }
