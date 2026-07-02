@@ -1324,6 +1324,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div class="mbdy">
             <input type="hidden" id="addAusbId">
             <div class="fg"><label class="fl">Name <span style="color:var(--bad)">*</span></label><input class="fi" id="addAusbNameInp" placeholder="Vor- und Nachname"></div>
+            <div class="fg"><label class="fl">Anrede (für Azubi-Anzeige)</label><select class="fi" id="addAusbAnredeInp"><option value="">– keine –</option><option value="Herr">Herr</option><option value="Frau">Frau</option></select></div>
             <div class="form-row">
               <div class="fg" style="flex:1"><label class="fl">E-Mail</label><input class="fi" id="addAusbEmailInp" type="email" placeholder="name@hbz.de"></div>
               <div class="fg" style="flex:1"><label class="fl">Telefon</label><input class="fi" id="addAusbTelInp" type="tel" placeholder="+49 151 123456"></div>
@@ -1670,11 +1671,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 323';
+const APP_VERSION = 'Build 324';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
-  {v:'Build 323', d:'02.07.2026', items:['🧹 Kurs-Detail: „✏ Labels"-Button dauerhaft entfernt (Custom-Noten-Labels werden ohnehin automatisch übernommen)']},
+  {v:'Build 324', d:'02.07.2026', items:['👤 Ausbilder: neues Feld „Anrede" (Herr/Frau) – wird an alle Kurse des Ausbilders mitgeführt (neue automatisch; bestehende beim Speichern des Ausbilders) und in AzubiPro vor dem Namen angezeigt']},
   {v:'Build 312', d:'26.06.2026', items:['🧹 Wartungs-Tool „Vertauschte Namen korrigieren" wieder entfernt (Einmal-Aufräumung erledigt)']},
   {v:'Build 311', d:'26.06.2026', items:['✏️ „Stefan Mohr" → „S. Mohr" in allen App-Oberflächen (Rechtstexte behalten den vollständigen Namen)','📋 Changelog auf Build-Schema umgestellt und Änderungen seit Mai nachgetragen']},
   {v:'Build 310', d:'26.06.2026', items:['🔢 Sichtbare Versionsnummer: aktuelle Build-Nummer oben in den Einstellungen und im Footer (statt fester „v2.9.0") – zeigt sofort, ob der aktuelle Stand geladen ist']},
@@ -3947,7 +3948,7 @@ function createKurs(){
     lehrgangsartId: lgartObj.id,
     beschreibung: lgartObj.inhalt||'',
     ausbilderName: ausbObj.name,
-    ausbilderEmail: ausbObj.email || '', ausbilderLoginEmail: ausbObj.loginEmail || ausbObj.email || '', ausbilderTel: ausbObj.tel || '',
+    ausbilderEmail: ausbObj.email || '', ausbilderLoginEmail: ausbObj.loginEmail || ausbObj.email || '', ausbilderTel: ausbObj.tel || '', ausbilderAnrede: ausbObj.anrede || '',
     ausbilderId: ausbObj.id,
     von, bis,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -3999,6 +4000,7 @@ function openAddAusbModal(){
   { const st=document.getElementById('ausbAcctStatus'); if(st)st.style.display='none';
     const cr=document.getElementById('ausbAcctCreate'); if(cr)cr.style.display='none'; }
   document.getElementById('addAusbTelInp').value = '';
+  { const _an=document.getElementById('addAusbAnredeInp'); if(_an) _an.value=''; }
   document.getElementById('addAusbDelBtn').style.display = 'none';
   document.getElementById('addAusbModalTit').textContent = 'Ausbilder hinzufügen';
   populateAusbBerufSelect();
@@ -4034,6 +4036,7 @@ function openEditAusbSettings(id){
     }
   }
   document.getElementById('addAusbTelInp').value = a.tel||'';
+  { const _an=document.getElementById('addAusbAnredeInp'); if(_an) _an.value=a.anrede||''; }
   populateAusbBerufSelect();
   document.getElementById('addAusbBerufInp').value = a.berufId||'';
   populateStandortSelect('addAusbStandortInp', a.standortId||'');
@@ -4083,6 +4086,7 @@ function saveAusbilder(){
   const loginEmail = (document.getElementById('addAusbLoginEmailInp').value||'').trim().toLowerCase();
   const pw      = (document.getElementById('addAusbPwInp')?.value||'').trim();
   const tel     = (document.getElementById('addAusbTelInp').value||'').trim();
+  const anrede  = document.getElementById('addAusbAnredeInp')?.value||'';
   const berufId = document.getElementById('addAusbBerufInp').value;
   if(!name){ toast('Bitte Name eingeben','bad'); return; }
   if(!berufId){ toast('Bitte Berufsgruppe wählen','bad'); return; }
@@ -4094,11 +4098,14 @@ function saveAusbilder(){
   const standortId = document.getElementById('addAusbStandortInp')?.value||'';
   const raumId = document.getElementById('addAusbRaumInp')?.value||'';
   const col = db.collection('shared').doc('kursSettings').collection('ausbilder');
-  const data = {name, email, loginEmail, tel, berufId, berufLabel, standortId, raumId, urlaub:_ausbUrlaubTemp||[]};
+  const data = {name, email, loginEmail, tel, anrede, berufId, berufLabel, standortId, raumId, urlaub:_ausbUrlaubTemp||[]};
 
   if(id){
     // Bearbeiten – nur Daten updaten
     col.doc(id).update(data).then(()=>{
+      // Anrede (und ggf. Name) an bestehende Kurse dieses Ausbilders mitziehen
+      db.collection('shared').doc('kurse').collection('list').where('ausbilderId','==',id).get()
+        .then(snap=>{ snap.forEach(d=>d.ref.update({ausbilderAnrede:anrede, ausbilderName:name}).catch(()=>{})); }).catch(()=>{});
       const oldA=_ausbilder.find(x=>x.id===id);
       const oldLen=(oldA?.urlaub||[]).length;
       if(_ausbUrlaubTemp.length!==oldLen) logUrlaub(name,'ausbilder','geändert','','');
@@ -6342,7 +6349,7 @@ function saveEditKurs(){
     berufsschultage: Array.from(document.querySelectorAll('#ekBSTage input:checked')).map(c=>c.value),
     ausbilderId: ausbId || '',
     ausbilderName: ausbObj ? ausbObj.name : '',
-    ausbilderEmail: ausbObj ? (ausbObj.email||'') : '', ausbilderLoginEmail: ausbObj ? (ausbObj.loginEmail||ausbObj.email||'') : '', ausbilderTel: ausbObj ? (ausbObj.tel||'') : '',
+    ausbilderEmail: ausbObj ? (ausbObj.email||'') : '', ausbilderLoginEmail: ausbObj ? (ausbObj.loginEmail||ausbObj.email||'') : '', ausbilderTel: ausbObj ? (ausbObj.tel||'') : '', ausbilderAnrede: ausbObj ? (ausbObj.anrede||'') : '',
     lehrgangsartId: lgartId || '',
     lehrgangsart: lgartObj ? lgartObj.name : '',
     name: lgartObj ? lgartObj.name : '',
@@ -9654,7 +9661,7 @@ function bldSaveEntwurf(){
     lehrgangsart:lgartObj.name,
     lehrgangsartId:lgartObj.id,
     ausbilderName:ausbObj?.name||'',
-    ausbilderEmail:ausbObj?.email||'', ausbilderLoginEmail:ausbObj?.loginEmail||ausbObj?.email||'', ausbilderTel:ausbObj?.tel||'',
+    ausbilderEmail:ausbObj?.email||'', ausbilderLoginEmail:ausbObj?.loginEmail||ausbObj?.email||'', ausbilderTel:ausbObj?.tel||'', ausbilderAnrede:ausbObj?.anrede||'',
     ausbilderId:ausbObj?.id||'',
     von, bis, beschreibung,
     berufsschultage:getBldBSTage(),
@@ -9905,7 +9912,7 @@ function bldUebertragen(){
     lehrgangsart: lgartObj.name,
     lehrgangsartId: lgartObj.id,
     ausbilderName: ausbObj.name,
-    ausbilderEmail: ausbObj.email || '', ausbilderLoginEmail: ausbObj.loginEmail || ausbObj.email || '', ausbilderTel: ausbObj.tel || '',
+    ausbilderEmail: ausbObj.email || '', ausbilderLoginEmail: ausbObj.loginEmail || ausbObj.email || '', ausbilderTel: ausbObj.tel || '', ausbilderAnrede: ausbObj.anrede || '',
     ausbilderId: ausbObj.id,
     von, bis,
     berufsschultage: getBldBSTage(),
