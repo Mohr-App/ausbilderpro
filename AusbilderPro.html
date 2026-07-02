@@ -5351,6 +5351,7 @@ function _setAusbilderDefaultGrades(grades){
   const clean=JSON.parse(JSON.stringify(grades||[]));
   // Schutz: einen vorhandenen, nicht-leeren Standard NICHT durch eine leere Liste überschreiben (verhindert versehentliches „Noten weg")
   if(clean.length===0){ const _ex=_getAusbilderDefaultGrades(); if(Array.isArray(_ex)&&_ex.length>0) return; }
+  try{ if(JSON.stringify(_getAusbilderDefaultGrades()||[])===JSON.stringify(clean)) return; }catch(e){}
   try{
     const p=getAusbilderProfil();
     p.defaultGrades=clean;
@@ -5358,6 +5359,20 @@ function _setAusbilderDefaultGrades(grades){
   }catch(e){}
   // Konto-weit sichern: neue Kurse übernehmen die Noten des Ausbilders auf JEDEM Gerät (Cloud = Source of Truth)
   try{ if(_db && _fbUid && !_demoMode){ _db.collection('users').doc(_fbUid).set({defaultGrades:clean},{merge:true}).catch(e=>console.warn('defaultGrades cloud-save:',e&&e.code)); } }catch(e){}
+}
+// Automatik: jüngster Kurs (mit eigenen Noten) gibt die Vorlage für neue Kurse vor
+function _kursStartKey(inst){ return (inst.sY||0)*10000+(inst.sM||0)*100+(inst.sD||0); }
+function _syncDefaultFromLatestKurs(){
+  try{
+    let best=null,bestKey=-1;
+    Object.values(S.kats||{}).forEach(k=>Object.values((k&&k.instances)||{}).forEach(inst=>{
+      if(inst && Array.isArray(inst.customGrades) && inst.customGrades.length){
+        const key=_kursStartKey(inst);
+        if(key>bestKey){ bestKey=key; best=inst; }
+      }
+    }));
+    if(best) _setAusbilderDefaultGrades(best.customGrades);
+  }catch(e){}
 }
 async function _loadAusbilderDefaultGradesFromCloud(){
   if(!_db||!_fbUid||_demoMode) return;
@@ -12616,6 +12631,8 @@ function _loginNotifyCheck(user,appName){
     setTimeout(()=>{try{_ensureSigStempelCloudSync();}catch(e){}}, 2000);
     // Noten-Defaults des Ausbilders aus der Cloud laden → neue Kurse übernehmen sie geräteübergreifend
     setTimeout(()=>{try{_loadAusbilderDefaultGradesFromCloud();}catch(e){}}, 1800);
+    // Automatik: jüngster Kurs mit eigenen Noten wird zur Vorlage für neue Kurse (nach Hydrate)
+    setTimeout(()=>{try{_syncDefaultFromLatestKurs();}catch(e){}}, 3500);
     // Cross-Ausbilder Noten-Sync nach Initialdaten-Load (3s damit Firestore Subscription Time hat)
     setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 3000);
     // Self-Heal: Kurs-Sync fuer ALLE Kategorien (falls Umbenennungen in Vergangenheit nicht gesynct)
@@ -12628,6 +12645,7 @@ function _loginNotifyCheck(user,appName){
       window._bgCustomGradeSyncTimer = setInterval(()=>{
         try{ syncAllCustomGradesToCloud(); }catch(e){}
         try{ if(curInst()) syncSeatGradesFromFirestore(); }catch(e){}
+        try{ _syncDefaultFromLatestKurs(); }catch(e){}
       }, 60*1000);
     }
     // App-Launcher-Check: Admin?
