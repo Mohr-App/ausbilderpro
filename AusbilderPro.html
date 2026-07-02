@@ -5347,11 +5347,33 @@ function _getAusbilderDefaultGrades(){
   return [];
 }
 function _setAusbilderDefaultGrades(grades){
+  const clean=JSON.parse(JSON.stringify(grades||[]));
   try{
     const p=getAusbilderProfil();
-    p.defaultGrades=JSON.parse(JSON.stringify(grades||[]));
+    p.defaultGrades=clean;
     localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(p));
   }catch(e){}
+  // Konto-weit sichern: neue Kurse übernehmen die Noten des Ausbilders auf JEDEM Gerät (Cloud = Source of Truth)
+  try{ if(_db && _fbUid && !_demoMode){ _db.collection('users').doc(_fbUid).set({defaultGrades:clean},{merge:true}).catch(e=>console.warn('defaultGrades cloud-save:',e&&e.code)); } }catch(e){}
+}
+async function _loadAusbilderDefaultGradesFromCloud(){
+  if(!_db||!_fbUid||_demoMode) return;
+  try{
+    const doc=await _db.collection('users').doc(_fbUid).get();
+    const dg = doc.exists ? doc.data().defaultGrades : null;
+    if(Array.isArray(dg) && dg.length){
+      // Cloud ist Source of Truth → lokal überschreiben, damit neue Kurse überall dieselben Noten übernehmen
+      const p=getAusbilderProfil(); p.defaultGrades=JSON.parse(JSON.stringify(dg));
+      localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(p));
+      console.log('[Noten-Defaults] Aus Cloud geladen ('+dg.length+')');
+    } else {
+      // Cloud leer: vorhandene lokale Defaults einmalig hochschieben (Bootstrap für bestehende Ausbilder)
+      const local=_getAusbilderDefaultGrades();
+      if(Array.isArray(local) && local.length){
+        _db.collection('users').doc(_fbUid).set({defaultGrades:local},{merge:true}).catch(()=>{});
+      }
+    }
+  }catch(e){ console.warn('[Noten-Defaults] Cloud-Load:',e&&e.code); }
 }
 
 function gradeSelHtml(id,val){
@@ -5364,6 +5386,7 @@ function gradeSelHtml(id,val){
 function renderGradesTab(d){
   const inst=curInst(); if(!inst)return;
   if(!inst.customGrades) inst.customGrades=[];
+  const _hasDef=(_getAusbilderDefaultGrades()||[]).length>0;
   const deleted=inst.deletedFixedGrades||[];
   const all=[...FIXED_GRADES.filter(g=>!deleted.includes(g.id)),...inst.customGrades];
   const fields=document.getElementById('gradesFields');
@@ -5375,7 +5398,9 @@ function renderGradesTab(d){
       +'<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">'
       +'<input type="text" id="newGradeName" placeholder="z.B. Führung" maxlength="20" style="padding:7px 10px;border:1px solid #93c5fd;border-radius:6px;font-size:.78rem;background:#fff;font-family:inherit;width:160px" onkeydown="if(event.key===\'Enter\'){addCustomGrade();}">'
       +'<button onclick="addCustomGrade()" style="padding:7px 14px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit">+ Anlegen</button>'
-      +'</div></div>';
+      +'</div>'
+      +(_hasDef?'<div style="margin-top:12px;padding-top:12px;border-top:1px dashed #93c5fd"><button onclick="applyDefaultGradesToCurrentKurs()" style="padding:7px 14px;background:#059669;color:#fff;border:none;border-radius:6px;font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit" title="Übernimmt deine gespeicherte Standard-Noten-Konfiguration für diesen Kurs">⤵ Meine Standard-Noten übernehmen</button></div>':'')
+      +'</div>';
     updGrades();
     return;
   }
@@ -5390,7 +5415,8 @@ function renderGradesTab(d){
         +gradeSelHtml(g.id,val)
         +'</div>';
     }).join('')
-    +'</div>';
+    +'</div>'
+    +(_hasDef?'<div style="margin-top:10px"><button onclick="applyDefaultGradesToCurrentKurs()" style="padding:5px 12px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);color:#047857;border-radius:6px;font-weight:700;font-size:.72rem;cursor:pointer;font-family:inherit" title="Ersetzt die Noten dieses Kurses durch deine Standard-Noten">⤵ Standard-Noten übernehmen</button></div>':'');
   updGrades();
 }
 
@@ -5407,6 +5433,21 @@ function addCustomGrade(){
   inp.value='';
   const d=curSeats()[curSeat]||{};
   renderGradesTab(d);
+}
+
+function applyDefaultGradesToCurrentKurs(){
+  const inst=curInst(); if(!inst) return;
+  const def=_getAusbilderDefaultGrades();
+  if(!Array.isArray(def)||!def.length){ toast('Noch keine Standard-Noten vorhanden – lege zuerst Noten an, sie werden dann dein Standard.'); return; }
+  const hatNoten=(inst.customGrades&&inst.customGrades.length)||((inst.deletedFixedGrades||[]).length<3);
+  if(hatNoten && !confirm('Deine Standard-Noten für diesen Kurs übernehmen?\n\nDie aktuelle Noten-Konfiguration dieses Kurses wird dadurch ersetzt (bereits eingetragene Noten-Werte zu anderen Kategorien gehen verloren).')) return;
+  inst.customGrades = JSON.parse(JSON.stringify(def));
+  inst.deletedFixedGrades = ['fuehrung','mitarbeit','praxis'];
+  persist();
+  try{ syncCustomGradesToCloud(); }catch(e){}
+  const d=curSeats()[curSeat]||{};
+  renderGradesTab(d);
+  toast('✓ Standard-Noten übernommen');
 }
 
 function removeCustomGrade(id){
@@ -12548,6 +12589,8 @@ function _loginNotifyCheck(user,appName){
     setTimeout(()=>{try{_watchFreigabePflicht();}catch(e){}}, 800);
     // Sig+Stempel: auto-sync local nach cloud falls noch nicht geschehen
     setTimeout(()=>{try{_ensureSigStempelCloudSync();}catch(e){}}, 2000);
+    // Noten-Defaults des Ausbilders aus der Cloud laden → neue Kurse übernehmen sie geräteübergreifend
+    setTimeout(()=>{try{_loadAusbilderDefaultGradesFromCloud();}catch(e){}}, 1800);
     // Cross-Ausbilder Noten-Sync nach Initialdaten-Load (3s damit Firestore Subscription Time hat)
     setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 3000);
     // Self-Heal: Kurs-Sync fuer ALLE Kategorien (falls Umbenennungen in Vergangenheit nicht gesynct)
