@@ -3139,8 +3139,8 @@ function linkHBZKurs(kursId, kursData, targetKatId){
     {id:'r2',label:'',seats:[...DEFAULT_RIGHT]}
   ];
   // Notenkategorien: nutze ausbilder-eigene Default-Konfiguration (aus Profil)
-  const _defaultGrades=_getAusbilderDefaultGrades();
-  const _hasDef = Array.isArray(_defaultGrades) && _defaultGrades.length>0;
+  const _tpl=_getGradeTemplate();
+  const _hasTpl=_hasGradeTemplate();
   S.kats[targetKatId].instances[instId]={
     sD:von.d, sM:von.m, sY:von.y,
     eD:bis.d, eM:bis.m, eY:bis.y,
@@ -3148,9 +3148,9 @@ function linkHBZKurs(kursId, kursData, targetKatId){
     sharedKursId: kursId,
     werkzeug: kursData.werkzeug||[],
     berufsschultage: kursData.berufsschultage||[],
-    // Mit eigenem Default: dessen Noten (feste ausblenden). OHNE Default: Standard Führung/Mitarbeit/Praxis behalten – nie leer!
-    deletedFixedGrades: _hasDef ? ['fuehrung','mitarbeit','praxis'] : [],
-    customGrades: _hasDef ? _defaultGrades : []
+    // Mit Vorlage: exakt deren Konfig (feste + eigene). OHNE Vorlage: Standard Führung/Mitarbeit/Praxis – nie leer!
+    deletedFixedGrades: _hasTpl ? _tpl.deletedFixed.slice() : [],
+    customGrades: _hasTpl ? JSON.parse(JSON.stringify(_tpl.custom)) : []
   };
   S.curKat=targetKatId;
   S.curInst=instId;
@@ -5346,27 +5346,37 @@ function _getAusbilderDefaultGrades(){
   }catch(e){}
   return [];
 }
-function _setAusbilderDefaultGrades(grades, manual){
-  const clean=JSON.parse(JSON.stringify(grades||[]));
+function _getGradeTemplate(){
+  const p=getAusbilderProfil();
+  return {
+    custom: Array.isArray(p.defaultGrades)?JSON.parse(JSON.stringify(p.defaultGrades)):[],
+    deletedFixed: Array.isArray(p.defaultDeletedFixed)?p.defaultDeletedFixed.slice():['fuehrung','mitarbeit','praxis'],
+    manual: !!p.defaultGradesManual
+  };
+}
+function _hasGradeTemplate(){
+  const p=getAusbilderProfil();
+  return !!p.defaultGradesManual || (Array.isArray(p.defaultGrades)&&p.defaultGrades.length>0);
+}
+function _setGradeTemplate(custom, deletedFixed, manual){
+  const c=JSON.parse(JSON.stringify(custom||[]));
+  const df=Array.isArray(deletedFixed)?deletedFixed.slice():['fuehrung','mitarbeit','praxis'];
   const prof=getAusbilderProfil();
-  // Automatik überschreibt eine BEWUSST gesetzte Vorlage nicht
-  if(!manual && prof.defaultGradesManual) return;
-  // Wipe-Schutz: leere Liste ersetzt keine vorhandene Vorlage (außer explizit/Reset)
-  if(clean.length===0 && !manual){ if(Array.isArray(prof.defaultGrades)&&prof.defaultGrades.length>0) return; }
-  const sameGrades = JSON.stringify(prof.defaultGrades||[])===JSON.stringify(clean);
-  if(sameGrades && !manual) return; // nichts Neues → keine Schreibung
+  if(!manual && prof.defaultGradesManual) return; // Automatik überschreibt bewusste Vorlage nicht
+  const same = JSON.stringify(prof.defaultGrades||[])===JSON.stringify(c)
+    && JSON.stringify((prof.defaultDeletedFixed||['fuehrung','mitarbeit','praxis']).slice().sort())===JSON.stringify(df.slice().sort());
+  if(same && !manual) return;
   try{
-    prof.defaultGrades=clean;
+    prof.defaultGrades=c; prof.defaultDeletedFixed=df;
     if(manual) prof.defaultGradesManual=true;
     localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(prof));
   }catch(e){}
-  // Konto-weit sichern (Cloud = Source of Truth, geräteübergreifend)
-  try{ if(_db && _fbUid && !_demoMode){ const payload={defaultGrades:clean}; if(manual) payload.defaultGradesManual=true; _db.collection('users').doc(_fbUid).set(payload,{merge:true}).catch(e=>console.warn('defaultGrades cloud-save:',e&&e.code)); } }catch(e){}
+  try{ if(_db&&_fbUid&&!_demoMode){ const payload={defaultGrades:c, defaultDeletedFixed:df}; if(manual) payload.defaultGradesManual=true; _db.collection('users').doc(_fbUid).set(payload,{merge:true}).catch(e=>console.warn('grade-tpl cloud:',e&&e.code)); } }catch(e){}
 }
 function resetGradeDefault(){
   if(!confirm('Deine Noten-Vorlage zurücksetzen?\n\nNeue Kurse starten dann wieder mit den Standard-Noten (Führung/Mitarbeit/Praxis), bis du eine neue Vorlage speicherst.')) return;
-  try{ const prof=getAusbilderProfil(); prof.defaultGrades=[]; prof.defaultGradesManual=false; localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(prof)); }catch(e){}
-  try{ if(_db && _fbUid && !_demoMode){ _db.collection('users').doc(_fbUid).set({defaultGrades:[],defaultGradesManual:false},{merge:true}).catch(()=>{}); } }catch(e){}
+  try{ const prof=getAusbilderProfil(); prof.defaultGrades=[]; prof.defaultDeletedFixed=['fuehrung','mitarbeit','praxis']; prof.defaultGradesManual=false; localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(prof)); }catch(e){}
+  try{ if(_db && _fbUid && !_demoMode){ _db.collection('users').doc(_fbUid).set({defaultGrades:[],defaultDeletedFixed:['fuehrung','mitarbeit','praxis'],defaultGradesManual:false},{merge:true}).catch(()=>{}); } }catch(e){}
   const inst=curInst(); if(inst){ const d=curSeats()[curSeat]||{}; renderGradesTab(d); }
   toast('↺ Noten-Vorlage zurückgesetzt');
 }
@@ -5382,27 +5392,31 @@ function _syncDefaultFromLatestKurs(){
         if(key>bestKey){ bestKey=key; best=inst; }
       }
     }));
-    if(best) _setAusbilderDefaultGrades(best.customGrades);
+    if(best) _setGradeTemplate(best.customGrades, best.deletedFixedGrades||['fuehrung','mitarbeit','praxis'], false);
   }catch(e){}
 }
 async function _loadAusbilderDefaultGradesFromCloud(){
   if(!_db||!_fbUid||_demoMode) return;
   try{
     const doc=await _db.collection('users').doc(_fbUid).get();
-    const dg = doc.exists ? doc.data().defaultGrades : null;
-    const dgm = doc.exists ? !!doc.data().defaultGradesManual : false;
-    if(Array.isArray(dg) && dg.length){
-      const p=getAusbilderProfil(); p.defaultGrades=JSON.parse(JSON.stringify(dg)); p.defaultGradesManual=dgm;
+    const data = doc.exists ? (doc.data()||{}) : {};
+    const dg = data.defaultGrades;
+    const df = data.defaultDeletedFixed;
+    const dgm = !!data.defaultGradesManual;
+    if((Array.isArray(dg)&&dg.length) || dgm){
+      const p=getAusbilderProfil();
+      p.defaultGrades = Array.isArray(dg)?JSON.parse(JSON.stringify(dg)):[];
+      p.defaultDeletedFixed = Array.isArray(df)?df.slice():['fuehrung','mitarbeit','praxis'];
+      p.defaultGradesManual = dgm;
       localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(p));
-      console.log('[Noten-Defaults] Aus Cloud geladen ('+dg.length+', manual='+dgm+')');
+      console.log('[Noten-Vorlage] Aus Cloud geladen (custom='+p.defaultGrades.length+', manual='+dgm+')');
     } else {
       const p=getAusbilderProfil();
-      const local=Array.isArray(p.defaultGrades)?p.defaultGrades:[];
-      if(local.length){
-        _db.collection('users').doc(_fbUid).set({defaultGrades:local, defaultGradesManual:!!p.defaultGradesManual},{merge:true}).catch(()=>{});
+      if((Array.isArray(p.defaultGrades)&&p.defaultGrades.length) || p.defaultGradesManual){
+        _db.collection('users').doc(_fbUid).set({defaultGrades:p.defaultGrades||[], defaultDeletedFixed:(p.defaultDeletedFixed||['fuehrung','mitarbeit','praxis']), defaultGradesManual:!!p.defaultGradesManual},{merge:true}).catch(()=>{});
       }
     }
-  }catch(e){ console.warn('[Noten-Defaults] Cloud-Load:',e&&e.code); }
+  }catch(e){ console.warn('[Noten-Vorlage] Cloud-Load:',e&&e.code); }
 }
 
 function gradeSelHtml(id,val){
@@ -5416,7 +5430,7 @@ function renderGradesTab(d){
   const inst=curInst(); if(!inst)return;
   _maybeAutoApplyDefaultGrades(inst);
   if(!inst.customGrades) inst.customGrades=[];
-  const _hasDef=(_getAusbilderDefaultGrades()||[]).length>0;
+  const _hasDef=_hasGradeTemplate();
   const deleted=inst.deletedFixedGrades||[];
   const all=[...FIXED_GRADES.filter(g=>!deleted.includes(g.id)),...inst.customGrades];
   const fields=document.getElementById('gradesFields');
@@ -5448,7 +5462,7 @@ function renderGradesTab(d){
     }).join('')
     +'</div>'
     +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
-    +((inst.customGrades&&inst.customGrades.length)?'<button onclick="saveCurrentGradesAsDefault()" style="padding:5px 12px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#2563eb;border-radius:6px;font-weight:700;font-size:.72rem;cursor:pointer;font-family:inherit" title="Diese Noten für alle neuen Kurse als deinen Standard speichern (geräteübergreifend)">★ Diese Noten als meinen Standard speichern</button>':'')
+    +'<button onclick="saveCurrentGradesAsDefault()" style="padding:5px 12px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#2563eb;border-radius:6px;font-weight:700;font-size:.72rem;cursor:pointer;font-family:inherit" title="Diese Noten (feste + eigene) als deine Vorlage für neue Kurse speichern – geräteübergreifend">★ Diese Noten als meinen Standard speichern</button>'
     +(_hasDef?'<button onclick="applyDefaultGradesToCurrentKurs()" style="padding:5px 12px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);color:#047857;border-radius:6px;font-weight:700;font-size:.72rem;cursor:pointer;font-family:inherit" title="Ersetzt die Noten dieses Kurses durch deinen gespeicherten Standard">⤵ Meinen Standard übernehmen</button>':'')
     +(_hasDef?'<button onclick="resetGradeDefault()" style="padding:5px 12px;background:none;border:1px solid var(--brd);color:var(--mu);border-radius:6px;font-weight:700;font-size:.72rem;cursor:pointer;font-family:inherit" title="Deine gespeicherte Noten-Vorlage löschen (neue Kurse starten dann wieder mit Standard-Noten)">↺ Vorlage zurücksetzen</button>':'')
     +'</div>';
@@ -5470,12 +5484,14 @@ function addCustomGrade(){
 
 function saveCurrentGradesAsDefault(){
   const inst=curInst(); if(!inst) return;
-  const g=inst.customGrades||[];
-  if(!g.length){ toast('Dieser Kurs hat keine eigenen Noten-Kategorien zum Speichern.'); return; }
-  _setAusbilderDefaultGrades(g, true);
+  const custom=inst.customGrades||[];
+  const df=inst.deletedFixedGrades||[];
+  const anyGrade = custom.length>0 || df.length<3;   // hat feste ODER eigene Noten
+  if(!anyGrade){ toast('Dieser Kurs hat keine Noten zum Speichern.'); return; }
+  _setGradeTemplate(custom, df, true);
   const d=curSeats()[curSeat]||{};
   renderGradesTab(d);
-  toast('✓ Als deine feste Vorlage gespeichert – neue Kurse übernehmen sie automatisch (auf allen Geräten)');
+  toast('✓ Als deine feste Vorlage gespeichert – neue Kurse übernehmen genau diese Noten (auf allen Geräten)');
 }
 function restoreStandardGrades(){
   const inst=curInst(); if(!inst) return;
@@ -5491,8 +5507,11 @@ function _maybeAutoApplyDefaultGrades(inst){
     if(!inst) return;
     if(!getAusbilderProfil().defaultGradesManual) return;       // nur eine BEWUSST gesetzte Vorlage still übernehmen
     if(inst.customGrades && inst.customGrades.length) return;   // hat schon eigene Noten → nichts tun
-    const def=_getAusbilderDefaultGrades();
-    if(!Array.isArray(def)||!def.length) return;                // keine Vorlage vorhanden
+    if(!_hasGradeTemplate()) return;
+    const tpl=_getGradeTemplate();
+    const sameCfg = JSON.stringify(inst.customGrades||[])===JSON.stringify(tpl.custom)
+      && JSON.stringify((inst.deletedFixedGrades||[]).slice().sort())===JSON.stringify(tpl.deletedFixed.slice().sort());
+    if(sameCfg) return;                                         // schon identisch → nichts tun
     // Sicherheit: nur wenn KEINE Noten-Werte eingetragen sind (sonst würden Werte verwaisen)
     const hasValues=Object.values(inst.seats||{}).some(s=>{
       if(!s) return false;
@@ -5501,26 +5520,25 @@ function _maybeAutoApplyDefaultGrades(inst){
       return false;
     });
     if(hasValues) return;
-    // sicher → Vorlage still übernehmen (keine Nachfrage)
-    inst.customGrades=JSON.parse(JSON.stringify(def));
-    inst.deletedFixedGrades=['fuehrung','mitarbeit','praxis'];
+    inst.customGrades=JSON.parse(JSON.stringify(tpl.custom));
+    inst.deletedFixedGrades=tpl.deletedFixed.slice();
     persist();
     try{ syncCustomGradesToCloud(); }catch(e){}
   }catch(e){}
 }
 function applyDefaultGradesToCurrentKurs(){
   const inst=curInst(); if(!inst) return;
-  const def=_getAusbilderDefaultGrades();
-  if(!Array.isArray(def)||!def.length){ toast('Noch keine Standard-Noten vorhanden – lege zuerst Noten an, sie werden dann dein Standard.'); return; }
+  if(!_hasGradeTemplate()){ toast('Noch keine Vorlage gespeichert – speichere zuerst über „★".'); return; }
+  const _tpl=_getGradeTemplate();
   const hatNoten=(inst.customGrades&&inst.customGrades.length)||((inst.deletedFixedGrades||[]).length<3);
   if(hatNoten && !confirm('Deine Standard-Noten für diesen Kurs übernehmen?\n\nDie aktuelle Noten-Konfiguration dieses Kurses wird dadurch ersetzt (bereits eingetragene Noten-Werte zu anderen Kategorien gehen verloren).')) return;
-  inst.customGrades = JSON.parse(JSON.stringify(def));
-  inst.deletedFixedGrades = ['fuehrung','mitarbeit','praxis'];
+  inst.customGrades = JSON.parse(JSON.stringify(_tpl.custom));
+  inst.deletedFixedGrades = _tpl.deletedFixed.slice();
   persist();
   try{ syncCustomGradesToCloud(); }catch(e){}
   const d=curSeats()[curSeat]||{};
   renderGradesTab(d);
-  toast('✓ Standard-Noten übernommen');
+  toast('✓ Vorlage übernommen');
 }
 
 function removeCustomGrade(id){
