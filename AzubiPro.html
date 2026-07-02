@@ -1095,7 +1095,28 @@ auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
 const AZUBI_VERSION='v234'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
-db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
+db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
+// Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
+// erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
+(function(){
+  function _fsHeal(msg){
+    if(!msg || String(msg).indexOf('INTERNAL ASSERTION FAILED')<0) return;
+    try{
+      var last=parseInt(sessionStorage.getItem('_fsHealAt')||'0',10);
+      if(Date.now()-last < 60000) return;
+      sessionStorage.setItem('_fsHealAt', String(Date.now()));
+    }catch(e){}
+    try{
+      var o=document.createElement('div');
+      o.style.cssText='position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.94);font-family:system-ui,-apple-system,sans-serif;font-size:15px;font-weight:600;color:#0f172a';
+      o.textContent='App wird neu geladen…';
+      (document.body||document.documentElement).appendChild(o);
+    }catch(e){}
+    setTimeout(function(){ try{ location.reload(); }catch(e){} }, 600);
+  }
+  window.addEventListener('error', function(e){ try{ _fsHeal(e && (e.message || (e.error&&e.error.message))); }catch(_){} });
+  window.addEventListener('unhandledrejection', function(e){ try{ _fsHeal(e && e.reason && (e.reason.message||String(e.reason))); }catch(_){} });
+})();
 const st=firebase.storage();
 let _uid=null, _email=null, _tnId=null, _tnData=null, _kurse=[];
 let _firmaEmail='';  // E-Mail des verknuepften Betriebs (fuer replyTo in Kunden-Mails)
