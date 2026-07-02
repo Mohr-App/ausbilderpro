@@ -77,6 +77,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .bnav-btn.active{color:var(--acc);}
 .bnav-btn.active .bi{background:linear-gradient(135deg,#2563eb,#059669);box-shadow:0 3px 10px rgba(37,99,235,.28);}
 .bnav-btn.active .bi svg{stroke:#fff;stroke-width:2.4}
+.uebl-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:14px;cursor:pointer;font-family:'Sora',sans-serif;font-size:.74rem;font-weight:700;color:var(--tx);text-align:center;line-height:1.2;transition:all .12s;}
+.uebl-tile:hover,.uebl-tile:active{background:#fff;border-color:var(--acc);}
+.uebl-tile .ic{font-size:1.5rem;line-height:1;}
+.uebl-tile .sub{font-size:.58rem;font-weight:600;color:var(--mu);}
 .stab{flex:1 1 0;min-width:0;padding:7px 6px;border:2px solid rgba(37,99,235,.4);border-radius:16px;background:var(--sur2);color:var(--mu);font-size:.64rem;font-weight:600;font-family:'Sora',sans-serif;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:all .15s;text-align:center;}
 .stab.active{background:linear-gradient(135deg,#2563eb,#059669);color:#fff;border-color:transparent;}
 #zeitStempelCard{background:transparent;border:none;box-shadow:none;padding:8px 0;border-top:1.5px solid rgba(37,99,235,.25);border-bottom:1.5px solid rgba(37,99,235,.25);border-radius:0;margin:12px 0;}
@@ -732,6 +736,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         + Weiteren Lehrgang beitreten
       </button>
       <div style="text-align:center;font-size:.6rem;color:var(--mu);margin-bottom:12px">Nur für einen zusätzlichen Kurs – nicht zum Einchecken</div>
+      <div style="font-size:.62rem;font-weight:700;color:var(--mu);letter-spacing:.04em;text-transform:uppercase;margin:4px 0 8px">Schnellzugriff</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <button class="uebl-tile" onclick="openKursInfo()" title="Kursinformationen"><span class="ic">ℹ️</span>Kurs­informationen<span class="sub">Termine · Details</span></button>
+        <button class="uebl-tile" onclick="openAusbilderKontakt()" title="Ausbilder-Kontakt"><span class="ic">👤</span>Ausbilder<span class="sub">Telefon · E-Mail</span></button>
+        <button class="uebl-tile" onclick="openKrankSpaeter()" title="Krank oder später melden"><span class="ic">🤒</span>Krank / Später<span class="sub">melden</span></button>
+        <button class="uebl-tile" onclick="showPage('docs')" title="Kursunterlagen"><span class="ic">📎</span>Kurs­unterlagen<span class="sub">Materialien</span></button>
+        <button class="uebl-tile" onclick="openKurshistorie()" title="Kurshistorie" style="grid-column:1 / -1"><span class="ic">📅</span>Kurshistorie<span class="sub">bisherige Lehrgänge</span></button>
+      </div>
       <div id="homeKurse"><div class="empty">Lädt Lehrgänge…</div></div>
       <div style="margin-top:14px;padding:12px 14px;background:rgba(100,116,139,.05);border:1px dashed rgba(100,116,139,.2);border-radius:10px;font-size:.7rem;color:var(--mu);line-height:1.5;text-align:center">
         Zum <b style="color:#059669">Anwesend-Melden</b> den großen Knopf oben „📡 Anwesenheit – QR scannen" nutzen. Den kleinen Knopf „Weiteren Lehrgang beitreten" brauchst du nur, wenn ein <b>zusätzlicher</b> Kurs dazukommt.
@@ -7022,6 +7034,53 @@ function confirmKurs(kursId, kursName){
 }
 
 // ── Kursdetail ──
+function _ueblActiveKursId(){
+  if(_tnData && _tnData.aktiverKursId) return _tnData.aktiverKursId;
+  if(_kurse && _kurse.length===1) return _kurse[0].id;
+  const today=new Date().toISOString().slice(0,10);
+  const running=(_kurse||[]).find(k=>k.von&&k.bis&&k.von<=today&&k.bis>=today);
+  if(running) return running.id;
+  return (_kurse&&_kurse[0])?_kurse[0].id:null;
+}
+function _closeSimplePopup(){ const e=document.getElementById('_simplePopup'); if(e) e.remove(); }
+function _showSimplePopup(title, inner){
+  _closeSimplePopup();
+  const ov=document.createElement('div'); ov.id='_simplePopup';
+  ov.style.cssText='position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.45);padding:20px';
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:340px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-size:.66rem;font-weight:700;color:var(--mu);letter-spacing:.04em;text-transform:uppercase">'+esc(title)+'</div><button onclick="_closeSimplePopup()" title="Schließen" style="background:none;border:none;font-size:1.15rem;cursor:pointer;color:var(--mu);line-height:1">✕</button></div>'
+    +'<div>'+inner+'</div></div>';
+  document.body.appendChild(ov); // Kein Schließen bei Overlay-Klick – nur über X
+}
+function openKursInfo(){
+  const id=_ueblActiveKursId();
+  if(!id){ toast('Noch kein Lehrgang vorhanden.'); return; }
+  showKursDetail(id);
+}
+function openAusbilderKontakt(){
+  const id=_ueblActiveKursId(); const k=(_kurse||[]).find(x=>x.id===id);
+  if(!k){ toast('Noch kein Lehrgang vorhanden.'); return; }
+  const name=esc(k.ausbilderName||'Ausbilder');
+  const tel=(k.ausbilderTel||k.ausbilderTelefon||'').trim();
+  const mail=(k.ausbilderEmail||k.ausbilderLoginEmail||'').trim();
+  const kursName=esc(k.name||k.lehrgangsart||'');
+  let inner='<div style="font-size:1rem;font-weight:800;margin-bottom:2px">'+name+'</div>';
+  if(kursName) inner+='<div style="font-size:.68rem;color:var(--mu);margin-bottom:12px">'+kursName+'</div>';
+  const btn='display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;border-radius:12px;text-decoration:none;font-size:.82rem;font-weight:700;font-family:\'Sora\',sans-serif;margin-bottom:8px;border:1.5px solid ';
+  if(tel) inner+='<a href="tel:'+esc(tel)+'" style="'+btn+'rgba(5,150,105,.4);color:#047857;background:rgba(5,150,105,.06)">📞 Anrufen<span style="margin-left:auto;font-weight:600;color:var(--mu)">'+esc(tel)+'</span></a>';
+  if(mail) inner+='<a href="mailto:'+esc(mail)+'" style="'+btn+'rgba(37,99,235,.4);color:#2563eb;background:rgba(37,99,235,.06)">✉️ E-Mail<span style="margin-left:auto;font-weight:600;color:var(--mu);font-size:.7rem;overflow:hidden;text-overflow:ellipsis">'+esc(mail)+'</span></a>';
+  if(!tel && !mail) inner+='<div style="font-size:.75rem;color:var(--mu)">Für diesen Lehrgang sind noch keine Kontaktdaten hinterlegt.</div>';
+  _showSimplePopup('Ausbilder-Kontakt', inner);
+}
+function openKrankSpaeter(){
+  const btn='display:flex;align-items:center;gap:10px;width:100%;padding:14px;border-radius:12px;font-size:.85rem;font-weight:700;font-family:\'Sora\',sans-serif;cursor:pointer;margin-bottom:8px;text-align:left;border:2px solid ';
+  const inner=
+    '<button onclick="_closeSimplePopup();sendBetriebMeldung(\'krank\')" style="'+btn+'rgba(239,68,68,.25);background:rgba(239,68,68,.08);color:#ef4444">🤒 Ich bin heute krank</button>'
+    +'<button onclick="_closeSimplePopup();sendBetriebMeldung(\'spaeter\')" style="'+btn+'rgba(245,158,11,.25);background:rgba(245,158,11,.08);color:#d97706">🕐 Ich komme heute später</button>'
+    +'<div style="font-size:.66rem;color:var(--mu);margin-top:4px;line-height:1.5">Dein Ausbilder und dein Betrieb werden informiert. Du musst dich zusätzlich <b>persönlich beim Betrieb</b> krankmelden.</div>';
+  _showSimplePopup('Krank / Später melden', inner);
+}
+function openKurshistorie(){ showPage('profil'); }
 let _kursDetailFrom='home';
 function showKursDetail(kursId){
   // Aktuelle Page merken bevor wir zur Detail-Page wechseln
