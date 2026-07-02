@@ -5420,7 +5420,10 @@ function renderGradesTab(d){
         +'</div>';
     }).join('')
     +'</div>'
-    +(_hasDef?'<div style="margin-top:10px"><button onclick="applyDefaultGradesToCurrentKurs()" style="padding:5px 12px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);color:#047857;border-radius:6px;font-weight:700;font-size:.72rem;cursor:pointer;font-family:inherit" title="Ersetzt die Noten dieses Kurses durch deine Standard-Noten">⤵ Standard-Noten übernehmen</button></div>':'');
+    +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
+    +((inst.customGrades&&inst.customGrades.length)?'<button onclick="saveCurrentGradesAsDefault()" style="padding:5px 12px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);color:#2563eb;border-radius:6px;font-weight:700;font-size:.72rem;cursor:pointer;font-family:inherit" title="Diese Noten für alle neuen Kurse als deinen Standard speichern (geräteübergreifend)">★ Diese Noten als meinen Standard speichern</button>':'')
+    +(_hasDef?'<button onclick="applyDefaultGradesToCurrentKurs()" style="padding:5px 12px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);color:#047857;border-radius:6px;font-weight:700;font-size:.72rem;cursor:pointer;font-family:inherit" title="Ersetzt die Noten dieses Kurses durch deinen gespeicherten Standard">⤵ Meinen Standard übernehmen</button>':'')
+    +'</div>';
   updGrades();
 }
 
@@ -5439,6 +5442,15 @@ function addCustomGrade(){
   renderGradesTab(d);
 }
 
+function saveCurrentGradesAsDefault(){
+  const inst=curInst(); if(!inst) return;
+  const g=inst.customGrades||[];
+  if(!g.length){ toast('Dieser Kurs hat keine eigenen Noten-Kategorien zum Speichern.'); return; }
+  _setAusbilderDefaultGrades(g);
+  const d=curSeats()[curSeat]||{};
+  renderGradesTab(d);
+  toast('✓ Als dein Standard gespeichert – neue Kurse übernehmen diese Noten (auf allen Geräten)');
+}
 function restoreStandardGrades(){
   const inst=curInst(); if(!inst) return;
   inst.deletedFixedGrades=[];
