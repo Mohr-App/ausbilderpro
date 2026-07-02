@@ -3633,6 +3633,7 @@ function renderMain(){
     }
     return;
   }
+  _maybeAutoApplyDefaultGrades(inst);
   const _lock=kursGesperrt(inst);
   const _lockBtn=inst.abgeschlossen
     ? '<button class="hdr-lock-btn" onclick="event.stopPropagation();kursAbschliessen()" title="Kurs ist abgeschlossen">✓ Kurs abgeschlossen'+(inst.abgeschlossenAm?' '+new Date(inst.abgeschlossenAm).toLocaleDateString('de-DE'):'')+'</button>'
@@ -5403,6 +5404,7 @@ function gradeSelHtml(id,val){
 
 function renderGradesTab(d){
   const inst=curInst(); if(!inst)return;
+  _maybeAutoApplyDefaultGrades(inst);
   if(!inst.customGrades) inst.customGrades=[];
   const _hasDef=(_getAusbilderDefaultGrades()||[]).length>0;
   const deleted=inst.deletedFixedGrades||[];
@@ -5474,6 +5476,27 @@ function restoreStandardGrades(){
   const d=curSeats()[curSeat]||{};
   renderGradesTab(d);
   toast('✓ Standard-Noten (Führung, Mitarbeit, Praxis) angelegt');
+}
+function _maybeAutoApplyDefaultGrades(inst){
+  try{
+    if(!inst) return;
+    if(inst.customGrades && inst.customGrades.length) return;   // hat schon eigene Noten → nichts tun
+    const def=_getAusbilderDefaultGrades();
+    if(!Array.isArray(def)||!def.length) return;                // keine Vorlage vorhanden
+    // Sicherheit: nur wenn KEINE Noten-Werte eingetragen sind (sonst würden Werte verwaisen)
+    const hasValues=Object.values(inst.seats||{}).some(s=>{
+      if(!s) return false;
+      if(['fuehrung','mitarbeit','praxis'].some(id=>s[id])) return true;
+      if(s.extraGrades && Object.values(s.extraGrades).some(v=>v)) return true;
+      return false;
+    });
+    if(hasValues) return;
+    // sicher → Vorlage still übernehmen (keine Nachfrage)
+    inst.customGrades=JSON.parse(JSON.stringify(def));
+    inst.deletedFixedGrades=['fuehrung','mitarbeit','praxis'];
+    persist();
+    try{ syncCustomGradesToCloud(); }catch(e){}
+  }catch(e){}
 }
 function applyDefaultGradesToCurrentKurs(){
   const inst=curInst(); if(!inst) return;
