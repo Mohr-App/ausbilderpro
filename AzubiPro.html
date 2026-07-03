@@ -1103,7 +1103,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v279'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v280'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -6448,9 +6448,11 @@ function refreshEmailHint(){
 function resendEmailVerification(){
   const u=auth.currentUser;
   if(!u) return;
-  u.sendEmailVerification(_acs)
-    .then(()=>alert('Bestätigungs-Mail gesendet – prüfe dein Postfach (auch Spam).'))
-    .catch(e=>alert(e&&e.code==='auth/too-many-requests'?'Zu viele Versuche – bitte kurz warten.':'Konnte nicht senden – versuch es später nochmal.'));
+  const nm=(_tnData && (_tnData.name || ((_tnData.vorname||'')+' '+(_tnData.nachname||'')).trim())) || '';
+  // Über dieselbe Cloud Function wie bei der Registrierung → gleiche gebrandete Mail mit Bestätigungs-Button.
+  // Fallback (in _queueWelcomeMail) schickt notfalls die Firebase-Standardmail.
+  _queueWelcomeMail(u.uid, u.email, nm, '');
+  alert('Bestätigungs-Mail wird gesendet – prüfe gleich dein Postfach (auch Spam).');
 }
 // E-Mail selbst korrigieren: Bestätigungslink an neue Adresse (Auth-E-Mail aendert sich nach Klick)
 function startEmailKorrektur(){
