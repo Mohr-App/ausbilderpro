@@ -1103,7 +1103,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v280'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v281'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -4092,6 +4092,23 @@ function _autoCheckinBeiRegistrierung(kursId){
    }).catch(()=>{});
   }); // Ende _istFreigegeben-Gate
 }
+function _handleCheckinError(e, ciRef){
+  // Race: Der Auto-Check-in (bei Registrierung) hat den Eintrag evtl. parallel schon angelegt →
+  // unser .set() wurde dadurch zum Update (dafuer gibt es keine Regel) → Rechte-Fehler.
+  // Kurz gegenpruefen: existiert der Eintrag jetzt, war der Check-in trotzdem erfolgreich.
+  ciRef.get().then(ci=>{
+    if(ci.exists){
+      _checkinBanner('ok','✓ Heute bereits eingecheckt'+(ci.data().zeit?' um '+ci.data().zeit+' Uhr':'')+'.');
+      try{ loadCheckinHistory(); }catch(_e){}
+    }else{
+      _checkinDone=false;
+      _checkinBanner('bad','Check-in fehlgeschlagen: '+((e&&e.message)||'unbekannter Fehler'));
+    }
+  }).catch(()=>{
+    _checkinDone=false;
+    _checkinBanner('bad','Check-in fehlgeschlagen: '+((e&&e.message)||'unbekannter Fehler'));
+  });
+}
 function _tryQRCheckin(){
   if(_checkinDone||!_checkinKursId||!_tnId||!_tnData) return;
   if(_tnData.aktiverKursId!==_checkinKursId) return; // anderer/kein Kurs -> Beitritts-Flow regelt das
@@ -4118,7 +4135,7 @@ function _tryQRCheckin(){
           ts:Date.now()
         }).then(()=>{
           _checkinBanner('ok','✓ Eingecheckt um '+zeit+' Uhr – dein Ausbilder sieht deine Anwesenheit.'); try{ loadCheckinHistory(); }catch(e){}
-        }).catch(e=>{ _checkinDone=false; _checkinBanner('bad','Check-in fehlgeschlagen: '+(e.message||'unbekannter Fehler')); });
+        }).catch(e=>{ _handleCheckinError(e, ciRef); });
         return;
       }
       _checkinBanner('info','📡 Anwesenheits-Check-in – GPS wird geprüft…');
@@ -4136,7 +4153,7 @@ function _tryQRCheckin(){
         }).then(()=>{
           _checkinBanner('ok','✓ Eingecheckt um '+zeit+' Uhr – dein Ausbilder sieht deine Anwesenheit.'); try{ loadCheckinHistory(); }catch(e){}
         }).catch(e=>{
-          _checkinBanner('bad','Check-in fehlgeschlagen: '+(e.message||'unbekannter Fehler'));
+          _handleCheckinError(e, ciRef);
         });
       });
     }).catch(()=>{});
