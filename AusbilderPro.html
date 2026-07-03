@@ -1863,13 +1863,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="tp-section">
           <div class="tp-section-hd">🎯 Status erfassen</div>
           <label class="fl" style="margin-bottom:8px">Status</label>
-          <div class="att-main-grid">
-            <button class="att-main-btn" id="btnP"  onclick="selMain('present')" title="Anwesend"><span class="abm-icon">✅</span>Anw.</button>
-            <button class="att-main-btn" id="btnK"  onclick="selMain('sick')" title="Krank"><span class="abm-icon">🤒</span>Krank</button>
-            <button class="att-main-btn" id="btnAE" onclick="selMain('absent_e')" title="Abwesend – Entschuldigt"><span class="abm-icon">📋</span>Entsch.</button>
-            <button class="att-main-btn" id="btnAU" onclick="selMain('absent_u')" title="Abwesend – Unentschuldigt"><span class="abm-icon">❌</span>Unentsch.</button>
-            <button class="att-main-btn" id="btnBS" onclick="selMain('berufsschule')" title="Berufsschule"><span class="abm-icon">🏫</span>BS</button>
-          </div>
+          <select class="fi" id="attStatusSel" onchange="selMain(this.value)" style="margin-bottom:4px;font-weight:700">
+            <option value="">– Status wählen –</option>
+            <option value="present">✅ Anwesend</option>
+            <option value="sick">🤒 Krank</option>
+            <option value="absent_e">📋 Abwesend – Entschuldigt</option>
+            <option value="absent_u">❌ Abwesend – Unentschuldigt</option>
+            <option value="berufsschule">🏫 Berufsschule</option>
+          </select>
           <div class="present-sub" id="presentSub">
             <div class="present-sub-row">
               <div class="sub-field">
@@ -1955,9 +1956,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v758';
+const APP_VERSION = 'v759';
 const APP_BUILD = '2026-07-02';
 const CHANGELOG = [
+  {v:'v759', d:'02.07.2026', items:['📅 Anwesenheit: Status jetzt als Dropdown (Anwesend · Krank · Entschuldigt · Unentschuldigt · Berufsschule) statt Icon-Buttons']},
   {v:'v758', d:'02.07.2026', items:['👤 Teilnehmer-Modal neu: startet mit einer Button-Übersicht (Person · Noten · Anwesenheit · Dokumente · Historie) statt Reiter; ein Klick öffnet den Bereich, „← Zurück" führt zur Übersicht. Bescheinigung + Status-Aktionen (Wiederholer/Nicht angetreten/Platz leeren) direkt in der Übersicht']},
   {v:'v757', d:'02.07.2026', items:['🔒 „Kurs abschließen" als eigener Button direkt neben „Aktionen" (Schreibsperre für abgeschlossene Kurse)','📊 Noten-Vorlage pro Ausbilder: eigene Notennamen werden konto-weit gespeichert und automatisch auf neue Kurse übernommen – geräteübergreifend; mit „★ als Standard speichern", „übernehmen" und „Vorlage zurücksetzen" (Wizard)','🩺 Bescheinigung: Option „Fehlzeiten leer lassen" und „Verspätung als tatsächliche Zeit"','🔢 Versionsanzeige vereinheitlicht']},
   {v:'v2.7.6', d:'13.05.2026', items:['🎨 Sidebar-Rahmen dezenter (Border 5px → 3px, 3px → 2px; Tints weicher)','📄 Lehrgang-Zeilen (Datumsangaben) jetzt als weiße Karten mit dezentem Rahmen auf dem getönten Kategorie-Hintergrund — Desktop + Mobile']},
@@ -5133,6 +5135,7 @@ function openModal(id){
   document.getElementById('earlyMins').value='';document.getElementById('earlyMins').disabled=true;
   document.getElementById('presentSub').classList.remove('show');
   document.querySelectorAll('.att-main-btn').forEach(b=>b.className='att-main-btn');
+  { const _s=document.getElementById('attStatusSel'); if(_s) _s.value=''; }
   // Speichern-Button: immer ausgegraut bis Hinzufügen gedrückt wird
   const saveAttBtn=document.getElementById('btnSaveAtt');
   if(saveAttBtn){saveAttBtn.style.opacity='.35';saveAttBtn.style.pointerEvents='none';saveAttBtn.classList.remove('btn-blink');}
@@ -5626,9 +5629,10 @@ function updGrades(){
 }
 function selMain(type){
   curAttMain=type;
+  const _sel=document.getElementById('attStatusSel'); if(_sel && _sel.value!==(type||'')) _sel.value=type||'';
   document.querySelectorAll('.att-main-btn').forEach(b=>{b.className='att-main-btn';});
   const map={present:{el:'btnP',cls:'sel-p'},absent_e:{el:'btnAE',cls:'sel-ae'},absent_u:{el:'btnAU',cls:'sel-au'},sick:{el:'btnK',cls:'sel-k'},berufsschule:{el:'btnBS',cls:'sel-bs'}};
-  const m=map[type];if(m) document.getElementById(m.el).className='att-main-btn '+m.cls;
+  const m=map[type];if(m){ const _el=document.getElementById(m.el); if(_el) _el.className='att-main-btn '+m.cls; }
   // show/hide present sub
   const sub=document.getElementById('presentSub');
   if(type==='present') sub.classList.add('show');
