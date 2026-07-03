@@ -1103,7 +1103,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v278'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v279'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -1922,6 +1922,20 @@ function submitJoinLogin(){
 }
 
 // ── WILLKOMMENS-MAIL nach erfolgreicher Self-Registration ──
+// Neue kombinierte Willkommens-+Bestätigungsmail via Cloud Function (Sammlung welcomeQueue).
+// Sicherheitsnetz: greift die Funktion nicht (noch nicht deployed), fällt es nach 12s auf die alten 2 Mails zurück.
+function _queueWelcomeMail(uid, email, name, kursName){
+  const _fallback=function(){
+    try{ sendWelcomeEmail(email, name, kursName); }catch(e){}
+    try{ const c=auth.currentUser; if(c && !c.emailVerified) c.sendEmailVerification(_acs).catch(()=>{}); }catch(e){}
+  };
+  if(!db || !uid || !email){ _fallback(); return; }
+  db.collection('welcomeQueue').add({ uid:uid, name:name||'', kursName:kursName||'', ts:Date.now() }).then(ref=>{
+    setTimeout(()=>{
+      ref.get().then(s=>{ if(s.exists){ ref.delete().catch(()=>{}); _fallback(); } }).catch(()=>{});
+    }, 12000);
+  }).catch(()=>{ _fallback(); });
+}
 function sendWelcomeEmail(email, name, kursName){
   if(!db || !email) return;
   const appUrl='https://mohr-app.github.io/ausbilderpro/AzubiPro.html';
@@ -2456,15 +2470,14 @@ function submitJoinRegistration(){
           return db.collection('users').doc(uid).set({email: email, role:'azubi'},{merge:true});
         }).then(()=>{
           const fullName=((vorname||'')+' '+(nachname||'')).trim();
-          sendWelcomeEmail(email, fullName, _kursNameForMail);
+          _queueWelcomeMail(uid, email, fullName, _kursNameForMail);
         });
       });
     });
   }).then(()=>{
     errEl.style.color='var(--acc)';
     errEl.textContent='✓ Registrierung erfolgreich!';
-    // Bestätigungsmail an die neue Adresse (best-effort, blockiert nichts). Nur Neu-Registrierte.
-    try{ const _cu=auth.currentUser; if(_cu && !_cu.emailVerified) _cu.sendEmailVerification(_acs).catch(()=>{}); }catch(e){}
+    // Bestätigung + Willkommen kommen jetzt als EINE Mail (via _queueWelcomeMail / Cloud Function; Fallback dort).
     // URL bereinigen
     window.history.replaceState({},'',window.location.pathname);
     const _regKursId=_joinKursId; // vor dem Nullen sichern (für Auto-Checkin)

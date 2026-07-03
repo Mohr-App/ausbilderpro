@@ -365,5 +365,15 @@ service cloud.firestore {
       // Jeder darf nur sein eigenes Presence-Doc schreiben (create/update/delete)
       allow write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Warteschlange für die kombinierte Willkommens-/Bestätigungsmail (Cloud Function sendWelcomeMail).
+    // Azubi darf nur einen Auftrag für sich selbst anlegen; die Cloud Function (Admin) verarbeitet + löscht ihn.
+    match /welcomeQueue/{id} {
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+      allow read, delete: if request.auth != null
+                    && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
   }
 }
