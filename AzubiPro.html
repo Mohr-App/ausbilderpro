@@ -1103,7 +1103,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v281'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v282'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -4077,6 +4077,9 @@ function _autoCheckinBeiRegistrierung(kursId){
   _istFreigegeben(kursId).then(_frei=>{
    if(!_frei) return; // Freigabe-Pflicht an + noch nicht freigegeben -> Ausbilder setzt Anwesenheit bei Freigabe
    const kursRef=db.collection('shared').doc('kurse').collection('list').doc(kursId);
+   kursRef.get().then(kdoc=>{
+   const _sperre=_checkinTagesSperre(kdoc&&kdoc.exists?kdoc.data():{});
+   if(_sperre) return; // Registrierung ok, aber keine Anwesenheit ausserhalb der Kurstage
    const datum=new Date().toISOString().slice(0,10);
    const ciRef=kursRef.collection('checkins').doc(_tnId+'_'+datum);
    ciRef.get().then(ci=>{
@@ -4090,6 +4093,7 @@ function _autoCheckinBeiRegistrierung(kursId){
        ts:Date.now()
      }).then(()=>{ try{ loadCheckinHistory(); }catch(e){} }).catch(()=>{});
    }).catch(()=>{});
+   }).catch(()=>{}); // Ende kursRef.get (Tages-Sperre)
   }); // Ende _istFreigegeben-Gate
 }
 function _handleCheckinError(e, ciRef){
@@ -4109,6 +4113,27 @@ function _handleCheckinError(e, ciRef){
     _checkinBanner('bad','Check-in fehlgeschlagen: '+((e&&e.message)||'unbekannter Fehler'));
   });
 }
+// Gesetzliche Feiertage NRW (YYYY-MM-DD) - feste + bewegliche via Gauss-Osterformel
+function _nrwFeiertage(jahr){
+  const a=jahr%19,b=Math.floor(jahr/100),c=jahr%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),ta=((h+l-7*m+114)%31)+1;
+  const ostern=new Date(Date.UTC(jahr,mo-1,ta));
+  const p=dt=>dt.toISOString().slice(0,10);
+  const plus=t=>{const d2=new Date(ostern);d2.setUTCDate(d2.getUTCDate()+t);return p(d2);};
+  return new Set([jahr+'-01-01',plus(-2),plus(1),jahr+'-05-01',plus(39),plus(50),plus(60),jahr+'-10-03',jahr+'-11-01',jahr+'-12-25',jahr+'-12-26']);
+}
+// Prueft ob Check-in heute erlaubt ist. null = ok, sonst Meldungstext.
+// Reihenfolge: 1. Kurszeitraum (gilt IMMER)  2. Wochenende/Feiertag (abschaltbar via qrWochenende am Kurs)
+function _checkinTagesSperre(kd){
+  const heute=new Date().toISOString().slice(0,10);
+  if(kd&&kd.von&&kd.bis&&(heute<kd.von||heute>kd.bis)){
+    return '\ud83d\udcc5 Der Lehrgang l\u00e4uft nicht ('+fmtDE(kd.von)+' \u2013 '+fmtDE(kd.bis)+') \u2013 Check-in nicht m\u00f6glich.';
+  }
+  if(kd&&kd.qrWochenende===true) return null; // Ausbilder hat Wochenende/Feiertage freigegeben
+  const wd=new Date(heute+'T12:00:00').getDay();
+  if(wd===0||wd===6) return '\ud83d\udcc5 Check-in am Wochenende ist deaktiviert \u2013 deine Anwesenheit tr\u00e4gt dein Ausbilder ein.';
+  if(_nrwFeiertage(+heute.slice(0,4)).has(heute)) return '\ud83d\udcc5 Check-in an Feiertagen ist deaktiviert \u2013 deine Anwesenheit tr\u00e4gt dein Ausbilder ein.';
+  return null;
+}
 function _tryQRCheckin(){
   if(_checkinDone||!_checkinKursId||!_tnId||!_tnData) return;
   if(_tnData.aktiverKursId!==_checkinKursId) return; // anderer/kein Kurs -> Beitritts-Flow regelt das
@@ -4118,6 +4143,9 @@ function _tryQRCheckin(){
    _checkinDone=true;
    const kursRef=db.collection('shared').doc('kurse').collection('list').doc(kursId);
    kursRef.get().then(doc=>{
+    const _kd=doc.exists?doc.data():{};
+    const _sperre=_checkinTagesSperre(_kd);
+    if(_sperre){ _checkinDone=false; _checkinBanner('warn',_sperre); return; }
     const qrGeo=(doc.exists&&doc.data().qrGeo)?doc.data().qrGeo:null;
     const gpsPflicht=doc.exists&&doc.data().qrGpsPflicht===true;
     const hatGeo=!!(qrGeo&&qrGeo.lat);

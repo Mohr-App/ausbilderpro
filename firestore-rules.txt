@@ -63,6 +63,9 @@ service cloud.firestore {
         // QR-Anwesenheit: GPS-Pflicht-Schalter
         allow update: if request.auth != null
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['qrGpsPflicht']);
+        // QR-Anwesenheit: Wochenend-/Feiertags-Check-in erlauben/sperren
+        allow update: if request.auth != null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['qrWochenende']);
         // Profil-Backfill: Kurs-Ersteller darf eigene Ausbilder-Stammdaten nachtragen
         allow update: if request.auth != null
           && resource.data.createdBy == request.auth.token.email

@@ -1964,9 +1964,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v762';
+const APP_VERSION = 'v764';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v764', d:'04.07.2026', items:['\ud83e\uddf9 QR-Check-in l\u00f6schbar: Wird ein per QR entstandener Anwesenheits-Eintrag im TN-Fenster gel\u00f6scht und gespeichert, wird jetzt auch der Check-in in der Cloud entfernt \u2013 vorher trug der Live-Sync den Eintrag sofort wieder ein']},
+  {v:'v763', d:'04.07.2026', items:['\ud83d\udcc5 QR-Anwesenheit: Neuer Schalter \u201eWochenende & Feiertage\u201c \u2013 Check-in ist Sa/So und an NRW-Feiertagen jetzt standardm\u00e4\u00dfig gesperrt (abfotografierter QR-Code n\u00fctzt nichts mehr), bei Bedarf pro Kurs freigebbar. Au\u00dferhalb des Kurszeitraums (vor Beginn/nach Ende) ist Check-in immer gesperrt']},
   {v:'v762', d:'04.07.2026', items:['🕢 Kursbeginn einstellbar (Zeitfeld im Kurs-Header neben „Kurstage“): ab dieser Zeit greifen roter Anwesenheits-Haken und Fehltag-Erinnerung. Einmal eingegebene Zeit gilt automatisch als Standard für alle neuen Lehrgänge (Standard 07:30)']},
   {v:'v761', d:'04.07.2026', items:['⏰ Erinnerungen am Sitzplatz: Roter Rahmen wenn TN am 1. Kurstag ohne jeden Eintrag blieb (Nicht angetreten?), amber Rahmen ab dem 2. Fehltag (Krank/Entschuldigt/Unentschuldigt oder Tag ganz ohne Eintrag – Berufsschule zählt nicht; 1 Fehltag ist ok). Hover erklärt was zu tun ist, ✕ blendet den Hinweis aus','🔴 7:30-Regel: Der grüne ✓-Schnellhaken wird ab 7:30 Uhr rot, solange für heute kein Eintrag/Check-in vorliegt (Klick trägt weiterhin Anwesend ein)']},
   {v:'v760', d:'03.07.2026', items:['🩹 Einzel-Bescheinigung: Ort-Auswahl (HBZ Bonn/Siegburg) und „überbetriebliche Unterweisung geführt: ja/nein" waren nicht anklickbar (fehlende lockGuard-Definition im Fenster) – behoben']},
@@ -2160,7 +2162,7 @@ function emptyTrash(){
   openTrash();
   toast('🗑 Papierkorb geleert');
 }
-let curSeat=null, curAttMain=null, tmpAtt=[];
+let curSeat=null, curAttMain=null, tmpAtt=[], tmpAttQrDel=[];
 let dpKatId=null;
 
 // Storage
@@ -5007,6 +5009,7 @@ function openModal(id){
   curSeat=id;curAttMain=null;
   const d=curSeats()[id]||{};
   tmpAtt=JSON.parse(JSON.stringify(d.attendance||[]));
+  tmpAttQrDel=[];
   // Leerer-Sitz-Hinweis: nur wenn Kurs mit Cloud verbunden + Sitz wirklich leer
   const inst_pre=curInst();
   const istLeer=!(d.name||'').trim() && !d.poolTnId;
@@ -5849,6 +5852,8 @@ function toggleAe(el, e){
   el.classList.toggle('expanded');
 }
 function delAtt(i){
+  const _a=tmpAtt[i];
+  if(_a&&_a.date&&(_a.qr||/per QR-Check-in/.test(_a.note||''))) tmpAttQrDel.push(_a.date);
   tmpAtt.splice(i,1);
   renderAtt();
   const saveBtn=document.getElementById('btnSaveAtt');
@@ -6135,6 +6140,22 @@ function saveSeat(){ if(lockGuard())return;
     werkzeugStatus:document.getElementById('wzFehlt')?.checked?'fehlt':document.getElementById('wzOk')?.checked?'ok':'',
     werkzeugFehlt:(document.getElementById('wzFehltText')?.value||'').trim(),
   };
+  // Geloeschte QR-Eintraege auch in der Cloud aufraeumen - sonst traegt der Live-Sync sie sofort wieder ein
+  try{
+    if(tmpAttQrDel.length && oldSeat.poolTnId && inst.sharedKursId && _db){
+      const _seatObj=S.kats[S.curKat].instances[S.curInst].seats[curSeat];
+      const _sid=curSeat;
+      tmpAttQrDel.filter(dt=>!tmpAtt.some(a=>a.date===dt)).forEach(dt=>{
+        _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
+          .collection('checkins').doc(oldSeat.poolTnId+'_'+dt).delete()
+          .catch(err=>{ toast('\u26a0 QR-Check-in ('+fmtD(dt)+') konnte nicht gel\u00f6scht werden: '+(err.code||err.message||'?'),'bad'); });
+        if(_seatObj.qrCheckin&&_seatObj.qrCheckin.datum===dt) _seatObj.qrCheckin=null;
+        if(inst.attendance&&inst.attendance[dt]&&inst.attendance[dt][_sid]) delete inst.attendance[dt][_sid];
+        try{ if(_todayCheckinMap&&_todayCheckinMap[oldSeat.poolTnId]&&_todayCheckinMap[oldSeat.poolTnId].datum===dt) delete _todayCheckinMap[oldSeat.poolTnId]; }catch(e){}
+      });
+    }
+    tmpAttQrDel=[];
+  }catch(e){ console.warn('QR-Cleanup:',e); }
   const _saveSeatId=curSeat;
   const _saveKatId=S.curKat;
   const _saveInstId=S.curInst;
@@ -8546,6 +8567,7 @@ function printQR(){
 // ═══ QR-ANWESENHEIT (Check-in per Scan + Geofence) ═══
 let _qrAttGeo=null; // {lat,lng,radius} des aktuellen Kurses (Cache fuer Modal)
 let _qrGpsPflicht=false; // GPS-Pruefung an/aus (Default aus)
+let _qrWochenende=false; // Wochenend-/Feiertags-Check-in erlauben (Default aus = gesperrt)
 let _qrAttCurKursId=null;
 function _qrAttUrl(kursId){
   // Derselbe Link wie der Kurs-Registrierungs-QR: AzubiPro entscheidet beim Oeffnen
@@ -8566,6 +8588,8 @@ function openQRAttModal(){
     const dd=doc.exists?doc.data():{};
     if(typeof dd.qrGpsPflicht==='boolean'){ _qrGpsPflicht=dd.qrGpsPflicht; }
     else { try{ const _em=(_auth&&_auth.currentUser&&_auth.currentUser.email||'x').toLowerCase(); _qrGpsPflicht=localStorage.getItem('myQrGpsPflicht_'+_em)==='1'; }catch(e){ _qrGpsPflicht=false; } }
+    if(typeof dd.qrWochenende==='boolean'){ _qrWochenende=dd.qrWochenende; }
+    else { try{ const _em=(_auth&&_auth.currentUser&&_auth.currentUser.email||'x').toLowerCase(); _qrWochenende=localStorage.getItem('myQrWochenende_'+_em)==='1'; }catch(e){ _qrWochenende=false; } }
     // Kein Geofence am Kurs? Persönlichen Standard dieses Ausbilders automatisch übernehmen
     if(!_qrAttGeo){
       try{
@@ -8610,6 +8634,14 @@ function _toggleQrGps(){
   }
   _renderQRAttBody(_qrAttCurKursId);
 }
+function _toggleQrWochenende(){
+  _qrWochenende=!_qrWochenende;
+  try{ const _em=(_auth&&_auth.currentUser&&_auth.currentUser.email||'x').toLowerCase(); localStorage.setItem('myQrWochenende_'+_em, _qrWochenende?'1':'0'); }catch(e){}
+  if(_qrAttCurKursId){
+    _db.collection('shared').doc('kurse').collection('list').doc(_qrAttCurKursId).update({qrWochenende:_qrWochenende}).catch(err=>{ toast('\u26a0 Speichern fehlgeschlagen ('+(err.code||err.message||'?')+') \u2013 Rules pr\u00fcfen','bad'); });
+  }
+  _renderQRAttBody(_qrAttCurKursId);
+}
 function _renderQRAttBody(kursId){
   const body=document.getElementById('qrAttBody');
   const url=_qrAttUrl(kursId);
@@ -8624,6 +8656,13 @@ function _renderQRAttBody(kursId){
     +'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(gpsPflicht?'An: Azubi muss per GPS vor Ort sein.':'Aus: QR-Scan genügt – keine Standortfreigabe nötig.')+'</div></div>'
     +'<button onclick="_toggleQrGps()" style="flex-shrink:0;width:52px;height:28px;border-radius:14px;border:none;cursor:pointer;background:'+(gpsPflicht?'#059669':'#cbd5e1')+';position:relative;transition:background .15s" title="GPS-Prüfung umschalten">'
     +'<span style="position:absolute;top:3px;'+(gpsPflicht?'right:3px':'left:3px')+';width:22px;height:22px;border-radius:50%;background:#fff;transition:all .15s"></span></button>'
+    +'</div>';
+  const wo=!!_qrWochenende;
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;margin-bottom:12px">'
+    +'<div style="text-align:left"><div style="font-size:.72rem;font-weight:800">\ud83d\udcc5 Wochenende &amp; Feiertage</div>'
+    +'<div style="font-size:.6rem;color:var(--mu);margin-top:2px">'+(wo?'An: Check-in auch Sa/So und an NRW-Feiertagen m\u00f6glich.':'Aus: Sa/So und NRW-Feiertage gesperrt. Au\u00dferhalb des Kurszeitraums ist Check-in immer gesperrt.')+'</div></div>'
+    +'<button onclick="_toggleQrWochenende()" style="flex-shrink:0;width:52px;height:28px;border-radius:14px;border:none;cursor:pointer;background:'+(wo?'#059669':'#cbd5e1')+';position:relative;transition:background .15s" title="Wochenend-/Feiertags-Check-in umschalten">'
+    +'<span style="position:absolute;top:3px;'+(wo?'right:3px':'left:3px')+';width:22px;height:22px;border-radius:50%;background:#fff;transition:all .15s"></span></button>'
     +'</div>';
   if(gpsPflicht){
     if(geoOk){
