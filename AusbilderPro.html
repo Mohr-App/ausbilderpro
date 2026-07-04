@@ -442,6 +442,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .satt{display:flex;gap:3px;margin-top:3px;flex-wrap:wrap;align-items:center;}
 .sqa-btn{position:absolute;top:50%;right:4px;transform:translateY(-50%);z-index:3;cursor:pointer;font-size:.85rem;width:20px;height:20px;display:flex;align-items:center;justify-content:center;background:rgba(34,197,94,.15);border:1.5px solid rgba(34,197,94,.4);border-radius:50%;color:#22c55e;font-weight:900;transition:transform .1s;}
 .sqa-btn:hover{transform:translateY(-50%) scale(1.2);background:rgba(34,197,94,.25);}
+.sqa-btn.sqa-late{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.5);color:#ef4444;}
+.sqa-btn.sqa-late:hover{background:rgba(239,68,68,.25);}
+/* Erinnerungs-Rahmen: Tag-1-No-Show (rot wie 'Nicht angetreten') / 2. Fehltag (amber wie 'Wiederholer') */
+.seat-alert-fehlt{outline:3px solid #dc2626;outline-offset:-2px;}
+.seat-alert-wdh{outline:3px solid #d97706;outline-offset:-2px;}
+.salert-x{position:absolute;top:3px;left:3px;z-index:5;cursor:pointer;font-size:.6rem;width:16px;height:16px;display:flex;align-items:center;justify-content:center;background:#fff;border:1.5px solid currentColor;border-radius:50%;font-weight:900;line-height:1;}
+.seat-alert-fehlt .salert-x{color:#dc2626;}
+.seat-alert-wdh .salert-x{color:#d97706;}
 /* attendance mini badges - dunkle Texte für Lesbarkeit auf Light-Theme */
 .ab{font-size:.54rem;padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-weight:700;white-space:nowrap;}
 .ab-bs{background:rgba(99,102,241,.18);color:#3730a3;border:1px solid rgba(99,102,241,.4);}
@@ -1956,9 +1964,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v760';
-const APP_BUILD = '2026-07-02';
+const APP_VERSION = 'v761';
+const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v761', d:'04.07.2026', items:['⏰ Erinnerungen am Sitzplatz: Roter Rahmen wenn TN am 1. Kurstag ohne jeden Eintrag blieb (Nicht angetreten?), amber Rahmen ab dem 2. Fehltag (Krank/Entschuldigt/Unentschuldigt oder Tag ganz ohne Eintrag – Berufsschule zählt nicht; 1 Fehltag ist ok). Hover erklärt was zu tun ist, ✕ blendet den Hinweis aus','🔴 7:30-Regel: Der grüne ✓-Schnellhaken wird ab 7:30 Uhr rot, solange für heute kein Eintrag/Check-in vorliegt (Klick trägt weiterhin Anwesend ein)']},
   {v:'v760', d:'03.07.2026', items:['🩹 Einzel-Bescheinigung: Ort-Auswahl (HBZ Bonn/Siegburg) und „überbetriebliche Unterweisung geführt: ja/nein" waren nicht anklickbar (fehlende lockGuard-Definition im Fenster) – behoben']},
   {v:'v759', d:'02.07.2026', items:['📅 Anwesenheit: Status jetzt als Dropdown (Anwesend · Krank · Entschuldigt · Unentschuldigt · Berufsschule) statt Icon-Buttons']},
   {v:'v758', d:'02.07.2026', items:['👤 Teilnehmer-Modal neu: startet mit einer Button-Übersicht (Person · Noten · Anwesenheit · Dokumente · Historie) statt Reiter; ein Klick öffnet den Bereich, „← Zurück" führt zur Übersicht. Bescheinigung + Status-Aktionen (Wiederholer/Nicht angetreten/Platz leeren) direkt in der Übersicht']},
@@ -4066,6 +4075,55 @@ function quickMarkAllPresent(){
   toast('✓ '+count+' TN als anwesend markiert');
 }
 
+// ═══ ERINNERUNGS-ALERTS am Sitzplatz (v761) ═══
+// Rot: 1. Kurstag komplett ohne Eintrag (nicht angetreten?).
+// Amber: 2. Fehltag – eingetragene Abwesenheit (Krank/Entschuldigt/Unentschuldigt, NICHT Berufsschule)
+//        ODER vergangener Kurstag ganz ohne Eintrag ODER heute ab 7:30 noch nichts. 1 Fehltag = ok.
+function seatAlertInfo(inst,id,d){
+  try{
+    if(!inst||!d||!d.name||d.wiederholer) return null;
+    const start=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+inst.sM+'-'+inst.sD):null;
+    if(!start) return null;
+    const end=(inst.eY&&inst.eM&&inst.eD)?(inst.eY+'-'+inst.eM+'-'+inst.eD):'9999-12-31';
+    const today=new Date().toISOString().slice(0,10);
+    if(today<=start) return null; // am 1. Kurstag selbst noch kein Rahmen
+    const att=d.attendance||[];
+    const hasEntry=ds=>!!(((inst.attendance||{})[ds]||{})[id])||att.some(a=>a.date===ds)||(d.qrCheckin&&d.qrCheckin.datum===ds);
+    const isAbsent=ds=>att.some(a=>a.date===ds&&(a.type==='absent_e'||a.type==='absent_u'||a.type==='sick'));
+    const dism=d.alertDismiss||{};
+    // ROT: Tag 1 ohne jeglichen Eintrag
+    if(!hasEntry(start)) return dism[start]?null:{kind:'fehlt',key:start};
+    // Fehltage: vergangene Kurstage (Mo–Fr) von Start bis gestern
+    const missed=[];
+    const dt=new Date(start+'T12:00:00');
+    for(let g=0;g<400;g++){
+      const ds=dt.toISOString().slice(0,10);
+      if(ds>=today||ds>end) break;
+      const wd=dt.getDay();
+      if(wd!==0&&wd!==6&&(!hasEntry(ds)||isAbsent(ds))) missed.push(ds);
+      dt.setDate(dt.getDate()+1);
+    }
+    // Droht heute der nächste Fehltag? (Kurstag, ab 7:30, noch kein Eintrag/Check-in)
+    const now=new Date();
+    const lateNow=(today<=end)&&now.getDay()!==0&&now.getDay()!==6&&(now.getHours()*60+now.getMinutes())>=450&&!hasEntry(today);
+    const cnt=missed.length+(lateNow?1:0);
+    if(cnt<2) return null; // 1 Fehltag ist ok – erst ab dem 2. wird erinnert
+    const key=missed.concat(lateNow?[today]:[]).join(',');
+    return dism[key]?null:{kind:'wdh',key:key,count:cnt};
+  }catch(e){ return null; }
+}
+function dismissSeatAlert(sid){
+  const inst=curInst(); if(!inst||!inst.seats) return;
+  const d=inst.seats[sid]; if(!d) return;
+  const a=seatAlertInfo(inst,sid,d); if(!a) return;
+  if(!d.alertDismiss) d.alertDismiss={};
+  d.alertDismiss[a.key]=true;
+  persist(); renderSeats();
+  toast('Hinweis ausgeblendet');
+}
+// 7:30-Auto-Refresh: Sitzplan neu zeichnen, sobald die Schwelle überschritten wird (Haken wird rot / Amber-Rahmen erscheint)
+setInterval(function(){try{const n=new Date();if(n.getHours()===7&&n.getMinutes()===30&&typeof renderSeats==='function')renderSeats();}catch(e){}},60000);
+
 function seatQuickAtt(sid){
   const inst=curInst(); if(!inst) return;
   const date=new Date().toISOString().slice(0,10);
@@ -4572,7 +4630,19 @@ function mkSeat(id,seats){
     const hasDetail=att.some(a=>a.date===qaD);
     const instEnd=inst.eY&&inst.eM&&inst.eD?(inst.eY+'-'+inst.eM+'-'+inst.eD):'9999-12-31';
     const instStart=inst.sY&&inst.sM&&inst.sD?(inst.sY+'-'+inst.sM+'-'+inst.sD):'0000-01-01';
-    const qaBtn=(qaSt||hasDetail||qaD>instEnd||qaD<instStart)?'':'<div class="sqa-btn" onclick="event.stopPropagation();seatQuickAtt(\''+id+'\')" title="Anwesend markieren">✓</div>';
+    const _qaN=new Date();
+    const qaLate=_qaN.getDay()!==0&&_qaN.getDay()!==6&&(_qaN.getHours()*60+_qaN.getMinutes())>=450;
+    const qaBtn=(qaSt||hasDetail||qaD>instEnd||qaD<instStart)?'':'<div class="sqa-btn'+(qaLate?' sqa-late':'')+'" onclick="event.stopPropagation();seatQuickAtt(\''+id+'\')" title="'+(qaLate?'Bis 7:30 nicht erschienen – Klick trägt trotzdem Anwesend ein':'Anwesend markieren')+'">✓</div>';
+    // Erinnerungs-Rahmen (Tag-1-No-Show rot / ab 2. Fehltag amber)
+    const seatAlert=seatAlertInfo(inst,id,d);
+    let alertX='';
+    if(seatAlert){
+      el.classList.add(seatAlert.kind==='fehlt'?'seat-alert-fehlt':'seat-alert-wdh');
+      el.title=seatAlert.kind==='fehlt'
+        ?('⚠ '+d.name+' – Nicht angetreten? → In den Container „Nicht angetreten" ziehen (Verwaltung wird informiert). Doch da gewesen? Anwesenheit nachtragen. ✕ = Hinweis aus')
+        :('⚠ '+d.name+' – Fehlt zum '+seatAlert.count+'. Mal? → In den Container „Kurs wiederholen" ziehen. Eintrag nur vergessen? Anwesenheit nachtragen. ✕ = Hinweis aus');
+      alertX='<div class="salert-x" title="Hinweis ausblenden" onclick="event.stopPropagation();dismissSeatAlert(\''+id+'\')">✕</div>';
+    }
     const wzBadge=d.werkzeugStatus==='fehlt'?'<div class="swz" style="font-size:.5rem;color:#ef4444;font-weight:800;margin-top:1px" title="Werkzeug unvollständig – Details im Teilnehmer-Fenster">🔧 unvollständig</div>':'';
     // Meldungs-Overlay
     let meldHtml='';
@@ -4591,7 +4661,7 @@ function mkSeat(id,seats){
     if(d.emailUnbestaetigt){
       /* 📧 jetzt am Anfang der Anwesenheits-Reihe (siehe oben) */
     }
-    el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
+    el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+alertX+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
   }
   return el;
 }
