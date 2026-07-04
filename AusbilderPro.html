@@ -1964,9 +1964,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v761';
+const APP_VERSION = 'v762';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v762', d:'04.07.2026', items:['🕢 Kursbeginn einstellbar (Zeitfeld im Kurs-Header neben „Kurstage“): ab dieser Zeit greifen roter Anwesenheits-Haken und Fehltag-Erinnerung. Einmal eingegebene Zeit gilt automatisch als Standard für alle neuen Lehrgänge (Standard 07:30)']},
   {v:'v761', d:'04.07.2026', items:['⏰ Erinnerungen am Sitzplatz: Roter Rahmen wenn TN am 1. Kurstag ohne jeden Eintrag blieb (Nicht angetreten?), amber Rahmen ab dem 2. Fehltag (Krank/Entschuldigt/Unentschuldigt oder Tag ganz ohne Eintrag – Berufsschule zählt nicht; 1 Fehltag ist ok). Hover erklärt was zu tun ist, ✕ blendet den Hinweis aus','🔴 7:30-Regel: Der grüne ✓-Schnellhaken wird ab 7:30 Uhr rot, solange für heute kein Eintrag/Check-in vorliegt (Klick trägt weiterhin Anwesend ein)']},
   {v:'v760', d:'03.07.2026', items:['🩹 Einzel-Bescheinigung: Ort-Auswahl (HBZ Bonn/Siegburg) und „überbetriebliche Unterweisung geführt: ja/nein" waren nicht anklickbar (fehlende lockGuard-Definition im Fenster) – behoben']},
   {v:'v759', d:'02.07.2026', items:['📅 Anwesenheit: Status jetzt als Dropdown (Anwesend · Krank · Entschuldigt · Unentschuldigt · Berufsschule) statt Icon-Buttons']},
@@ -3673,7 +3674,7 @@ function renderMain(){
     : '<button class="hdr-lock-btn" onclick="event.stopPropagation();kursAbschliessen()" title="Kurs abschließen – danach schreibgeschützt">🔒 Kurs abschließen</button>';
   el.innerHTML=
     (_lock?'<div style="margin:8px 0;padding:10px 14px;background:rgba(5,150,105,.10);border:1.5px solid rgba(5,150,105,.4);border-radius:10px;font-size:.74rem;font-weight:700;color:#047857;line-height:1.5">✓ Kurs abgeschlossen — schreibgeschützt, keine Änderungen möglich.</div>':'')+
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span>'+'</div><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button>'+_lockBtn+'</div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span><span style="font-size:.62rem;color:#64748b;margin-left:10px">🕢 <input type="time" value="'+_instBeginn(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateBeginn(this.value)" onclick="event.stopPropagation()" title="Kursbeginn – ab dieser Zeit greifen die Erinnerungen (roter Haken / Fehltag-Rahmen). Gilt auch als Standard für neue Lehrgänge"> Beginn</span>'+'</div><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button>'+_lockBtn+'</div></div>'
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="kursact-close" onclick="toggleKursActions()" title="Schließen" aria-label="Schließen">✕</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="markAlleAnwesend()" title="Alle TN heute als anwesend markieren (für leere Tage)">✓ Alle anwesend</button>'
@@ -4075,6 +4076,15 @@ function quickMarkAllPresent(){
   toast('✓ '+count+' TN als anwesend markiert');
 }
 
+// Kursbeginn (fuer Erinnerungen): pro Lehrgang inst.beginn, sonst konto-weiter Standard S.beginnDefault, sonst 07:30
+function _instBeginn(inst){ return (inst&&inst.beginn)||S.beginnDefault||'07:30'; }
+function _instBeginnMins(inst){ const m=/^(\d{1,2}):(\d{2})$/.exec(_instBeginn(inst)); return m?(+m[1])*60+(+m[2]):450; }
+function updateBeginn(v){
+  const inst=curInst(); if(!inst) return;
+  if(!/^\d{2}:\d{2}$/.test(v||'')){ toast('Ungültige Zeit','bad'); return; }
+  inst.beginn=v; S.beginnDefault=v; persist(); renderSeats();
+  toast('Kursbeginn '+v+' gespeichert – gilt auch für neue Lehrgänge');
+}
 // ═══ ERINNERUNGS-ALERTS am Sitzplatz (v761) ═══
 // Rot: 1. Kurstag komplett ohne Eintrag (nicht angetreten?).
 // Amber: 2. Fehltag – eingetragene Abwesenheit (Krank/Entschuldigt/Unentschuldigt, NICHT Berufsschule)
@@ -4105,7 +4115,7 @@ function seatAlertInfo(inst,id,d){
     }
     // Droht heute der nächste Fehltag? (Kurstag, ab 7:30, noch kein Eintrag/Check-in)
     const now=new Date();
-    const lateNow=(today<=end)&&now.getDay()!==0&&now.getDay()!==6&&(now.getHours()*60+now.getMinutes())>=450&&!hasEntry(today);
+    const lateNow=(today<=end)&&now.getDay()!==0&&now.getDay()!==6&&(now.getHours()*60+now.getMinutes())>=_instBeginnMins(inst)&&!hasEntry(today);
     const cnt=missed.length+(lateNow?1:0);
     if(cnt<2) return null; // 1 Fehltag ist ok – erst ab dem 2. wird erinnert
     const key=missed.concat(lateNow?[today]:[]).join(',');
@@ -4122,7 +4132,7 @@ function dismissSeatAlert(sid){
   toast('Hinweis ausgeblendet');
 }
 // 7:30-Auto-Refresh: Sitzplan neu zeichnen, sobald die Schwelle überschritten wird (Haken wird rot / Amber-Rahmen erscheint)
-setInterval(function(){try{const n=new Date();if(n.getHours()===7&&n.getMinutes()===30&&typeof renderSeats==='function')renderSeats();}catch(e){}},60000);
+setInterval(function(){try{const inst=(typeof curInst==='function')?curInst():null;if(!inst)return;const n=new Date();const hm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');if(hm===_instBeginn(inst)&&typeof renderSeats==='function')renderSeats();}catch(e){}},60000);
 
 function seatQuickAtt(sid){
   const inst=curInst(); if(!inst) return;
@@ -4631,8 +4641,8 @@ function mkSeat(id,seats){
     const instEnd=inst.eY&&inst.eM&&inst.eD?(inst.eY+'-'+inst.eM+'-'+inst.eD):'9999-12-31';
     const instStart=inst.sY&&inst.sM&&inst.sD?(inst.sY+'-'+inst.sM+'-'+inst.sD):'0000-01-01';
     const _qaN=new Date();
-    const qaLate=_qaN.getDay()!==0&&_qaN.getDay()!==6&&(_qaN.getHours()*60+_qaN.getMinutes())>=450;
-    const qaBtn=(qaSt||hasDetail||qaD>instEnd||qaD<instStart)?'':'<div class="sqa-btn'+(qaLate?' sqa-late':'')+'" onclick="event.stopPropagation();seatQuickAtt(\''+id+'\')" title="'+(qaLate?'Bis 7:30 nicht erschienen – Klick trägt trotzdem Anwesend ein':'Anwesend markieren')+'">✓</div>';
+    const qaLate=_qaN.getDay()!==0&&_qaN.getDay()!==6&&(_qaN.getHours()*60+_qaN.getMinutes())>=_instBeginnMins(inst);
+    const qaBtn=(qaSt||hasDetail||qaD>instEnd||qaD<instStart)?'':'<div class="sqa-btn'+(qaLate?' sqa-late':'')+'" onclick="event.stopPropagation();seatQuickAtt(\''+id+'\')" title="'+(qaLate?'Bis '+_instBeginn(inst)+' nicht erschienen – Klick trägt trotzdem Anwesend ein':'Anwesend markieren')+'">✓</div>';
     // Erinnerungs-Rahmen (Tag-1-No-Show rot / ab 2. Fehltag amber)
     const seatAlert=seatAlertInfo(inst,id,d);
     let alertX='';
