@@ -234,11 +234,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <!-- Fortschrittsbalken -->
       <div style="margin-bottom:18px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-size:.68rem;color:var(--mu);font-weight:700" id="wizStepLabel">Schritt 1 von 6</div>
+          <div style="font-size:.68rem;color:var(--mu);font-weight:700" id="wizStepLabel">Schritt 1 von 5</div>
           <button onclick="wizCancel()" style="background:none;border:none;color:var(--mu);font-size:.7rem;cursor:pointer;text-decoration:underline" title="Zurück zum Login">✕ Abbrechen</button>
         </div>
         <div style="height:6px;background:var(--brd);border-radius:3px;overflow:hidden">
-          <div id="wizProgress" style="height:100%;background:linear-gradient(90deg,#2563eb,#10b981);width:16%;transition:width .25s"></div>
+          <div id="wizProgress" style="height:100%;background:linear-gradient(90deg,#2563eb,#10b981);width:20%;transition:width .25s"></div>
         </div>
       </div>
 
@@ -258,30 +258,23 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div><label class="fl">Lehrjahr</label><select class="fi" id="jLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
       </div>
 
-      <!-- Schritt 3: Betrieb -->
+      <!-- Schritt 3: Geburtsdatum (Betrieb kommt aus den hinterlegten Daten des Bildungszentrums) -->
       <div class="wiz-step" data-step="3" style="display:none">
-        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🏢 Wo machst du die Ausbildung?</div>
-        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Dein Ausbildungsbetrieb.</div>
-        <div><label class="fl">Betrieb / Firma <span style="color:#ef4444">*</span></label><input class="fi" id="jFirma" placeholder="Firma GmbH"></div>
-      </div>
-
-      <!-- Schritt 4: Geburtsdatum -->
-      <div class="wiz-step" data-step="4" style="display:none">
         <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🎂 Geburtsdatum</div>
         <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Brauchen wir, um dich deinem Kurs zuzuordnen (Abgleich mit dem Bildungszentrum).</div>
         <div><label class="fl">Geburtsdatum <span style="color:#ef4444">*</span></label><input type="date" class="fi" id="jGeburt"></div>
       </div>
 
-      <!-- Schritt 5: Kontakt -->
-      <div class="wiz-step" data-step="5" style="display:none">
+      <!-- Schritt 4: Kontakt -->
+      <div class="wiz-step" data-step="4" style="display:none">
         <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">📧 Wie erreichen wir dich?</div>
         <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Email ist nötig zum Einloggen.</div>
         <div><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jEmail" placeholder="deine@email.de" autocomplete="email"></div>
         <div style="margin-top:8px"><label class="fl">Telefon <span style="font-size:.6rem;font-weight:400;color:var(--mu)">(optional)</span></label><input class="fi" type="tel" id="jTelefon" placeholder="0151 12345678" autocomplete="tel"></div>
       </div>
 
-      <!-- Schritt 6: Passwort + DSGVO -->
-      <div class="wiz-step" data-step="6" style="display:none">
+      <!-- Schritt 5: Passwort + DSGVO -->
+      <div class="wiz-step" data-step="5" style="display:none">
         <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🔒 Letzter Schritt</div>
         <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Passwort festlegen und Datenschutz bestätigen.</div>
         <div><label class="fl">Passwort wählen <span style="color:#ef4444">*</span></label><input class="fi" type="password" id="jPasswort" placeholder="Mindestens 6 Zeichen" autocomplete="new-password"></div>
@@ -1101,7 +1094,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v283'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v284'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -2020,7 +2013,7 @@ function sendWelcomeEmail(email, name, kursName){
 
 // ── REGISTRIERUNGS-WIZARD (Step-by-Step) ──
 let _wizStep = 1;
-const _WIZ_TOTAL = 6;
+const _WIZ_TOTAL = 5;
 
 function startJoinWizard(){
   // Schritt 0: erst den Lehrgang bestätigen lassen, bevor Daten eingegeben werden
@@ -2134,12 +2127,8 @@ function wizValidateStep(n){
     if(!v){ errEl.textContent='Bitte Vorname eintragen.'; return false; }
     if(!nn){ errEl.textContent='Bitte Nachname eintragen.'; return false; }
   }
-  // Schritt 2 (Lehrjahr) ist optional - Beruf kommt aus den Bestandsdaten
+  // Schritt 2 (Lehrjahr) ist optional - Beruf & Betrieb kommen aus den Bestandsdaten
   if(n===3){
-    const f=(document.getElementById('jFirma').value||'').trim();
-    if(!f){ errEl.textContent='Bitte Betrieb/Firma eintragen.'; return false; }
-  }
-  if(n===4){
     const g=(document.getElementById('jGeburt').value||'').trim();
     if(!g){ errEl.textContent='Bitte Geburtsdatum eintragen.'; return false; }
     const d=new Date(g);
@@ -2147,7 +2136,7 @@ function wizValidateStep(n){
     if(d>new Date()){ errEl.textContent='Das Geburtsdatum kann nicht in der Zukunft liegen.'; return false; }
     if(d.getFullYear()<1900){ errEl.textContent='Bitte ein gültiges Geburtsdatum eintragen.'; return false; }
   }
-  if(n===5){
+  if(n===4){
     const eIn=document.getElementById('jEmail');
     const e=(eIn.value||'').trim();
     const res=_validateEmail(e);
@@ -2160,7 +2149,7 @@ function wizValidateStep(n){
       // Bei Ablehnung: Original behalten und durchlassen (Format ist ja gültig)
     }
   }
-  // Schritt 6 wird beim Submit validiert
+  // Schritt 5 wird beim Submit validiert
   return true;
 }
 
@@ -2273,7 +2262,7 @@ function _fyAnswer(istIch){
 function submitJoinRegistration(){
   let vorname=(document.getElementById('jVorname').value||'').trim();
   let nachname=(document.getElementById('jNachname').value||'').trim();
-  const firma=(document.getElementById('jFirma').value||'').trim();
+  const firma=(document.getElementById('jFirma')?.value||'').trim(); // Feld existiert nicht mehr - Betrieb kommt aus Bestandsdaten
   const berufSel=document.getElementById('jBeruf');
   const fachSel=document.getElementById('jFachrichtung');
   const beruf=fachSel&&fachSel.value?fachSel.value:(berufSel?berufSel.value:'');
@@ -2287,8 +2276,6 @@ function submitJoinRegistration(){
   errEl.textContent='';
 
   if(!vorname||!nachname){errEl.textContent='Bitte Vor- und Nachname eingeben';return;}
-  if(!beruf){errEl.textContent='Bitte Beruf auswählen';return;}
-  if(!firma){errEl.textContent='Bitte Betrieb angeben';return;}
   // Geburtsdatum ist Pflicht – ohne ihn kann die Zuordnung (Match) nicht funktionieren.
   // Finale Schranke unabhängig von der Schritt-Navigation (alter Cache / Enter / Direktaufruf).
   if(!geburtsdatum){errEl.textContent='Bitte Geburtsdatum eintragen';return;}
