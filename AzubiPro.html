@@ -251,13 +251,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="margin-top:8px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="jNachname" placeholder="Müller" autocomplete="family-name"></div>
       </div>
 
-      <!-- Schritt 2: Beruf -->
+      <!-- Schritt 2: Lehrjahr (Beruf kommt aus den hinterlegten Daten des Bildungszentrums) -->
       <div class="wiz-step" data-step="2" style="display:none">
-        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">🛠 Was lernst du?</div>
-        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Wähle deinen Ausbildungsberuf.</div>
-        <div><label class="fl">Beruf <span style="color:#ef4444">*</span></label><select class="fi" id="jBeruf" onchange="fillFachrichtungen('jBeruf','jFachrichtung')" style="font-size:.82rem"><option value="">– Beruf wählen –</option></select></div>
-        <div id="jFachrichtungRow" style="margin-top:8px;display:none"><label class="fl">Fachrichtung</label><select class="fi" id="jFachrichtung" style="font-size:.82rem"><option value="">– erst Beruf wählen –</option></select></div>
-        <div style="margin-top:8px"><label class="fl">Lehrjahr</label><select class="fi" id="jLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+        <div style="font-size:1.1rem;font-weight:800;color:var(--tx);margin-bottom:4px">📅 In welchem Lehrjahr bist du?</div>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:14px">Deinen Beruf kennt dein Bildungszentrum schon – den musst du nicht eingeben.</div>
+        <div><label class="fl">Lehrjahr</label><select class="fi" id="jLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
       </div>
 
       <!-- Schritt 3: Betrieb -->
@@ -1103,7 +1101,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v282'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v283'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -2136,10 +2134,7 @@ function wizValidateStep(n){
     if(!v){ errEl.textContent='Bitte Vorname eintragen.'; return false; }
     if(!nn){ errEl.textContent='Bitte Nachname eintragen.'; return false; }
   }
-  if(n===2){
-    const b=document.getElementById('jBeruf').value||'';
-    if(!b){ errEl.textContent='Bitte Beruf auswählen.'; return false; }
-  }
+  // Schritt 2 (Lehrjahr) ist optional - Beruf kommt aus den Bestandsdaten
   if(n===3){
     const f=(document.getElementById('jFirma').value||'').trim();
     if(!f){ errEl.textContent='Bitte Betrieb/Firma eintragen.'; return false; }
@@ -2229,7 +2224,7 @@ function _azubiFindMatch(vn,nn,geb){
       const x=d.data();
       if(!_fyNameMatch(vn,nn,x.vorname,x.nachname)) return;
       if(x.verknuepftUid || x.selfRegistered===true){ linkedMatch=true; return; }
-      free.push({id:d.id, vorname:x.vorname||'', nachname:x.nachname||'', beruf:(x.beruf||x.berufGruppe||''), firma:(x.firma||'')});
+      free.push({id:d.id, vorname:x.vorname||'', nachname:x.nachname||'', beruf:(x.beruf||x.berufGruppe||''), berufGruppeId:(x.berufGruppeId||''), firma:(x.firma||'')});
     });
     if(free.length===1) return free[0];               // genau ein freier Treffer
     if(free.length===0 && linkedMatch) return {alreadyLinked:true}; // nur schon belegte Treffer
@@ -2240,7 +2235,15 @@ function _azubiShowFoundYou(m){
   return new Promise(res=>{
     _foundYouResolve=res;
     document.getElementById('fyName').textContent=((m.vorname||'')+' '+(m.nachname||'')).trim();
-    document.getElementById('fyBeruf').textContent=m.beruf||'—';
+    (function(){
+      const bEl=document.getElementById('fyBeruf');
+      if(m.beruf){ bEl.textContent=m.beruf; return; }
+      if(!m.berufGruppeId){ bEl.textContent='—'; return; }
+      bEl.textContent='…';
+      db.collection('shared').doc('kursSettings').collection('berufe').doc(m.berufGruppeId).get()
+        .then(dd=>{ bEl.textContent=(dd.exists&&(dd.data().name||''))||'—'; })
+        .catch(()=>{ bEl.textContent='—'; });
+    })();
     document.getElementById('fyFirma').textContent=m.firma||'—';
     var c=document.getElementById('fyConfirmChk'); if(c) c.checked=false;
     var y=document.getElementById('fyYesBtn'); if(y){ y.disabled=true; y.style.opacity='.5'; }

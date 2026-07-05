@@ -1671,10 +1671,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 325';
+const APP_VERSION = 'Build 326';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 326', d:'04.07.2026', items:['\ud83c\udd95 Eigener Container \u201eNeuzug\u00e4nge (selbst registriert)\u201c ganz oben im TN-Baum: Azubis, die sich selbst angelegt haben (nicht aus der importierten Liste, ohne Beruf/Gruppe), landen dort zur Nachpflege \u2013 sobald Beruf/Gruppe zugewiesen ist, wandern sie automatisch in die richtige Berufsgruppe']},
   {v:'Build 325', d:'04.07.2026', items:['\u2709 Zuweisungs-Mails gehen nur noch an registrierte Azubis (App-Konto verkn\u00fcpft) \u2013 importierte TN ohne Konto werden nicht mehr angeschrieben, auch wenn eine E-Mail hinterlegt ist. Z\u00e4hler im \u00dcbertragen-Dialog entsprechend angepasst']},
   {v:'Build 324', d:'02.07.2026', items:['👤 Ausbilder: neues Feld „Anrede" (Herr/Frau) – wird an alle Kurse des Ausbilders mitgeführt (neue automatisch; bestehende beim Speichern des Ausbilders) und in AzubiPro vor dem Namen angezeigt']},
   {v:'Build 312', d:'26.06.2026', items:['🧹 Wartungs-Tool „Vertauschte Namen korrigieren" wieder entfernt (Einmal-Aufräumung erledigt)']},
@@ -2543,16 +2544,18 @@ function renderSbTnTree(){
   const root = document.getElementById('sbTnTree');
   if(!root) return;
 
-  // Group TN by beruf
+  // Group TN by beruf. Selbstregistrierte Neuzugaenge (nicht aus Verenas Liste, ohne Beruf/Gruppe)
+  // landen in einem eigenen Container ganz oben, bis Verena ihnen Beruf/Gruppe zuweist.
   const groups = {};
   _globalTN.forEach(t=>{
-    const key = getBerufKey(t.beruf, t.berufGruppeId);
+    const isNeu = t.selfRegistered===true && !t.beruf && !t.berufGruppeId;
+    const key = isNeu ? '_neuzugang' : getBerufKey(t.beruf, t.berufGruppeId);
     if(!groups[key]) groups[key] = [];
     groups[key].push(t);
   });
 
   root.innerHTML = '';
-  const berufKeys = Object.keys(BERUFE);
+  let berufKeys = Object.keys(BERUFE);
   if(!berufKeys.length && !_globalTN.length){
     root.innerHTML='<div class="sb-loading" style="font-size:.68rem;padding:10px 14px">Noch keine Berufsgruppen angelegt.<br>Erstelle sie unter Einstellungen.</div>';
     return;
@@ -2563,15 +2566,17 @@ function renderSbTnTree(){
   }
 
   berufKeys.sort((a,b)=>(BERUFE[a]?.order!=null?BERUFE[a].order:999)-(BERUFE[b]?.order!=null?BERUFE[b].order:999)||(BERUFE[a]?.name||'').localeCompare(BERUFE[b]?.name||'','de'));
+  if(groups['_neuzugang']&&groups['_neuzugang'].length) berufKeys=['_neuzugang'].concat(berufKeys);
 
   berufKeys.forEach((key,idx)=>{
-    const def = BERUFE[key];
+    const def = key==='_neuzugang' ? {label:'\ud83c\udd95 Neuzugänge (selbst registriert)', name:'Neuzugänge'} : BERUFE[key];
     const tns = groups[key] || [];
 
     const wrap = document.createElement('div');
     wrap.className = 'sb-branche';
-    wrap.style.cssText = 'border-left:3px solid '+berufColor(key)+';border-bottom:2px solid '+berufColor(key)+';border-radius:0 0 0 6px;margin-bottom:10px;padding-bottom:4px;';
-    if(!('ontouchstart' in window)) wrap.draggable = true;
+    const _wrapCol = key==='_neuzugang' ? '#f59e0b' : berufColor(key);
+    wrap.style.cssText = 'border-left:3px solid '+_wrapCol+';border-bottom:2px solid '+_wrapCol+';border-radius:0 0 0 6px;margin-bottom:10px;padding-bottom:4px;';
+    if(!('ontouchstart' in window) && key!=='_neuzugang') wrap.draggable = true;
     wrap.dataset.berufKey = key;
     wrap.dataset.section = 'tn';
     const hdr = document.createElement('div');
