@@ -449,6 +449,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .seat-alert-wdh{outline:3px solid #d97706;outline-offset:-2px;}
 .salert-x{position:absolute;top:3px;left:3px;z-index:5;cursor:pointer;font-size:.6rem;width:16px;height:16px;display:flex;align-items:center;justify-content:center;background:#fff;border:1.5px solid currentColor;border-radius:50%;font-weight:900;line-height:1;}
 .seat-alert-fehlt .salert-x{color:#dc2626;}
+.pool-card-fehlt{outline:3px solid #dc2626;outline-offset:-2px;}
 .seat-alert-wdh .salert-x{color:#d97706;}
 /* attendance mini badges - dunkle Texte für Lesbarkeit auf Light-Theme */
 .ab{font-size:.54rem;padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-weight:700;white-space:nowrap;}
@@ -1964,9 +1965,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v768';
+const APP_VERSION = 'v769';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v769', d:'04.07.2026', items:['\u26a0 TN-Pool: Unplatzierte Teilnehmer bekommen nach dem 1. Kurstag einen roten Rahmen (Nicht angetreten?) \u2013 Hover erkl\u00e4rt was zu tun ist. Verschwindet beim Platzieren oder Verschieben in den Container']},
   {v:'v768', d:'04.07.2026', items:['\ud83c\udfa8 Aktionen-Men\u00fc: Alle wei\u00dfen Buttons jetzt mit Schatten (hervorstehender Look wie \u201eTN+\u201c/\u201eQR-Anwesenheit\u201c)']},
   {v:'v767', d:'04.07.2026', items:['\ud83c\udfa8 Aktionen-Men\u00fc: Rahmen der wei\u00dfen Buttons jetzt in modernem Grau']},
   {v:'v766', d:'04.07.2026', items:['\ud83c\udfa8 Aktionen-Men\u00fc: Buttons jetzt wei\u00df mit farbigem Rahmen \u2013 die drei Warn-Buttons unten (Beginnt sp\u00e4ter / Ausfall / L\u00f6schen) bleiben farbig']},
@@ -11886,6 +11888,11 @@ function loadPool(){
       const placedNames = new Set(Object.values(seats).filter(d=>d&&d.name).map(d=>normName(d.name)));
       const placedTnIds = new Set(Object.values(seats).filter(d=>d&&d.poolTnId).map(d=>d.poolTnId));
       const allTN = [];
+      // Kurs laeuft schon? Dann werden unplatzierte Pool-TN rot markiert (Tag-1-No-Show)
+      const _instP=curInst();
+      const _todayP=new Date().toISOString().slice(0,10);
+      const _instStartP=(_instP&&_instP.sY&&_instP.sM&&_instP.sD)?(_instP.sY+'-'+_instP.sM+'-'+_instP.sD):null;
+      const _kursLaeuftP=!!(_instStartP&&_todayP>_instStartP);
       body.innerHTML='';
       const allBtn = document.createElement('button');
       allBtn.className='pool-all-btn';
@@ -11914,6 +11921,10 @@ function loadPool(){
         const isUnbestaetigt = _freigabePflicht && !!d.bestaetigungAngefordert && !d.bestaetigtAm;
         if(isPending){ card.style.opacity='.5'; card.style.borderColor='rgba(239,68,68,.4)'; card.draggable=false; }
         else if(isUnbestaetigt){ card.classList.add('pool-card-unbestaetigt'); }
+        if(_kursLaeuftP && !isPlaced && !isPending){
+          card.classList.add('pool-card-fehlt');
+          card.title='\u26a0 '+fullName+' \u2013 Nicht angetreten? \u2192 In den Container \u201eNicht angetreten\u201c ziehen (Verwaltung wird informiert). Doch da? Auf einen Sitzplatz ziehen.';
+        }
         card.innerHTML='<div class="pool-avatar"'+(isPending?' style="background:rgba(239,68,68,.2);color:#ef4444"':'')+'>'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(fullName)+'</div>'
           +'<div class="pool-sub">'+(isPending?'<span style="color:#ef4444;font-weight:700">🔴 Wird entfernt</span>':isUnbestaetigt?'<span style="color:#ef4444;font-weight:700">⚠️ noch nicht bestätigt</span>':isPlaced?'✓ Platziert':urlConf?'<span style="color:#f59e0b;font-weight:700">🏖 '+urlConf.days+'d Urlaub</span>':(d.wunschSitzplatz?'<span style="color:#10b981;font-weight:600">🪑 Platz '+esc(d.wunschSitzplatz)+'</span> · ':'')+esc(d.firma||d.beruf||''))+'</div></div>';
