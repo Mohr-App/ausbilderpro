@@ -1965,9 +1965,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v769';
+const APP_VERSION = 'v770';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v770', d:'04.07.2026', items:['\u2705 Registrierungs-Badge korrigiert: Azubis, die sich per App mit ihren Bestandsdaten verkn\u00fcpft haben, zeigen jetzt \u201ePer App registriert\u201c statt f\u00e4lschlich \u201eManuell angelegt\u201c','\ud83d\udd27 Beruf-Anzeige: Ist kein konkreter Beruf hinterlegt, wird der Berufsgruppen-Name angezeigt (Import hatte Gruppennamen bewusst in die Gruppe statt ins Beruf-Feld gelegt)']},
   {v:'v769', d:'04.07.2026', items:['\u26a0 TN-Pool: Unplatzierte Teilnehmer bekommen nach dem 1. Kurstag einen roten Rahmen (Nicht angetreten?) \u2013 Hover erkl\u00e4rt was zu tun ist. Verschwindet beim Platzieren oder Verschieben in den Container']},
   {v:'v768', d:'04.07.2026', items:['\ud83c\udfa8 Aktionen-Men\u00fc: Alle wei\u00dfen Buttons jetzt mit Schatten (hervorstehender Look wie \u201eTN+\u201c/\u201eQR-Anwesenheit\u201c)']},
   {v:'v767', d:'04.07.2026', items:['\ud83c\udfa8 Aktionen-Men\u00fc: Rahmen der wei\u00dfen Buttons jetzt in modernem Grau']},
@@ -2169,6 +2170,21 @@ function emptyTrash(){
   toast('🗑 Papierkorb geleert');
 }
 let curSeat=null, curAttMain=null, tmpAtt=[], tmpAttQrDel=[];
+// Berufsgruppen-Namen (shared/kursSettings/berufe) - nur fuer Anzeige-Fallback wenn beruf leer
+let _berufNames=null;
+function _loadBerufNames(){
+  if(_berufNames!==null||!_db) return;
+  _berufNames={};
+  _db.collection('shared').doc('kursSettings').collection('berufe').get().then(snap=>{
+    snap.forEach(d=>{ _berufNames[d.id]=(d.data().name||d.id); });
+  }).catch(()=>{ _berufNames=null; });
+}
+function berufDisplay(t){
+  if(!t) return '';
+  if(t.beruf) return t.beruf;
+  if(t.berufGruppeId&&_berufNames&&_berufNames[t.berufGruppeId]) return _berufNames[t.berufGruppeId];
+  return '';
+}
 let dpKatId=null;
 
 // Storage
@@ -5085,7 +5101,7 @@ function openModal(id){
           }
           let h='<div id="seatFreigabeBox"></div><div style="font-size:.58rem;font-weight:700;color:var(--mu);letter-spacing:.06em;margin-bottom:6px">REGISTRIERUNGSDATEN</div>';
           // Typ-Badge: per App registriert vs manuell angelegt
-          if(t.selfRegistered===true){
+          if(t.selfRegistered===true||t.verknuepftUid){
             h+='<div style="margin-bottom:8px;padding:7px 10px;background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.3);border-radius:8px;font-size:.68rem;font-weight:700;color:#059669">✅ Per App registriert (aktives Azubi-Konto)</div>';
           } else {
             h+='<div style="margin-bottom:8px;padding:7px 10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);border-radius:8px;font-size:.68rem;font-weight:700;color:#b45309">✏️ Manuell angelegt (kein aktives Azubi-Konto) – bei Doppel-Eintrag diesen löschen</div>';
@@ -8105,7 +8121,7 @@ function openTnDetail(tnId){
     let html='<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">'
       +'<div style="width:48px;height:48px;border-radius:50%;background:rgba(59,130,246,.15);display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:800;color:var(--acc);flex-shrink:0;border:2px solid rgba(59,130,246,.3)">'+esc(init)+'</div>'
       +'<div><div style="font-size:1rem;font-weight:800;color:var(--tx)">'+esc(name)+'</div>'
-      +'<div style="font-size:.7rem;color:var(--mu)">'+(t.beruf||'')+(t.ausbjahr?' · '+t.ausbjahr+'. Lehrjahr':'')+'</div></div></div>';
+      +'<div style="font-size:.7rem;color:var(--mu)">'+(berufDisplay(t)||'')+(t.ausbjahr?' · '+t.ausbjahr+'. Lehrjahr':'')+'</div></div></div>';
     html+='<div id="tnFreigabeBox"></div>';
     function field(label,val,icon){
       if(!val) return '';
@@ -8115,14 +8131,14 @@ function openTnDetail(tnId){
         +'<div style="font-size:.82rem;color:var(--tx);font-weight:600;word-break:break-word">'+esc(val)+'</div></div></div>';
     }
     html+=field('Betrieb',t.firma,'🏢');
-    html+=field('Beruf',t.beruf,'🔧');
+    html+=field('Beruf',berufDisplay(t),'🔧');
     html+=field('Lehrjahr',t.ausbjahr?t.ausbjahr+'. Jahr':'','📅');
     html+=field('Geburtsdatum',t.geburtsdatum?fmtDE(t.geburtsdatum):'','🎂');
     html+=field('E-Mail',t.kontaktEmail||t.email,'📧');
     html+=field('Telefon',t.kontaktTelefon||t.tel,'📱');
     html+=field('Sitzplatz-Wunsch',t.wunschSitzplatz?'Platz '+t.wunschSitzplatz:'','🪑');
     // Registrierungsinfo
-    if(t.selfRegistered){
+    if(t.selfRegistered||t.verknuepftUid){
       html+='<div style="margin:8px 0;padding:7px 10px;background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.3);border-radius:8px;font-size:.68rem;font-weight:700;color:#059669">✅ Per App registriert (aktives Azubi-Konto)</div>';
       const regDate=t.registeredAt?new Date(t.registeredAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
       html+=field('Registriert am',regDate,'✅');
@@ -12865,6 +12881,8 @@ function _loginNotifyCheck(user,appName){
     setTimeout(()=>{try{_loginNotifyCheck(user,'AusbilderPro');}catch(e){}}, 1500);
     // Globaler Schalter 'Ausbilder-Freigabe verpflichtend' live mitlesen (Default aus)
     setTimeout(()=>{try{_watchFreigabePflicht();}catch(e){}}, 800);
+    // Berufsgruppen-Namen fuer Beruf-Anzeige-Fallback laden
+    setTimeout(()=>{try{_loadBerufNames();}catch(e){}}, 1200);
     // Sig+Stempel: auto-sync local nach cloud falls noch nicht geschehen
     setTimeout(()=>{try{_ensureSigStempelCloudSync();}catch(e){}}, 2000);
     // Noten-Defaults des Ausbilders aus der Cloud laden → neue Kurse übernehmen sie geräteübergreifend
