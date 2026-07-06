@@ -1529,8 +1529,9 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
               <div class="fg"><label class="fl">Berufsgruppe *</label>
                 <select class="fi" id="ntnBerufGruppe" onchange="updateBerufSelect()"><option value="">– Berufsgruppe –</option></select>
               </div>
-              <div class="fg"><label class="fl">Fachrichtung / Beruf</label>
-                <select class="fi" id="ntnBeruf"><option value="">– Erst Berufsgruppe wählen –</option></select>
+              <div class="fg"><label class="fl">Beruf / Fachrichtung (laut Liste)</label>
+                <input class="fi" id="ntnBeruf" list="ntnBerufVorschlaege" placeholder="z. B. Elektroniker/in, FR Energie- und Gebäudetechnik">
+                <datalist id="ntnBerufVorschlaege"></datalist>
               </div>
             </div>
             <div class="form-row">
@@ -1671,10 +1672,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 327';
+const APP_VERSION = 'Build 328';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 328', d:'06.07.2026', items:['\ud83d\udcd6 Import liest jetzt auch die Fachrichtungs-/Schwerpunkt-Spalte der KH-Liste \u2013 im TN steht der volle Original-Beruf (z. B. \u201eElektroniker/in, FR Energie- und Geb\u00e4udetechnik\u201c)','\u270f Teilnehmer-Formular: \u201eBeruf / Fachrichtung\u201c ist jetzt ein Textfeld mit dem exakten Listenwert (vordefinierte Fachrichtungen der Gruppe erscheinen als Tipp-Vorschl\u00e4ge)']},
   {v:'Build 327', d:'06.07.2026', items:['\ud83d\udcdc Die Liste hat Hoheit beim Beruf: Der Import beh\u00e4lt jetzt immer den Original-Berufstext (inkl. Fachrichtung) im TN \u2013 das fr\u00fchere Leeren bei Gruppen-Exaktmatch entf\u00e4llt. Berufsgruppen dienen nur noch der Sortierung (Name/Fachrichtung/Stichwort-Match)','\ud83e\ude79 Bestand heilt sich: Beim n\u00e4chsten Listen-Import wird das Beruf-Feld vorhandener TN aus der Liste \u00fcbernommen \u2013 auch manuell eingegebene Berufe werden ersetzt, sobald sie von der Liste abweichen (Bericht: \u201eLehrjahr/Beruf erg\u00e4nzt\u201c)']},
   {v:'Build 326', d:'04.07.2026', items:['\ud83c\udd95 Eigener Container \u201eNeuzug\u00e4nge (selbst registriert)\u201c ganz oben im TN-Baum: Azubis, die sich selbst angelegt haben (nicht aus der importierten Liste, ohne Beruf/Gruppe), landen dort zur Nachpflege \u2013 sobald Beruf/Gruppe zugewiesen ist, wandern sie automatisch in die richtige Berufsgruppe']},
   {v:'Build 325', d:'04.07.2026', items:['\u2709 Zuweisungs-Mails gehen nur noch an registrierte Azubis (App-Konto verkn\u00fcpft) \u2013 importierte TN ohne Konto werden nicht mehr angeschrieben, auch wenn eine E-Mail hinterlegt ist. Z\u00e4hler im \u00dcbertragen-Dialog entsprechend angepasst']},
@@ -4394,7 +4396,8 @@ const IMP_FIELDS=[
   {key:'email',label:'E-Mail'},
   {key:'tel',label:'Telefon'},
   {key:'firma',label:'Betrieb / Firma'},
-  {key:'beruf',label:'Beruf / Fachrichtung'},
+  {key:'beruf',label:'Beruf (Bezeichnung)'},
+  {key:'fachrichtung',label:'Fachrichtung / Schwerpunkt'},
   {key:'ausbjahr',label:'Lehrjahr'},
   {key:'berufGruppeId',label:'Berufsgruppe'},
   {key:'geburtsdatum',label:'Geburtsdatum'},
@@ -4465,7 +4468,8 @@ function impAutoMap(){
     email:['email','e-mail','mail','e_mail','emailadresse'],
     tel:['tel','telefon','phone','mobile','mobil','handy','telefonnummer'],
     firma:['firma','betriebname','betrieb','company','unternehmen','arbeitgeber','ausbildungsbetrieb'],
-    beruf:['beruf','fachrichtung','profession','ausbildungsberuf','berufsbez'],
+    beruf:['beruf','profession','ausbildungsberuf','berufsbez'],
+    fachrichtung:['fachrichtung','schwerpunkt','vertiefung','fachbereich'],
     ausbjahr:['ausbjahr','lehrjahr','jahr','year','ausbildungsjahr','lj'],
     anfang:['anfang','ausbildungsbeginn','vertragsbeginn','lehrbeginn'],
     endeVorgesehen:['vorgesehenesende','lehrzeitende','lehrzeitendedatum'],
@@ -4709,6 +4713,8 @@ function impAnalysiere(){
     const aj=ajManuell||_impLehrjahr(_anfang,_endeV);
     const _firma=_impMapping.firma?(row[_impMapping.firma]||'').toString().trim():'';
     const _beruf=_impMapping.beruf?(row[_impMapping.beruf]||'').toString().trim():'';
+    const _fachr=_impMapping.fachrichtung?(row[_impMapping.fachrichtung]||'').toString().trim():'';
+    const _berufVoll=_beruf+(_fachr?', '+_fachr:''); // exakt wie in der KH-Liste: Bezeichnung + Fachrichtung/Schwerpunkt
     const _adresse=_impMapping.adresse?(row[_impMapping.adresse]||'').toString().trim():'';
     const _plz=_impMapping.plz?(row[_impMapping.plz]||'').toString().trim():'';
     const _ort=_impMapping.ort?(row[_impMapping.ort]||'').toString().trim():'';
@@ -4759,7 +4765,7 @@ function impAnalysiere(){
       if(_firma && !_impIstNummer(_firma) && _impIstNummer(hitBest.firma)) bfUpd.firma=_firma;
       // Beruf: Die KH-Liste hat absolute Hoheit - Listenwert (inkl. Fachrichtung) ersetzt
       // auch manuell eingegebene Berufe, sobald er abweicht. Nur leerer Listenwert laesst den Bestand in Ruhe.
-      if(_beruf && _beruf!==hitBest.beruf) bfUpd.beruf=_beruf;
+      if(_berufVoll && _berufVoll!==hitBest.beruf) bfUpd.beruf=_berufVoll;
       if(Object.keys(bfUpd).length) backfill[i]=Object.assign({id:hitBest.id, name:vn+' '+nn}, bfUpd);
       // (3b) Loser Selbst-Eintrag -> offizielle Liste gewinnt (Name/Firma/Beruf/Adresse), Lehrjahr bleibt vom TN,
       //      Eintrag wird befoerdert (selfRegistered:false). Konto/Kurs/Anwesenheit/E-Mail bleiben unberuehrt.
@@ -4980,7 +4986,9 @@ async function doImport(){
     const nn=(row[_impMapping.nachname]||'').toString().trim();
     if(!vn&&!nn){ fail++; continue; }
 
-    const bgMatch=matchBerufGruppe(row[_impMapping.berufGruppeId]||row[_impMapping.beruf]||'');
+    const _impFachr=_impMapping.fachrichtung?((row[_impMapping.fachrichtung]||'')+'').trim():'';
+    const _impBerufRoh=(((row[_impMapping.beruf]||row[_impMapping.berufGruppeId]||'')+'').trim())+(_impFachr?', '+_impFachr:'');
+    const bgMatch=matchBerufGruppe(_impBerufRoh);
     const _anfang=_impMapping.anfang?_impGeb(row[_impMapping.anfang]):'';
     const _endeV=_impMapping.endeVorgesehen?_impGeb(row[_impMapping.endeVorgesehen]):'';
     const _ajManuell=(row[_impMapping.ausbjahr]||'').toString().trim();
@@ -8578,27 +8586,18 @@ function populateBerufGruppeSelect(selectedId){
 }
 
 function updateBerufSelect(selectedBeruf){
+  // Beruf ist jetzt Freitext (Original aus der KH-Liste). Die vordefinierten Fachrichtungen
+  // der gewaehlten Gruppe dienen nur noch als Tipp-Vorschlaege (datalist).
   const gruppeId=document.getElementById('ntnBerufGruppe')?.value;
-  const sel=document.getElementById('ntnBeruf');
-  if(!sel) return;
-  sel.innerHTML='';
-  if(!gruppeId){
-    sel.innerHTML='<option value="">– Erst Berufsgruppe –</option>';
-    return;
+  const inp=document.getElementById('ntnBeruf');
+  const dl=document.getElementById('ntnBerufVorschlaege');
+  if(!inp) return;
+  if(typeof selectedBeruf==='string') inp.value=selectedBeruf; // beim Oeffnen: gespeicherten Wert setzen
+  if(dl){
+    dl.innerHTML='';
+    const berufe=(BERUFE[gruppeId]?.berufe)||[];
+    berufe.forEach(name=>{ const o=document.createElement('option'); o.value=name; dl.appendChild(o); });
   }
-  const b=BERUFE[gruppeId];
-  const berufe=b?.berufe||[];
-  if(!berufe.length){
-    sel.innerHTML='<option value="">Keine Fachrichtungen hinterlegt</option>';
-    return;
-  }
-  sel.innerHTML='<option value="">– Fachrichtung –</option>';
-  berufe.forEach(name=>{
-    const o=document.createElement('option');
-    o.value=name; o.textContent=name;
-    if(name===selectedBeruf) o.selected=true;
-    sel.appendChild(o);
-  });
 }
 function closeNewTNModal(){document.getElementById('newTNModal').classList.remove('open');}
 
