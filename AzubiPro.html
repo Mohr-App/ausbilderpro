@@ -1096,7 +1096,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v289'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v290'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -1278,6 +1278,13 @@ function findTN(email){
         if(snap.empty) return false;
         _tnId=snap.docs[0].id;
         _tnData=snap.docs[0].data();
+        // Self-Heal: per E-Mail gefunden, aber noch keine stabile Konto-Verknuepfung ->
+        // verknuepftUid nachtragen (Badge in AP wird gruen, Login uebersteht E-Mail-Aenderungen)
+        if(uid && !_tnData.verknuepftUid){
+          db.collection('globalTN').doc(_tnId).update({verknuepftUid: uid})
+            .then(()=>{ _tnData.verknuepftUid=uid; })
+            .catch(e=>console.warn('verknuepftUid-Self-Heal:', e&&e.code));
+        }
         try{ _syncEmailStatus(); }catch(e){}
         return true;
       }).catch(()=>false);
