@@ -1671,10 +1671,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 326';
+const APP_VERSION = 'Build 327';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 327', d:'06.07.2026', items:['\ud83d\udcdc Die Liste hat Hoheit beim Beruf: Der Import beh\u00e4lt jetzt immer den Original-Berufstext (inkl. Fachrichtung) im TN \u2013 das fr\u00fchere Leeren bei Gruppen-Exaktmatch entf\u00e4llt. Berufsgruppen dienen nur noch der Sortierung (Name/Fachrichtung/Stichwort-Match)','\ud83e\ude79 Bestand heilt sich: Beim n\u00e4chsten Listen-Import wird das Beruf-Feld vorhandener TN aus der Liste \u00fcbernommen \u2013 auch manuell eingegebene Berufe werden ersetzt, sobald sie von der Liste abweichen (Bericht: \u201eLehrjahr/Beruf erg\u00e4nzt\u201c)']},
   {v:'Build 326', d:'04.07.2026', items:['\ud83c\udd95 Eigener Container \u201eNeuzug\u00e4nge (selbst registriert)\u201c ganz oben im TN-Baum: Azubis, die sich selbst angelegt haben (nicht aus der importierten Liste, ohne Beruf/Gruppe), landen dort zur Nachpflege \u2013 sobald Beruf/Gruppe zugewiesen ist, wandern sie automatisch in die richtige Berufsgruppe']},
   {v:'Build 325', d:'04.07.2026', items:['\u2709 Zuweisungs-Mails gehen nur noch an registrierte Azubis (App-Konto verkn\u00fcpft) \u2013 importierte TN ohne Konto werden nicht mehr angeschrieben, auch wenn eine E-Mail hinterlegt ist. Z\u00e4hler im \u00dcbertragen-Dialog entsprechend angepasst']},
   {v:'Build 324', d:'02.07.2026', items:['👤 Ausbilder: neues Feld „Anrede" (Herr/Frau) – wird an alle Kurse des Ausbilders mitgeführt (neue automatisch; bestehende beim Speichern des Ausbilders) und in AzubiPro vor dem Namen angezeigt']},
@@ -4756,6 +4757,10 @@ function impAnalysiere(){
       if(_betTel && _betTel!==hitBest.betriebTelefon) bfUpd.betriebTelefon=_betTel;
       // Firma = reine Betriebsnummer (Altbestand) -> echten Namen aus Liste setzen
       if(_firma && !_impIstNummer(_firma) && _impIstNummer(hitBest.firma)) bfUpd.firma=_firma;
+      // Beruf: Die KH-Liste hat absolute Hoheit - Listenwert (inkl. Fachrichtung) ersetzt
+      // auch manuell eingegebene Berufe, sobald er abweicht. Nur leerer Listenwert laesst den Bestand in Ruhe.
+      const _rawBeruf=((row[_impMapping.berufGruppeId]||row[_impMapping.beruf]||'')+'').trim();
+      if(_rawBeruf && _rawBeruf!==hitBest.beruf) bfUpd.beruf=_rawBeruf;
       if(Object.keys(bfUpd).length) backfill[i]=Object.assign({id:hitBest.id, name:vn+' '+nn}, bfUpd);
       // (3b) Loser Selbst-Eintrag -> offizielle Liste gewinnt (Name/Firma/Beruf/Adresse), Lehrjahr bleibt vom TN,
       //      Eintrag wird befoerdert (selfRegistered:false). Konto/Kurs/Anwesenheit/E-Mail bleiben unberuehrt.
@@ -4892,13 +4897,11 @@ async function doImport(){
 
   // Berufsgruppe Matching
   function matchBerufGruppe(val){
+    // Die heilige Liste hat Hoheit: der Original-Berufstext (inkl. Fachrichtung) bleibt IMMER im beruf-Feld.
+    // Die Berufsgruppe dient nur der Sortierung und wird per getBerufKey (Name/Fachrichtung/Regex) bestimmt.
     if(!val) return {berufGruppeId:'',beruf:''};
-    const vl=val.toString().toLowerCase();
-    for(const[k,b] of Object.entries(BERUFE)){
-      if(b.name.toLowerCase()===vl||k===vl) return {berufGruppeId:k,beruf:''};
-      if(b.berufe&&b.berufe.some(fb=>fb.toLowerCase()===vl)) return {berufGruppeId:k,beruf:val};
-    }
-    return {berufGruppeId:'',beruf:val};
+    const gk=(typeof getBerufKey==='function')?getBerufKey(val.toString(),''):'andere';
+    return {berufGruppeId:(gk&&gk!=='andere')?gk:'', beruf:val.toString().trim()};
   }
 
   let ok=0, fail=0, skipSchon=0, skipUnsicher=0, skipTippfehler=0, skipLeer=0, skipListdub=0, skipGhost=0, bfDone=0, abgleichDone=0, promoDone=0, gebFixDone=0;
@@ -4945,6 +4948,7 @@ async function doImport(){
         if(bf.endeVorgesehen) upd.endeVorgesehen=bf.endeVorgesehen;
         if(bf.betriebTelefon!==undefined) upd.betriebTelefon=bf.betriebTelefon;
         if(bf.firma!==undefined) upd.firma=bf.firma;
+        if(bf.beruf!==undefined) upd.beruf=bf.beruf;
         if(Object.keys(upd).length){
           try{ await db.collection('globalTN').doc(bf.id).update(upd); bfDone++; }
           catch(e){ console.warn('Backfill '+bf.id+':',e); }
@@ -5032,7 +5036,7 @@ async function doImport(){
 
   let bericht='✅ <b>'+ok+' neu angelegt</b>';
   if(skipSchon) bericht+=' · '+skipSchon+' schon vorhanden';
-  if(bfDone) bericht+=' · <span style="color:#16a34a">'+bfDone+' Lehrjahr ergänzt</span>';
+  if(bfDone) bericht+=' · <span style="color:#16a34a">'+bfDone+' Lehrjahr/Beruf ergänzt</span>';
   if(promoDone) bericht+=' · <span style="color:#16a34a">'+promoDone+' lose Einträge mit Liste abgeglichen</span>';
   if(abgleichDone) bericht+=' · <span style="color:#0d9488">'+abgleichDone+' an VP angeglichen</span>';
   if(skipListdub) bericht+=' · <span style="color:#7c3aed">'+skipListdub+' Doppel in der Liste</span>';
