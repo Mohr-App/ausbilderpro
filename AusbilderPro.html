@@ -1491,8 +1491,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="fg" style="margin-top:6px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="mtNachname" placeholder="Mustermann" oninput="mtSearchSuggestions()" autocomplete="off"></div>
 <div id="mtSuggBox" style="display:none;margin-top:6px;border:1.5px solid rgba(37,99,235,.3);border-radius:8px;background:#fff;max-height:240px;overflow-y:auto"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Betrieb</label><input class="fi" id="mtBetrieb" placeholder="Firma GmbH"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">Berufsgruppe <span style="color:#ef4444">*</span></label><select class="fi" id="mtBerufGruppe" onchange="mtUpdateFachrichtungen()" style="cursor:pointer"><option value="">– Berufsgruppe wählen –</option></select></div>
-<div class="fg" style="margin-top:6px;display:none" id="mtFachWrap"><label class="fl">Fachrichtung</label><select class="fi" id="mtFachrichtung" style="cursor:pointer"><option value="">– Fachrichtung wählen –</option></select></div>
+<div class="fg" style="margin-top:6px"><label class="fl">Beruf / Fachrichtung (laut Liste)</label><input class="fi" id="mtBeruf" placeholder="z. B. Elektroniker/in, FR Energie- und Gebäudetechnik"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Lehrjahr <span style="color:#ef4444">*</span></label><select class="fi" id="mtLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
 <div style="display:flex;gap:8px;margin-top:6px">
 <div class="fg" style="flex:1"><label class="fl">E-Mail</label><input class="fi" id="mtEmail" type="email" placeholder="max@firma.de"></div>
@@ -1956,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v773';
+const APP_VERSION = 'v774';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v774', d:'06.07.2026', items:['\u270f \u201e\ud83d\udc64+ TN\u201c: Berufsgruppen-/Fachrichtungs-Auswahl entf\u00e4llt \u2013 nur noch ein Textfeld \u201eBeruf / Fachrichtung (laut Liste)\u201c. Die VP-Sortierung l\u00e4uft jetzt direkt \u00fcber die Berufsbezeichnung aus der KH-Liste']},
   {v:'v773', d:'06.07.2026', items:['\ud83d\udd04 Neuer Men\u00fcpunkt \u201eTN-Daten auffrischen\u201c (Aktionen): zieht Beruf/Fachrichtung aller platzierten TN aus den Stammdaten der KH-Liste auf die Sitze','\u270f Beruf im TN-Fenster ist jetzt ein Textfeld mit dem exakten Listenwert (statt Auswahl-Listen) und gleicht sich beim \u00d6ffnen automatisch an die Stammdaten an']},
   {v:'v771', d:'05.07.2026', items:['\ud83e\udd12 App-Krankmeldungen werden automatisch als \u201eKrank\u201c in die Anwesenheit \u00fcbernommen \u2013 Krank geht vor: ein vorheriges \u201eAnwesend\u201c (auch per QR) desselben Tages wird ersetzt. Jede Meldung wird nur einmal angewendet, manuelle \u00c4nderungen des Ausbilders danach bleiben bestehen']},
   {v:'v770', d:'04.07.2026', items:['\u2705 Registrierungs-Badge korrigiert: Azubis, die sich per App mit ihren Bestandsdaten verkn\u00fcpft haben, zeigen jetzt \u201ePer App registriert\u201c statt f\u00e4lschlich \u201eManuell angelegt\u201c','\ud83d\udd27 Beruf-Anzeige: Ist kein konkreter Beruf hinterlegt, wird der Berufsgruppen-Name angezeigt (Import hatte Gruppennamen bewusst in die Gruppe statt ins Beruf-Feld gelegt)']},
@@ -8856,9 +8856,7 @@ function openManualTNModal(){ if(lockGuard())return;
   document.getElementById('mtVorname').value='';
   document.getElementById('mtNachname').value='';
   document.getElementById('mtBetrieb').value='';
-  document.getElementById('mtBerufGruppe').value='';
-  document.getElementById('mtFachrichtung').value='';
-  document.getElementById('mtFachWrap').style.display='none';
+  { const _mb=document.getElementById('mtBeruf'); if(_mb) _mb.value=''; }
   document.getElementById('mtLehrjahr').value='';
   document.getElementById('mtEmail').value='';
   document.getElementById('mtTelefon').value='';
@@ -8955,26 +8953,8 @@ function mtPickExisting(tnId){
   document.getElementById('mtBetrieb').value = t.firma;
   document.getElementById('mtEmail').value = t.kontaktEmail;
   document.getElementById('mtTelefon').value = t.kontaktTelefon;
-  // BerufGruppe via data-id
-  if(t.berufGruppeId){
-    const sel = document.getElementById('mtBerufGruppe');
-    if(sel){
-      Array.from(sel.options).forEach(o=>{
-        if(o.dataset.id === t.berufGruppeId) sel.value = o.value;
-      });
-      try{ mtUpdateFachrichtungen(); }catch(e){}
-      // Fachrichtung aus "Hauptberuf – Fachrichtung" extrahieren
-      if(t.beruf && t.beruf.includes('–')){
-        const fach = t.beruf.split('–').pop().trim();
-        const fSel = document.getElementById('mtFachrichtung');
-        if(fSel){
-          Array.from(fSel.options).forEach(o=>{
-            if(o.value===fach) fSel.value = fach;
-          });
-        }
-      }
-    }
-  }
+  // Beruf-Text 1:1 aus dem Stammdatensatz (Liste hat Hoheit)
+  { const _mb=document.getElementById('mtBeruf'); if(_mb) _mb.value=t.beruf||''; }
   if(t.ausbjahr) document.getElementById('mtLehrjahr').value = t.ausbjahr;
   // Suggestions ausblenden
   const c=document.getElementById('mtSuggBox');
@@ -8990,15 +8970,9 @@ function saveManualTN(){
   let nachname=(document.getElementById('mtNachname').value||'').trim();
   if(!vorname||!nachname){toast('Bitte Vor- und Nachname eingeben','bad');return;}
   const firma=(document.getElementById('mtBetrieb').value||'').trim();
-  // Neue Dropdown-Logik: Berufsgruppe + optional Fachrichtung
-  const berufGruppeSel=document.getElementById('mtBerufGruppe');
-  const berufGruppeOpt=berufGruppeSel.selectedOptions[0];
-  const berufGruppeId=berufGruppeOpt?.dataset?.id||'';
-  const berufGruppeName=berufGruppeSel.value||'';
-  const fachrichtung=(document.getElementById('mtFachrichtung').value||'').trim();
-  if(!berufGruppeName){toast('Bitte Berufsgruppe wählen','bad');return;}
-  // Vollständiger Beruf-String: "Elektroniker – Energie- und Gebäudetechnik"
-  const beruf=fachrichtung?(berufGruppeName+' – '+fachrichtung):berufGruppeName;
+  // Beruf als Freitext (Original-Schreibweise der KH-Liste); Gruppen-Zuordnung braucht es nicht mehr
+  const beruf=(document.getElementById('mtBeruf')?.value||'').trim();
+  const berufGruppeId='';
   const ausbjahr=document.getElementById('mtLehrjahr').value||'';
   if(!ausbjahr){toast('Bitte Lehrjahr wählen','bad');return;}
   const kontaktEmail=(document.getElementById('mtEmail').value||'').trim();
@@ -9199,6 +9173,7 @@ function mtPopulateBerufe(){
 }
 
 function mtUpdateFachrichtungen(){
+  if(!document.getElementById('mtBerufGruppe')) return; // Beruf ist jetzt Freitext (mtBeruf)
   const sel=document.getElementById('mtBerufGruppe');
   const opt=sel.selectedOptions[0];
   const wrap=document.getElementById('mtFachWrap');

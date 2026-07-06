@@ -707,7 +707,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div class="sb-sec-hdr sb-sec-tn" title="Section auf-/zuklappen" onclick="toggleSbSection('sbTnTree','sbTnArr')">
         <span style="display:flex;align-items:center;gap:8px"><span class="card-icon green" style="width:22px;height:22px"><svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>TEILNEHMER</span>
         <span style="display:flex;gap:4px;align-items:center;margin-left:auto">
-          <button class="sb-sort-btn" onclick="event.stopPropagation();sortBerufAlpha('tn')" title="A-Z sortieren">A↓</button>
+          <button class="sb-sort-btn" onclick="event.stopPropagation();openTnBaumFilter()" title="Berufe ein-/ausblenden">👁</button>
           <span id="sbTnArr" class="sb-arr closed">▼</span>
         </span>
       </div>
@@ -1672,10 +1672,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 328';
+const APP_VERSION = 'Build 329';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 329', d:'06.07.2026', items:['\ud83c\udf33 TN-Baum jetzt 1:1 zur KH-Liste: Container = Berufsbezeichnungen aus den Daten (Fachrichtungen zusammengefasst), alphabetisch, neue Gewerke erscheinen automatisch \u2013 keine Pflege der Berufsgruppen mehr n\u00f6tig','\ud83d\udc41 Auge-Button am TEILNEHMER-Block: Berufe w\u00e4hlbar ein-/ausblenden (gilt f\u00fcr alle VP-Nutzer). Container \u201eOhne Beruf\u201c zeigt TN ohne Berufsangabe, \u201eNeuzug\u00e4nge\u201c bleibt oben']},
   {v:'Build 328', d:'06.07.2026', items:['\ud83d\udcd6 Import liest jetzt auch die Fachrichtungs-/Schwerpunkt-Spalte der KH-Liste \u2013 im TN steht der volle Original-Beruf (z. B. \u201eElektroniker/in, FR Energie- und Geb\u00e4udetechnik\u201c)','\u270f Teilnehmer-Formular: \u201eBeruf / Fachrichtung\u201c ist jetzt ein Textfeld mit dem exakten Listenwert (vordefinierte Fachrichtungen der Gruppe erscheinen als Tipp-Vorschl\u00e4ge)']},
   {v:'Build 327', d:'06.07.2026', items:['\ud83d\udcdc Die Liste hat Hoheit beim Beruf: Der Import beh\u00e4lt jetzt immer den Original-Berufstext (inkl. Fachrichtung) im TN \u2013 das fr\u00fchere Leeren bei Gruppen-Exaktmatch entf\u00e4llt. Berufsgruppen dienen nur noch der Sortierung (Name/Fachrichtung/Stichwort-Match)','\ud83e\ude79 Bestand heilt sich: Beim n\u00e4chsten Listen-Import wird das Beruf-Feld vorhandener TN aus der Liste \u00fcbernommen \u2013 auch manuell eingegebene Berufe werden ersetzt, sobald sie von der Liste abweichen (Bericht: \u201eLehrjahr/Beruf erg\u00e4nzt\u201c)']},
   {v:'Build 326', d:'04.07.2026', items:['\ud83c\udd95 Eigener Container \u201eNeuzug\u00e4nge (selbst registriert)\u201c ganz oben im TN-Baum: Azubis, die sich selbst angelegt haben (nicht aus der importierten Liste, ohne Beruf/Gruppe), landen dort zur Nachpflege \u2013 sobald Beruf/Gruppe zugewiesen ist, wandern sie automatisch in die richtige Berufsgruppe']},
@@ -1718,6 +1719,8 @@ function loadHVKontakt(){
     const fp=document.getElementById('freigabePflichtChk');
     if(fp) fp.checked = (d.freigabePflicht===true);
     _transferMail = (d.transferMail===true);
+    _tnBaumHidden = Array.isArray(d.tnBaumHidden)?d.tnBaumHidden:[];
+    try{ renderSbTnTree(); }catch(e){}
     const tm=document.getElementById('transferMailChk');
     if(tm) tm.checked = _transferMail;
   }).catch(()=>{});
@@ -1923,6 +1926,7 @@ let _email = null;
 let _kurse = [];
 let _defaultKurstage = 5;
 let _transferMail = false;
+let _tnBaumHidden = []; // im TN-Baum ausgeblendete Berufsbezeichnungen (shared, kursSettings.tnBaumHidden)
 let _csvData = [];
 let _selectedKursId = null;
 
@@ -2543,43 +2547,86 @@ function renderSbAusbTree(){
 
 
 // ── Sidebar Teilnehmer Baum (aufklappbar mit einzelnen TN) ──
+// Berufsbezeichnung = Teil vor Fachrichtung/Schwerpunkt ("Kfz-Mechatroniker/in, SW PKW-Technik" -> "Kfz-Mechatroniker/in")
+function _berufBezeichnung(beruf){
+  let b=(beruf||'').trim();
+  if(!b) return '';
+  return b.split(',')[0].split(' \u2013 ')[0].split(' - ')[0].trim();
+}
+// Auswahl-Dialog: welche Berufe im TN-Baum sichtbar sind (Haken = sichtbar). Gilt fuer alle VP-Nutzer.
+function openTnBaumFilter(){
+  const set={};
+  (_globalTN||[]).forEach(t=>{const b=_berufBezeichnung(t.beruf); if(b) set[b]=(set[b]||0)+1;});
+  const names=Object.keys(set).sort((a,b)=>a.localeCompare(b,'de'));
+  if(!names.length){ toast('Keine Berufe vorhanden'); return; }
+  const hid=(_tnBaumHidden||[]);
+  const rows=names.map(n=>'<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--brd);font-size:.72rem;cursor:pointer"><input type="checkbox" class="tnbf-chk" value="'+esc(n).replace(/"/g,'&quot;')+'"'+(hid.indexOf(n)<0?' checked':'')+'> <span style="flex:1">'+esc(n)+'</span><span style="font-size:.6rem;color:var(--mu)">'+set[n]+'</span></label>').join('');
+  let m=document.getElementById('tnBaumFilterModal');
+  if(m) m.remove();
+  m=document.createElement('div');
+  m.id='tnBaumFilterModal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+  m.innerHTML='<div style="background:#fff;border-radius:14px;max-width:420px;width:92%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--brd)"><div style="font-weight:800;font-size:.85rem">\ud83d\udc41 Berufe im TN-Baum</div><button onclick="document.getElementById(\'tnBaumFilterModal\').remove()" title="Schlie\u00dfen" style="border:none;background:none;font-size:1rem;cursor:pointer">\u2715</button></div>'
+    +'<div style="padding:2px 10px;overflow-y:auto">'+rows+'</div>'
+    +'<div style="padding:10px 14px;border-top:1px solid var(--brd);display:flex;gap:8px"><button class="btn-sm" onclick="document.querySelectorAll(\'.tnbf-chk\').forEach(c=>c.checked=true)" style="font-size:.68rem">Alle an</button><button class="btn-sm btn-ok" onclick="saveTnBaumFilter()" style="margin-left:auto;font-size:.72rem;padding:6px 16px">Speichern</button></div>'
+    +'</div>';
+  document.body.appendChild(m);
+}
+function saveTnBaumFilter(){
+  const hid=[];
+  document.querySelectorAll('.tnbf-chk').forEach(c=>{ if(!c.checked) hid.push(c.value); });
+  _tnBaumHidden=hid;
+  const mm=document.getElementById('tnBaumFilterModal'); if(mm) mm.remove();
+  renderSbTnTree();
+  db.collection('shared').doc('kursSettings').set({tnBaumHidden:hid},{merge:true})
+    .then(()=>toast(hid.length?('\ud83d\udc41 '+hid.length+' Beruf(e) ausgeblendet \u2013 gilt f\u00fcr alle VP-Nutzer'):'Alle Berufe sichtbar'))
+    .catch(err=>toast('Speichern fehlgeschlagen: '+err.message,'bad'));
+}
 function renderSbTnTree(){
   const root = document.getElementById('sbTnTree');
   if(!root) return;
 
-  // Group TN by beruf. Selbstregistrierte Neuzugaenge (nicht aus Verenas Liste, ohne Beruf/Gruppe)
-  // landen in einem eigenen Container ganz oben, bis Verena ihnen Beruf/Gruppe zuweist.
+  // 1:1 zur KH-Liste: gruppiert wird nach der Berufsbezeichnung aus dem TN-Datensatz.
+  // Container entstehen datengetrieben - neue Gewerke erscheinen automatisch, nichts muss gepflegt werden.
   const groups = {};
   _globalTN.forEach(t=>{
     const isNeu = t.selfRegistered===true && !t.beruf && !t.berufGruppeId;
-    const key = isNeu ? '_neuzugang' : getBerufKey(t.beruf, t.berufGruppeId);
+    const key = isNeu ? '_neuzugang' : (_berufBezeichnung(t.beruf) || '_ohne');
     if(!groups[key]) groups[key] = [];
     groups[key].push(t);
   });
 
   root.innerHTML = '';
-  let berufKeys = Object.keys(BERUFE);
-  if(!berufKeys.length && !_globalTN.length){
-    root.innerHTML='<div class="sb-loading" style="font-size:.68rem;padding:10px 14px">Noch keine Berufsgruppen angelegt.<br>Erstelle sie unter Einstellungen.</div>';
+  if(!_globalTN.length){
+    root.innerHTML='<div class="sb-loading" style="font-size:.68rem;padding:10px 14px">Noch keine Teilnehmer vorhanden.</div>';
     return;
   }
-  if(!berufKeys.length && _globalTN.length){
-    root.innerHTML='<div class="sb-loading" style="font-size:.68rem;padding:10px 14px">'+_globalTN.length+' TN vorhanden – bitte Berufsgruppen unter Einstellungen anlegen.</div>';
-    return;
-  }
-
-  berufKeys.sort((a,b)=>(BERUFE[a]?.order!=null?BERUFE[a].order:999)-(BERUFE[b]?.order!=null?BERUFE[b].order:999)||(BERUFE[a]?.name||'').localeCompare(BERUFE[b]?.name||'','de'));
+  let berufKeys=Object.keys(groups).filter(k=>k!=='_neuzugang'&&k!=='_ohne').sort((a,b)=>a.localeCompare(b,'de'));
+  const _hid=(_tnBaumHidden||[]);
+  const _hidCount=berufKeys.filter(k=>_hid.indexOf(k)>=0).length;
+  berufKeys=berufKeys.filter(k=>_hid.indexOf(k)<0);
+  if(groups['_ohne']&&groups['_ohne'].length) berufKeys.push('_ohne');
   if(groups['_neuzugang']&&groups['_neuzugang'].length) berufKeys=['_neuzugang'].concat(berufKeys);
+  if(_hidCount>0){
+    const hint=document.createElement('div');
+    hint.style.cssText='font-size:.6rem;color:var(--mu);padding:2px 14px 6px;cursor:pointer';
+    hint.textContent='\ud83d\udc41 '+_hidCount+' Beruf(e) ausgeblendet \u2013 \u00e4ndern';
+    hint.onclick=openTnBaumFilter;
+    root.appendChild(hint);
+  }
 
   berufKeys.forEach((key,idx)=>{
-    const def = key==='_neuzugang' ? {label:'\ud83c\udd95 Neuzugänge (selbst registriert)', name:'Neuzugänge'} : BERUFE[key];
+    const def = key==='_neuzugang' ? {label:'\ud83c\udd95 Neuzugänge (selbst registriert)'} : key==='_ohne' ? {label:'Ohne Beruf'} : {label:key};
     const tns = groups[key] || [];
 
     const wrap = document.createElement('div');
     wrap.className = 'sb-branche';
-    const _wrapCol = key==='_neuzugang' ? '#f59e0b' : berufColor(key);
+    const _pal=['#2563eb','#059669','#d97706','#7c3aed','#dc2626','#0891b2','#be185d','#4d7c0f','#b45309','#475569'];
+    let _hsh=0; for(let ci=0;ci<key.length;ci++){ _hsh=(_hsh*31+key.charCodeAt(ci))>>>0; }
+    const _wrapCol = key==='_neuzugang' ? '#f59e0b' : key==='_ohne' ? '#94a3b8' : _pal[_hsh%_pal.length];
     wrap.style.cssText = 'border-left:3px solid '+_wrapCol+';border-bottom:2px solid '+_wrapCol+';border-radius:0 0 0 6px;margin-bottom:10px;padding-bottom:4px;';
-    if(!('ontouchstart' in window) && key!=='_neuzugang') wrap.draggable = true;
+    // kein Drag-Reorder mehr - Container sind datengetrieben und alphabetisch sortiert
     wrap.dataset.berufKey = key;
     wrap.dataset.section = 'tn';
     const hdr = document.createElement('div');
