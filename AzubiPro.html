@@ -1096,7 +1096,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v287'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v289'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -3098,8 +3098,11 @@ function sendMeldung(type, kursId){
     document.getElementById('krankCheck').checked=false;
     return;
   }
-  // Bestätigung für spaeter/frueher
-  const labels={'spaeter':'Meldung "Komme später" senden?','frueher':'Meldung "Gehe früher" senden?'};
+  // Bestätigung für spaeter/frueher - mit Hinweis wer die Info erhält
+  const _k=(_kurse||[]).find(x=>x.id===kursId);
+  const _ausb=_k?(((_k.ausbilderAnrede?_k.ausbilderAnrede+' ':'')+(_k.ausbilderName||'')).trim()):'';
+  const _wer=_ausb?('Dein Ausbilder '+_ausb+' erhält die Info.'):'Dein Ausbilder erhält die Info.';
+  const labels={'spaeter':'Meldung "Komme später" senden?\n\n'+_wer,'frueher':'Meldung "Gehe früher" senden?\n\n'+_wer};
   if(labels[type]){
     if(!confirm(labels[type])) return;
   }
@@ -7126,9 +7129,15 @@ function openKrankSpaeter(){
   const btn='display:flex;align-items:center;gap:10px;width:100%;padding:14px;border-radius:12px;font-size:.85rem;font-weight:700;font-family:\'Sora\',sans-serif;cursor:pointer;margin-bottom:8px;text-align:left;border:2px solid ';
   const inner=
     '<button onclick="_closeSimplePopup();sendBetriebMeldung(\'krank\')" style="'+btn+'rgba(239,68,68,.25);background:rgba(239,68,68,.08);color:#ef4444">🤒 Ich bin heute krank</button>'
-    +'<button onclick="_closeSimplePopup();sendBetriebMeldung(\'spaeter\')" style="'+btn+'rgba(245,158,11,.25);background:rgba(245,158,11,.08);color:#d97706">🕐 Ich komme heute später</button>'
-    +'<div style="font-size:.66rem;color:var(--mu);margin-top:4px;line-height:1.5">Dein Ausbilder und dein Betrieb werden informiert. Du musst dich zusätzlich <b>persönlich beim Betrieb</b> krankmelden.</div>';
+    +'<button onclick="_closeSimplePopup();ueblSpaeterMeldung()" style="'+btn+'rgba(245,158,11,.25);background:rgba(245,158,11,.08);color:#d97706">🕐 Ich komme heute später</button>'
+    +'<div style="font-size:.66rem;color:var(--mu);margin-top:4px;line-height:1.5"><b>Krank:</b> Ausbilder und Betrieb werden informiert – du musst dich zusätzlich <b>persönlich beim Betrieb</b> krankmelden.<br><b>Komme später:</b> nur dein Ausbilder wird informiert.</div>';
   _showSimplePopup('Krank / Später melden', inner);
+}
+// 'Komme spaeter' aus der UEBL-Kachel: nur Kurs-Meldung an den Ausbilder (Sitzplatz-Icon), KEIN Betrieb
+function ueblSpaeterMeldung(){
+  const kursId=_tnData&&_tnData.aktiverKursId;
+  if(!kursId){ toast('Kein aktiver Kurs','bad'); return; }
+  sendMeldung('spaeter', kursId);
 }
 function openKurshistorie(){
   const hist=((_tnData&&_tnData.kursHistory)||[]).slice().sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
