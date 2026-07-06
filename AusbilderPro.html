@@ -1766,18 +1766,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div class="tp-section">
           <div class="tp-section-hd">🎓 Ausbildung</div>
           <div class="fg">
-            <label class="fl">Beruf</label>
-            <select class="fi" id="iProfOber" onchange="updateFachrichtungen()" style="cursor:pointer">
-              <option value="">– Beruf wählen –</option>
-            </select>
+            <label class="fl">Beruf / Fachrichtung (laut Liste)</label>
+            <input class="fi" id="iProf" placeholder="z. B. Elektroniker/in, FR Energie- und Gebäudetechnik">
           </div>
-          <div class="fg" id="iProfFachWrap" style="display:none">
-            <label class="fl">Fachrichtung</label>
-            <select class="fi" id="iProfFach" style="cursor:pointer">
-              <option value="">– Fachrichtung wählen –</option>
-            </select>
-          </div>
-          <input type="hidden" id="iProf">
           <div style="display:grid;grid-template-columns:1fr;gap:8px;max-width:200px">
             <div class="fg">
               <label class="fl">Ausbildungsjahr</label>
@@ -1965,9 +1956,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v771';
+const APP_VERSION = 'v773';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v773', d:'06.07.2026', items:['\ud83d\udd04 Neuer Men\u00fcpunkt \u201eTN-Daten auffrischen\u201c (Aktionen): zieht Beruf/Fachrichtung aller platzierten TN aus den Stammdaten der KH-Liste auf die Sitze','\u270f Beruf im TN-Fenster ist jetzt ein Textfeld mit dem exakten Listenwert (statt Auswahl-Listen) und gleicht sich beim \u00d6ffnen automatisch an die Stammdaten an']},
   {v:'v771', d:'05.07.2026', items:['\ud83e\udd12 App-Krankmeldungen werden automatisch als \u201eKrank\u201c in die Anwesenheit \u00fcbernommen \u2013 Krank geht vor: ein vorheriges \u201eAnwesend\u201c (auch per QR) desselben Tages wird ersetzt. Jede Meldung wird nur einmal angewendet, manuelle \u00c4nderungen des Ausbilders danach bleiben bestehen']},
   {v:'v770', d:'04.07.2026', items:['\u2705 Registrierungs-Badge korrigiert: Azubis, die sich per App mit ihren Bestandsdaten verkn\u00fcpft haben, zeigen jetzt \u201ePer App registriert\u201c statt f\u00e4lschlich \u201eManuell angelegt\u201c','\ud83d\udd27 Beruf-Anzeige: Ist kein konkreter Beruf hinterlegt, wird der Berufsgruppen-Name angezeigt (Import hatte Gruppennamen bewusst in die Gruppe statt ins Beruf-Feld gelegt)']},
   {v:'v769', d:'04.07.2026', items:['\u26a0 TN-Pool: Unplatzierte Teilnehmer bekommen nach dem 1. Kurstag einen roten Rahmen (Nicht angetreten?) \u2013 Hover erkl\u00e4rt was zu tun ist. Verschwindet beim Platzieren oder Verschieben in den Container']},
@@ -3711,6 +3703,7 @@ function renderMain(){
     +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g btn-grad" onclick="openManualTNModal()" title="Teilnehmer manuell zum Kurs hinzufügen">👤+ TN</button><button class="tbtn main-docs-btn ka-b" onclick="openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button><button class="tbtn main-docs-btn ka-g btn-grad" onclick="openQRAttModal()" title="QR-Anwesenheit: Azubis checken per Scan + GPS-Standortprüfung selbst ein">📡 QR-Anwesenheit</button>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
     +'<button class="tbtn main-docs-btn ka-g" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Diesen Lehrgang in einen anderen Kurs verschieben">↔ Lehrgang verschieben</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="showAktionsVerlauf()" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">📋 Aktions-Verlauf</button>'
+    +'<button class="tbtn main-docs-btn ka-b" onclick="refreshTNStammdaten()" title="Beruf/Fachrichtung aller platzierten TN aus den Stammdaten (KH-Liste) auffrischen">🔄 TN-Daten auffrischen</button>'
     +'<div class="ka-divider"></div>'
     +'<button class="tbtn main-docs-btn ka-warn" onclick="ausbilderKommtSpaeter()" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
     +'<button class="tbtn main-docs-btn ka-orange" onclick="kursAusfall()" title="Kurs für heute als ausgefallen markieren">⚠️ Ausfall</button>'
@@ -4881,6 +4874,7 @@ function populateProfOber(selectedValue){
 }
 
 function updateFachrichtungen(){
+  if(!document.getElementById('iProfOber')) return; // Beruf ist jetzt Freitext (iProf)
   const ober=document.getElementById('iProfOber').value;
   const wrap=document.getElementById('iProfFachWrap');
   const fachSel=document.getElementById('iProfFach');
@@ -4908,6 +4902,7 @@ function updateFachrichtungen(){
 }
 
 function setProfFromValue(val){
+  if(!document.getElementById('iProfOber')){ const ip=document.getElementById('iProf'); if(ip) ip.value=val||''; return; }
   if(!val){ document.getElementById('iProfOber').value=''; updateFachrichtungen(); return; }
   const parts=val.split(' – ');
   const ober=parts[0].trim();
@@ -5043,7 +5038,7 @@ function openModal(id){
   { const _af=document.getElementById('agEmailFg'); if(_af) _af.style.display=istLeer?'none':''; }
   // Person-Tab-Eingaben sperren wenn leerer Sitz auf Cloud-Kurs:
   // User soll erst über +TN in der Sidebar einen TN anlegen, dann auf den Sitz ziehen.
-  ['iName','iCo','iAgEmail','iProfOber','iProfFach','iAusbjahr','iNote','iBemerkung','wzOk','wzFehlt','wzFehltText'].forEach(fid=>{
+  ['iName','iCo','iAgEmail','iProf','iProfOber','iProfFach','iAusbjahr','iNote','iBemerkung','wzOk','wzFehlt','wzFehltText'].forEach(fid=>{
     const el=document.getElementById(fid);
     if(!el) return;
     el.disabled=sperrePerson;
@@ -5091,6 +5086,18 @@ function openModal(id){
           if(!tdoc||!tdoc.exists){fsInfo.innerHTML='';fsInfo.style.display='none';return;}
           const t=tdoc.data();
           const resolvedTnId=(tdoc&&tdoc.id)||d.poolTnId;
+          // Liste hat Hoheit: weicht der Stamm-Beruf vom Sitz ab -> Sitz still angleichen
+          try{
+            if(t&&t.beruf){
+              const instB=curInst();
+              const sdB=instB&&instB.seats&&instB.seats[curSeat];
+              if(sdB&&(sdB.profession||'')!==t.beruf){
+                sdB.profession=t.beruf;
+                const ipB=document.getElementById('iProf'); if(ipB) ipB.value=t.beruf;
+                persist();
+              }
+            }
+          }catch(e){}
           function fld(icon,label,val,actionHtml){
             if(!val)return '';
             return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:rgba(59,130,246,.03);border:1px solid rgba(59,130,246,.08);border-radius:7px;margin-bottom:4px">'
@@ -11466,6 +11473,30 @@ let _meldungenUnsub = null;
 let _meldUnsub = null; // Meldungen listener
 let _checkinUnsub = null; // QR-Anwesenheit Check-in listener
 let _todayCheckinMap = {}; // tnId -> checkin-Doc (heutige QR-Check-ins, für Abgleich auch bei späterer Platzierung)
+
+// Frischt Beruf/Fachrichtung aller platzierten Sitze aus den globalTN-Stammdaten auf (Liste hat Hoheit).
+function refreshTNStammdaten(){
+  const inst=curInst(); const seats=curSeats();
+  if(!inst||!seats||!_db){ toast('Kein Kurs geöffnet','bad'); return; }
+  const jobs=[];
+  for(const sid in seats){
+    const d=seats[sid];
+    if(!d||!d.name||!d.poolTnId) continue;
+    jobs.push(_db.collection('globalTN').doc(d.poolTnId).get().then(doc=>{
+      if(!doc.exists) return 0;
+      const b=(doc.data().beruf||'').trim();
+      if(b&&(d.profession||'')!==b){ d.profession=b; return 1; }
+      return 0;
+    }).catch(()=>0));
+  }
+  if(!jobs.length){ toast('Keine verknüpften TN auf dem Sitzplan'); return; }
+  toast('🔄 Gleiche '+jobs.length+' TN mit den Stammdaten ab…');
+  Promise.all(jobs).then(res=>{
+    const n=res.reduce((a,b)=>a+b,0);
+    if(n>0){ persist(); renderSeats(); }
+    toast(n>0?('✅ '+n+' TN aktualisiert (Beruf/Fachrichtung aus der Liste)'):'✅ Alles aktuell – keine Abweichungen');
+  });
+}
 
 // Krankmeldungen aus der App automatisch als Anwesenheits-Status 'Krank' eintragen.
 // Krank geht vor: ein vorheriger Anwesend-Eintrag (auch QR) desselben Tages wird ersetzt.
