@@ -1965,9 +1965,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v770';
+const APP_VERSION = 'v771';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v771', d:'05.07.2026', items:['\ud83e\udd12 App-Krankmeldungen werden automatisch als \u201eKrank\u201c in die Anwesenheit \u00fcbernommen \u2013 Krank geht vor: ein vorheriges \u201eAnwesend\u201c (auch per QR) desselben Tages wird ersetzt. Jede Meldung wird nur einmal angewendet, manuelle \u00c4nderungen des Ausbilders danach bleiben bestehen']},
   {v:'v770', d:'04.07.2026', items:['\u2705 Registrierungs-Badge korrigiert: Azubis, die sich per App mit ihren Bestandsdaten verkn\u00fcpft haben, zeigen jetzt \u201ePer App registriert\u201c statt f\u00e4lschlich \u201eManuell angelegt\u201c','\ud83d\udd27 Beruf-Anzeige: Ist kein konkreter Beruf hinterlegt, wird der Berufsgruppen-Name angezeigt (Import hatte Gruppennamen bewusst in die Gruppe statt ins Beruf-Feld gelegt)']},
   {v:'v769', d:'04.07.2026', items:['\u26a0 TN-Pool: Unplatzierte Teilnehmer bekommen nach dem 1. Kurstag einen roten Rahmen (Nicht angetreten?) \u2013 Hover erkl\u00e4rt was zu tun ist. Verschwindet beim Platzieren oder Verschieben in den Container']},
   {v:'v768', d:'04.07.2026', items:['\ud83c\udfa8 Aktionen-Men\u00fc: Alle wei\u00dfen Buttons jetzt mit Schatten (hervorstehender Look wie \u201eTN+\u201c/\u201eQR-Anwesenheit\u201c)']},
@@ -11466,6 +11467,47 @@ let _meldUnsub = null; // Meldungen listener
 let _checkinUnsub = null; // QR-Anwesenheit Check-in listener
 let _todayCheckinMap = {}; // tnId -> checkin-Doc (heutige QR-Check-ins, für Abgleich auch bei späterer Platzierung)
 
+// Krankmeldungen aus der App automatisch als Anwesenheits-Status 'Krank' eintragen.
+// Krank geht vor: ein vorheriger Anwesend-Eintrag (auch QR) desselben Tages wird ersetzt.
+// Jede Meldung wird pro Sitz nur EINMAL angewendet (d.krankAutoDone) - danach gewinnt der Ausbilder.
+function _applyKrankMeldungen(){
+  if(window._applyingKrank) return;
+  const inst=curInst(); if(!inst) return;
+  const seats=curSeats(); if(!seats) return;
+  if(!_tnMeldungen||!Object.keys(_tnMeldungen).length) return;
+  window._applyingKrank=true;
+  let changed=false;
+  try{
+    for(const sid in seats){
+      const d=seats[sid];
+      if(!d||!d.poolTnId) continue;
+      const melds=(_tnMeldungen[d.poolTnId]||[]).filter(m=>m.type==='krank'&&m.zeit&&m.docId);
+      if(!melds.length) continue;
+      if(!d.attendance) d.attendance=[];
+      if(!d.krankAutoDone) d.krankAutoDone=[];
+      melds.forEach(m=>{
+        if(d.krankAutoDone.indexOf(m.docId)>=0) return; // schon angewendet
+        const datum=(m.zeit||'').slice(0,10);
+        if(!datum) return;
+        d.krankAutoDone.push(m.docId);
+        if(d.krankAutoDone.length>30) d.krankAutoDone=d.krankAutoDone.slice(-30);
+        const ex=d.attendance.find(a=>a.date===datum);
+        if(ex&&ex.type==='sick') { changed=true; return; }
+        const zeitHM=(m.zeit||'').slice(11,16);
+        const note='per App-Krankmeldung'+(zeitHM?' '+zeitHM:'')+((ex&&ex.type==='present')?' (war zuvor anwesend)':'');
+        if(ex){ ex.type='sick'; ex.note=note; ex.lateMins=0; ex.earlyMins=0; delete ex.qr; }
+        else { d.attendance.push({date:datum,type:'sick',note:note,lateMins:0,earlyMins:0}); }
+        if(inst.attendance&&inst.attendance[datum]&&inst.attendance[datum][sid]) delete inst.attendance[datum][sid];
+        changed=true;
+        try{ syncAttendanceToFirestore(sid); }catch(e){}
+        toast('\ud83e\udd12 '+esc(d.name||'TN')+' automatisch als krank eingetragen ('+fmtD(datum)+')');
+      });
+    }
+  }catch(e){ console.warn('KrankAuto:',e); }
+  window._applyingKrank=false;
+  if(changed){ persist(); renderSeats(); }
+}
+
 // Gleicht heutige QR-Check-ins gegen die aktuell platzierten Sitze ab.
 // Greift auch, wenn der TN ERST NACH dem Check-in platziert wird. Manueller Eintrag gewinnt.
 function _applyCheckinsToSeats(showToast){
@@ -11870,6 +11912,8 @@ function loadPool(){
         if(!_tnMeldungen[m.tnId]) _tnMeldungen[m.tnId]=[];
         _tnMeldungen[m.tnId].push({docId:doc.id, ...m});
       });
+      // Krankmeldungen automatisch als 'Krank' in die Anwesenheit uebernehmen
+      try{ _applyKrankMeldungen(); }catch(e){}
       // Seats neu rendern damit Rahmen/Icons erscheinen
       renderSeats();
       // Toast für neue Meldungen
