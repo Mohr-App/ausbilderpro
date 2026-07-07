@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v777';
+const APP_VERSION = 'v778';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v778', d:'07.07.2026', items:['\ud83d\udd27 Nachtrag: Sitzplan wird direkt nach dem Laden der Status-Daten neu gezeichnet \u2013 Wiederholer/Nicht-angetreten werden jetzt sofort ausgegraut, ohne zweiten Render abzuwarten']},
   {v:'v777', d:'07.07.2026', items:['\ud83d\udd27 Nachtrag zu v776: Wiederholer-Sitze werden jetzt auch ger\u00e4te\u00fcbergreifend ausgegraut (Wiederholer wird in der Kurs-Subcollection als eigenes Feld gef\u00fchrt, nicht im status-Feld \u2013 wird jetzt korrekt gelesen)']},
   {v:'v776', d:'07.07.2026', items:['\ud83d\udd04 Sitze von Wiederholern / Nicht-Angetretenen werden jetzt auf JEDEM Ger\u00e4t ausgegraut \u2013 der Status wird ger\u00e4te\u00fcbergreifend aus der Cloud gelesen (kein Rein-/Rausziehen mehr n\u00f6tig, l\u00f6st keine Mails aus)']},
   {v:'v775', d:'07.07.2026', items:['\ud83d\udce7 Neuer Button (\ud83d\udce7) am \u201eNicht angetreten\u201c-TN: informiert den Ausbildungsbetrieb final, wenn der Azubi sich nicht innerhalb der Frist gemeldet hat und nicht erschienen ist. Wird pro Lehrgang nur einmal gesendet; nur aktiv, wenn eine Betriebs-E-Mail hinterlegt ist']},
@@ -12028,6 +12029,8 @@ function loadPool(){
       // Nicht-angetreten als status:'absent' - beides beruecksichtigen.
       _tnStatusMap={};
       snap.forEach(doc=>{ const dd=doc.data(); if(!dd) return; if(dd.wiederholer===true){ _tnStatusMap[doc.id]='wiederholer'; } else if(dd.status){ _tnStatusMap[doc.id]=dd.status; } });
+      // Sitze neu zeichnen, damit Wiederholer/Nicht-angetreten sofort ausgegraut werden (Map ist jetzt aktuell)
+      try{ renderSeats(); }catch(e){}
       // Duplikat-Check (manuell angelegt vs. selbst registriert)
       try{ checkDuplicateTNs(snap.docs, kursId); }catch(e){console.warn('dup check:',e);}
       const seats = curSeats();
