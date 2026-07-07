@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v775';
+const APP_VERSION = 'v776';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v776', d:'07.07.2026', items:['\ud83d\udd04 Sitze von Wiederholern / Nicht-Angetretenen werden jetzt auf JEDEM Ger\u00e4t ausgegraut \u2013 der Status wird ger\u00e4te\u00fcbergreifend aus der Cloud gelesen (kein Rein-/Rausziehen mehr n\u00f6tig, l\u00f6st keine Mails aus)']},
   {v:'v775', d:'07.07.2026', items:['\ud83d\udce7 Neuer Button (\ud83d\udce7) am \u201eNicht angetreten\u201c-TN: informiert den Ausbildungsbetrieb final, wenn der Azubi sich nicht innerhalb der Frist gemeldet hat und nicht erschienen ist. Wird pro Lehrgang nur einmal gesendet; nur aktiv, wenn eine Betriebs-E-Mail hinterlegt ist']},
   {v:'v775', d:'07.07.2026', items:['\ud83d\udce7 Verschieben in \u201eNicht angetreten\u201c oder \u201eKurs wiederholen\u201c schickt jetzt zus\u00e4tzlich eine E-Mail an Verwaltungs-Personen, die das in VP abonniert haben (Einstellungen \u2192 Status-Mails, pro Person an-/abschaltbar)']},
   {v:'v774', d:'06.07.2026', items:['\u270f \u201e\ud83d\udc64+ TN\u201c: Berufsgruppen-/Fachrichtungs-Auswahl entf\u00e4llt \u2013 nur noch ein Textfeld \u201eBeruf / Fachrichtung (laut Liste)\u201c. Die VP-Sortierung l\u00e4uft jetzt direkt \u00fcber die Berufsbezeichnung aus der KH-Liste']},
@@ -4600,7 +4601,9 @@ function mkSeat(id,seats){
     el.classList.add('filled');
     if(d._unbestaetigt) el.classList.add('seat-unbestaetigt');
     el.title=d.name+' – Klicken für Details';
-    if(d.wiederholer) el.classList.add('wiederholer');
+    // Ausgrauen: lokales Flag ODER Cloud-Status des verknuepften TN (geraeteuebergreifend, rein visuell)
+    const _cloudStat=(d.poolTnId&&_tnStatusMap[d.poolTnId])||'';
+    if(d.wiederholer||_cloudStat==='wiederholer'||_cloudStat==='absent') el.classList.add('wiederholer');
     const att=d.attendance||[];
     // one dot per day – oldest left, newest right, max 14
     const dayMap=new Map();
@@ -11520,6 +11523,7 @@ let _meldungenUnsub = null;
 let _meldUnsub = null; // Meldungen listener
 let _checkinUnsub = null; // QR-Anwesenheit Check-in listener
 let _todayCheckinMap = {}; // tnId -> checkin-Doc (heutige QR-Check-ins, für Abgleich auch bei späterer Platzierung)
+let _tnStatusMap = {}; // tnId -> globalTN.status ('absent'|'wiederholer'|...) aus dem Pool-Snapshot; graut Sitze geraeteuebergreifend aus
 
 // Frischt Beruf/Fachrichtung aller platzierten Sitze aus den globalTN-Stammdaten auf (Liste hat Hoheit).
 function refreshTNStammdaten(){
@@ -12018,6 +12022,9 @@ function loadPool(){
       // ── Snapshot-Guard ──
       if(isStale()){if(_poolUnsub){_poolUnsub();_poolUnsub=null;}return;}
       if(snap.empty){ body.innerHTML=poolEmptyGuideHtml('noTN'); renderFehlt(kursId); renderWiederholer(kursId); try{ updatePoolHint(); }catch(e){} try{ checkDuplicateTNs([], kursId); }catch(e){} return; }
+      // Cloud-Status je TN cachen (fuer geraeteuebergreifendes Ausgrauen von Wiederholer/Nicht-angetreten-Sitzen)
+      _tnStatusMap={};
+      snap.forEach(doc=>{ const dd=doc.data(); if(dd&&dd.status){ _tnStatusMap[doc.id]=dd.status; } });
       // Duplikat-Check (manuell angelegt vs. selbst registriert)
       try{ checkDuplicateTNs(snap.docs, kursId); }catch(e){console.warn('dup check:',e);}
       const seats = curSeats();
