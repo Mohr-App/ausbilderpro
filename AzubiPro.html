@@ -1096,7 +1096,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v291'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v292'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -3901,7 +3901,19 @@ function getGPS(){
 }
 
 // ═══ QR-ANWESENHEIT CHECK-IN (Scan des Kurs-QR + GPS-Pruefung) ═══
-let _checkinKursId=(function(){try{return new URLSearchParams(window.location.search).get('join')||null;}catch(e){return null;}})();
+let _checkinKursId=(function(){
+  try{
+    const j=new URLSearchParams(window.location.search).get('join')||null;
+    if(!j) return null;
+    // Zeitstempel nur bei FRISCHEM Scan: das installierte App-Icon (iOS traegt den join-Link
+    // dauerhaft) und wiederhergestellte/neu geladene Tabs duerfen NICHT automatisch einchecken.
+    const standalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;
+    let navType='navigate';
+    try{ const en=performance.getEntriesByType('navigation'); if(en&&en[0]&&en[0].type) navType=en[0].type; }catch(e2){}
+    if(standalone||navType==='reload'||navType==='back_forward'){ window._ciSuppressed=true; return null; }
+    return j;
+  }catch(e){ return null; }
+})();
 let _checkinDone=false;
 function _qrDistanz(gps,geo){
   const R=6371000;
@@ -4138,6 +4150,16 @@ function _checkinTagesSperre(kd){
   return null;
 }
 function _tryQRCheckin(){
+  if(!_checkinKursId&&window._ciSuppressed&&_tnId&&_tnData&&_tnData.aktiverKursId){
+    try{
+      const _h=new Date().toISOString().slice(0,10);
+      const _wd=new Date().getDay();
+      if(_wd!==0&&_wd!==6&&localStorage.getItem('_ciHintDay')!==_h){
+        localStorage.setItem('_ciHintDay',_h);
+        _checkinBanner('warn','\ud83d\udcf7 Zum Einchecken bitte den QR-Code im Kursraum scannen (Button \u201eEinchecken\u201c).');
+      }
+    }catch(e){}
+  }
   if(_checkinDone||!_checkinKursId||!_tnId||!_tnData) return;
   if(_tnData.aktiverKursId!==_checkinKursId) return; // anderer/kein Kurs -> Beitritts-Flow regelt das
   const kursId=_checkinKursId;
