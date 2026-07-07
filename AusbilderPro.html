@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v780';
+const APP_VERSION = 'v781';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v781', d:'07.07.2026', items:['\ud83d\udd24 Texte am finalen Nicht-angetreten-Button vereinheitlicht: \u201eBetrieb & Verwaltung final informieren\u201c (Hover-Titel, Hinweise)']},
   {v:'v780', d:'07.07.2026', items:['\ud83d\udce7 Benachrichtigungen pr\u00e4zisiert: Beim Verschieben in \u201eNicht angetreten\u201c geht KEINE Verwaltungs-E-Mail mehr raus (nur App-Info + Azubi + Betrieb). Erst die finale Best\u00e4tigung (\ud83d\udce7) informiert Verwaltung (Mail+App), Azubi (endg\u00fcltig) und Betrieb. Wiederholer-Mail an den Betrieb nennt jetzt den Grund']},
   {v:'v779', d:'07.07.2026', items:['\ud83d\udce7 Finale Nicht-angetreten-Info geht jetzt an Betrieb UND an die abonnierten Verwaltungs-Personen (VerwaltungPro \u2192 Einstellungen \u2192 Status-Mails). Ist keine Betriebs-Mail hinterlegt, wird zumindest die Verwaltung informiert']},
   {v:'v778', d:'07.07.2026', items:['\ud83d\udd27 Nachtrag: Sitzplan wird direkt nach dem Laden der Status-Daten neu gezeichnet \u2013 Wiederholer/Nicht-angetreten werden jetzt sofort ausgegraut, ohne zweiten Render abzuwarten']},
@@ -11343,7 +11344,7 @@ function finalAbsentNotify(tnId, name){
     const data=doc.data();
     // Schon gesendet fuer diesen Kurs?
     const sentList=data.finalAbsentMailSent||[];
-    if(kursId && sentList.indexOf(kursId)>=0){ toast('Betrieb wurde bereits final informiert'); return; }
+    if(kursId && sentList.indexOf(kursId)>=0){ toast('Betrieb & Verwaltung wurden bereits final informiert'); return; }
     const agMail=(_seatAgEmailByTnId(tnId)|| '').trim();
     const hasAgAccount = !!(data.firmaUid||data.arbeitgeberId);
     const _agMoeglich = !!(agMail||hasAgAccount);
@@ -11365,7 +11366,7 @@ function finalAbsentNotify(tnId, name){
     const upd={};
     if(kursId){ upd.finalAbsentMailSent=firebase.firestore.FieldValue.arrayUnion(kursId); }
     upd.benachrichtigungen=firebase.firestore.FieldValue.arrayUnion({
-      typ:'kurs_final_nicht_angetreten', text:'Betrieb final über Nichtantreten informiert ('+kursNameMail+').',
+      typ:'kurs_final_nicht_angetreten', text:'Betrieb & Verwaltung final über Nichtantreten informiert ('+kursNameMail+').',
       ausbilder:ausName, datum:new Date().toISOString(), gelesen:true
     });
     ref.update(upd).catch(()=>{});
@@ -12680,7 +12681,7 @@ function renderFehlt(kursId){
     card.dataset.company=company||''; card.dataset.profession=profession||''; card.dataset.ausbjahr=ausbjahr||'';
     const resetBtn='<button class="tn-reset-btn" title="Status zurücksetzen (Azubi hat sich gemeldet / kommt doch)" data-tnid="'+esc(tnId||'')+'" data-name="'+esc(name).replace(/"/g,'&quot;')+'" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">↺</button>';
     // Finale Betriebs-Info nur sinnvoll mit Firestore-Verknuepfung
-    const finalBtn= tnId ? '<button class="tn-final-btn" title="Frist abgelaufen: Betrieb final informieren (nicht gemeldet, nicht erschienen)" data-tnid="'+esc(tnId||'')+'" data-name="'+esc(name).replace(/"/g,'&quot;')+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:.95rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">📧</button>' : '';
+    const finalBtn= tnId ? '<button class="tn-final-btn" title="Frist abgelaufen: Betrieb &amp; Verwaltung final informieren (nicht gemeldet, nicht erschienen)" data-tnid="'+esc(tnId||'')+'" data-name="'+esc(name).replace(/"/g,'&quot;')+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:.95rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">📧</button>' : '';
     card.innerHTML='<div class="pool-avatar" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444">'+initials+'</div>'
       +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(name)+'</div></div>'
       +finalBtn+resetBtn;
