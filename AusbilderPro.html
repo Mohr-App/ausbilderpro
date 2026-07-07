@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v778';
+const APP_VERSION = 'v779';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v779', d:'07.07.2026', items:['\ud83d\udce7 Finale Nicht-angetreten-Info geht jetzt an Betrieb UND an die abonnierten Verwaltungs-Personen (VerwaltungPro \u2192 Einstellungen \u2192 Status-Mails). Ist keine Betriebs-Mail hinterlegt, wird zumindest die Verwaltung informiert']},
   {v:'v778', d:'07.07.2026', items:['\ud83d\udd27 Nachtrag: Sitzplan wird direkt nach dem Laden der Status-Daten neu gezeichnet \u2013 Wiederholer/Nicht-angetreten werden jetzt sofort ausgegraut, ohne zweiten Render abzuwarten']},
   {v:'v777', d:'07.07.2026', items:['\ud83d\udd27 Nachtrag zu v776: Wiederholer-Sitze werden jetzt auch ger\u00e4te\u00fcbergreifend ausgegraut (Wiederholer wird in der Kurs-Subcollection als eigenes Feld gef\u00fchrt, nicht im status-Feld \u2013 wird jetzt korrekt gelesen)']},
   {v:'v776', d:'07.07.2026', items:['\ud83d\udd04 Sitze von Wiederholern / Nicht-Angetretenen werden jetzt auf JEDEM Ger\u00e4t ausgegraut \u2013 der Status wird ger\u00e4te\u00fcbergreifend aus der Cloud gelesen (kein Rein-/Rausziehen mehr n\u00f6tig, l\u00f6st keine Mails aus)']},
@@ -11342,11 +11343,11 @@ function finalAbsentNotify(tnId, name){
     if(kursId && sentList.indexOf(kursId)>=0){ toast('Betrieb wurde bereits final informiert'); return; }
     const agMail=(_seatAgEmailByTnId(tnId)|| '').trim();
     const hasAgAccount = !!(data.firmaUid||data.arbeitgeberId);
-    if(!agMail && !hasAgAccount){ toast('Keine Betriebs-Mail hinterlegt – kann Betrieb nicht informieren','bad'); return; }
+    const _agMoeglich = !!(agMail||hasAgAccount);
     const dispName=((data.vorname||'')+' '+(data.nachname||'')).trim()||name||'Azubi';
-    if(!confirm('📧 Betrieb final informieren?\n\n'+dispName+' hat sich nicht innerhalb der Frist gemeldet und ist nicht erschienen.\n\nDer Ausbildungsbetrieb erhält jetzt eine abschließende Info. Fortfahren?')) return;
+    if(!confirm('📧 Betrieb & Verwaltung final informieren?\n\n'+dispName+' hat sich nicht innerhalb der Frist gemeldet und ist nicht erschienen.\n\nDer Ausbildungsbetrieb (falls Mail hinterlegt) und die abonnierten Verwaltungs-Personen erhalten jetzt eine abschließende Info. Fortfahren?')) return;
     const jetzt=new Date().toLocaleString('de-DE',{weekday:'long',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'})+' Uhr';
-    sendAgEmail(data, '⛔ Auszubildender nicht angetreten – '+kursNameMail+' (keine Rückmeldung)',
+    if(_agMoeglich) sendAgEmail(data, '⛔ Auszubildender nicht angetreten – '+kursNameMail+' (keine Rückmeldung)',
       '<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">wir hatten Sie darüber informiert, dass Ihr Auszubildender zum Lehrgang erwartet wurde. Es erfolgte <b>keine Rückmeldung innerhalb der gesetzten Frist</b>.</p>'
       +'<div style="padding:14px;background:#fef2f2;border:2px solid #dc2626;border-radius:8px;margin-bottom:14px">'
       +'<p style="margin:0 0 6px;font-size:.7rem;color:#991b1b;font-weight:800;text-transform:uppercase;letter-spacing:.04em">Endgültiger Status: Nicht angetreten</p>'
@@ -11365,7 +11366,27 @@ function finalAbsentNotify(tnId, name){
       ausbilder:ausName, datum:new Date().toISOString(), gelesen:true
     });
     ref.update(upd).catch(()=>{});
-    toast('📧 Betrieb final informiert – '+dispName);
+    // Zusaetzlich die abonnierten Verwaltungs-Personen final informieren (kursSettings.statusMailEmpfaenger)
+    try{
+      _db.collection('shared').doc('kursSettings').get().then(cs=>{
+        const emp=(cs.exists&&Array.isArray(cs.data().statusMailEmpfaenger))?cs.data().statusMailEmpfaenger:[];
+        if(!emp.length) return;
+        const betreffV='\u26d4 Endgültig nicht angetreten: '+dispName+' \u2013 '+kursNameMail;
+        const htmlV='<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:18px">'
+          +'<h2 style="margin:0 0 4px;font-size:1.05rem;color:#dc2626">\u26d4 Endgültig nicht angetreten</h2>'
+          +'<p style="margin:0 0 12px;font-size:.8rem;color:#64748b">Der Azubi hat sich nicht innerhalb der Frist gemeldet und ist nicht erschienen. Der Betrieb wurde informiert.</p>'
+          +'<table style="font-size:.9rem;border-collapse:collapse">'
+          +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Teilnehmer</td><td><b>'+esc(dispName)+'</b></td></tr>'
+          +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Betrieb</td><td>'+((data.firma||'')||'\u2013')+'</td></tr>'
+          +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Lehrgang</td><td>'+kursNameMail+'</td></tr>'
+          +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Ausbilder</td><td>'+(ausName||'\u2013')+'</td></tr>'
+          +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Festgestellt</td><td>'+jetzt+'</td></tr>'
+          +'</table>'
+          +'<p style="margin:14px 0 0;font-size:.75rem;color:#94a3b8">Der Lehrgang gilt für den Azubi als nicht teilgenommen. Abbestellen: VerwaltungPro \u2192 Einstellungen \u2192 Status-Mails.</p></div>';
+        emp.forEach(adr=>{ _db.collection('mail').add({to:adr, message:{subject:betreffV, html:htmlV}}).catch(()=>{}); });
+      }).catch(()=>{});
+    }catch(e){}
+    toast('📧 Betrieb & Verwaltung final informiert – '+dispName);
     try{ renderFehlt(curInst()?.sharedKursId); }catch(e){}
   }).catch(()=>{ toast('Fehler beim Senden','bad'); });
 }
