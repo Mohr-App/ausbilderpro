@@ -1955,9 +1955,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v774';
+const APP_VERSION = 'v775';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v775', d:'07.07.2026', items:['\ud83d\udce7 Neuer Button (\ud83d\udce7) am \u201eNicht angetreten\u201c-TN: informiert den Ausbildungsbetrieb final, wenn der Azubi sich nicht innerhalb der Frist gemeldet hat und nicht erschienen ist. Wird pro Lehrgang nur einmal gesendet; nur aktiv, wenn eine Betriebs-E-Mail hinterlegt ist']},
+  {v:'v775', d:'07.07.2026', items:['\ud83d\udce7 Verschieben in \u201eNicht angetreten\u201c oder \u201eKurs wiederholen\u201c schickt jetzt zus\u00e4tzlich eine E-Mail an Verwaltungs-Personen, die das in VP abonniert haben (Einstellungen \u2192 Status-Mails, pro Person an-/abschaltbar)']},
   {v:'v774', d:'06.07.2026', items:['\u270f \u201e\ud83d\udc64+ TN\u201c: Berufsgruppen-/Fachrichtungs-Auswahl entf\u00e4llt \u2013 nur noch ein Textfeld \u201eBeruf / Fachrichtung (laut Liste)\u201c. Die VP-Sortierung l\u00e4uft jetzt direkt \u00fcber die Berufsbezeichnung aus der KH-Liste']},
   {v:'v773', d:'06.07.2026', items:['\ud83d\udd04 Neuer Men\u00fcpunkt \u201eTN-Daten auffrischen\u201c (Aktionen): zieht Beruf/Fachrichtung aller platzierten TN aus den Stammdaten der KH-Liste auf die Sitze','\u270f Beruf im TN-Fenster ist jetzt ein Textfeld mit dem exakten Listenwert (statt Auswahl-Listen) und gleicht sich beim \u00d6ffnen automatisch an die Stammdaten an']},
   {v:'v771', d:'05.07.2026', items:['\ud83e\udd12 App-Krankmeldungen werden automatisch als \u201eKrank\u201c in die Anwesenheit \u00fcbernommen \u2013 Krank geht vor: ein vorheriges \u201eAnwesend\u201c (auch per QR) desselben Tages wird ersetzt. Jede Meldung wird nur einmal angewendet, manuelle \u00c4nderungen des Ausbilders danach bleiben bestehen']},
@@ -11177,6 +11179,31 @@ function _notifyVwEvent(typ, tnId, tnData, kursName, ausName, extra){
     agMailGrund: 'pruefung_laeuft',
     agAnzahlEmpfaenger: 0
   };
+  // Status-Mail an Verwaltungs-Personen, die es abonniert haben (VP-Einstellungen, kursSettings.statusMailEmpfaenger)
+  try{
+    _db.collection('shared').doc('kursSettings').get().then(cs=>{
+      const emp=(cs.exists&&Array.isArray(cs.data().statusMailEmpfaenger))?cs.data().statusMailEmpfaenger:[];
+      if(!emp.length) return;
+      const istAbsent=(typ==='absent');
+      const betreff=(istAbsent?'\u26d4 Nicht angetreten: ':'\u21a9 Wiederholer: ')+tnName+' \u2013 '+kursName;
+      const zusatz=istAbsent?(extra&&extra.frist?('<p style="margin:6px 0 0;font-size:.85rem">R\u00fcckmeldefrist f\u00fcr den Azubi: <b>'+new Date(extra.frist).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+' Uhr</b></p>'):'')
+        :(extra&&extra.grund?('<p style="margin:6px 0 0;font-size:.85rem">Grund: <b>'+extra.grund+'</b></p>'):'');
+      const html='<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:18px">'
+        +'<h2 style="margin:0 0 4px;font-size:1.05rem;color:'+(istAbsent?'#dc2626':'#d97706')+'">'+(istAbsent?'\u26d4 Nicht angetreten':'\u21a9 Kurs wiederholen')+'</h2>'
+        +'<p style="margin:0 0 12px;font-size:.8rem;color:#64748b">Automatische Info aus AusbilderPro</p>'
+        +'<table style="font-size:.9rem;border-collapse:collapse">'
+        +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Teilnehmer</td><td><b>'+tnName+'</b></td></tr>'
+        +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Betrieb</td><td>'+(firma||'\u2013')+'</td></tr>'
+        +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Lehrgang</td><td>'+kursName+'</td></tr>'
+        +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Ausbilder</td><td>'+(ausName||'\u2013')+'</td></tr>'
+        +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Zeitpunkt</td><td>'+new Date().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+' Uhr</td></tr>'
+        +'</table>'+zusatz
+        +'<p style="margin:14px 0 0;font-size:.75rem;color:#94a3b8">Details in VerwaltungPro unter Meldungen. Abbestellen: VerwaltungPro \u2192 Einstellungen \u2192 Status-Mails.</p></div>';
+      emp.forEach(adr=>{
+        _db.collection('mail').add({to:adr, message:{subject:betreff, html:html}}).catch(()=>{});
+      });
+    }).catch(()=>{});
+  }catch(e){}
   // Erst Event anlegen, dann AG-Status pruefen + nachtragen
   _db.collection('vwEvents').add(event).then(ref=>{
     if(!firma){
@@ -11291,6 +11318,51 @@ function absentFristConfirm(){
   const onConfirm = _absentFristState.onConfirm;
   const fristIso = _absentFristState.frist;
   if(typeof onConfirm === 'function') onConfirm(fristIso);
+}
+
+// Finale Betriebs-Info nach Fristablauf: Azubi hat sich nicht gemeldet und ist nicht erschienen.
+// Sendet einmalig eine AG-Mail (Merker finalAbsentMailSent in globalTN verhindert Doppelversand).
+function finalAbsentNotify(tnId, name){
+  if(!_db||!tnId) return;
+  const ref=_db.collection('globalTN').doc(tnId);
+  const kursName=S.kats[S.curKat]?.label||'Lehrgang';
+  const kursNameMail=katLabelFull(S.curKat)||kursName;
+  const ausName=getAusbilderProfil().name||_auth?.currentUser?.email?.split('@')[0]||'Ausbilder';
+  const kursId=curInst()?.sharedKursId;
+  ref.get().then(doc=>{
+    if(!doc.exists){ toast('TN nicht gefunden','bad'); return; }
+    const data=doc.data();
+    // Schon gesendet fuer diesen Kurs?
+    const sentList=data.finalAbsentMailSent||[];
+    if(kursId && sentList.indexOf(kursId)>=0){ toast('Betrieb wurde bereits final informiert'); return; }
+    const agMail=(_seatAgEmailByTnId(tnId)|| '').trim();
+    const hasAgAccount = !!(data.firmaUid||data.arbeitgeberId);
+    if(!agMail && !hasAgAccount){ toast('Keine Betriebs-Mail hinterlegt – kann Betrieb nicht informieren','bad'); return; }
+    const dispName=((data.vorname||'')+' '+(data.nachname||'')).trim()||name||'Azubi';
+    if(!confirm('📧 Betrieb final informieren?\n\n'+dispName+' hat sich nicht innerhalb der Frist gemeldet und ist nicht erschienen.\n\nDer Ausbildungsbetrieb erhält jetzt eine abschließende Info. Fortfahren?')) return;
+    const jetzt=new Date().toLocaleString('de-DE',{weekday:'long',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'})+' Uhr';
+    sendAgEmail(data, '⛔ Auszubildender nicht angetreten – '+kursNameMail+' (keine Rückmeldung)',
+      '<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">wir hatten Sie darüber informiert, dass Ihr Auszubildender zum Lehrgang erwartet wurde. Es erfolgte <b>keine Rückmeldung innerhalb der gesetzten Frist</b>.</p>'
+      +'<div style="padding:14px;background:#fef2f2;border:2px solid #dc2626;border-radius:8px;margin-bottom:14px">'
+      +'<p style="margin:0 0 6px;font-size:.7rem;color:#991b1b;font-weight:800;text-transform:uppercase;letter-spacing:.04em">Endgültiger Status: Nicht angetreten</p>'
+      +'<p style="margin:0 0 4px;font-size:.85rem;color:#0f172a"><b>Auszubildender:</b> '+esc(dispName)+'</p>'
+      +'<p style="margin:0 0 4px;font-size:.85rem;color:#0f172a"><b>Lehrgang:</b> '+kursNameMail+'</p>'
+      +'<p style="margin:0 0 4px;font-size:.85rem;color:#0f172a"><b>Festgestellt am:</b> '+jetzt+'</p>'
+      +'<p style="margin:0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
+      +'<p style="margin:0 0 10px;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender hat sich nicht gemeldet und ist nicht erschienen. Der Lehrgang gilt für ihn als <b>nicht teilgenommen</b>. Bitte klären Sie das weitere Vorgehen mit Ihrem Auszubildenden.</p>'
+      +'<p style="margin:10px 0 0;font-size:.78rem;color:#64748b;line-height:1.55">Bei Rückfragen wenden Sie sich bitte an das Bildungszentrum.</p>'
+    , agMail);
+    // Merker setzen (Doppelversand verhindern) + Historie
+    const upd={};
+    if(kursId){ upd.finalAbsentMailSent=firebase.firestore.FieldValue.arrayUnion(kursId); }
+    upd.benachrichtigungen=firebase.firestore.FieldValue.arrayUnion({
+      typ:'kurs_final_nicht_angetreten', text:'Betrieb final über Nichtantreten informiert ('+kursNameMail+').',
+      ausbilder:ausName, datum:new Date().toISOString(), gelesen:true
+    });
+    ref.update(upd).catch(()=>{});
+    toast('📧 Betrieb final informiert – '+dispName);
+    try{ renderFehlt(curInst()?.sharedKursId); }catch(e){}
+  }).catch(()=>{ toast('Fehler beim Senden','bad'); });
 }
 
 function syncGlobalTNStatus(tnId, statusType, opts){
@@ -12557,10 +12629,12 @@ function renderFehlt(kursId){
     card.draggable=false;
     card.dataset.name=name; card.dataset.tnid=tnId||''; card.dataset.kursid=fsKursId||'';
     card.dataset.company=company||''; card.dataset.profession=profession||''; card.dataset.ausbjahr=ausbjahr||'';
-    const resetBtn='<button class="tn-reset-btn" title="Status zurücksetzen" data-tnid="'+esc(tnId||'')+'" data-name="'+esc(name).replace(/"/g,'&quot;')+'" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">↺</button>';
+    const resetBtn='<button class="tn-reset-btn" title="Status zurücksetzen (Azubi hat sich gemeldet / kommt doch)" data-tnid="'+esc(tnId||'')+'" data-name="'+esc(name).replace(/"/g,'&quot;')+'" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">↺</button>';
+    // Finale Betriebs-Info nur sinnvoll mit Firestore-Verknuepfung
+    const finalBtn= tnId ? '<button class="tn-final-btn" title="Frist abgelaufen: Betrieb final informieren (nicht gemeldet, nicht erschienen)" data-tnid="'+esc(tnId||'')+'" data-name="'+esc(name).replace(/"/g,'&quot;')+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:.95rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">📧</button>' : '';
     card.innerHTML='<div class="pool-avatar" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444">'+initials+'</div>'
       +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(name)+'</div></div>'
-      +resetBtn;
+      +finalBtn+resetBtn;
     // Reset-Button per addEventListener (sicher gegenüber Quote-Problemen im Namen)
     const btn=card.querySelector('.tn-reset-btn');
     if(btn){
@@ -12583,6 +12657,12 @@ function renderFehlt(kursId){
       });
       btn.addEventListener('mouseover',()=>{ btn.style.background='rgba(100,116,139,.12)'; btn.style.color='#0f172a'; });
       btn.addEventListener('mouseout',()=>{ btn.style.background='none'; btn.style.color='#64748b'; });
+    }
+    const fbtn=card.querySelector('.tn-final-btn');
+    if(fbtn){
+      fbtn.addEventListener('click',ev=>{ ev.stopPropagation(); ev.preventDefault(); if(tnId) finalAbsentNotify(tnId, name); });
+      fbtn.addEventListener('mouseover',()=>{ fbtn.style.background='rgba(220,38,38,.10)'; });
+      fbtn.addEventListener('mouseout',()=>{ fbtn.style.background='none'; });
     }
     card.addEventListener('dragstart',ev=>{
       _poolDragId=name; _poolDragTnId=tnId||null; _poolDragKursId=fsKursId||null;
