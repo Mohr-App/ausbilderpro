@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v781';
+const APP_VERSION = 'v782';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v782', d:'07.07.2026', items:['\u270f Formulierung der finalen Nicht-angetreten-Info neutralisiert: \u201eendg\u00fcltig nicht angetreten (Frist abgelaufen)\u201c statt \u201enicht gemeldet und nicht erschienen\u201c \u2013 deckt auch den Fall ab, dass der Azubi abgesagt hat']},
   {v:'v781', d:'07.07.2026', items:['\ud83d\udd24 Texte am finalen Nicht-angetreten-Button vereinheitlicht: \u201eBetrieb & Verwaltung final informieren\u201c (Hover-Titel, Hinweise)']},
   {v:'v780', d:'07.07.2026', items:['\ud83d\udce7 Benachrichtigungen pr\u00e4zisiert: Beim Verschieben in \u201eNicht angetreten\u201c geht KEINE Verwaltungs-E-Mail mehr raus (nur App-Info + Azubi + Betrieb). Erst die finale Best\u00e4tigung (\ud83d\udce7) informiert Verwaltung (Mail+App), Azubi (endg\u00fcltig) und Betrieb. Wiederholer-Mail an den Betrieb nennt jetzt den Grund']},
   {v:'v779', d:'07.07.2026', items:['\ud83d\udce7 Finale Nicht-angetreten-Info geht jetzt an Betrieb UND an die abonnierten Verwaltungs-Personen (VerwaltungPro \u2192 Einstellungen \u2192 Status-Mails). Ist keine Betriebs-Mail hinterlegt, wird zumindest die Verwaltung informiert']},
@@ -11330,7 +11331,7 @@ function absentFristConfirm(){
   if(typeof onConfirm === 'function') onConfirm(fristIso);
 }
 
-// Finale Betriebs-Info nach Fristablauf: Azubi hat sich nicht gemeldet und ist nicht erschienen.
+// Finale Info nach Fristablauf: Azubi gilt als endgueltig nicht angetreten (Frist abgelaufen).
 // Sendet einmalig eine AG-Mail (Merker finalAbsentMailSent in globalTN verhindert Doppelversand).
 function finalAbsentNotify(tnId, name){
   if(!_db||!tnId) return;
@@ -11349,7 +11350,7 @@ function finalAbsentNotify(tnId, name){
     const hasAgAccount = !!(data.firmaUid||data.arbeitgeberId);
     const _agMoeglich = !!(agMail||hasAgAccount);
     const dispName=((data.vorname||'')+' '+(data.nachname||'')).trim()||name||'Azubi';
-    if(!confirm('📧 Betrieb & Verwaltung final informieren?\n\n'+dispName+' hat sich nicht innerhalb der Frist gemeldet und ist nicht erschienen.\n\nDer Ausbildungsbetrieb (falls Mail hinterlegt) und die abonnierten Verwaltungs-Personen erhalten jetzt eine abschließende Info. Fortfahren?')) return;
+    if(!confirm('📧 Betrieb & Verwaltung final informieren?\n\n'+dispName+' gilt für diesen Lehrgang als endgültig nicht angetreten (Frist abgelaufen).\n\nDer Ausbildungsbetrieb (falls Mail hinterlegt) und die abonnierten Verwaltungs-Personen erhalten jetzt eine abschließende Info. Fortfahren?')) return;
     const jetzt=new Date().toLocaleString('de-DE',{weekday:'long',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'})+' Uhr';
     if(_agMoeglich) sendAgEmail(data, '⛔ Auszubildender nicht angetreten – '+kursNameMail+' (keine Rückmeldung)',
       '<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">wir hatten Sie darüber informiert, dass Ihr Auszubildender zum Lehrgang erwartet wurde. Es erfolgte <b>keine Rückmeldung innerhalb der gesetzten Frist</b>.</p>'
@@ -11359,7 +11360,7 @@ function finalAbsentNotify(tnId, name){
       +'<p style="margin:0 0 4px;font-size:.85rem;color:#0f172a"><b>Lehrgang:</b> '+kursNameMail+'</p>'
       +'<p style="margin:0 0 4px;font-size:.85rem;color:#0f172a"><b>Festgestellt am:</b> '+jetzt+'</p>'
       +'<p style="margin:0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
-      +'<p style="margin:0 0 10px;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender hat sich nicht gemeldet und ist nicht erschienen. Der Lehrgang gilt für ihn als <b>nicht teilgenommen</b>. Bitte klären Sie das weitere Vorgehen mit Ihrem Auszubildenden.</p>'
+      +'<p style="margin:0 0 10px;font-size:.85rem;color:#374151;line-height:1.6">Der Lehrgang gilt für Ihren Auszubildenden als <b>endgültig nicht angetreten</b>. Bitte klären Sie das weitere Vorgehen mit Ihrem Auszubildenden.</p>'
       +'<p style="margin:10px 0 0;font-size:.78rem;color:#64748b;line-height:1.55">Bei Rückfragen wenden Sie sich bitte an das Bildungszentrum.</p>'
     , agMail);
     // Merker setzen (Doppelversand verhindern) + Historie
@@ -11373,7 +11374,7 @@ function finalAbsentNotify(tnId, name){
     // Azubi final informieren: es nuetzt nichts mehr, gilt endgueltig als nicht teilgenommen
     try{
       sendTnEmail(data, '⛔ Lehrgang "'+kursNameMail+'" – endgültig nicht teilgenommen',
-        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">für den Lehrgang <b>"'+kursNameMail+'"</b> ist die Rückmeldefrist abgelaufen, ohne dass eine Meldung von dir eingegangen ist.</p>'
+        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">für den Lehrgang <b>"'+kursNameMail+'"</b> ist die Rückmeldefrist abgelaufen.</p>'
         +'<div style="padding:12px;background:#fef2f2;border:2px solid #ef4444;border-radius:8px;margin-bottom:12px">'
         +'<p style="margin:0;font-size:.85rem;color:#991b1b;font-weight:700">Der Lehrgang gilt für dich als endgültig <b>nicht teilgenommen</b>. Eine nachträgliche Teilnahme an diesem Termin ist nicht mehr möglich.</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Dein Ausbildungsbetrieb wurde ebenfalls informiert. Bitte kläre das weitere Vorgehen mit deinem Betrieb und dem Bildungszentrum.</p>'
@@ -11389,7 +11390,7 @@ function finalAbsentNotify(tnId, name){
         const betreffV='\u26d4 Endgültig nicht angetreten: '+dispName+' \u2013 '+kursNameMail;
         const htmlV='<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:18px">'
           +'<h2 style="margin:0 0 4px;font-size:1.05rem;color:#dc2626">\u26d4 Endgültig nicht angetreten</h2>'
-          +'<p style="margin:0 0 12px;font-size:.8rem;color:#64748b">Der Azubi hat sich nicht innerhalb der Frist gemeldet und ist nicht erschienen. Der Betrieb wurde informiert.</p>'
+          +'<p style="margin:0 0 12px;font-size:.8rem;color:#64748b">Der Azubi gilt für diesen Lehrgang als endgültig nicht angetreten (Frist abgelaufen). Der Betrieb wurde informiert.</p>'
           +'<table style="font-size:.9rem;border-collapse:collapse">'
           +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Teilnehmer</td><td><b>'+esc(dispName)+'</b></td></tr>'
           +'<tr><td style="padding:3px 12px 3px 0;color:#64748b">Betrieb</td><td>'+((data.firma||'')||'\u2013')+'</td></tr>'
@@ -12681,7 +12682,7 @@ function renderFehlt(kursId){
     card.dataset.company=company||''; card.dataset.profession=profession||''; card.dataset.ausbjahr=ausbjahr||'';
     const resetBtn='<button class="tn-reset-btn" title="Status zurücksetzen (Azubi hat sich gemeldet / kommt doch)" data-tnid="'+esc(tnId||'')+'" data-name="'+esc(name).replace(/"/g,'&quot;')+'" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">↺</button>';
     // Finale Betriebs-Info nur sinnvoll mit Firestore-Verknuepfung
-    const finalBtn= tnId ? '<button class="tn-final-btn" title="Frist abgelaufen: Betrieb &amp; Verwaltung final informieren (nicht gemeldet, nicht erschienen)" data-tnid="'+esc(tnId||'')+'" data-name="'+esc(name).replace(/"/g,'&quot;')+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:.95rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">📧</button>' : '';
+    const finalBtn= tnId ? '<button class="tn-final-btn" title="Frist abgelaufen: Betrieb &amp; Verwaltung final informieren (endgültig nicht angetreten)" data-tnid="'+esc(tnId||'')+'" data-name="'+esc(name).replace(/"/g,'&quot;')+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:.95rem;padding:4px 6px;border-radius:5px;flex-shrink:0;line-height:1">📧</button>' : '';
     card.innerHTML='<div class="pool-avatar" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#ef4444">'+initials+'</div>'
       +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(name)+'</div></div>'
       +finalBtn+resetBtn;
