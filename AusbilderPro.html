@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v779';
+const APP_VERSION = 'v780';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v780', d:'07.07.2026', items:['\ud83d\udce7 Benachrichtigungen pr\u00e4zisiert: Beim Verschieben in \u201eNicht angetreten\u201c geht KEINE Verwaltungs-E-Mail mehr raus (nur App-Info + Azubi + Betrieb). Erst die finale Best\u00e4tigung (\ud83d\udce7) informiert Verwaltung (Mail+App), Azubi (endg\u00fcltig) und Betrieb. Wiederholer-Mail an den Betrieb nennt jetzt den Grund']},
   {v:'v779', d:'07.07.2026', items:['\ud83d\udce7 Finale Nicht-angetreten-Info geht jetzt an Betrieb UND an die abonnierten Verwaltungs-Personen (VerwaltungPro \u2192 Einstellungen \u2192 Status-Mails). Ist keine Betriebs-Mail hinterlegt, wird zumindest die Verwaltung informiert']},
   {v:'v778', d:'07.07.2026', items:['\ud83d\udd27 Nachtrag: Sitzplan wird direkt nach dem Laden der Status-Daten neu gezeichnet \u2013 Wiederholer/Nicht-angetreten werden jetzt sofort ausgegraut, ohne zweiten Render abzuwarten']},
   {v:'v777', d:'07.07.2026', items:['\ud83d\udd27 Nachtrag zu v776: Wiederholer-Sitze werden jetzt auch ger\u00e4te\u00fcbergreifend ausgegraut (Wiederholer wird in der Kurs-Subcollection als eigenes Feld gef\u00fchrt, nicht im status-Feld \u2013 wird jetzt korrekt gelesen)']},
@@ -11186,7 +11187,9 @@ function _notifyVwEvent(typ, tnId, tnData, kursName, ausName, extra){
     agAnzahlEmpfaenger: 0
   };
   // Status-Mail an Verwaltungs-Personen, die es abonniert haben (VP-Einstellungen, kursSettings.statusMailEmpfaenger)
+  // Bei noMail (z.B. Verschieben in 'Nicht angetreten') wird KEINE Mail gesendet - nur das App-Event unten.
   try{
+    if(extra && extra.noMail) throw '__skip_mail__';
     _db.collection('shared').doc('kursSettings').get().then(cs=>{
       const emp=(cs.exists&&Array.isArray(cs.data().statusMailEmpfaenger))?cs.data().statusMailEmpfaenger:[];
       if(!emp.length) return;
@@ -11366,6 +11369,17 @@ function finalAbsentNotify(tnId, name){
       ausbilder:ausName, datum:new Date().toISOString(), gelesen:true
     });
     ref.update(upd).catch(()=>{});
+    // Azubi final informieren: es nuetzt nichts mehr, gilt endgueltig als nicht teilgenommen
+    try{
+      sendTnEmail(data, '⛔ Lehrgang "'+kursNameMail+'" – endgültig nicht teilgenommen',
+        '<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b;line-height:1.6">für den Lehrgang <b>"'+kursNameMail+'"</b> ist die Rückmeldefrist abgelaufen, ohne dass eine Meldung von dir eingegangen ist.</p>'
+        +'<div style="padding:12px;background:#fef2f2;border:2px solid #ef4444;border-radius:8px;margin-bottom:12px">'
+        +'<p style="margin:0;font-size:.85rem;color:#991b1b;font-weight:700">Der Lehrgang gilt für dich als endgültig <b>nicht teilgenommen</b>. Eine nachträgliche Teilnahme an diesem Termin ist nicht mehr möglich.</p></div>'
+        +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Dein Ausbildungsbetrieb wurde ebenfalls informiert. Bitte kläre das weitere Vorgehen mit deinem Betrieb und dem Bildungszentrum.</p>'
+      );
+    }catch(e){}
+    // VP-App-Event (Glocke), damit auch nur-App-Verwaltung die finale Bestaetigung sieht - ohne zusaetzliche Mail hier
+    try{ _notifyVwEvent('final_absent', tnId, data, kursName, ausName, {frist:'', noMail:true}); }catch(e){}
     // Zusaetzlich die abonnierten Verwaltungs-Personen final informieren (kursSettings.statusMailEmpfaenger)
     try{
       _db.collection('shared').doc('kursSettings').get().then(cs=>{
@@ -11469,8 +11483,8 @@ function syncGlobalTNStatus(tnId, statusType, opts){
         +'<p style="margin:0 0 10px;font-size:.85rem;color:#374151;line-height:1.6"><b>Bitte versuchen Sie kurzfristig, Ihren Azubi zu erreichen</b> und ihn zu informieren. Falls er sich rechtzeitig meldet (z.B. Bahn-Verspätung, Krankmeldung), kann der Status zurückgesetzt werden.</p>'
         +'<p style="margin:10px 0 0;font-size:.78rem;color:#64748b;line-height:1.55">Erfolgt keine Rückmeldung innerhalb der Frist, gilt der Lehrgang für ihn als nicht teilgenommen.</p>'
       , _seatAgEmailByTnId(tnId));
-      // Verwaltung benachrichtigen (Aufploppen + Browser-Push)
-      _notifyVwEvent('absent', tnId, data, kursName, ausName, {frist: opts.frist});
+      // Verwaltung: NUR App-Event (Glocke), KEINE E-Mail beim Verschieben (erst bei finaler Bestaetigung)
+      _notifyVwEvent('absent', tnId, data, kursName, ausName, {frist: opts.frist, noMail:true});
     }).catch(()=>{});
   } else if(statusType === 'wiederholer'){
     if(!confirm('↩ Als Wiederholer markieren?\n\nDer Azubi wird über folgende Wege informiert:\n• App-Benachrichtigung in AzubiPro\n• E-Mail (sofern Adresse hinterlegt)\n• Der Arbeitgeber wird ebenfalls per E-Mail informiert\n\nFortfahren?')) return;
@@ -11504,6 +11518,7 @@ function syncGlobalTNStatus(tnId, statusType, opts){
         '<div style="padding:12px;background:#fffbeb;border:2px solid #fde68a;border-radius:8px;margin-bottom:12px">'
         +'<p style="margin:0 0 6px;font-size:.85rem;color:#92400e;font-weight:700">Status: Wiederholer</p>'
         +'<p style="margin:0;font-size:.82rem;color:#1e293b;line-height:1.5">Lehrgang: '+kursNameMail+'</p>'
+        +((data.wdhGrund||'')?'<p style="margin:4px 0 0;font-size:.82rem;color:#1e293b;line-height:1.5">Grund: <b>'+esc(data.wdhGrund)+'</b></p>':'')
         +'<p style="margin:4px 0 0;font-size:.78rem;color:#64748b">Ausbilder: '+ausName+'</p></div>'
         +'<p style="margin:0;font-size:.85rem;color:#374151;line-height:1.6">Ihr Auszubildender wurde als Wiederholer eingestuft und nimmt am aktuellen Kurs nicht mehr teil. Der Kurs wird zu einem späteren Zeitpunkt wiederholt.</p>'
       , _seatAgEmailByTnId(tnId));

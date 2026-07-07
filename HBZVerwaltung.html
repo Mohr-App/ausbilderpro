@@ -1102,6 +1102,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                 <input type="checkbox" id="transferMailChk" onchange="event.stopPropagation();saveTransferMail()" style="margin-top:2px;flex:none">
                 <span><span style="font-weight:700;font-size:.72rem">E-Mails beim Zuweisen an Ausbilder verschicken</span><br><span style="font-size:.58rem;color:var(--mu)">Aus (Standard): beim Übertragen eines Kurses gehen keine E-Mails raus (Azubi + AG erhalten ihre Info erst bei der Lehrgangs-Bestätigung). An: Azubi- und AG-Mail sofort beim Zuweisen.</span></span>
               </label>
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-top:10px" onclick="event.stopPropagation()">
+                <input type="checkbox" id="statusMailChk" onchange="event.stopPropagation();saveStatusMailAbo()" style="margin-top:2px;flex:none">
+                <span><span style="font-weight:700;font-size:.72rem">📧 Status-Mails an mich (Nicht angetreten / Wiederholer)</span><br><span style="font-size:.58rem;color:var(--mu)">An: Du bekommst eine E-Mail, wenn ein Ausbilder einen TN als „Nicht angetreten" oder „Wiederholer" einstuft und wenn er das Nichtantreten final bestätigt. Gilt nur für dein Konto (<span id="statusMailWho">–</span>).</span></span>
+              </label>
+              <div id="statusMailListe" style="font-size:.56rem;color:var(--mu);margin:4px 0 0 26px"></div>
               <div style="border-top:1px solid var(--brd);margin:12px 0 8px"></div>
               <div style="font-weight:700;font-size:.72rem;margin-bottom:4px">🏢 Betriebsnamen korrigieren</div>
               <div style="font-size:.58rem;color:var(--mu);margin-bottom:8px">Korrigiert das Firma-Feld, wo statt des Namens eine Betriebsnummer (z.B. 1234567-00) steht. Mapping-Datei (betriebsnamen-mapping.json) laden → Vorschau → schreiben.</div>
@@ -1672,10 +1677,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 329';
+const APP_VERSION = 'Build 330';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 330', d:'07.07.2026', items:['\ud83d\udce7 Neuer Schalter in den Einstellungen: „Status-Mails an mich" \u2013 wer ihn aktiviert, wird per E-Mail informiert, wenn ein Ausbilder einen TN als „Nicht angetreten" oder „Wiederholer" einstuft bzw. das Nichtantreten final best\u00e4tigt. Gilt pro Login \u2013 jede Person abonniert nur f\u00fcr sich selbst']},
   {v:'Build 329', d:'06.07.2026', items:['\ud83c\udf33 TN-Baum jetzt 1:1 zur KH-Liste: Container = Berufsbezeichnungen aus den Daten (Fachrichtungen zusammengefasst), alphabetisch, neue Gewerke erscheinen automatisch \u2013 keine Pflege der Berufsgruppen mehr n\u00f6tig','\ud83d\udc41 Auge-Button am TEILNEHMER-Block: Berufe w\u00e4hlbar ein-/ausblenden (gilt f\u00fcr alle VP-Nutzer). Container \u201eOhne Beruf\u201c zeigt TN ohne Berufsangabe, \u201eNeuzug\u00e4nge\u201c bleibt oben']},
   {v:'Build 328', d:'06.07.2026', items:['\ud83d\udcd6 Import liest jetzt auch die Fachrichtungs-/Schwerpunkt-Spalte der KH-Liste \u2013 im TN steht der volle Original-Beruf (z. B. \u201eElektroniker/in, FR Energie- und Geb\u00e4udetechnik\u201c)','\u270f Teilnehmer-Formular: \u201eBeruf / Fachrichtung\u201c ist jetzt ein Textfeld mit dem exakten Listenwert (vordefinierte Fachrichtungen der Gruppe erscheinen als Tipp-Vorschl\u00e4ge)']},
   {v:'Build 327', d:'06.07.2026', items:['\ud83d\udcdc Die Liste hat Hoheit beim Beruf: Der Import beh\u00e4lt jetzt immer den Original-Berufstext (inkl. Fachrichtung) im TN \u2013 das fr\u00fchere Leeren bei Gruppen-Exaktmatch entf\u00e4llt. Berufsgruppen dienen nur noch der Sortierung (Name/Fachrichtung/Stichwort-Match)','\ud83e\ude79 Bestand heilt sich: Beim n\u00e4chsten Listen-Import wird das Beruf-Feld vorhandener TN aus der Liste \u00fcbernommen \u2013 auch manuell eingegebene Berufe werden ersetzt, sobald sie von der Liste abweichen (Bericht: \u201eLehrjahr/Beruf erg\u00e4nzt\u201c)']},
@@ -1723,6 +1729,14 @@ function loadHVKontakt(){
     try{ renderSbTnTree(); }catch(e){}
     const tm=document.getElementById('transferMailChk');
     if(tm) tm.checked = _transferMail;
+    // Status-Mail-Abo (pro Login)
+    _statusMailEmpf = Array.isArray(d.statusMailEmpfaenger)?d.statusMailEmpfaenger:[];
+    const sm=document.getElementById('statusMailChk');
+    const myMail=(_email||'').toLowerCase();
+    if(sm) sm.checked = _statusMailEmpf.map(x=>(x||'').toLowerCase()).indexOf(myMail)>=0;
+    const who=document.getElementById('statusMailWho'); if(who) who.textContent=_email||'–';
+    const liste=document.getElementById('statusMailListe');
+    if(liste) liste.textContent=_statusMailEmpf.length?('Empfänger aktuell: '+_statusMailEmpf.join(', ')):'Aktuell niemand abonniert.';
   }).catch(()=>{});
 }
 function saveHVKontakt(){
@@ -1751,6 +1765,22 @@ function saveTransferMail(){
   db.collection('shared').doc('kursSettings').set({transferMail:an},{merge:true})
     .then(()=>toast(an?'E-Mails beim Zuweisen sind jetzt aktiv ✓':'E-Mails beim Zuweisen sind jetzt aus ✓'))
     .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
+// Status-Mail-Abo pro Login: eigene Adresse in kursSettings.statusMailEmpfaenger ein-/austragen
+function saveStatusMailAbo(){
+  const an=document.getElementById('statusMailChk')?.checked===true;
+  const myMail=(_email||'').trim();
+  if(!myMail){ toast('Keine Login-E-Mail gefunden','bad'); return; }
+  const ref=db.collection('shared').doc('kursSettings');
+  const op=an?firebase.firestore.FieldValue.arrayUnion(myMail):firebase.firestore.FieldValue.arrayRemove(myMail);
+  ref.set({statusMailEmpfaenger:op},{merge:true}).then(()=>{
+    if(an){ if(_statusMailEmpf.indexOf(myMail)<0) _statusMailEmpf.push(myMail); }
+    else { _statusMailEmpf=_statusMailEmpf.filter(x=>x!==myMail); }
+    const liste=document.getElementById('statusMailListe');
+    if(liste) liste.textContent=_statusMailEmpf.length?('Empfänger aktuell: '+_statusMailEmpf.join(', ')):'Aktuell niemand abonniert.';
+    toast(an?'📧 Du erhältst jetzt Status-Mails ✓':'Status-Mails abbestellt ✓');
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 // ── "Nicht mehr in der Liste": Übersicht / Export / reversible Markierung ──
@@ -1926,6 +1956,7 @@ let _email = null;
 let _kurse = [];
 let _defaultKurstage = 5;
 let _transferMail = false;
+let _statusMailEmpf = [];
 let _tnBaumHidden = []; // im TN-Baum ausgeblendete Berufsbezeichnungen (shared, kursSettings.tnBaumHidden)
 let _csvData = [];
 let _selectedKursId = null;
