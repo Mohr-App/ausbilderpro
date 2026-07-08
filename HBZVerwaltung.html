@@ -1677,10 +1677,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 330';
+const APP_VERSION = 'Build 331';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 331', d:'07.07.2026', items:['\ud83d\udcda Beim Übertragen eines Lehrgangs an einen Ausbilder erh\u00e4lt dieser jetzt automatisch eine E-Mail (Kurs-Name, Zeitraum, Teilnehmerzahl, Link zu AusbilderPro)']},
   {v:'Build 330', d:'07.07.2026', items:['\ud83d\udce7 Neuer Schalter in den Einstellungen: „Status-Mails an mich" \u2013 wer ihn aktiviert, wird per E-Mail informiert, wenn ein Ausbilder einen TN als „Nicht angetreten" oder „Wiederholer" einstuft bzw. das Nichtantreten final best\u00e4tigt. Gilt pro Login \u2013 jede Person abonniert nur f\u00fcr sich selbst']},
   {v:'Build 329', d:'06.07.2026', items:['\ud83c\udf33 TN-Baum jetzt 1:1 zur KH-Liste: Container = Berufsbezeichnungen aus den Daten (Fachrichtungen zusammengefasst), alphabetisch, neue Gewerke erscheinen automatisch \u2013 keine Pflege der Berufsgruppen mehr n\u00f6tig','\ud83d\udc41 Auge-Button am TEILNEHMER-Block: Berufe w\u00e4hlbar ein-/ausblenden (gilt f\u00fcr alle VP-Nutzer). Container \u201eOhne Beruf\u201c zeigt TN ohne Berufsangabe, \u201eNeuzug\u00e4nge\u201c bleibt oben']},
   {v:'Build 328', d:'06.07.2026', items:['\ud83d\udcd6 Import liest jetzt auch die Fachrichtungs-/Schwerpunkt-Spalte der KH-Liste \u2013 im TN steht der volle Original-Beruf (z. B. \u201eElektroniker/in, FR Energie- und Geb\u00e4udetechnik\u201c)','\u270f Teilnehmer-Formular: \u201eBeruf / Fachrichtung\u201c ist jetzt ein Textfeld mit dem exakten Listenwert (vordefinierte Fachrichtungen der Gruppe erscheinen als Tipp-Vorschl\u00e4ge)']},
@@ -9888,6 +9889,7 @@ function transferEntwurf(kursId){
   Promise.all([batch.commit(),...oldKursCleanups]).then(()=>{
     toast('✓ '+tnIds.length+' TN übertragen!');
     notifyTNByEmail(tnIds, k.name, k.von, k.bis, k.ausbilderName);
+    notifyAusbilderNeuerKurs(k, tnIds.length);
     setTimeout(()=>showKursDetail(kursId),500);
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
@@ -9942,6 +9944,7 @@ async function transferAlleEntwuerfe(){
       const kursRef=db.collection('shared').doc('kurse').collection('list').doc(k.id);
       batch.update(kursRef,{entwurf:firebase.firestore.FieldValue.delete(),entwurfTNIds:firebase.firestore.FieldValue.delete(),lastTransfer:firebase.firestore.FieldValue.serverTimestamp(),transferredBy:_email});
       await batch.commit();
+      try{ notifyAusbilderNeuerKurs(k, tnIds.length); }catch(_){}
       ok++;
     }catch(e){ fail++; }
   }
@@ -10118,6 +10121,31 @@ function closeAc(dropId){ document.getElementById(dropId).classList.remove('open
 
 // Firmen sammeln aus allen Teilnehmern
 // Schickt jedem TN eine personalisierte Kurs-Zuweisungs-Mail mit App-Link, Installations-Anleitung und Datenschutz-Info
+// Informiert den zugewiesenen Ausbilder per E-Mail ueber einen neu uebertragenen Lehrgang.
+function notifyAusbilderNeuerKurs(k, tnAnzahl){
+  if(!db||!k) return;
+  const mail=((k.ausbilderLoginEmail||k.ausbilderEmail||'')+'').trim();
+  if(!mail) return;
+  const anrede=(k.ausbilderAnrede||'').trim();
+  const name=(k.ausbilderName||'').trim();
+  const hallo=anrede?('Hallo '+anrede+(name?' '+name:'')):(name?('Hallo '+name):'Hallo');
+  const ort=(k.ort||k.unterrichtsort||'').trim();
+  const zeitraum=(k.von?fmtDE(k.von):'')+(k.bis?' – '+fmtDE(k.bis):'');
+  const html='<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:18px">'
+    +'<h2 style="margin:0 0 6px;font-size:1.05rem;color:#2563eb">📚 Neuer Lehrgang für dich</h2>'
+    +'<p style="margin:0 0 14px;font-size:.9rem;color:#1e293b;line-height:1.55">'+esc(hallo)+',<br>dir wurde soeben ein Lehrgang zugewiesen. Er steht in AusbilderPro bereit.</p>'
+    +'<div style="padding:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:14px">'
+    +'<p style="margin:0 0 6px;font-size:.95rem;color:#0f172a"><b>'+esc(k.name||'Lehrgang')+'</b></p>'
+    +(zeitraum?'<p style="margin:0 0 3px;font-size:.85rem;color:#334155">🗓 '+zeitraum+'</p>':'')
+    +(ort?'<p style="margin:0 0 3px;font-size:.85rem;color:#334155">📍 '+esc(ort)+'</p>':'')
+    +'<p style="margin:0;font-size:.85rem;color:#334155">👥 '+(tnAnzahl||0)+' Teilnehmer</p>'
+    +'</div>'
+    +'<p style="margin:0 0 16px;font-size:.85rem;color:#374151;line-height:1.6">Öffne AusbilderPro und rufe deine Lehrgänge ab, um den Sitzplan und die Teilnehmerliste zu sehen.</p>'
+    +'<a href="https://ausbilderpro.de/AusbilderPro.html" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-size:.85rem;font-weight:700">AusbilderPro öffnen</a>'
+    +'<p style="margin:16px 0 0;font-size:.7rem;color:#94a3b8">Diese Benachrichtigung kann in VerwaltungPro → Einstellungen abgeschaltet werden.</p></div>';
+  db.collection('mail').add({to:mail, message:{subject:'📚 Neuer Lehrgang: '+(k.name||'')+(zeitraum?' ('+zeitraum+')':''), html:html}}).catch(e=>console.warn('Ausbilder-Kursmail:',e));
+}
+
 function notifyTNByEmail(tnIds, kursName, von, bis, ausbilderName){
   if(!db||!tnIds||!tnIds.length) return;
   // Globaler Schalter: standardmaessig KEINE Mails beim Zuweisen (Azubi+AG erhalten Info erst bei Lehrgangs-Bestaetigung)
