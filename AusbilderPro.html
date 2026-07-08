@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v783';
+const APP_VERSION = 'v784';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v784', d:'07.07.2026', items:['\ud83e\uddf9 Kein pulsierender Erinnerungsrahmen mehr an Sitzen von TN, die im Container \u201eNicht angetreten\u201c oder \u201eWiederholer\u201c liegen (auch ger\u00e4te\u00fcbergreifend)']},
   {v:'v783', d:'07.07.2026', items:['\u2713 Meldung \u201eKommt später\u201c/\u201eGeht früher\u201c: beim Antippen des Sitzes jetzt zwei Buttons \u2013 \u201eZur Kenntnis genommen\u201c (zur\u00fcck zum Sitzplan, ohne das Modal zu öffnen) oder \u201eZur Kenntnis \u2013 Sitzplatz öffnen\u201c wie bisher. Kein automatischer Anwesenheitseintrag']},
   {v:'v782', d:'07.07.2026', items:['\u270f Formulierung der finalen Nicht-angetreten-Info neutralisiert: \u201eendg\u00fcltig nicht angetreten (Frist abgelaufen)\u201c statt \u201enicht gemeldet und nicht erschienen\u201c \u2013 deckt auch den Fall ab, dass der Azubi abgesagt hat']},
   {v:'v781', d:'07.07.2026', items:['\ud83d\udd24 Texte am finalen Nicht-angetreten-Button vereinheitlicht: \u201eBetrieb & Verwaltung final informieren\u201c (Hover-Titel, Hinweise)']},
@@ -4120,6 +4121,9 @@ function updateBeginn(v){
 function seatAlertInfo(inst,id,d){
   try{
     if(!inst||!d||!d.name||d.wiederholer) return null;
+    // Kein Erinnerungsrahmen fuer TN, die als Wiederholer/Nicht-angetreten gelten (auch geraeteuebergreifend via Cloud-Status)
+    const _cs=(d.poolTnId&&_tnStatusMap[d.poolTnId])||'';
+    if(_cs==='wiederholer'||_cs==='absent') return null;
     const start=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+inst.sM+'-'+inst.sD):null;
     if(!start) return null;
     const end=(inst.eY&&inst.eM&&inst.eD)?(inst.eY+'-'+inst.eM+'-'+inst.eD):'9999-12-31';
