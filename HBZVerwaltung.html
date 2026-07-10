@@ -1684,10 +1684,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 336';
+const APP_VERSION = 'Build 337';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 337', d:'09.07.2026', items:['\ud83d\udcc4 Teilnahmebescheinigung spiegelt jetzt die im AusbilderPro festgelegte Position von Stempel und Unterschrift 1:1 \u2013 Ansicht und Ausdruck in der Verwaltung sind identisch zum Original']},
   {v:'Build 336', d:'09.07.2026', items:['\ud83c\udfa8 Alle Scrollleisten in VerwaltungPro jetzt einheitlich schlank und dezent hellgrau (Sidebar, Listen, Dialoge)']},
   {v:'Build 335', d:'09.07.2026', items:['\ud83c\udfa8 Schlanke, dezent hellgraue Scrollleiste in der Sidebar (abgerundet, mit Hover-Effekt)']},
   {v:'Build 334', d:'09.07.2026', items:['\ud83d\udcdc Sidebar hat jetzt einen eigenen Scrollbereich: Bei vielen ge\u00f6ffneten Containern scrollt nur die Seitenleiste \u2013 Dashboard und Inhalt rechts bleiben immer sichtbar']},
@@ -6907,6 +6908,12 @@ function generateAlleBescheinigungen(){
       const bemerkung=d.bemerkung||'';
       const sigData=d.bescheinigungSignatur||'';
       const stempelData=d.bescheinigungStempel||'';
+      // Positionen aus AusbilderPro spiegeln (identische Darstellung)
+      const _sp=(d.bescheinigungStempelPos&&typeof d.bescheinigungStempelPos==='object')?d.bescheinigungStempelPos:null;
+      const _gp=(d.bescheinigungSigPos&&typeof d.bescheinigungSigPos==='object')?d.bescheinigungSigPos:null;
+      const _n=(v,dd)=>{const n=Number(v);return isFinite(n)?n:dd;};
+      const stempelStyle=_sp?(' style="left:calc(50% + '+_n(_sp.x,0)+'mm);top:'+_n(_sp.y,-30)+'mm;width:'+_n(_sp.size,38)+'mm;height:'+_n(_sp.size,38)+'mm;"'):'';
+      const sigImgStyle=_gp?(' style="transform:translateX(calc(-50% + '+_n(_gp.x,0)+'mm));bottom:'+(-_n(_gp.y,0))+'mm;height:'+_n(_gp.size,16)+'mm;"'):'';
       const tnId=t.id;
       const storedStandort=d.bescheinigungStandort;
       const validStandort=storedStandort==='bonn'||storedStandort==='sieg';
@@ -6955,10 +6962,10 @@ ${notenHtml}
 <div class="datum-zeile"><b>Siegburg, den ${heute}</b></div>
 <div class="sig-row">
   <div class="sig-block">
-    <div class="sig-area" id="sigArea-${tnId}">${sigData?'<div class="sig-canvas-wrap signed"><img src="'+sigData+'" class="sig-img"></div>':'<div class="sig-canvas-wrap-empty"></div>'}</div>${ausgATxt?'<div class="no-print" style="font-size:9px;color:#166534;font-weight:700;text-align:center">'+ausgATxt+'</div>':''}
+    <div class="sig-area" id="sigArea-${tnId}">${sigData?'<div class="sig-canvas-wrap signed"><img src="'+sigData+'" class="sig-img"'+sigImgStyle+'></div>':'<div class="sig-canvas-wrap-empty"></div>'}</div>${ausgATxt?'<div class="no-print" style="font-size:9px;color:#166534;font-weight:700;text-align:center">'+ausgATxt+'</div>':''}
     <div class="sig-line">Lehrgangsleiter</div>
   </div>
-  <div class="stempel-slot">${stempelData?('<img src="'+stempelData+'" alt="Stempel">'):''}</div>
+  <div class="stempel-slot"${stempelStyle}>${stempelData?('<img src="'+stempelData+'" alt="Stempel">'):''}</div>
   <div class="sig-block"><div class="sig-space"></div><div class="sig-line">Ausbilder (Meister)</div></div>
 </div>
 <div class="hinweis-row">

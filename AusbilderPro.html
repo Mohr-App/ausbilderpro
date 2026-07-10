@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v786';
+const APP_VERSION = 'v787';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v787', d:'09.07.2026', items:['\ud83d\udcc4 Bescheinigung: Position von Unterschrift und Stempel wird jetzt mitgespeichert, damit die Verwaltung (VerwaltungPro) die Teilnahmebescheinigung 1:1 identisch anzeigen und ausdrucken kann']},
   {v:'v786', d:'09.07.2026', items:['\u26a0\ufe0f Dubletten-Warnung beim Lehrgänge-Abrufen: Gleicht ein zugewiesener Kurs einem bereits vorhandenen eigenen Kurs (Name + Zeitraum), wird er markiert und kann direkt „Verworfen" werden, statt ihn doppelt zu übernehmen']},
   {v:'v785', d:'09.07.2026', items:['\ud83c\udfa8 Einheitliche dezent hellgraue Scrollleisten (Sidebar bei vielen Kursen, Listen, Dialoge) \u2013 passend zu VerwaltungPro']},
   {v:'v784', d:'07.07.2026', items:['\ud83e\uddf9 Kein pulsierender Erinnerungsrahmen mehr an Sitzen von TN, die im Container \u201eNicht angetreten\u201c oder \u201eWiederholer\u201c liegen (auch ger\u00e4te\u00fcbergreifend)']},
@@ -7181,7 +7182,7 @@ async function insertSigStempelBulk(){
     if(result.sig){
       area.innerHTML='<div class="sig-canvas-wrap signed"><img src="'+result.sig+'" class="sig-img"><button class="btn-remove-overlay no-print" onclick="removeSigBulk(\\''+tnId+'\\')" title="Unterschrift entfernen">✕</button></div>';
       if(window.opener&&window.opener._saveBescheinigungSignature){
-        window.opener._saveBescheinigungSignature(window._kursId,tnId,result.sig,result.stempel);
+        window.opener._saveBescheinigungSignature(window._kursId,tnId,result.sig,result.stempel,_sigPos,_stempelPos);
       }
     }
   });
@@ -10564,7 +10565,7 @@ async function sendBescheinigung(){
     if(!window.opener._saveBescheinigungSignature){
       throw new Error('Bitte AusbilderPro im Hauptfenster neu laden');
     }
-    await window.opener._saveBescheinigungSignature(window._kursId,window._tnId,sigToSave,window._loadedStempel);
+    await window.opener._saveBescheinigungSignature(window._kursId,window._tnId,sigToSave,window._loadedStempel,_sigPos,_stempelPos);
     // 2. PDF aus .page generieren
     btn.textContent='Erstelle PDF…';
     document.body.classList.add('pdf-mode');
@@ -14387,14 +14388,19 @@ window._markBescheinigungAusgestelltBulk=function(kursId,tnIds,art){
   });
   return batch.commit().catch(err=>console.error('Ausgestellt-Mark bulk:',err));
 };
-window._saveBescheinigungSignature=function(kursId,tnId,signatureData,stempelData){ if(lockGuard())return;
+window._saveBescheinigungSignature=function(kursId,tnId,signatureData,stempelData,sigPos,stempelPos){ if(lockGuard())return;
   if(!_db||!kursId||!tnId) return Promise.reject(new Error('Missing kursId/tnId'));
   // JSON-Roundtrip + lokales Object stellt sicher dass es 100% plain ist
-  const data=JSON.parse(JSON.stringify({
+  const _num=(v,d)=>{ const n=Number(v); return isFinite(n)?n:d; };
+  const obj={
     bescheinigungSignatur:String(signatureData||''),
     bescheinigungStempel:String(stempelData||''),
     bescheinigungDatum:Date.now()
-  }));
+  };
+  // Positionen mitspeichern, damit VerwaltungPro die Bescheinigung identisch darstellt (1:1-Spiegel)
+  if(sigPos&&typeof sigPos==='object') obj.bescheinigungSigPos={x:_num(sigPos.x,0),y:_num(sigPos.y,0),size:_num(sigPos.size,16)};
+  if(stempelPos&&typeof stempelPos==='object') obj.bescheinigungStempelPos={x:_num(stempelPos.x,0),y:_num(stempelPos.y,-30),size:_num(stempelPos.size,38)};
+  const data=JSON.parse(JSON.stringify(obj));
   return _db.collection('shared').doc('kurse').collection('list').doc(String(kursId)).collection('teilnehmer').doc(String(tnId)).set(data,{merge:true});
 };
 // Bescheinigungs-Mail mit PDF-Anhang versenden (Parent-Context!)
