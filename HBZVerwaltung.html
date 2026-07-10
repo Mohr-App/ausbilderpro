@@ -1684,10 +1684,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 338';
+const APP_VERSION = 'Build 339';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 339', d:'09.07.2026', items:['\ud83d\udd27 Eigene Notenarten (z. B. N1\u2013N4) erscheinen jetzt auf der Teilnahmebescheinigung: Die Bezeichnungen werden aus dem Kurs geladen (nicht nur aus dem TN-Doc), und Werte werden auch ohne Label angezeigt \u2013 keine Note geht mehr verloren']},
   {v:'Build 338', d:'09.07.2026', items:['\ud83d\udd27 Bescheinigung liest Noten, Nachweis und Signatur jetzt direkt aus derselben Quelle wie die Kursansicht (teilnehmer-Subcollection) \u2013 Noten und Unterweisungs-Best\u00e4tigung erscheinen jetzt zuverl\u00e4ssig auf der Teilnahmebescheinigung']},
   {v:'Build 337', d:'09.07.2026', items:['\ud83d\udcc4 Teilnahmebescheinigung spiegelt jetzt die im AusbilderPro festgelegte Position von Stempel und Unterschrift 1:1 \u2013 Ansicht und Ausdruck in der Verwaltung sind identisch zum Original']},
   {v:'Build 336', d:'09.07.2026', items:['\ud83c\udfa8 Alle Scrollleisten in VerwaltungPro jetzt einheitlich schlank und dezent hellgrau (Sidebar, Listen, Dialoge)']},
@@ -6929,8 +6930,17 @@ function generateAlleBescheinigungen(){
       if(String(fuehrung).trim()) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Führung:</span><span class="note-line">${esc(String(fuehrung))}</span></div>`);
       if(String(mitarbeit).trim()) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Mitarbeit:</span><span class="note-line">${esc(String(mitarbeit))}</span></div>`);
       if(String(praxis).trim()) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Fachkenntnisse (praktisch):</span><span class="note-line">${esc(String(praxis))}</span></div>`);
+      // Custom-Noten-Labels: TN-Doc > Kurs-Doc (customGrades) > numerischer Fallback (N1, N2, ...) - wie in der Kursansicht.
+      // Wert wird auch OHNE Label gerendert (Label-Fallback greift immer), damit keine Note verloren geht.
       const exLabels=d.noten_extra_labels||{}; const ex=d.noten_extra||{};
-      Object.keys(ex).forEach(cid=>{ const v=ex[cid]; const lbl=exLabels[cid]; if(v&&lbl&&String(v).trim()) notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(lbl))}:</span><span class="note-line">${esc(String(v))}</span></div>`); });
+      const _kursCG=(kurs&&kurs.customGrades)||{};
+      let _exIdx=0;
+      Object.keys(ex).forEach(cid=>{
+        const v=ex[cid]; if(!(v&&String(v).trim())) return;
+        _exIdx++;
+        const lbl=exLabels[cid]||_kursCG[cid]||('Note '+_exIdx);
+        notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(lbl))}:</span><span class="note-line">${esc(String(v))}</span></div>`);
+      });
       notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage}</span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short">${verspaetungen}</span></div>`);
       if(bemerkung) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
       const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
