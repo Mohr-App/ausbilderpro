@@ -1684,10 +1684,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 337';
+const APP_VERSION = 'Build 338';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 338', d:'09.07.2026', items:['\ud83d\udd27 Bescheinigung liest Noten, Nachweis und Signatur jetzt direkt aus derselben Quelle wie die Kursansicht (teilnehmer-Subcollection) \u2013 Noten und Unterweisungs-Best\u00e4tigung erscheinen jetzt zuverl\u00e4ssig auf der Teilnahmebescheinigung']},
   {v:'Build 337', d:'09.07.2026', items:['\ud83d\udcc4 Teilnahmebescheinigung spiegelt jetzt die im AusbilderPro festgelegte Position von Stempel und Unterschrift 1:1 \u2013 Ansicht und Ausdruck in der Verwaltung sind identisch zum Original']},
   {v:'Build 336', d:'09.07.2026', items:['\ud83c\udfa8 Alle Scrollleisten in VerwaltungPro jetzt einheitlich schlank und dezent hellgrau (Sidebar, Listen, Dialoge)']},
   {v:'Build 335', d:'09.07.2026', items:['\ud83c\udfa8 Schlanke, dezent hellgraue Scrollleiste in der Sidebar (abgerundet, mit Hover-Effekt)']},
@@ -6874,23 +6875,23 @@ function generateAlleBescheinigungen(){
   const standortLow=(kurs.standort||'').toLowerCase();
   const isBonn=standortLow.includes('bonn');
   const heute=new Date().toLocaleDateString('de-DE');
-  db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
-    const tns=[];
-    snap.forEach(doc=>tns.push({id:doc.id,...doc.data()}));
-    if(!tns.length){
-      _globalTN.forEach(t=>{
-        if((t.kursHistory||[]).some(h=>h.kursId===kursId)&&!tns.some(x=>x.id===t.id)) tns.push(t);
-      });
-    }
-    if(!tns.length){toast('Keine TN gefunden','bad');return;}
-    tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
-    const promises=tns.map(t=>
-      db.collection('shared').doc('kurse').collection('list').doc(kursId)
-        .collection('teilnehmer').doc(t.id).get()
-        .then(doc=>({tn:t, sync:doc.exists?doc.data():{}}))
-        .catch(()=>({tn:t, sync:{}}))
-    );
-    return Promise.all(promises);
+  // Quelle wie die Kursansicht: direkt die teilnehmer-Subcollection (dort liegen Noten, Nachweis, Signatur).
+  // Namen/Geburtsdatum werden aus globalTN (bzw. _globalTN-Cache) dazugezogen.
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').get().then(subSnap=>{
+    const syncMap={};
+    subSnap.forEach(doc=>{ syncMap[doc.id]={id:doc.id,...doc.data()}; });
+    // Stammdaten (Name, Geburtsdatum) je TN-ID
+    const stammById={};
+    (_globalTN||[]).forEach(t=>{ stammById[t.id]=t; });
+    // Alle TN, die ein Sync-Doc in diesem Kurs haben
+    const results=Object.keys(syncMap).map(tnId=>{
+      const stamm=stammById[tnId]||{id:tnId};
+      return {tn:stamm, sync:syncMap[tnId]};
+    });
+    // Nach Nachname sortieren (aus Stammdaten)
+    results.sort((a,b)=>((a.tn.nachname||'')).localeCompare((b.tn.nachname||''),'de'));
+    return results;
   }).then(results=>{
     if(!results||!results.length) return;
     const signed=results.filter(r=>r.sync && r.sync.bescheinigungSignatur);
