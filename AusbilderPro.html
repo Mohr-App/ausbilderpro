@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v785';
+const APP_VERSION = 'v786';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v786', d:'09.07.2026', items:['\u26a0\ufe0f Dubletten-Warnung beim Lehrgänge-Abrufen: Gleicht ein zugewiesener Kurs einem bereits vorhandenen eigenen Kurs (Name + Zeitraum), wird er markiert und kann direkt „Verworfen" werden, statt ihn doppelt zu übernehmen']},
   {v:'v785', d:'09.07.2026', items:['\ud83c\udfa8 Einheitliche dezent hellgraue Scrollleisten (Sidebar bei vielen Kursen, Listen, Dialoge) \u2013 passend zu VerwaltungPro']},
   {v:'v784', d:'07.07.2026', items:['\ud83e\uddf9 Kein pulsierender Erinnerungsrahmen mehr an Sitzen von TN, die im Container \u201eNicht angetreten\u201c oder \u201eWiederholer\u201c liegen (auch ger\u00e4te\u00fcbergreifend)']},
   {v:'v783', d:'07.07.2026', items:['\u2713 Meldung \u201eKommt später\u201c/\u201eGeht früher\u201c: beim Antippen des Sitzes jetzt zwei Buttons \u2013 \u201eZur Kenntnis genommen\u201c (zur\u00fcck zum Sitzplan, ohne das Modal zu öffnen) oder \u201eZur Kenntnis \u2013 Sitzplatz öffnen\u201c wie bisher. Kein automatischer Anwesenheitseintrag']},
@@ -3021,23 +3022,81 @@ function openLehrgangAbrufen(){
         const lgart=k.lehrgangsart||k.name||'Kurs';
         const vonBis=fmtDE(k.von)+' – '+fmtDE(k.bis);
         const tnCount=k.tnCount||'?';
+        const dupe=_findKursDublette(k); // vorhandener eigener Kurs mit gleichem Namen + ueberlappendem Zeitraum
         const card=document.createElement('div');
-        card.style.cssText='display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--sur2);border:2px solid var(--brd);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all .12s;';
+        card.style.cssText='display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--sur2);border:2px solid '+(dupe?'#f59e0b':'var(--brd)')+';border-radius:10px;margin-bottom:8px;transition:all .12s;';
         card.innerHTML=
-          '<div style="width:42px;height:42px;border-radius:10px;background:rgba(59,130,246,.12);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">📋</div>'
+          '<div style="width:42px;height:42px;border-radius:10px;background:'+(dupe?'rgba(245,158,11,.14)':'rgba(59,130,246,.12)')+';display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">'+(dupe?'⚠️':'📋')+'</div>'
           +'<div style="flex:1;min-width:0">'
           +'<div style="font-weight:700;font-size:.85rem">'+esc(lgart)+'</div>'
           +'<div style="font-size:.68rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace;margin-top:2px">'+esc(vonBis)+'</div>'
+          +(dupe?'<div style="font-size:.64rem;color:#b45309;font-weight:700;margin-top:3px">Mögliche Dublette zu deinem Kurs „'+esc(dupe)+'"</div>':'')
           +'</div>'
-          +'<div style="font-size:.72rem;color:var(--acc);font-weight:700;flex-shrink:0">Übernehmen →</div>';
-        card.onmouseenter=function(){this.style.borderColor='var(--acc)';this.style.background='rgba(59,130,246,.05)';};
-        card.onmouseleave=function(){this.style.borderColor='var(--brd)';this.style.background='var(--sur2)';};
-        card.onclick=function(){ abrufKurs(k.id, k); };
+          +'<div class="abruf-actions" style="display:flex;flex-direction:column;gap:6px;flex-shrink:0"></div>';
+        const act=card.querySelector('.abruf-actions');
+        const bTake=document.createElement('button');
+        bTake.textContent='Übernehmen →';
+        bTake.style.cssText='font-size:.72rem;color:#fff;background:var(--acc);border:none;border-radius:7px;padding:7px 12px;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif';
+        bTake.onclick=function(ev){ ev.stopPropagation(); abrufKurs(k.id, k); };
+        act.appendChild(bTake);
+        if(dupe){
+          const bDrop=document.createElement('button');
+          bDrop.textContent='🗑 Verwerfen';
+          bDrop.title='Diese zugewiesene (doppelte) Kopie löschen, ohne sie zu übernehmen';
+          bDrop.style.cssText='font-size:.68rem;color:#dc2626;background:#fff;border:1.5px solid #fca5a5;border-radius:7px;padding:6px 12px;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif';
+          bDrop.onclick=function(ev){ ev.stopPropagation(); verwerfeZugewiesenenKurs(k.id, lgart, card); };
+          act.appendChild(bDrop);
+        }
         body.appendChild(card);
       });
     }).catch(err=>{
       body.innerHTML='<div style="text-align:center;padding:20px;color:#ef4444">Fehler: '+esc(err.message)+'</div>';
     });
+}
+
+// Prueft, ob zu einem zugewiesenen Kurs bereits ein eigener Kurs mit gleichem Namen
+// und ueberlappendem Zeitraum existiert. Gibt den Namen des vorhandenen Kurses zurueck (sonst '').
+function _findKursDublette(k){
+  const norm=x=>(x||'').toString().toLowerCase().replace(/\s+/g,' ').trim();
+  const kName=norm(k.lehrgangsart||k.name);
+  if(!kName) return '';
+  const kVon=(k.von||''), kBis=(k.bis||'');
+  for(const katId in S.kats){
+    const kat=S.kats[katId];
+    const katName=norm(kat.label);
+    const insts=kat.instances||{};
+    for(const iid in insts){
+      const inst=insts[iid];
+      if(!inst) continue;
+      // Name-Aehnlichkeit: Kategorie-Label ODER Instanz-Name matcht
+      const iName=norm(inst.name);
+      const nameHit = katName===kName || iName===kName || (katName&&kName&&(katName.indexOf(kName)>=0||kName.indexOf(katName)>=0));
+      if(!nameHit) continue;
+      // Zeitraum-Ueberlappung (wenn beide Datumsangaben haben)
+      const iVon=(inst.von||inst.startDatum||''), iBis=(inst.bis||inst.endDatum||'');
+      if(kVon&&kBis&&iVon&&iBis){
+        if(kVon<=iBis && iVon<=kBis) return kat.label||inst.name||'Kurs';
+      } else {
+        // ohne Datum: Namensgleichheit reicht als Warnung
+        return kat.label||inst.name||'Kurs';
+      }
+    }
+  }
+  return '';
+}
+
+// Loescht eine zugewiesene (doppelte) Kurs-Kopie, ohne sie zu uebernehmen.
+function verwerfeZugewiesenenKurs(kursId, name, cardEl){
+  if(!confirm('🗑 Zugewiesenen Lehrgang „'+name+'" verwerfen?\n\nDie von der Verwaltung übertragene Kopie wird gelöscht. Dein eigener Kurs bleibt unberührt.\n\nFortfahren?')) return;
+  if(!_db){ toast('Keine Verbindung','bad'); return; }
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId).delete().then(()=>{
+    if(cardEl&&cardEl.parentNode) cardEl.parentNode.removeChild(cardEl);
+    toast('🗑 Zugewiesener Lehrgang verworfen');
+    const body=document.getElementById('abrufBody');
+    if(body && !body.querySelector('.abruf-actions')){
+      body.innerHTML='<div style="text-align:center;padding:20px;color:var(--mu);font-size:.8rem">Keine weiteren zugewiesenen Lehrgänge.</div>';
+    }
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
 function abrufKurs(kursId, kursData){
