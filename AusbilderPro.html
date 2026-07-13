@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v788';
+const APP_VERSION = 'v789';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v789', d:'09.07.2026', items:['\ud83d\udd27 E-Mail-Bestätigung-Übersicht liest den Status jetzt aus den Stammdaten (globalTN) \u2013 bestätigte Azubis werden korrekt mit \u2705 angezeigt']},
   {v:'v788', d:'09.07.2026', items:['\ud83d\udce7 Neuer Aktionen-Punkt „E-Mail-Bestätigung": zeigt für alle TN übersichtlich, wer die Adresse bestätigt hat (\u2705), wer noch aussteht (\u23f3) oder keinen Check hat. Das 📧-Zeichen am Sitzplatz entfällt \u2013 der Sitzplan ist jetzt ruhiger und einheitlich']},
   {v:'v787', d:'09.07.2026', items:['\ud83d\udcc4 Bescheinigung: Position von Unterschrift und Stempel wird jetzt mitgespeichert, damit die Verwaltung (VerwaltungPro) die Teilnahmebescheinigung 1:1 identisch anzeigen und ausdrucken kann']},
   {v:'v786', d:'09.07.2026', items:['\u26a0\ufe0f Dubletten-Warnung beim Lehrgänge-Abrufen: Gleicht ein zugewiesener Kurs einem bereits vorhandenen eigenen Kurs (Name + Zeitraum), wird er markiert und kann direkt „Verworfen" werden, statt ihn doppelt zu übernehmen']},
@@ -11653,15 +11654,22 @@ function openEmailBestaetigung(){
   document.body.appendChild(modal);
   _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').get().then(snap=>{
     const rows=[];
+    // Bestaetigungs-Status liegt im globalTN-Doc (AzubiPro schreibt emailBestaetigt/emailCheckAktiv dorthin),
+    // NICHT im Kurs-Sub-Doc. Daher pro TN das Stammdoc heranziehen.
+    const stammById={};
+    (_globalTN||[]).forEach(t=>{ stammById[t.id]=t; });
     snap.forEach(doc=>{
       const d=doc.data();
-      const name=((d.vorname||'')+' '+(d.nachname||'')).trim()|| (d.name||'') ||'(ohne Name)';
-      const mail=(d.kontaktEmail||d.email||'').trim();
+      const g=stammById[doc.id]||{};
+      const name=((d.vorname||g.vorname||'')+' '+(d.nachname||g.nachname||'')).trim()|| (d.name||g.name||'') ||'(ohne Name)';
+      const mail=(d.kontaktEmail||d.email||g.kontaktEmail||g.email||'').trim();
+      const best=(g.emailBestaetigt===true)||(d.emailBestaetigt===true);
+      const check=(g.emailCheckAktiv===true)||(d.emailCheckAktiv===true)||(g.selfRegistered===true)||(g.verknuepftUid?true:false);
       let status, col, bg;
-      if(d.emailBestaetigt===true){ status='✅ bestätigt'; col='#059669'; bg='rgba(5,150,105,.08)'; }
-      else if(d.emailCheckAktiv===true){ status='⏳ ausstehend'; col='#b45309'; bg='rgba(245,158,11,.10)'; }
+      if(best){ status='✅ bestätigt'; col='#059669'; bg='rgba(5,150,105,.08)'; }
+      else if(check){ status='⏳ ausstehend'; col='#b45309'; bg='rgba(245,158,11,.10)'; }
       else { status='—'; col='#94a3b8'; bg='transparent'; }
-      rows.push({name,mail,status,col,bg,sort:(d.emailBestaetigt===true?2:(d.emailCheckAktiv===true?0:1))});
+      rows.push({name,mail,status,col,bg,sort:(best?2:(check?0:1))});
     });
     rows.sort((a,b)=>a.sort-b.sort || a.name.localeCompare(b.name,'de'));
     const body=document.getElementById('emailBestBody');
