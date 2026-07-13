@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v789';
+const APP_VERSION = 'v790';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v790', d:'09.07.2026', items:['\ud83d\udc1b Fix E-Mail-Bestätigung-Übersicht: Status wird jetzt korrekt je TN aus den Stammdaten geladen (Fehler „_globalTN is not defined" behoben) \u2013 bestätigte Azubis erscheinen mit \u2705']},
   {v:'v789', d:'09.07.2026', items:['\ud83d\udd27 E-Mail-Bestätigung-Übersicht liest den Status jetzt aus den Stammdaten (globalTN) \u2013 bestätigte Azubis werden korrekt mit \u2705 angezeigt']},
   {v:'v788', d:'09.07.2026', items:['\ud83d\udce7 Neuer Aktionen-Punkt „E-Mail-Bestätigung": zeigt für alle TN übersichtlich, wer die Adresse bestätigt hat (\u2705), wer noch aussteht (\u23f3) oder keinen Check hat. Das 📧-Zeichen am Sitzplatz entfällt \u2013 der Sitzplan ist jetzt ruhiger und einheitlich']},
   {v:'v787', d:'09.07.2026', items:['\ud83d\udcc4 Bescheinigung: Position von Unterschrift und Stempel wird jetzt mitgespeichert, damit die Verwaltung (VerwaltungPro) die Teilnahmebescheinigung 1:1 identisch anzeigen und ausdrucken kann']},
@@ -11653,14 +11654,16 @@ function openEmailBestaetigung(){
     +'</div>';
   document.body.appendChild(modal);
   _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').get().then(snap=>{
+    // Bestaetigungs-Status liegt im globalTN-Doc (AzubiPro schreibt emailBestaetigt/emailCheckAktiv dorthin).
+    // Pro Sub-Doc das zugehoerige globalTN-Stammdoc laden.
+    const subDocs=[]; snap.forEach(doc=>subDocs.push({id:doc.id, d:doc.data()}));
+    const jobs=subDocs.map(sd=>_db.collection('globalTN').doc(sd.id).get()
+      .then(g=>({sd, g:g.exists?g.data():{}})).catch(()=>({sd, g:{}})));
+    return Promise.all(jobs);
+  }).then(pairs=>{
     const rows=[];
-    // Bestaetigungs-Status liegt im globalTN-Doc (AzubiPro schreibt emailBestaetigt/emailCheckAktiv dorthin),
-    // NICHT im Kurs-Sub-Doc. Daher pro TN das Stammdoc heranziehen.
-    const stammById={};
-    (_globalTN||[]).forEach(t=>{ stammById[t.id]=t; });
-    snap.forEach(doc=>{
-      const d=doc.data();
-      const g=stammById[doc.id]||{};
+    pairs.forEach(({sd,g})=>{
+      const d=sd.d||{};
       const name=((d.vorname||g.vorname||'')+' '+(d.nachname||g.nachname||'')).trim()|| (d.name||g.name||'') ||'(ohne Name)';
       const mail=(d.kontaktEmail||d.email||g.kontaktEmail||g.email||'').trim();
       const best=(g.emailBestaetigt===true)||(d.emailBestaetigt===true);
