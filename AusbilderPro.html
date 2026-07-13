@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v787';
+const APP_VERSION = 'v788';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v788', d:'09.07.2026', items:['\ud83d\udce7 Neuer Aktionen-Punkt „E-Mail-Bestätigung": zeigt für alle TN übersichtlich, wer die Adresse bestätigt hat (\u2705), wer noch aussteht (\u23f3) oder keinen Check hat. Das 📧-Zeichen am Sitzplatz entfällt \u2013 der Sitzplan ist jetzt ruhiger und einheitlich']},
   {v:'v787', d:'09.07.2026', items:['\ud83d\udcc4 Bescheinigung: Position von Unterschrift und Stempel wird jetzt mitgespeichert, damit die Verwaltung (VerwaltungPro) die Teilnahmebescheinigung 1:1 identisch anzeigen und ausdrucken kann']},
   {v:'v786', d:'09.07.2026', items:['\u26a0\ufe0f Dubletten-Warnung beim Lehrgänge-Abrufen: Gleicht ein zugewiesener Kurs einem bereits vorhandenen eigenen Kurs (Name + Zeitraum), wird er markiert und kann direkt „Verworfen" werden, statt ihn doppelt zu übernehmen']},
   {v:'v785', d:'09.07.2026', items:['\ud83c\udfa8 Einheitliche dezent hellgraue Scrollleisten (Sidebar bei vielen Kursen, Listen, Dialoge) \u2013 passend zu VerwaltungPro']},
@@ -3770,6 +3771,7 @@ function renderMain(){
     +'<button class="tbtn main-docs-btn ka-g" onclick="markBerufsschultag()" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="openCourseDocsModal()" title="Kurs-Dokumente – Austausch mit der Verwaltung (nicht für Teilnehmer sichtbar)">📁 Dokumente (Verwaltung)</button>'
     +'<button class="tbtn main-docs-btn ka-g" onclick="generateTNListeAusbilder()" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">📋 TN-Liste</button>'
+    +'<button class="tbtn main-docs-btn ka-b" onclick="openEmailBestaetigung()" title="Übersicht: welche Azubis ihre E-Mail-Adresse bestätigt haben">📧 E-Mail-Bestätigung</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="generateBetriebslisteAusbilder()" title="PDF-Liste der Ausbildungsbetriebe mit Telefonnummern">🏢 Betriebsliste</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="generateAlleBescheinigungenAusbilder()" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen</button>'
     +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g btn-grad" onclick="openManualTNModal()" title="Teilnehmer manuell zum Kurs hinzufügen">👤+ TN</button><button class="tbtn main-docs-btn ka-b" onclick="openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button><button class="tbtn main-docs-btn ka-g btn-grad" onclick="openQRAttModal()" title="QR-Anwesenheit: Azubis checken per Scan + GPS-Standortprüfung selbst ein">📡 QR-Anwesenheit</button>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
@@ -4671,7 +4673,6 @@ function mkSeat(id,seats){
   }
   else{
     el.classList.add('filled');
-    if(d._unbestaetigt) el.classList.add('seat-unbestaetigt');
     el.title=d.name+' – Klicken für Details';
     // Ausgrauen: lokales Flag ODER Cloud-Status des verknuepften TN (geraeteuebergreifend, rein visuell)
     const _cloudStat=(d.poolTnId&&_tnStatusMap[d.poolTnId])||'';
@@ -4682,11 +4683,9 @@ function mkSeat(id,seats){
     att.forEach(a=>{ if(a.date) dayMap.set(a.date,attCfg(a).dot); });
     const dotsHtml=[...dayMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).slice(-14).map(([date,cls])=>'<div class="sdot '+cls+'" title="'+fmtD(date)+'"></div>').join('');
     const _today=new Date().toISOString().slice(0,10);
-    // 📧 unbestaetigte Mail: dauerhaftes Kennzeichen am Reihenanfang (wird NICHT durch Anwesenheit ersetzt)
-    const emailDot=d.emailUnbestaetigt?'<div class="sdot sdot-emoji" title="E-Mail noch nicht bestätigt – nur ein Hinweis, blockiert nichts. Der Azubi kann die App normal nutzen. Möglicherweise ist die Adresse falsch – du kannst sie hier korrigieren, damit er E-Mails (z. B. Willkommen) erhält.">📧</div>':'';
     // 📣 Fehlen-informiert: am Heute-Platz (rechts); der echte Anwesenheits-Badge ersetzt es, sobald der Tag eingetragen ist
     const fehlDot=(d.fehlInfo && !dayMap.has(_today))?'<div class="sdot sdot-emoji sdot-fehl" title="Wegen Fehlen informiert am '+fmtD(d.fehlInfo.date)+' – verschwindet, sobald die Anwesenheit für den Tag eingetragen ist">📣</div>':'';
-    const rowHtml=emailDot+dotsHtml+fehlDot;
+    const rowHtml=dotsHtml+fehlDot;
     if(rowHtml) el.innerHTML+='<div class="sdots-row">'+rowHtml+'</div>';
     // grades - Reihenfolge identisch zum Noten-Reiter (FIXED nicht-geloeschte zuerst, dann custom in Definitions-Reihenfolge)
     let g='';
@@ -11635,6 +11634,50 @@ let _todayCheckinMap = {}; // tnId -> checkin-Doc (heutige QR-Check-ins, für Ab
 let _tnStatusMap = {}; // tnId -> globalTN.status ('absent'|'wiederholer'|...) aus dem Pool-Snapshot; graut Sitze geraeteuebergreifend aus
 
 // Frischt Beruf/Fachrichtung aller platzierten Sitze aus den globalTN-Stammdaten auf (Liste hat Hoheit).
+// Uebersicht E-Mail-Bestaetigung: alle TN des Kurses mit Status (bestaetigt / ausstehend / kein Check)
+function openEmailBestaetigung(){
+  const inst=curInst();
+  if(!inst||!inst.sharedKursId){ toast('Nur bei Cloud-Kursen verfügbar','bad'); return; }
+  const kursId=inst.sharedKursId;
+  let modal=document.getElementById('emailBestModal');
+  if(modal) modal.remove();
+  modal=document.createElement('div');
+  modal.id='emailBestModal';
+  modal.className='modal';
+  modal.style.cssText='display:flex;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9999;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML='<div style="background:#fff;border-radius:14px;max-width:520px;width:100%;max-height:82vh;display:flex;flex-direction:column;overflow:hidden">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e2e8f0"><div style="font-weight:800;font-size:.9rem">📧 E-Mail-Bestätigung</div><button onclick="document.getElementById(\'emailBestModal\').remove()" style="border:none;background:none;font-size:1.1rem;cursor:pointer;color:#64748b">✕</button></div>'
+    +'<div id="emailBestBody" style="padding:8px 10px;overflow-y:auto"><div style="text-align:center;padding:24px;color:#64748b;font-size:.8rem">Lädt…</div></div>'
+    +'<div style="padding:10px 16px;border-top:1px solid #e2e8f0;font-size:.62rem;color:#94a3b8;line-height:1.5">✅ bestätigt · ⏳ ausstehend (Adresse evtl. falsch – im TN-Fenster korrigierbar) · — kein Konto/Check</div>'
+    +'</div>';
+  document.body.appendChild(modal);
+  _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').get().then(snap=>{
+    const rows=[];
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const name=((d.vorname||'')+' '+(d.nachname||'')).trim()|| (d.name||'') ||'(ohne Name)';
+      const mail=(d.kontaktEmail||d.email||'').trim();
+      let status, col, bg;
+      if(d.emailBestaetigt===true){ status='✅ bestätigt'; col='#059669'; bg='rgba(5,150,105,.08)'; }
+      else if(d.emailCheckAktiv===true){ status='⏳ ausstehend'; col='#b45309'; bg='rgba(245,158,11,.10)'; }
+      else { status='—'; col='#94a3b8'; bg='transparent'; }
+      rows.push({name,mail,status,col,bg,sort:(d.emailBestaetigt===true?2:(d.emailCheckAktiv===true?0:1))});
+    });
+    rows.sort((a,b)=>a.sort-b.sort || a.name.localeCompare(b.name,'de'));
+    const body=document.getElementById('emailBestBody');
+    if(!body) return;
+    if(!rows.length){ body.innerHTML='<div style="text-align:center;padding:24px;color:#64748b;font-size:.8rem">Keine Teilnehmer.</div>'; return; }
+    const nBest=rows.filter(r=>r.status.indexOf('bestätigt')>=0).length;
+    const nWait=rows.filter(r=>r.status.indexOf('ausstehend')>=0).length;
+    body.innerHTML='<div style="font-size:.68rem;color:#64748b;padding:4px 6px 8px">'+rows.length+' TN · '+nBest+' bestätigt · '+nWait+' ausstehend</div>'
+      +rows.map(r=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-bottom:1px solid #f1f5f9">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:.8rem;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(r.name)+'</div>'
+        +(r.mail?'<div style="font-size:.66rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(r.mail)+'</div>':'<div style="font-size:.66rem;color:#cbd5e1">keine Adresse</div>')+'</div>'
+        +'<div style="flex-shrink:0;font-size:.66rem;font-weight:700;color:'+r.col+';background:'+r.bg+';padding:3px 8px;border-radius:6px">'+r.status+'</div>'
+        +'</div>').join('');
+  }).catch(err=>{ const body=document.getElementById('emailBestBody'); if(body) body.innerHTML='<div style="text-align:center;padding:24px;color:#ef4444;font-size:.8rem">Fehler: '+esc(err.message)+'</div>'; });
+}
+
 function refreshTNStammdaten(){
   const inst=curInst(); const seats=curSeats();
   if(!inst||!seats||!_db){ toast('Kein Kurs geöffnet','bad'); return; }
