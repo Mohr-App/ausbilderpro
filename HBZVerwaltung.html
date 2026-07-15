@@ -1684,10 +1684,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 342';
+const APP_VERSION = 'Build 343';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 343', d:'15.07.2026', items:['\ud83d\udcc4 Teilnahmebescheinigung wortgetreu wie das KHS-Original: gemeinsamer Wortstamm gepaarter Noten wird nur einmal gedruckt \u2013 identisch zu AusbilderPro']},
   {v:'Build 342', d:'15.07.2026', items:['\ud83d\udcd0 Teilnahmebescheinigung: Alle Linien enden b\u00fcndig am rechten Rand \u2013 identisch zu AusbilderPro']},
   {v:'Build 341', d:'14.07.2026', items:['\ud83d\udcc4 Teilnahmebescheinigung wie in AusbilderPro: max. 5 Zeilen (3 Noten-Zeilen + Fehltage/Verspätungen + Besondere Bemerkungen), ab 4 Notenarten werden die unteren paarweise nebeneinander gesetzt','\u270d „Besondere Bemerkungen" erscheint jetzt immer (leer mit Linie zum Ausf\u00fcllen); \u201eVerspätungen\u201c r\u00fcckt n\u00e4her an \u201eFehltage\u201c']},
   {v:'Build 340', d:'14.07.2026', items:['\ud83d\udd50 Teilnahmebescheinigung: Verspätungen k\u00f6nnen jetzt wahlweise als Anzahl (Standard) oder als Auflistung je Kurstag angezeigt und gedruckt werden (z. B. \u201eT1 10 min \u00b7 T3 3 min\u201c) \u2013 die Daten kommen aus AusbilderPro']},
@@ -6880,9 +6881,23 @@ function _notenZeilenHtml(items){
     for(let k=0;k<singles && i<n;k++) rows.push([items[i++]]);
     while(i<n){ rows.push([items[i], items[i+1]].filter(Boolean)); i+=2; }
   }
+  // Doppelpunkt entfaellt, wenn das Label in einer Klammer endet - wie im KHS-Original
+  // ("Fachkenntnisse (praktisch) ....... (theoretisch) .......").
+  const _sep=l=>/\)\s*$/.test(String(l))?'':':';
+  // Haben zwei gepaarte Noten denselben Wortstamm vor der Klammer, wird er nur EINMAL gedruckt.
+  // Generisch: greift bei jedem gemeinsamen Praefix, nicht nur bei "Fachkenntnisse".
+  const _kurz2=(l1,l2)=>{
+    const a=String(l1), b=String(l2);
+    const i1=a.indexOf('('), i2=b.indexOf('(');
+    if(i1<1||i2<1) return null;
+    const p1=a.slice(0,i1).trim(), p2=b.slice(0,i2).trim();
+    if(!p1||p1.toLowerCase()!==p2.toLowerCase()) return null;
+    return b.slice(i2).trim();
+  };
   return rows.map(r=>{
-    if(r.length===1) return '<div class="note-row"><span class="note-label">'+r[0].label+':</span><span class="note-line">'+r[0].val+'</span></div>';
-    return '<div class="note-row note-row-split"><span class="note-label">'+r[0].label+':</span><span class="note-line note-line-short">'+r[0].val+'</span><span class="note-label-inline">'+r[1].label+':</span><span class="note-line note-line-short">'+r[1].val+'</span></div>';
+    if(r.length===1) return '<div class="note-row"><span class="note-label">'+r[0].label+_sep(r[0].label)+'</span><span class="note-line">'+r[0].val+'</span></div>';
+    const l1=r[0].label, l2=_kurz2(r[0].label, r[1].label)||r[1].label;
+    return '<div class="note-row note-row-split"><span class="note-label">'+l1+_sep(l1)+'</span><span class="note-line note-line-short">'+r[0].val+'</span><span class="note-label-inline">'+l2+_sep(l2)+'</span><span class="note-line note-line-short">'+r[1].val+'</span></div>';
   }).join('');
 }
 

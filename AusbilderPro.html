@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v795';
+const APP_VERSION = 'v796';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v796', d:'15.07.2026', items:['\ud83d\udcc4 Bescheinigung wortgetreu wie das KHS-Original: Bei zwei zusammengeh\u00f6renden Noten wird der gemeinsame Wortstamm nur einmal gedruckt \u2013 \u201eFachkenntnisse (praktisch) ....... (theoretisch) .......\u201c. Die Notennamen bleiben in App, TN-Liste und Verwaltung vollst\u00e4ndig lesbar','\ud83d\udd24 Kein Doppelpunkt mehr bei Bezeichnungen, die in einer Klammer enden']},
   {v:'v795', d:'15.07.2026', items:['\ud83d\udcd0 Bescheinigung: Alle Linien enden jetzt b\u00fcndig am rechten Rand \u2013 Noten, Fehltage/Verspätungen und Bemerkungen auf einer Senkrechten','\ud83d\udc1b Fix: Die Verk\u00fcrzung des Fehltage-Feldes (\u201eVerspätungen\u201c dichter heran) hat bisher nicht gegriffen und wirkt jetzt']},
   {v:'v794', d:'14.07.2026', items:['\ud83d\udcc4 Bescheinigung wie das alte Formular: max. 5 Zeilen (3 Noten-Zeilen + Fehltage/Verspätungen + Besondere Bemerkungen). Ab 4 Notenarten werden die unteren automatisch paarweise nebeneinander gesetzt (z. B. Fachkenntnisse praktisch/theoretisch) \u2013 Notennamen bleiben frei \u00e4nderbar','\u270d „Besondere Bemerkungen" erscheint jetzt IMMER (leer mit Linie zum handschriftlichen Ausf\u00fcllen)','\u2194 \u201eVerspätungen\u201c r\u00fcckt n\u00e4her an \u201eFehltage\u201c \u2013 mehr Platz f\u00fcr die Angaben']},
   {v:'v793', d:'14.07.2026', items:['\ud83d\udd04 Verspätungen je Kurstag werden jetzt mitsynchronisiert \u2013 die Verwaltung (VerwaltungPro) kann die Auflistung dadurch identisch anzeigen und ausdrucken']},
@@ -3738,9 +3739,23 @@ function _notenZeilenHtml(items){
     for(let k=0;k<singles && i<n;k++) rows.push([items[i++]]);
     while(i<n){ rows.push([items[i], items[i+1]].filter(Boolean)); i+=2; }
   }
+  // Doppelpunkt entfaellt, wenn das Label in einer Klammer endet - wie im KHS-Original
+  // ("Fachkenntnisse (praktisch) ....... (theoretisch) .......").
+  const _sep=l=>/\)\s*$/.test(String(l))?'':':';
+  // Haben zwei gepaarte Noten denselben Wortstamm vor der Klammer, wird er nur EINMAL gedruckt.
+  // Generisch: greift bei jedem gemeinsamen Praefix, nicht nur bei "Fachkenntnisse".
+  const _kurz2=(l1,l2)=>{
+    const a=String(l1), b=String(l2);
+    const i1=a.indexOf('('), i2=b.indexOf('(');
+    if(i1<1||i2<1) return null;
+    const p1=a.slice(0,i1).trim(), p2=b.slice(0,i2).trim();
+    if(!p1||p1.toLowerCase()!==p2.toLowerCase()) return null;
+    return b.slice(i2).trim();
+  };
   return rows.map(r=>{
-    if(r.length===1) return '<div class="note-row"><span class="note-label">'+r[0].label+':</span><span class="note-line">'+r[0].val+'</span></div>';
-    return '<div class="note-row note-row-split"><span class="note-label">'+r[0].label+':</span><span class="note-line note-line-short">'+r[0].val+'</span><span class="note-label-inline">'+r[1].label+':</span><span class="note-line note-line-short">'+r[1].val+'</span></div>';
+    if(r.length===1) return '<div class="note-row"><span class="note-label">'+r[0].label+_sep(r[0].label)+'</span><span class="note-line">'+r[0].val+'</span></div>';
+    const l1=r[0].label, l2=_kurz2(r[0].label, r[1].label)||r[1].label;
+    return '<div class="note-row note-row-split"><span class="note-label">'+l1+_sep(l1)+'</span><span class="note-line note-line-short">'+r[0].val+'</span><span class="note-label-inline">'+l2+_sep(l2)+'</span><span class="note-line note-line-short">'+r[1].val+'</span></div>';
   }).join('');
 }
 // Kompakte Auflistung der verspaeteten Kurstage: 'T1 10 min · T3 3 min', nach je 5 Eintraegen Zeilenumbruch.
