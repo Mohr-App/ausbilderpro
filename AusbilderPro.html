@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v791';
+const APP_VERSION = 'v792';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v792', d:'14.07.2026', items:['\ud83d\udd50 Bescheinigung: Verspätungen jetzt in drei w\u00e4hlbaren Varianten \u2013 Anzahl (Standard), Gesamtzeit oder neu die Auflistung je Kurstag (z. B. \u201eT1 10 min \u00b7 T3 3 min\u201c, nur verspätete Tage, 5 pro Zeile, kleine Schrift). Standard-Layout bleibt unver\u00e4ndert']},
   {v:'v791', d:'09.07.2026', items:['\ud83c\udfa8 Aktionen-Buttons einheitlich in schwarzer, fetter Schrift']},
   {v:'v790', d:'09.07.2026', items:['\ud83d\udc1b Fix E-Mail-Bestätigung-Übersicht: Status wird jetzt korrekt je TN aus den Stammdaten geladen (Fehler „_globalTN is not defined" behoben) \u2013 bestätigte Azubis erscheinen mit \u2705']},
   {v:'v789', d:'09.07.2026', items:['\ud83d\udd27 E-Mail-Bestätigung-Übersicht liest den Status jetzt aus den Stammdaten (globalTN) \u2013 bestätigte Azubis werden korrekt mit \u2705 angezeigt']},
@@ -3703,6 +3704,33 @@ function nextUpcomingInst(){
   return best;
 }
 function _fmtDauer(m){ m=parseInt(m)||0; if(m<=0) return '0 Min'; const h=Math.floor(m/60), mm=m%60; if(h>0) return h+' Std'+(mm?' '+mm+' Min':''); return mm+' Min'; }
+// Kurstag-Nummer eines Datums: zaehlt Werktage (Mo-Fr) ab Kursstart. 0 = nicht ermittelbar/Wochenende.
+function _kurstagNr(inst, dateStr){
+  if(!inst||!dateStr) return 0;
+  const start=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+inst.sM+'-'+inst.sD):null;
+  if(!start||dateStr<start) return 0;
+  const dt=new Date(start+'T12:00:00'); let n=0;
+  for(let g=0; g<400; g++){
+    const ds=dt.toISOString().slice(0,10), wd=dt.getDay();
+    if(wd!==0&&wd!==6) n++;
+    if(ds===dateStr) return (wd!==0&&wd!==6)?n:0;
+    if(ds>dateStr) break;
+    dt.setDate(dt.getDate()+1);
+  }
+  return 0;
+}
+// Kompakte Auflistung der verspaeteten Kurstage: 'T1 10 min · T3 3 min', nach je 5 Eintraegen Zeilenumbruch.
+function _verspListe(inst, attendance){
+  const items=(attendance||[])
+    .filter(e=>e&&e.type==='present'&&(parseInt(e.lateMins)||0)>0)
+    .map(e=>({nr:_kurstagNr(inst,e.date), date:e.date, min:parseInt(e.lateMins)||0}))
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  if(!items.length) return '';
+  return items.map((it,i)=>{
+    const lbl=it.nr>0?('T'+it.nr):(it.date?it.date.slice(8,10)+'.'+it.date.slice(5,7)+'.':'?');
+    return (i>0 && i%5===0 ? '<br>' : (i>0?' · ':'')) + lbl+' '+it.min+' min';
+  }).join('');
+}
 function instDotStyle(inst, isAktiv, startStr, today){
   if(isAktiv) return ' style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4)"';
   if(startStr>today){
@@ -6760,6 +6788,7 @@ function generateAlleBescheinigungenAusbilder(){
       const verspaetungen=sync.attLate||0;
       const verspMin=(s.attendance||[]).reduce((sum,e)=> sum + (e && e.type==='present' ? (parseInt(e.lateMins)||0) : 0), 0);
       const verspZeit=_fmtDauer(verspMin);
+      const verspListe=_verspListe(inst, s.attendance)||'–';
       const bemerkung=sync.bemerkung||s.bemerkung||'';
       const wasSignedA=!!(sync.bescheinigungSignatur||'');
       const ausgA=sync.bescheinigungAusgestellt||null;
@@ -6796,7 +6825,7 @@ function generateAlleBescheinigungenAusbilder(){
         }
       });
       // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-      notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span></span></span></div>`);
+      notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
       if(bemerkung){
         notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
       }
@@ -6989,11 +7018,17 @@ body.fz-blank .fz-num{visibility:hidden;}
 .vz-time,.vz-lbl-time{display:none;}
 body.fz-zeit .vz-count,body.fz-zeit .vz-lbl-count{display:none;}
 body.fz-zeit .vz-time,body.fz-zeit .vz-lbl-time{display:inline;}
+/* Variante 3: Auflistung je Kurstag - klein, max. 5 pro Zeile; Breite nur in dieser Variante gelockert */
+.vz-liste,.vz-lbl-liste{display:none;}
+body.fz-liste .vz-count,body.fz-liste .vz-lbl-count{display:none;}
+body.fz-liste .vz-liste{display:inline-block;font-size:7.5px;line-height:1.3;text-align:left;}
+body.fz-liste .vz-lbl-liste{display:inline;}
+body.fz-liste .note-row-split .note-line-short:last-of-type{max-width:none;min-width:0;}
 </style></head><body>
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="printAllCert()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
   <div style="margin:6px 0;font-size:12px;color:#334155"><label style="cursor:pointer;user-select:none"><input type="checkbox" onchange="toggleFehlzeitenBlank(this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen (Fehltage &amp; Verspätungen handschriftlich eintragen)</label></div>
-  <div style="margin:6px 0;font-size:12px;color:#334155"><label style="cursor:pointer;user-select:none"><input type="checkbox" onchange="toggleVerspaetungZeit(this.checked)" style="vertical-align:middle;margin-right:5px">🕐 Verspätung als tatsächliche Zeit anzeigen (Minuten statt Anzahl)</label></div>
+  <div style="margin:6px 0;font-size:12px;color:#334155">🕐 Verspätungen anzeigen als: <select onchange="setVerspModus(this.value)" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl (z. B. 2)</option><option value="sum">Gesamtzeit (z. B. 13 Min)</option><option value="list">Je Kurstag (z. B. T1 10 min · T3 3 min)</option></select></div>
   <div style="margin:8px 0;display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:center">
     <span style="font-size:11px;color:#475569;align-self:center;margin-right:4px"><b>Standort:</b></span>
     <button class="bulk-btn bulk-btn-standort" onclick="setAllStandort('bonn')">Alle HBZ Bonn</button>
@@ -7015,6 +7050,7 @@ window._kursId='${kursId}';
 function lockGuard(){ try{ return !!(window.opener && window.opener.kursGesperrt && window.opener.kursGesperrt()); }catch(e){ return false; } }
 function toggleFehlzeitenBlank(on){ document.body.classList.toggle('fz-blank', on); }
 function toggleVerspaetungZeit(on){ document.body.classList.toggle('fz-zeit', on); }
+function setVerspModus(m){ document.body.classList.toggle('fz-zeit', m==='sum'); document.body.classList.toggle('fz-liste', m==='list'); }
 function toggleNachweis(tnId,val){
   var yes=document.querySelector('.rb-yes[data-tn="'+tnId+'"]');
   var no=document.querySelector('.rb-no[data-tn="'+tnId+'"]');
@@ -10041,6 +10077,7 @@ function generateBescheinigungAusbilder(){
     const verspaetungen=sync.attLate||0;
     const verspMin=(d.attendance||[]).reduce((sum,e)=> sum + (e && e.type==='present' ? (parseInt(e.lateMins)||0) : 0), 0);
     const verspZeit=_fmtDauer(verspMin);
+    const verspListe=_verspListe(inst, d.attendance)||'–';
     const bemerkung=sync.bemerkung||d.bemerkung||'';
     const wasSigned=!!(sync.bescheinigungSignatur||'');
     const ausg=sync.bescheinigungAusgestellt||null;
@@ -10075,7 +10112,7 @@ function generateBescheinigungAusbilder(){
       }
     });
     // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-    notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span></span></span></div>`);
+    notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
     if(bemerkung){
       notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
     }
@@ -10195,6 +10232,12 @@ body.fz-blank .fz-num{visibility:hidden;}
 .vz-time,.vz-lbl-time{display:none;}
 body.fz-zeit .vz-count,body.fz-zeit .vz-lbl-count{display:none;}
 body.fz-zeit .vz-time,body.fz-zeit .vz-lbl-time{display:inline;}
+/* Variante 3: Auflistung je Kurstag - klein, max. 5 pro Zeile; Breite nur in dieser Variante gelockert */
+.vz-liste,.vz-lbl-liste{display:none;}
+body.fz-liste .vz-count,body.fz-liste .vz-lbl-count{display:none;}
+body.fz-liste .vz-liste{display:inline-block;font-size:7.5px;line-height:1.3;text-align:left;}
+body.fz-liste .vz-lbl-liste{display:inline;}
+body.fz-liste .note-row-split .note-line-short:last-of-type{max-width:none;min-width:0;}
 </style></head><body>
 <div class="action-bar no-print">
   <button class="btn-print" onclick="printCert()" title="Drucken">🖨 Drucken</button>
@@ -10203,7 +10246,7 @@ body.fz-zeit .vz-time,body.fz-zeit .vz-lbl-time{display:inline;}
 </div>
 <div class="no-print" style="text-align:center;margin:2px 0 6px;font-size:12px;color:#334155">
   <label style="cursor:pointer;user-select:none;margin:0 8px"><input type="checkbox" onchange="document.body.classList.toggle('fz-blank',this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen</label>
-  <label style="cursor:pointer;user-select:none;margin:0 8px"><input type="checkbox" onchange="document.body.classList.toggle('fz-zeit',this.checked)" style="vertical-align:middle;margin-right:5px">🕐 Verspätung als tatsächliche Zeit</label>
+  <span style="margin:0 8px">🕐 Verspätungen: <select onchange="document.body.classList.toggle('fz-zeit',this.value==='sum');document.body.classList.toggle('fz-liste',this.value==='list');" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl</option><option value="sum">Gesamtzeit</option><option value="list">Je Kurstag</option></select></span>
 </div>
 <div id="statusArea" class="no-print">${ausgTxt?'<div class="status-msg" style="background:#dcfce7;color:#166534">'+ausgTxt+'</div>':''}</div>
 
