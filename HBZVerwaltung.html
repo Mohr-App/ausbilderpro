@@ -1684,10 +1684,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 345';
+const APP_VERSION = 'Build 346';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 346', d:'15.07.2026', items:['\ud83c\udfed Betriebe: Pro Betrieb l\u00e4sst sich jetzt einstellen, welche Module er in BetriebPro sieht (Zeit/Mitarbeiter, Aufträge, Belege, Urlaub). Azubis + ÜbL, Meldungen und Einstellungen bleiben immer sichtbar','\u2139\ufe0f Neu registrierte Betriebe starten schlank mit Azubis + ÜbL \u2013 weitere Module schaltest du hier auf Wunsch frei. Bestehende Betriebe behalten alles']},
   {v:'Build 345', d:'15.07.2026', items:['\ud83d\udd0d Verspätungen je Kurstag: Schriftgr\u00f6\u00dfe passt sich automatisch an die Anzahl an \u2013 identisch zu AusbilderPro']},
   {v:'Build 344', d:'15.07.2026', items:['\ud83d\udd24 Verspätungen je Kurstag im Format „T1: 30min, T3: 3min" \u2013 identisch zu AusbilderPro']},
   {v:'Build 343', d:'15.07.2026', items:['\ud83d\udcc4 Teilnahmebescheinigung wortgetreu wie das KHS-Original: gemeinsamer Wortstamm gepaarter Noten wird nur einmal gedruckt \u2013 identisch zu AusbilderPro']},
@@ -10361,6 +10362,20 @@ function collectFirmen(){
 
 // ── ARBEITGEBER ZUGÄNGE ──
 let _agUsers=[];
+// Ein Haekchen pro Modul. Fehlt agModule komplett, gilt alles als sichtbar (Bestandsbetriebe).
+function _agModulChk(uid,key,label,m){
+  const an = !m || m[key]!==false;
+  return '<label style="font-size:.66rem;display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none">'
+    +'<input type="checkbox" '+(an?'checked':'')+' onchange="setAgModul(\''+uid+'\',\''+key+'\',this.checked)" style="cursor:pointer"> '+esc(label)+'</label>';
+}
+// Schaltet ein Modul fuer diesen Betrieb frei bzw. blendet es aus.
+window.setAgModul=function(uid,key,val){
+  const upd={}; upd['agModule.'+key]=!!val;
+  db.collection('users').doc(uid).update(upd)
+    .then(()=>toast(val?'Modul freigeschaltet':'Modul ausgeblendet'))
+    .catch(e=>toast('Fehler: '+e.message,'bad'));
+};
+
 function loadAgVerwaltung(){
   const pendEl=document.getElementById('agPendingList');
   const actEl=document.getElementById('agActiveList');
@@ -10393,6 +10408,14 @@ function loadAgVerwaltung(){
           +'<div style="font-size:.7rem;color:var(--mu)">'+esc(name)+' · '+esc(d.email||'')+'</div></div>'
           +'<div style="text-align:right"><div style="font-size:.7rem;font-weight:700;color:var(--acc)">✅ Aktiv</div>'
           +'<button title="Sperren" onclick="sperrenAG(\''+d.uid+'\')" style="font-size:.55rem;padding:2px 8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:4px;color:#ef4444;cursor:pointer;font-weight:600;margin-top:4px">Sperren</button>'
+          +'</div></div>'
+          +'<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--brd)">'
+          +'<div style="font-size:.6rem;color:var(--mu);margin-bottom:5px">Sichtbare Module (Azubis + ÜbL, Meldungen und Einstellungen sind immer sichtbar)</div>'
+          +'<div style="display:flex;gap:12px;flex-wrap:wrap">'
+          +_agModulChk(d.uid,'zeit','Zeit / Mitarbeiter',d.agModule)
+          +_agModulChk(d.uid,'auftraege','Aufträge',d.agModule)
+          +_agModulChk(d.uid,'belege','Belege',d.agModule)
+          +_agModulChk(d.uid,'urlaub','Urlaub',d.agModule)
           +'</div></div></div>';
       }
     });

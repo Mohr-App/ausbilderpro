@@ -1354,6 +1354,43 @@ const db=firebase.firestore();
 db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 
 let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};
+
+// ─── MODUL-SICHTBARKEIT ───
+// Die HBZ schaltet pro Betrieb frei, was er sehen soll (users/{uid}.agModule).
+// Fehlt das Feld komplett, ist ALLES an - Bestandsbetriebe verlieren dadurch nichts.
+// Immer sichtbar bleiben: Azubis + ÜbL, Meldungen und Einstellungen.
+// Hinweis: Das ist eine Anzeige-Steuerung fuer die Uebersicht, keine Zugriffsgrenze -
+// die Datentrennung machen weiterhin die Firestore-Rules (jeder Betrieb sieht nur seine Daten).
+function _applyAgModule(m){
+  const an = k => !m || m[k]!==false;
+  const zeit=an('zeit'), auftraege=an('auftraege'), belege=an('belege'), urlaub=an('urlaub');
+  const setVis=(el,sichtbar)=>{ if(el) el.style.display = sichtbar ? '' : 'none'; };
+  const q=sel=>document.querySelector(sel);
+
+  // Live: Heute (Zeiterfassung) und Aufträge
+  setVis(q('#agLiveTabs [data-tab="heute"]'), zeit);
+  setVis(q('#agLiveTabs [data-tab="auftraege"]'), auftraege);
+  // Mitarbeiter-Sektion - die Azubi-Sektion darunter bleibt IMMER
+  setVis(document.getElementById('sectArbeitnehmer'), zeit);
+  // Auswertung
+  setVis(q('#agAusTabs [data-tab="monat"]'), zeit);
+  setVis(q('#agAusTabs [data-tab="auftraege"]'), auftraege);
+  setVis(q('#agAusTabs [data-tab="urlaub"]'), urlaub);
+  // Untere Navigation
+  setVis(document.getElementById('agnav-belege'), belege);
+  setVis(document.getElementById('agnav-auswertung'), zeit||auftraege||urlaub);
+
+  // Wurde der aktive Reiter ausgeblendet, den ersten sichtbaren aktivieren
+  ['agLiveTabs','agAusTabs'].forEach(id=>{
+    const wrap=document.getElementById(id); if(!wrap) return;
+    const btns=Array.from(wrap.querySelectorAll('.stab'));
+    const aktiv=btns.find(b=>b.classList.contains('active'));
+    if(aktiv && aktiv.style.display==='none'){
+      const ersterSichtbar=btns.find(b=>b.style.display!=='none');
+      if(ersterSichtbar) ersterSichtbar.click();
+    }
+  });
+}
 let _briefkopf='';  // Frei definierbarer Briefkopf-TEXT (Fallback)
 let _briefkopfImg='';  // Briefkopf als Bild (DataURL) — hat Vorrang vor Text
 let _briefkopfImgMode='kopf';  // 'kopf' = nur Kopfzeile oben, 'voll' = ganzes A4-Briefpapier als Hintergrund
@@ -1448,7 +1485,9 @@ function doRegister(){
     return db.collection('users').doc(uid).set({
       email, role:'arbeitgeber', firma, vorname, nachname, tel,
       agStatus:'aktiv', registriertAm:Date.now(),
-      firmaCode: _generateFirmaCode(firma)
+      firmaCode: _generateFirmaCode(firma),
+      // Neue Betriebe starten schlank: nur Azubis + ÜbL. Weitere Module schaltet die HBZ auf Wunsch frei.
+      agModule:{zeit:false,auftraege:false,belege:false,urlaub:false}
     }).then(()=>{
       // AG-Registrierung ist saubere Privat-Sache des Betriebs.
       // KEINE Info-Mail an HBZ - der AG ist ein eigenstaendiger Mandant.
@@ -1671,6 +1710,7 @@ function loadUserData(){
     _briefkopfImg=d.briefkopfImg||'';
     _briefkopfImgMode=d.briefkopfImgMode||'kopf';
     _briefkopfImgVoll=!!d.briefkopfImgVoll;
+    _applyAgModule(d.agModule);
     // Abrechnungs-Einstellungen laden
     loadAbrSettings();
     // Firmencode generieren NUR fuer Bestandskunden die nie einen hatten (firmaCode-Feld fehlt komplett)
