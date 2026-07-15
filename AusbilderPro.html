@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v801';
+const APP_VERSION = 'v802';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v802', d:'15.07.2026', items:['\ud83d\udd04 Fehltage werden jetzt je Kurstag mitsynchronisiert \u2013 der Betrieb sieht in BetriebPro dadurch, an welchen Kurstagen gefehlt wurde (entschuldigt / unentschuldigt / krank), nicht nur die Anzahl']},
   {v:'v801', d:'15.07.2026', items:['\ud83d\udd0d Verspätungen je Kurstag: Die Schrift passt sich jetzt automatisch an \u2013 bei 1\u20132 Verspätungen gro\u00df und gut lesbar (15px), bei vielen entsprechend kleiner, damit immer alles in eine Zeile passt']},
   {v:'v800', d:'15.07.2026', items:['\ud83d\udd24 Verspätungen je Kurstag jetzt im Format „T1: 30min, T3: 3min" \u2013 Doppelpunkt nach dem Tag, Komma zwischen den Tagen']},
   {v:'v799', d:'15.07.2026', items:['\ud83d\udd50 Variante „Gesamtzeit" zeigt jetzt zus\u00e4tzlich die Anzahl der Verspätungen: „Verspätungen: 3 (25 Min)" statt nur der Minuten']},
@@ -4660,6 +4661,11 @@ function syncMobileAttToFirestore(sid){
     .filter(e=>e&&e.type==='present'&&(parseInt(e.lateMins)||0)>0)
     .map(e=>({t:_kurstagNr(inst,e.date,_bsSync)||0, d:String(e.date||''), m:parseInt(e.lateMins)||0}))
     .sort((a,b)=>(a.d||'').localeCompare(b.d||''));
+  // Fehltage je Kurstag mitsenden, damit der Betrieb sieht WANN gefehlt wurde (nicht nur wie oft)
+  const absentDetails=(seatAtt||[])
+    .filter(e=>e&&(e.type==='absent_e'||e.type==='absent_u'||e.type==='sick'))
+    .map(e=>({t:_kurstagNr(inst,e.date,_bsSync)||0, d:String(e.date||''), typ:String(e.type)}))
+    .sort((a,b)=>(a.d||'').localeCompare(b.d||''));
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(tnId).update({
       attTotal:total,attPresent:present,
@@ -4667,6 +4673,7 @@ function syncMobileAttToFirestore(sid){
       attSick:sick,attBerufsschule:berufsschule,
       attLate:late,attEarly:early,
       attLateDetails:lateDetails,
+      attAbsentDetails:absentDetails,
       attPercent,attLastSync:Date.now()
     }).catch(()=>{});
 }

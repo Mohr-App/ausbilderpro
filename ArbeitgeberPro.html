@@ -91,6 +91,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .kurs-field{display:flex;align-items:baseline;gap:8px;padding:4px 0;font-size:.75rem;}
 .kurs-field-label{color:var(--mu);font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;min-width:80px;font-family:'JetBrains Mono',monospace;}
 .att-bar{display:flex;gap:2px;margin:8px 0;height:18px;border-radius:6px;overflow:hidden;}
+/* Kachel-Optik wie in AzubiPro */
+.ag-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
+.uebl-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:14px;cursor:pointer;font-family:'Sora',sans-serif;font-size:.72rem;font-weight:700;color:var(--tx);text-align:center;line-height:1.2;transition:all .12s;}
+.uebl-tile:hover,.uebl-tile:active,.uebl-tile.active{background:#fff;border-color:var(--acc);}
+.uebl-tile .ic{font-size:1.4rem;line-height:1;}
 .att-seg{min-width:2px;}
 .att-summary{font-size:.65rem;font-family:'JetBrains Mono',monospace;color:var(--mu);display:flex;gap:10px;flex-wrap:wrap;}
 .att-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;}
@@ -1380,6 +1385,13 @@ function _applyAgModule(m){
   setVis(document.getElementById('agnav-belege'), belege);
   setVis(document.getElementById('agnav-auswertung'), zeit||auftraege||urlaub);
 
+  // Hat der Betrieb nur die ÜbL-Ansicht, direkt aufklappen - sonst liegt sie zu tief vergraben
+  if(!zeit && !auftraege && !belege && !urlaub){
+    const sa=document.getElementById('sectAzubis'); if(sa) sa.open=true;
+    const uc=document.getElementById('ueblCollapse');
+    if(uc && uc.style.display==='none' && typeof toggleUeblView==='function') toggleUeblView();
+  }
+
   // Wurde der aktive Reiter ausgeblendet, den ersten sichtbaren aktivieren
   ['agLiveTabs','agAusTabs'].forEach(id=>{
     const wrap=document.getElementById(id); if(!wrap) return;
@@ -2475,64 +2487,100 @@ function renderAzubiList(){
     const detail=document.createElement('div');
     detail.className='azubi-detail';detail.style.display='none';
     if(kurs){
-      let h='<div class="kurs-box"><div class="kurs-name">📚 '+esc(kurs.name||'Lehrgang')+'</div>';
-      h+='<div class="kurs-meta">'+fmtDE(kurs.von)+' – '+fmtDE(kurs.bis)+'</div>';
-      if(kurs.beschreibung)h+='<div style="font-size:.75rem;color:var(--tx);padding:8px 10px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.12);border-radius:7px;margin-bottom:8px;line-height:1.5">'+esc(kurs.beschreibung)+'</div>';
-      if(bsToday)h+='<div style="font-size:.75rem;padding:8px 10px;background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.2);border-radius:7px;margin-bottom:8px;color:#7c3aed;font-weight:700">🎓 Heute ist Berufsschultag</div>';
-      h+='<div class="kurs-field"><span class="kurs-field-label">Ausbilder</span><span>'+esc(kurs.ausbilderName||'–')+'</span></div>';
-      if(kurs.ausbilderEmail)h+='<div class="kurs-field"><span class="kurs-field-label">Kontakt</span><span><a href="mailto:'+esc(kurs.ausbilderEmail)+'" style="color:var(--acc)">'+esc(kurs.ausbilderEmail)+'</a>'+(kurs.ausbilderTel?' · <a href="tel:'+esc(kurs.ausbilderTel)+'" style="color:var(--acc)">📞'+esc(kurs.ausbilderTel)+'</a>':'')+'</span></div>';
-      if(kurs.standortName)h+='<div class="kurs-field"><span class="kurs-field-label">Standort</span><span>'+esc(kurs.standortName)+(kurs.standortGebaeude?' – '+esc(kurs.standortGebaeude):'')+'</span></div>';
-      // Werkzeug-Warnung
+      const _tid='agtl'+String(a.id).replace(/[^a-zA-Z0-9]/g,'');
+      const kursBeendet=kurs.bis&&today>kurs.bis;
+
+      // ─── Baustein: Lehrgang ───
+      let hKurs='<div class="kurs-name">📚 '+esc(kurs.name||'Lehrgang')+'</div>';
+      hKurs+='<div class="kurs-meta">'+fmtDE(kurs.von)+' – '+fmtDE(kurs.bis)+'</div>';
+      if(kurs.beschreibung)hKurs+='<div style="font-size:.75rem;color:var(--tx);padding:8px 10px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.12);border-radius:7px;margin-bottom:8px;line-height:1.5">'+esc(kurs.beschreibung)+'</div>';
+      if(bsToday)hKurs+='<div style="font-size:.75rem;padding:8px 10px;background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.2);border-radius:7px;margin-bottom:8px;color:#7c3aed;font-weight:700">🎓 Heute ist Berufsschultag</div>';
+      hKurs+='<div class="kurs-field"><span class="kurs-field-label">Ausbilder</span><span>'+esc(kurs.ausbilderName||'–')+'</span></div>';
+      if(kurs.ausbilderEmail)hKurs+='<div class="kurs-field"><span class="kurs-field-label">Kontakt</span><span><a href="mailto:'+esc(kurs.ausbilderEmail)+'" style="color:var(--acc)">'+esc(kurs.ausbilderEmail)+'</a>'+(kurs.ausbilderTel?' · <a href="tel:'+esc(kurs.ausbilderTel)+'" style="color:var(--acc)">📞'+esc(kurs.ausbilderTel)+'</a>':'')+'</span></div>';
+      if(kurs.standortName)hKurs+='<div class="kurs-field"><span class="kurs-field-label">Standort</span><span>'+esc(kurs.standortName)+(kurs.standortGebaeude?' – '+esc(kurs.standortGebaeude):'')+'</span></div>';
+
+      // ─── Baustein: Werkzeug ───
+      let hWz='';
       if(kurs.werkzeug&&kurs.werkzeug.length){
-        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">🔧 MITZUBRINGEN</div>';
-        h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
-        kurs.werkzeug.forEach(w=>{h+='<span style="font-size:.62rem;padding:3px 8px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:5px;color:var(--tx)">'+esc(w)+'</span>';});
-        h+='</div>';
+        hWz+='<div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">🔧 MITZUBRINGEN</div>';
+        hWz+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+        kurs.werkzeug.forEach(w=>{hWz+='<span style="font-size:.62rem;padding:3px 8px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:5px;color:var(--tx)">'+esc(w)+'</span>';});
+        hWz+='</div>';
         if(td&&td.werkzeugStatus==='fehlt'){
-          h+='<div style="margin-top:8px;padding:8px 10px;background:rgba(239,68,68,.06);border:2px solid rgba(239,68,68,.25);border-radius:7px;font-size:.72rem;color:#dc2626;font-weight:700">⚠ Werkzeug unvollständig'+(td.werkzeugFehlt?' – fehlt: '+esc(td.werkzeugFehlt):'')+'</div>';
+          hWz+='<div style="margin-top:8px;padding:8px 10px;background:rgba(239,68,68,.06);border:2px solid rgba(239,68,68,.25);border-radius:7px;font-size:.72rem;color:#dc2626;font-weight:700">⚠ Werkzeug unvollständig'+(td.werkzeugFehlt?' – fehlt: '+esc(td.werkzeugFehlt):'')+'</div>';
         } else if(td&&td.werkzeugStatus==='ok'){
-          h+='<div style="margin-top:8px;font-size:.62rem;color:#16a34a;font-weight:600">✓ Werkzeug vollständig</div>';
+          hWz+='<div style="margin-top:8px;font-size:.62rem;color:#16a34a;font-weight:600">✓ Werkzeug vollständig</div>';
         }
-        h+='</div>';
       }
+
+      // ─── Baustein: Anwesenheit (steht ganz oben und ist immer offen) ───
+      let hAtt='<div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">📊 ANWESENHEIT</div>';
       if(td&&td.attTotal){
         const t=td,p=t.attPercent||0,col=p>=80?'#16a34a':p>=60?'#d97706':'#dc2626',total=t.attTotal||1;
         const segs=[{v:t.attPresent||0,c:'#16a34a',l:'Anwesend'},{v:t.attLate||0,c:'#d97706',l:'Zu spät'},{v:t.attSick||0,c:'#fbbf24',l:'Krank'},{v:t.attAbsentE||0,c:'#60a5fa',l:'Entschuldigt'},{v:t.attAbsentU||0,c:'#dc2626',l:'Unentschuldigt'},{v:t.attBerufsschule||0,c:'#8b5cf6',l:'Berufsschule'}];
-        h+='<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">📊 ANWESENHEIT</div>';
-        h+='<div class="att-bar">';
-        segs.forEach(s=>{if(s.v>0)h+='<div class="att-seg" style="width:'+Math.max((s.v/total)*100,3)+'%;background:'+s.c+'" title="'+s.l+': '+s.v+'"></div>';});
-        h+='</div><div style="display:flex;align-items:center;gap:10px;margin-top:4px"><span style="font-size:1.3rem;font-weight:800;color:'+col+';font-family:\'JetBrains Mono\',monospace">'+p+'%</span><div class="att-summary">';
-        segs.forEach(s=>{if(s.v>0)h+='<span><span class="att-dot" style="background:'+s.c+'"></span>'+s.v+'× '+s.l+'</span>';});
-        h+='</div></div>';
-        h+='<div style="font-size:.6rem;color:var(--mu);margin-top:6px;font-family:\'JetBrains Mono\',monospace">Aktualisiert: '+(t.attLastSync?new Date(t.attLastSync).toLocaleString('de-DE'):'–')+'</div></div>';
+        hAtt+='<div class="att-bar">';
+        segs.forEach(s=>{if(s.v>0)hAtt+='<div class="att-seg" style="width:'+Math.max((s.v/total)*100,3)+'%;background:'+s.c+'" title="'+s.l+': '+s.v+'"></div>';});
+        hAtt+='</div><div style="display:flex;align-items:center;gap:10px;margin-top:4px"><span style="font-size:1.3rem;font-weight:800;color:'+col+';font-family:\'JetBrains Mono\',monospace">'+p+'%</span><div class="att-summary">';
+        segs.forEach(s=>{if(s.v>0)hAtt+='<span><span class="att-dot" style="background:'+s.c+'"></span>'+s.v+'× '+s.l+'</span>';});
+        hAtt+='</div></div>';
+        // Tagesgenaue Angaben aus AusbilderPro: an welchen Kurstagen zu spät bzw. gefehlt wurde
+        const _tag=x=>{const n=parseInt(x&&x.t)||0, dd=String((x&&x.d)||''); return n>0?('Tag '+n):(dd?fmtDE(dd):'?');};
+        const ld=Array.isArray(td.attLateDetails)?td.attLateDetails:[];
+        if(ld.length){
+          hAtt+='<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--brd)"><div style="font-size:.62rem;font-weight:800;color:#d97706;margin-bottom:5px">🕐 ZU SPÄT AN</div><div style="line-height:1.9">'
+            +ld.map(x=>'<span style="font-size:.68rem;padding:3px 8px;margin:0 4px 4px 0;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.22);border-radius:6px;display:inline-block">'+_tag(x)+': <b>'+(parseInt(x.m)||0)+' min</b></span>').join('')
+            +'</div></div>';
+        }
+        const ad=Array.isArray(td.attAbsentDetails)?td.attAbsentDetails:[];
+        if(ad.length){
+          const tl={absent_e:'entschuldigt',absent_u:'unentschuldigt',sick:'krank'};
+          const tc={absent_e:'#60a5fa',absent_u:'#dc2626',sick:'#fbbf24'};
+          hAtt+='<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--brd)"><div style="font-size:.62rem;font-weight:800;color:#dc2626;margin-bottom:5px">✗ GEFEHLT AN</div><div style="line-height:1.9">'
+            +ad.map(x=>{const c=tc[x.typ]||'#94a3b8'; return '<span style="font-size:.68rem;padding:3px 8px;margin:0 4px 4px 0;background:'+c+'14;border:1px solid '+c+'40;border-radius:6px;display:inline-block">'+_tag(x)+' <b style="color:'+c+'">'+(tl[x.typ]||esc(String(x.typ||'')))+'</b></span>';}).join('')
+            +'</div></div>';
+        }
+        hAtt+='<div style="font-size:.6rem;color:var(--mu);margin-top:8px;font-family:\'JetBrains Mono\',monospace">Aktualisiert: '+(td.attLastSync?new Date(td.attLastSync).toLocaleString('de-DE'):'–')+'</div>';
+      } else {
+        hAtt+='<div style="font-size:.72rem;color:var(--mu);padding:6px 0">Noch keine Anwesenheitsdaten – sie erscheinen, sobald der Ausbilder den ersten Kurstag eingetragen hat.</div>';
       }
-      // Noten nur nach Kursende anzeigen
-      const kursBeendet=kurs.bis&&today>kurs.bis;
+
+      // ─── Baustein: Benotung ───
+      let hNoten='';
       if(kursBeendet&&td&&(td.noten_mitarbeit||td.noten_fuehrung||td.noten_praxis)){
-        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">📝 BENOTUNG</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
-        if(td.noten_mitarbeit)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Mitarbeit: '+esc(td.noten_mitarbeit)+'</span>';
-        if(td.noten_fuehrung)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Führung: '+esc(td.noten_fuehrung)+'</span>';
-        if(td.noten_praxis)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Praxis: '+esc(td.noten_praxis)+'</span>';
-        const ex=td.noten_extra||{};Object.entries(ex).forEach(([k,v])=>{if(v)h+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">'+esc(k)+': '+esc(v)+'</span>';});
-        h+='</div></div>';
+        hNoten+='<div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:6px">📝 BENOTUNG</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+        if(td.noten_mitarbeit)hNoten+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Mitarbeit: '+esc(td.noten_mitarbeit)+'</span>';
+        if(td.noten_fuehrung)hNoten+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Führung: '+esc(td.noten_fuehrung)+'</span>';
+        if(td.noten_praxis)hNoten+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">Praxis: '+esc(td.noten_praxis)+'</span>';
+        const ex=td.noten_extra||{};Object.entries(ex).forEach(([k,v])=>{if(v)hNoten+='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.7rem;padding:4px 8px;border-radius:5px;font-weight:800;background:#475569;color:#fff">'+esc(k)+': '+esc(v)+'</span>';});
+        hNoten+='</div>';
       } else if(!kursBeendet&&td&&(td.noten_mitarbeit||td.noten_fuehrung||td.noten_praxis)){
-        h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)"><div style="font-size:.65rem;color:var(--mu);font-style:italic">📝 Benotung wird nach Kursende sichtbar.</div></div>';
+        hNoten+='<div style="font-size:.65rem;color:var(--mu);font-style:italic">📝 Benotung wird nach Kursende sichtbar.</div>';
       }
-      h+='</div>';
-      // Kurshistorie (wie bei AzubiPro)
+
+      // ─── Baustein: weitere Lehrgänge ───
+      let hHist='';
       const hist=(a.kursHistory||[]).filter(hh=>hh.kursId!==a.aktiverKursId&&!hh.abgebrochen&&!hh.entfernt&&!hh.nichtErschienen).sort((x,y)=>(y.von||'').localeCompare(x.von||''));
       if(hist.length){
-        h+='<div style="margin-top:10px"><div style="font-size:.68rem;font-weight:800;color:var(--mu);letter-spacing:.04em;margin-bottom:6px">📅 WEITERE LEHRGÄNGE ('+hist.length+')</div>';
+        hHist+='<div style="font-size:.68rem;font-weight:800;color:var(--mu);letter-spacing:.04em;margin-bottom:6px">📅 WEITERE LEHRGÄNGE ('+hist.length+')</div>';
         hist.forEach(hh=>{
-          h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:7px;margin-bottom:4px">'
+          hHist+='<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:7px;margin-bottom:4px">'
             +'<div style="width:6px;height:6px;border-radius:50%;background:#9ca3af;flex-shrink:0"></div>'
             +'<div style="flex:1;min-width:0"><div style="font-size:.72rem;font-weight:700">'+esc(hh.kursName||'Lehrgang')+'</div>'
             +'<div style="font-size:.6rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(hh.von)+' – '+fmtDE(hh.bis)+'</div></div>'
             +'<span style="font-size:.55rem;padding:2px 6px;border-radius:4px;background:rgba(148,163,184,.1);color:#94a3b8;font-weight:700">Beendet</span>'
             +'</div>';
         });
-        h+='</div>';
       }
+
+      // ─── Zusammenbau: Anwesenheit oben, alles Weitere hinter Kacheln ───
+      let h='<div class="kurs-box">'+hAtt;
+      const tiles=[{k:'kurs',ic:'📚',t:'Lehrgang',html:hKurs}];
+      if(hWz) tiles.push({k:'wz',ic:'🔧',t:'Werkzeug',html:hWz});
+      if(hNoten) tiles.push({k:'noten',ic:'📝',t:'Benotung',html:hNoten});
+      if(hHist) tiles.push({k:'hist',ic:'📅',t:'Lehrgänge',html:hHist});
+      h+='<div class="ag-tiles">'+tiles.map(x=>'<button class="uebl-tile" onclick="agTogTile(event,\''+_tid+'-'+x.k+'\')"><span class="ic">'+x.ic+'</span>'+x.t+'</button>').join('')+'</div>';
+      h+=tiles.map(x=>'<div id="'+_tid+'-'+x.k+'" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">'+x.html+'</div>').join('');
+      h+='</div>';
       detail.innerHTML=h;
     } else if(lastAbgebr){
       let h2='<div class="kurs-box" style="border-color:rgba(220,38,38,.3)">'
@@ -3663,6 +3711,16 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
     }
   });
 }
+// Klappt den Bereich hinter einer Kachel auf/zu
+function agTogTile(ev,id){
+  if(ev&&ev.stopPropagation) ev.stopPropagation();
+  const el=document.getElementById(id); if(!el) return;
+  const auf = el.style.display==='none';
+  el.style.display = auf ? '' : 'none';
+  const btn = ev && ev.currentTarget;
+  if(btn && btn.classList) btn.classList.toggle('active', auf);
+}
+
 function toggleUeblView(){
   const el=document.getElementById('ueblCollapse');
   const arr=document.getElementById('ueblArrow');
