@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v799';
+const APP_VERSION = 'v800';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v800', d:'15.07.2026', items:['\ud83d\udd24 Verspätungen je Kurstag jetzt im Format „T1: 30min, T3: 3min" \u2013 Doppelpunkt nach dem Tag, Komma zwischen den Tagen']},
   {v:'v799', d:'15.07.2026', items:['\ud83d\udd50 Variante „Gesamtzeit" zeigt jetzt zus\u00e4tzlich die Anzahl der Verspätungen: „Verspätungen: 3 (25 Min)" statt nur der Minuten']},
   {v:'v798', d:'15.07.2026', items:['\ud83c\udf93 Verspätungen je Kurstag: Es werden jetzt nur noch die tats\u00e4chlichen Kurstage gez\u00e4hlt \u2013 Berufsschultage (und Wochenenden) z\u00e4hlen nicht mit. Beispiel: Ist Mittwoch Berufsschule, ist der Donnerstag „Tag 3"']},
   {v:'v797', d:'15.07.2026', items:['\ud83d\udcac „Besondere Bemerkungen" steht jetzt direkt im Reiter Noten (statt im Reiter Person) \u2013 dort, wo sie auch auf der Bescheinigung erscheinen','\u2139\ufe0f Klar beschriftet: Der Text wird auf der Teilnahmebescheinigung gedruckt UND ist in der Kurshistorie f\u00fcr andere Ausbilder sichtbar. F\u00fcr rein private Notizen bleibt „Notiz (privat, nur f\u00fcr dich)" im Reiter Person']},
@@ -3782,7 +3783,8 @@ function _verspListe(inst, attendance){
   if(!items.length) return '';
   return items.map((it,i)=>{
     const lbl=it.nr>0?('T'+it.nr):(it.date?it.date.slice(8,10)+'.'+it.date.slice(5,7)+'.':'?');
-    return (i>0 && i%5===0 ? '<br>' : (i>0?' · ':'')) + lbl+' '+it.min+' min';
+    // Format: 'T1: 30min, T3: 3min' - Komma am Zeilenende, nach je 5 Eintraegen Umbruch
+    return (i>0 ? (i%5===0 ? ',<br>' : ', ') : '') + lbl+': '+it.min+'min';
   }).join('');
 }
 function instDotStyle(inst, isAktiv, startStr, today){
@@ -7093,7 +7095,7 @@ body.fz-liste .vz-lbl-liste{display:inline;}
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="printAllCert()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
   <div style="margin:6px 0;font-size:12px;color:#334155"><label style="cursor:pointer;user-select:none"><input type="checkbox" onchange="toggleFehlzeitenBlank(this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen (Fehltage &amp; Verspätungen handschriftlich eintragen)</label></div>
-  <div style="margin:6px 0;font-size:12px;color:#334155">🕐 Verspätungen anzeigen als: <select onchange="setVerspModus(this.value)" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl (z. B. 2)</option><option value="sum">Anzahl + Gesamtzeit (z. B. 3 (13 Min))</option><option value="list">Je Kurstag (z. B. T1 10 min · T3 3 min)</option></select></div>
+  <div style="margin:6px 0;font-size:12px;color:#334155">🕐 Verspätungen anzeigen als: <select onchange="setVerspModus(this.value)" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl (z. B. 2)</option><option value="sum">Anzahl + Gesamtzeit (z. B. 3 (13 Min))</option><option value="list">Je Kurstag (z. B. T1: 30min, T3: 3min)</option></select></div>
   <div style="margin:8px 0;display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:center">
     <span style="font-size:11px;color:#475569;align-self:center;margin-right:4px"><b>Standort:</b></span>
     <button class="bulk-btn bulk-btn-standort" onclick="setAllStandort('bonn')">Alle HBZ Bonn</button>
