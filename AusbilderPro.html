@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v800';
+const APP_VERSION = 'v801';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v801', d:'15.07.2026', items:['\ud83d\udd0d Verspätungen je Kurstag: Die Schrift passt sich jetzt automatisch an \u2013 bei 1\u20132 Verspätungen gro\u00df und gut lesbar (15px), bei vielen entsprechend kleiner, damit immer alles in eine Zeile passt']},
   {v:'v800', d:'15.07.2026', items:['\ud83d\udd24 Verspätungen je Kurstag jetzt im Format „T1: 30min, T3: 3min" \u2013 Doppelpunkt nach dem Tag, Komma zwischen den Tagen']},
   {v:'v799', d:'15.07.2026', items:['\ud83d\udd50 Variante „Gesamtzeit" zeigt jetzt zus\u00e4tzlich die Anzahl der Verspätungen: „Verspätungen: 3 (25 Min)" statt nur der Minuten']},
   {v:'v798', d:'15.07.2026', items:['\ud83c\udf93 Verspätungen je Kurstag: Es werden jetzt nur noch die tats\u00e4chlichen Kurstage gez\u00e4hlt \u2013 Berufsschultage (und Wochenenden) z\u00e4hlen nicht mit. Beispiel: Ist Mittwoch Berufsschule, ist der Donnerstag „Tag 3"']},
@@ -3781,11 +3782,19 @@ function _verspListe(inst, attendance){
     .map(e=>({nr:_kurstagNr(inst,e.date,_bs), date:e.date, min:parseInt(e.lateMins)||0}))
     .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   if(!items.length) return '';
-  return items.map((it,i)=>{
+  const inner=items.map((it,i)=>{
     const lbl=it.nr>0?('T'+it.nr):(it.date?it.date.slice(8,10)+'.'+it.date.slice(5,7)+'.':'?');
     // Format: 'T1: 30min, T3: 3min' - Komma am Zeilenende, nach je 5 Eintraegen Umbruch
     return (i>0 ? (i%5===0 ? ',<br>' : ', ') : '') + lbl+': '+it.min+'min';
   }).join('');
+  return '<span style="font-size:'+_verspPx(items.length)+'px">'+inner+'</span>';
+}
+// Schriftgroesse der Verspaetungs-Liste: so gross wie moeglich, aber die laengste Zeile
+// (max. 5 Eintraege) muss in die ~47mm neben "Fehltage: .. Verspätungen:" passen.
+// Da die meisten TN nur 1-3 Verspätungen haben, wird die Schrift im Normalfall deutlich groesser.
+function _verspPx(n){
+  const proZeile=Math.min(n,5);
+  return proZeile<=2 ? 15 : proZeile===3 ? 12.5 : proZeile===4 ? 9.5 : 7.5;
 }
 function instDotStyle(inst, isAktiv, startStr, today){
   if(isAktiv) return ' style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4)"';

@@ -1684,10 +1684,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 344';
+const APP_VERSION = 'Build 345';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 345', d:'15.07.2026', items:['\ud83d\udd0d Verspätungen je Kurstag: Schriftgr\u00f6\u00dfe passt sich automatisch an die Anzahl an \u2013 identisch zu AusbilderPro']},
   {v:'Build 344', d:'15.07.2026', items:['\ud83d\udd24 Verspätungen je Kurstag im Format „T1: 30min, T3: 3min" \u2013 identisch zu AusbilderPro']},
   {v:'Build 343', d:'15.07.2026', items:['\ud83d\udcc4 Teilnahmebescheinigung wortgetreu wie das KHS-Original: gemeinsamer Wortstamm gepaarter Noten wird nur einmal gedruckt \u2013 identisch zu AusbilderPro']},
   {v:'Build 342', d:'15.07.2026', items:['\ud83d\udcd0 Teilnahmebescheinigung: Alle Linien enden b\u00fcndig am rechten Rand \u2013 identisch zu AusbilderPro']},
@@ -6953,12 +6954,12 @@ function generateAlleBescheinigungen(){
       // Positionen aus AusbilderPro spiegeln (identische Darstellung)
       // Verspaetungen je Kurstag (aus AusbilderPro gespiegelt): 'T1 10 min · T3 3 min', 5 pro Zeile
       const _ld=Array.isArray(d.attLateDetails)?d.attLateDetails:[];
-      const verspListe=_ld.length?_ld.map((it,i)=>{
+      const verspListe=_ld.length?('<span style="font-size:'+(function(n){const p=Math.min(n,5);return p<=2?15:p===3?12.5:p===4?9.5:7.5;})(_ld.length)+'px">'+_ld.map((it,i)=>{
         const nr=parseInt(it&&it.t)||0, dt=String((it&&it.d)||''), mn=parseInt(it&&it.m)||0;
         const lbl=nr>0?('T'+nr):(dt?dt.slice(8,10)+'.'+dt.slice(5,7)+'.':'?');
         // Format wie in AusbilderPro: 'T1: 30min, T3: 3min'
         return (i>0 ? (i%5===0 ? ',<br>' : ', ') : '') + lbl+': '+mn+'min';
-      }).join(''):'–';
+      }).join('')+'</span>'):'–';
       const _sp=(d.bescheinigungStempelPos&&typeof d.bescheinigungStempelPos==='object')?d.bescheinigungStempelPos:null;
       const _gp=(d.bescheinigungSigPos&&typeof d.bescheinigungSigPos==='object')?d.bescheinigungSigPos:null;
       const _n=(v,dd)=>{const n=Number(v);return isFinite(n)?n:dd;};
