@@ -1955,9 +1955,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v792';
+const APP_VERSION = 'v794';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v794', d:'14.07.2026', items:['\ud83d\udcc4 Bescheinigung wie das alte Formular: max. 5 Zeilen (3 Noten-Zeilen + Fehltage/Verspätungen + Besondere Bemerkungen). Ab 4 Notenarten werden die unteren automatisch paarweise nebeneinander gesetzt (z. B. Fachkenntnisse praktisch/theoretisch) \u2013 Notennamen bleiben frei \u00e4nderbar','\u270d „Besondere Bemerkungen" erscheint jetzt IMMER (leer mit Linie zum handschriftlichen Ausf\u00fcllen)','\u2194 \u201eVerspätungen\u201c r\u00fcckt n\u00e4her an \u201eFehltage\u201c \u2013 mehr Platz f\u00fcr die Angaben']},
+  {v:'v793', d:'14.07.2026', items:['\ud83d\udd04 Verspätungen je Kurstag werden jetzt mitsynchronisiert \u2013 die Verwaltung (VerwaltungPro) kann die Auflistung dadurch identisch anzeigen und ausdrucken']},
   {v:'v792', d:'14.07.2026', items:['\ud83d\udd50 Bescheinigung: Verspätungen jetzt in drei w\u00e4hlbaren Varianten \u2013 Anzahl (Standard), Gesamtzeit oder neu die Auflistung je Kurstag (z. B. \u201eT1 10 min \u00b7 T3 3 min\u201c, nur verspätete Tage, 5 pro Zeile, kleine Schrift). Standard-Layout bleibt unver\u00e4ndert']},
   {v:'v791', d:'09.07.2026', items:['\ud83c\udfa8 Aktionen-Buttons einheitlich in schwarzer, fetter Schrift']},
   {v:'v790', d:'09.07.2026', items:['\ud83d\udc1b Fix E-Mail-Bestätigung-Übersicht: Status wird jetzt korrekt je TN aus den Stammdaten geladen (Fehler „_globalTN is not defined" behoben) \u2013 bestätigte Azubis erscheinen mit \u2705']},
@@ -3719,6 +3721,27 @@ function _kurstagNr(inst, dateStr){
   }
   return 0;
 }
+// Noten-Zeilen fuer das Formular: max. 3 Zeilen (3 Noten + Fehltage/Verspaetungen + Bemerkungen = 5).
+// Gepaart wird von UNTEN, damit die ersten Noten (z.B. Fuehrung, Mitarbeit) einzeln stehen bleiben -
+// wie im alten Papier-Formular: 4 Noten -> Fuehrung / Mitarbeit / Fachkenntnisse prakt.+theor. nebeneinander.
+// Regel zaehlt nur, matcht NICHT auf Notennamen - die bleiben frei aenderbar.
+function _notenZeilenHtml(items){
+  const n=(items||[]).length;
+  if(!n) return '';
+  const rows=[];
+  if(n<=3){ items.forEach(it=>rows.push([it])); }
+  else {
+    const pairsNeeded=n-3;                          // 4->1, 5->2, 6->3
+    const singles=Math.max(0, n-2*pairsNeeded);     // 4->2, 5->1, 6->0
+    let i=0;
+    for(let k=0;k<singles && i<n;k++) rows.push([items[i++]]);
+    while(i<n){ rows.push([items[i], items[i+1]].filter(Boolean)); i+=2; }
+  }
+  return rows.map(r=>{
+    if(r.length===1) return '<div class="note-row"><span class="note-label">'+r[0].label+':</span><span class="note-line">'+r[0].val+'</span></div>';
+    return '<div class="note-row note-row-split"><span class="note-label">'+r[0].label+':</span><span class="note-line note-line-short">'+r[0].val+'</span><span class="note-label-inline">'+r[1].label+':</span><span class="note-line note-line-short">'+r[1].val+'</span></div>';
+  }).join('');
+}
 // Kompakte Auflistung der verspaeteten Kurstage: 'T1 10 min · T3 3 min', nach je 5 Eintraegen Zeilenumbruch.
 function _verspListe(inst, attendance){
   const items=(attendance||[])
@@ -4589,12 +4612,18 @@ function syncMobileAttToFirestore(sid){
   const kurstage=inst.kurstage||5;
   const effektiveTage=kurstage;
   const attPercent=Math.round((present/effektiveTage)*100);
+  // Verspaetungs-Details je Kurstag mitspeichern, damit VerwaltungPro die Auflistung spiegeln kann
+  const lateDetails=(seatAtt||[])
+    .filter(e=>e&&e.type==='present'&&(parseInt(e.lateMins)||0)>0)
+    .map(e=>({t:_kurstagNr(inst,e.date)||0, d:String(e.date||''), m:parseInt(e.lateMins)||0}))
+    .sort((a,b)=>(a.d||'').localeCompare(b.d||''));
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(tnId).update({
       attTotal:total,attPresent:present,
       attAbsentE:absentE,attAbsentU:absentU,
       attSick:sick,attBerufsschule:berufsschule,
       attLate:late,attEarly:early,
+      attLateDetails:lateDetails,
       attPercent,attLastSync:Date.now()
     }).catch(()=>{});
 }
@@ -6811,6 +6840,7 @@ function generateAlleBescheinigungenAusbilder(){
       const deletedFixed=(inst.deletedFixedGrades||[]);
       const fixedActive=FIXED_GRADES.filter(g=>!deletedFixed.includes(g.id));
       const allGradeDefs=[...fixedActive,...(inst.customGrades||[])];
+      const gradeItems=[];
       allGradeDefs.forEach(g=>{
         if(!g||!g.label||!String(g.label).trim()) return; // ignoriere kaputte/leere Definitionen
         let val='';
@@ -6820,15 +6850,13 @@ function generateAlleBescheinigungenAusbilder(){
           val=sync['noten_'+g.id]||s[g.id]||'';
         }
         val=String(val||'').trim();
-        if(val){
-          notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(g.label).trim())}:</span><span class="note-line">${gradeOut(val)}</span></div>`);
-        }
+        if(val) gradeItems.push({label:esc(String(g.label).trim()), val:gradeOut(val)});
       });
+      { const _nz=_notenZeilenHtml(gradeItems); if(_nz) notenHtmlParts.push(_nz); }
       // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-      notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
-      if(bemerkung){
-        notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
-      }
+      notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
+      // Besondere Bemerkungen IMMER (leer = Linie zum handschriftlichen Ausfuellen)
+      notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
       const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
       return `<div class="page">
   <div class="khs-logo"><img src="data:image/png;base64,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" alt="KHS Logo"></div>
@@ -7023,7 +7051,10 @@ body.fz-zeit .vz-time,body.fz-zeit .vz-lbl-time{display:inline;}
 body.fz-liste .vz-count,body.fz-liste .vz-lbl-count{display:none;}
 body.fz-liste .vz-liste{display:inline-block;font-size:7.5px;line-height:1.3;text-align:left;}
 body.fz-liste .vz-lbl-liste{display:inline;}
-body.fz-liste .note-row-split .note-line-short:last-of-type{max-width:none;min-width:0;}
+body.fz-liste .note-row-fz .note-line-short:last-of-type{max-width:none;min-width:0;}
+/* Fehlzeiten-Zeile: Zahl schmal, damit 'Verspätungen' dichter an 'Fehltage' rueckt und rechts Platz entsteht */
+.note-row-fz .note-line-short:first-of-type{max-width:18mm;min-width:12mm;}
+.note-row-fz .note-label-inline{margin-left:2mm;}
 </style></head><body>
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="printAllCert()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
@@ -10098,6 +10129,7 @@ function generateBescheinigungAusbilder(){
     const deletedFixed=(inst.deletedFixedGrades||[]);
     const fixedActive=FIXED_GRADES.filter(g=>!deletedFixed.includes(g.id));
     const allGradeDefs=[...fixedActive,...(inst.customGrades||[])];
+    const gradeItems=[];
     allGradeDefs.forEach(g=>{
       if(!g||!g.label||!String(g.label).trim())return;
       let val='';
@@ -10107,15 +10139,13 @@ function generateBescheinigungAusbilder(){
         val=sync['noten_'+g.id]||d[g.id]||'';
       }
       val=String(val||'').trim();
-      if(val){
-        notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(g.label).trim())}:</span><span class="note-line">${gradeOut(val)}</span></div>`);
-      }
+      if(val) gradeItems.push({label:esc(String(g.label).trim()), val:gradeOut(val)});
     });
+    { const _nz=_notenZeilenHtml(gradeItems); if(_nz) notenHtmlParts.push(_nz); }
     // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-    notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
-    if(bemerkung){
-      notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
-    }
+    notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
+    // Besondere Bemerkungen IMMER (leer = Linie zum handschriftlichen Ausfuellen)
+    notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
     const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
     const w=window.open('','_blank');
     if(!w){toast('Popup blockiert – bitte Popups erlauben','bad');return;}
@@ -10237,7 +10267,10 @@ body.fz-zeit .vz-time,body.fz-zeit .vz-lbl-time{display:inline;}
 body.fz-liste .vz-count,body.fz-liste .vz-lbl-count{display:none;}
 body.fz-liste .vz-liste{display:inline-block;font-size:7.5px;line-height:1.3;text-align:left;}
 body.fz-liste .vz-lbl-liste{display:inline;}
-body.fz-liste .note-row-split .note-line-short:last-of-type{max-width:none;min-width:0;}
+body.fz-liste .note-row-fz .note-line-short:last-of-type{max-width:none;min-width:0;}
+/* Fehlzeiten-Zeile: Zahl schmal, damit 'Verspätungen' dichter an 'Fehltage' rueckt und rechts Platz entsteht */
+.note-row-fz .note-line-short:first-of-type{max-width:18mm;min-width:12mm;}
+.note-row-fz .note-label-inline{margin-left:2mm;}
 </style></head><body>
 <div class="action-bar no-print">
   <button class="btn-print" onclick="printCert()" title="Drucken">🖨 Drucken</button>

@@ -1684,10 +1684,12 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 339';
+const APP_VERSION = 'Build 341';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 341', d:'14.07.2026', items:['\ud83d\udcc4 Teilnahmebescheinigung wie in AusbilderPro: max. 5 Zeilen (3 Noten-Zeilen + Fehltage/Verspätungen + Besondere Bemerkungen), ab 4 Notenarten werden die unteren paarweise nebeneinander gesetzt','\u270d „Besondere Bemerkungen" erscheint jetzt immer (leer mit Linie zum Ausf\u00fcllen); \u201eVerspätungen\u201c r\u00fcckt n\u00e4her an \u201eFehltage\u201c']},
+  {v:'Build 340', d:'14.07.2026', items:['\ud83d\udd50 Teilnahmebescheinigung: Verspätungen k\u00f6nnen jetzt wahlweise als Anzahl (Standard) oder als Auflistung je Kurstag angezeigt und gedruckt werden (z. B. \u201eT1 10 min \u00b7 T3 3 min\u201c) \u2013 die Daten kommen aus AusbilderPro']},
   {v:'Build 339', d:'09.07.2026', items:['\ud83d\udd27 Eigene Notenarten (z. B. N1\u2013N4) erscheinen jetzt auf der Teilnahmebescheinigung: Die Bezeichnungen werden aus dem Kurs geladen (nicht nur aus dem TN-Doc), und Werte werden auch ohne Label angezeigt \u2013 keine Note geht mehr verloren']},
   {v:'Build 338', d:'09.07.2026', items:['\ud83d\udd27 Bescheinigung liest Noten, Nachweis und Signatur jetzt direkt aus derselben Quelle wie die Kursansicht (teilnehmer-Subcollection) \u2013 Noten und Unterweisungs-Best\u00e4tigung erscheinen jetzt zuverl\u00e4ssig auf der Teilnahmebescheinigung']},
   {v:'Build 337', d:'09.07.2026', items:['\ud83d\udcc4 Teilnahmebescheinigung spiegelt jetzt die im AusbilderPro festgelegte Position von Stempel und Unterschrift 1:1 \u2013 Ansicht und Ausdruck in der Verwaltung sind identisch zum Original']},
@@ -6862,6 +6864,27 @@ ${pages}
   w.document.close();
 }
 
+// Noten-Zeilen fuer das Formular: max. 3 Zeilen (3 Noten + Fehltage/Verspaetungen + Bemerkungen = 5).
+// Gepaart wird von UNTEN, damit die ersten Noten (Fuehrung, Mitarbeit) einzeln stehen bleiben.
+// Identisch zu AusbilderPro, damit die Bescheinigung 1:1 gleich aussieht.
+function _notenZeilenHtml(items){
+  const n=(items||[]).length;
+  if(!n) return '';
+  const rows=[];
+  if(n<=3){ items.forEach(it=>rows.push([it])); }
+  else {
+    const pairsNeeded=n-3;
+    const singles=Math.max(0, n-2*pairsNeeded);
+    let i=0;
+    for(let k=0;k<singles && i<n;k++) rows.push([items[i++]]);
+    while(i<n){ rows.push([items[i], items[i+1]].filter(Boolean)); i+=2; }
+  }
+  return rows.map(r=>{
+    if(r.length===1) return '<div class="note-row"><span class="note-label">'+r[0].label+':</span><span class="note-line">'+r[0].val+'</span></div>';
+    return '<div class="note-row note-row-split"><span class="note-label">'+r[0].label+':</span><span class="note-line note-line-short">'+r[0].val+'</span><span class="note-label-inline">'+r[1].label+':</span><span class="note-line note-line-short">'+r[1].val+'</span></div>';
+  }).join('');
+}
+
 // ─── TEILNAHMEBESCHEINIGUNG (Ausbilder) ───
 function generateAlleBescheinigungen(){
   if(!_selectedKursId){toast('Kein Kurs gewählt','bad');return;}
@@ -6911,6 +6934,13 @@ function generateAlleBescheinigungen(){
       const sigData=d.bescheinigungSignatur||'';
       const stempelData=d.bescheinigungStempel||'';
       // Positionen aus AusbilderPro spiegeln (identische Darstellung)
+      // Verspaetungen je Kurstag (aus AusbilderPro gespiegelt): 'T1 10 min · T3 3 min', 5 pro Zeile
+      const _ld=Array.isArray(d.attLateDetails)?d.attLateDetails:[];
+      const verspListe=_ld.length?_ld.map((it,i)=>{
+        const nr=parseInt(it&&it.t)||0, dt=String((it&&it.d)||''), mn=parseInt(it&&it.m)||0;
+        const lbl=nr>0?('T'+nr):(dt?dt.slice(8,10)+'.'+dt.slice(5,7)+'.':'?');
+        return (i>0 && i%5===0 ? '<br>' : (i>0?' · ':'')) + lbl+' '+mn+' min';
+      }).join(''):'–';
       const _sp=(d.bescheinigungStempelPos&&typeof d.bescheinigungStempelPos==='object')?d.bescheinigungStempelPos:null;
       const _gp=(d.bescheinigungSigPos&&typeof d.bescheinigungSigPos==='object')?d.bescheinigungSigPos:null;
       const _n=(v,dd)=>{const n=Number(v);return isFinite(n)?n:dd;};
@@ -6927,9 +6957,10 @@ function generateAlleBescheinigungen(){
       const ausgA=d.bescheinigungAusgestellt||null;
       const ausgATxt=ausgA?('✅ Ausgestellt am '+(ausgA.am?String(ausgA.am).split('-').reverse().join('.'):'?')+(ausgA.art==='mail'?' (E-Mail)':' (Druck)')):'';
       const notenHtmlParts=[];
-      if(String(fuehrung).trim()) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Führung:</span><span class="note-line">${esc(String(fuehrung))}</span></div>`);
-      if(String(mitarbeit).trim()) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Mitarbeit:</span><span class="note-line">${esc(String(mitarbeit))}</span></div>`);
-      if(String(praxis).trim()) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Fachkenntnisse (praktisch):</span><span class="note-line">${esc(String(praxis))}</span></div>`);
+      const gradeItems=[];
+      if(String(fuehrung).trim()) gradeItems.push({label:'Führung', val:esc(String(fuehrung))});
+      if(String(mitarbeit).trim()) gradeItems.push({label:'Mitarbeit', val:esc(String(mitarbeit))});
+      if(String(praxis).trim()) gradeItems.push({label:'Fachkenntnisse (praktisch)', val:esc(String(praxis))});
       // Custom-Noten-Labels: TN-Doc > Kurs-Doc (customGrades) > numerischer Fallback (N1, N2, ...) - wie in der Kursansicht.
       // Wert wird auch OHNE Label gerendert (Label-Fallback greift immer), damit keine Note verloren geht.
       const exLabels=d.noten_extra_labels||{}; const ex=d.noten_extra||{};
@@ -6939,10 +6970,12 @@ function generateAlleBescheinigungen(){
         const v=ex[cid]; if(!(v&&String(v).trim())) return;
         _exIdx++;
         const lbl=exLabels[cid]||_kursCG[cid]||('Note '+_exIdx);
-        notenHtmlParts.push(`<div class="note-row"><span class="note-label">${esc(String(lbl))}:</span><span class="note-line">${esc(String(v))}</span></div>`);
+        gradeItems.push({label:esc(String(lbl)), val:esc(String(v))});
       });
-      notenHtmlParts.push(`<div class="note-row note-row-split"><span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage}</span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short">${verspaetungen}</span></div>`);
-      if(bemerkung) notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung))}</span></div>`);
+      { const _nz=_notenZeilenHtml(gradeItems); if(_nz) notenHtmlParts.push(_nz); }
+      notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage}</span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short"><span class="vz-count">${verspaetungen}</span><span class="vz-liste">${verspListe}</span></span></div>`);
+      // Besondere Bemerkungen IMMER (leer = Linie zum handschriftlichen Ausfuellen)
+      notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
       const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
       return `<div class="page">
   <div class="khs-logo"><img src="data:image/png;base64,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" alt="KHS Logo"></div>
@@ -7128,9 +7161,18 @@ body.pdf-mode .stempel-slot,body.pdf-mode .sig-canvas-wrap{cursor:default !impor
 .btn-remove-overlay{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:#ef4444;color:#fff;cursor:pointer;font-weight:900;font-size:.7rem;box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:10;line-height:0;display:flex;align-items:center;justify-content:center;}
 @media print{.no-print,.btn-remove-overlay{display:none !important;}}
 body.pdf-mode .btn-remove-overlay{display:none !important;}
+/* Verspaetungen: Anzahl (Standard) oder Auflistung je Kurstag - Breite nur in der Listen-Variante gelockert */
+.vz-liste{display:none;}
+body.fz-liste .vz-count{display:none;}
+body.fz-liste .vz-liste{display:inline-block;font-size:7.5px;line-height:1.3;text-align:left;}
+body.fz-liste .note-row-fz .note-line-short:last-of-type{max-width:none;min-width:0;}
+/* Fehlzeiten-Zeile: Zahl schmal, damit 'Verspätungen' dichter an 'Fehltage' rueckt */
+.note-row-fz .note-line-short:first-of-type{max-width:18mm;min-width:12mm;}
+.note-row-fz .note-label-inline{margin-left:2mm;}
 </style></head><body>
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="window.print()" title="Drucken">🖨 Drucken (${sigCount} unterschriebene Bescheinigung${sigCount===1?'':'en'})</button>
+  <div style="margin:6px 0;font-size:12px;color:#334155">🕐 Verspätungen anzeigen als: <select onchange="document.body.classList.toggle('fz-liste',this.value==='list')" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl</option><option value="list">Je Kurstag</option></select></div>
   <div class="print-hint">Nur unterschriebene Bescheinigungen werden angezeigt. Beim Drucken lassen sich im Dialog einzelne Seiten auswählen.</div>
 </div>
 ${pages}
