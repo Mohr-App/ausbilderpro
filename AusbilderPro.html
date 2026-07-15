@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v794';
+const APP_VERSION = 'v795';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v795', d:'15.07.2026', items:['\ud83d\udcd0 Bescheinigung: Alle Linien enden jetzt b\u00fcndig am rechten Rand \u2013 Noten, Fehltage/Verspätungen und Bemerkungen auf einer Senkrechten','\ud83d\udc1b Fix: Die Verk\u00fcrzung des Fehltage-Feldes (\u201eVerspätungen\u201c dichter heran) hat bisher nicht gegriffen und wirkt jetzt']},
   {v:'v794', d:'14.07.2026', items:['\ud83d\udcc4 Bescheinigung wie das alte Formular: max. 5 Zeilen (3 Noten-Zeilen + Fehltage/Verspätungen + Besondere Bemerkungen). Ab 4 Notenarten werden die unteren automatisch paarweise nebeneinander gesetzt (z. B. Fachkenntnisse praktisch/theoretisch) \u2013 Notennamen bleiben frei \u00e4nderbar','\u270d „Besondere Bemerkungen" erscheint jetzt IMMER (leer mit Linie zum handschriftlichen Ausf\u00fcllen)','\u2194 \u201eVerspätungen\u201c r\u00fcckt n\u00e4her an \u201eFehltage\u201c \u2013 mehr Platz f\u00fcr die Angaben']},
   {v:'v793', d:'14.07.2026', items:['\ud83d\udd04 Verspätungen je Kurstag werden jetzt mitsynchronisiert \u2013 die Verwaltung (VerwaltungPro) kann die Auflistung dadurch identisch anzeigen und ausdrucken']},
   {v:'v792', d:'14.07.2026', items:['\ud83d\udd50 Bescheinigung: Verspätungen jetzt in drei w\u00e4hlbaren Varianten \u2013 Anzahl (Standard), Gesamtzeit oder neu die Auflistung je Kurstag (z. B. \u201eT1 10 min \u00b7 T3 3 min\u201c, nur verspätete Tage, 5 pro Zeile, kleine Schrift). Standard-Layout bleibt unver\u00e4ndert']},
@@ -6854,7 +6855,7 @@ function generateAlleBescheinigungenAusbilder(){
       });
       { const _nz=_notenZeilenHtml(gradeItems); if(_nz) notenHtmlParts.push(_nz); }
       // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-      notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
+      notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short fz-first"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
       // Besondere Bemerkungen IMMER (leer = Linie zum handschriftlichen Ausfuellen)
       notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
       const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
@@ -7051,9 +7052,11 @@ body.fz-zeit .vz-time,body.fz-zeit .vz-lbl-time{display:inline;}
 body.fz-liste .vz-count,body.fz-liste .vz-lbl-count{display:none;}
 body.fz-liste .vz-liste{display:inline-block;font-size:7.5px;line-height:1.3;text-align:left;}
 body.fz-liste .vz-lbl-liste{display:inline;}
-body.fz-liste .note-row-fz .note-line-short:last-of-type{max-width:none;min-width:0;}
-/* Fehlzeiten-Zeile: Zahl schmal, damit 'Verspätungen' dichter an 'Fehltage' rueckt und rechts Platz entsteht */
-.note-row-fz .note-line-short:first-of-type{max-width:18mm;min-width:12mm;}
+/* Buendiger rechter Rand: in geteilten Zeilen duerfen die Linien bis zum rechten Blockrand wachsen,
+   dadurch enden ALLE Linien (einzeln, gepaart, Fehlzeiten, Bemerkungen) auf derselben Senkrechten. */
+.note-row-split .note-line-short{max-width:none;}
+/* Fehlzeiten-Zeile: Zahlenfeld schmal, damit 'Verspätungen' dicht an 'Fehltage' rueckt */
+.note-row-fz .fz-first{flex:0 0 18mm;max-width:18mm;min-width:18mm;}
 .note-row-fz .note-label-inline{margin-left:2mm;}
 </style></head><body>
 <div style="text-align:center" class="no-print">
@@ -10143,7 +10146,7 @@ function generateBescheinigungAusbilder(){
     });
     { const _nz=_notenZeilenHtml(gradeItems); if(_nz) notenHtmlParts.push(_nz); }
     // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-    notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
+    notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short fz-first"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
     // Besondere Bemerkungen IMMER (leer = Linie zum handschriftlichen Ausfuellen)
     notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
     const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
@@ -10267,9 +10270,11 @@ body.fz-zeit .vz-time,body.fz-zeit .vz-lbl-time{display:inline;}
 body.fz-liste .vz-count,body.fz-liste .vz-lbl-count{display:none;}
 body.fz-liste .vz-liste{display:inline-block;font-size:7.5px;line-height:1.3;text-align:left;}
 body.fz-liste .vz-lbl-liste{display:inline;}
-body.fz-liste .note-row-fz .note-line-short:last-of-type{max-width:none;min-width:0;}
-/* Fehlzeiten-Zeile: Zahl schmal, damit 'Verspätungen' dichter an 'Fehltage' rueckt und rechts Platz entsteht */
-.note-row-fz .note-line-short:first-of-type{max-width:18mm;min-width:12mm;}
+/* Buendiger rechter Rand: in geteilten Zeilen duerfen die Linien bis zum rechten Blockrand wachsen,
+   dadurch enden ALLE Linien (einzeln, gepaart, Fehlzeiten, Bemerkungen) auf derselben Senkrechten. */
+.note-row-split .note-line-short{max-width:none;}
+/* Fehlzeiten-Zeile: Zahlenfeld schmal, damit 'Verspätungen' dicht an 'Fehltage' rueckt */
+.note-row-fz .fz-first{flex:0 0 18mm;max-width:18mm;min-width:18mm;}
 .note-row-fz .note-label-inline{margin-left:2mm;}
 </style></head><body>
 <div class="action-bar no-print">

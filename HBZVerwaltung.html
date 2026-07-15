@@ -1684,10 +1684,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 341';
+const APP_VERSION = 'Build 342';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 342', d:'15.07.2026', items:['\ud83d\udcd0 Teilnahmebescheinigung: Alle Linien enden b\u00fcndig am rechten Rand \u2013 identisch zu AusbilderPro']},
   {v:'Build 341', d:'14.07.2026', items:['\ud83d\udcc4 Teilnahmebescheinigung wie in AusbilderPro: max. 5 Zeilen (3 Noten-Zeilen + Fehltage/Verspätungen + Besondere Bemerkungen), ab 4 Notenarten werden die unteren paarweise nebeneinander gesetzt','\u270d „Besondere Bemerkungen" erscheint jetzt immer (leer mit Linie zum Ausf\u00fcllen); \u201eVerspätungen\u201c r\u00fcckt n\u00e4her an \u201eFehltage\u201c']},
   {v:'Build 340', d:'14.07.2026', items:['\ud83d\udd50 Teilnahmebescheinigung: Verspätungen k\u00f6nnen jetzt wahlweise als Anzahl (Standard) oder als Auflistung je Kurstag angezeigt und gedruckt werden (z. B. \u201eT1 10 min \u00b7 T3 3 min\u201c) \u2013 die Daten kommen aus AusbilderPro']},
   {v:'Build 339', d:'09.07.2026', items:['\ud83d\udd27 Eigene Notenarten (z. B. N1\u2013N4) erscheinen jetzt auf der Teilnahmebescheinigung: Die Bezeichnungen werden aus dem Kurs geladen (nicht nur aus dem TN-Doc), und Werte werden auch ohne Label angezeigt \u2013 keine Note geht mehr verloren']},
@@ -6973,7 +6974,7 @@ function generateAlleBescheinigungen(){
         gradeItems.push({label:esc(String(lbl)), val:esc(String(v))});
       });
       { const _nz=_notenZeilenHtml(gradeItems); if(_nz) notenHtmlParts.push(_nz); }
-      notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short">${fehltage}</span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short"><span class="vz-count">${verspaetungen}</span><span class="vz-liste">${verspListe}</span></span></div>`);
+      notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short fz-first">${fehltage}</span><span class="note-label-inline">Verspätungen:</span><span class="note-line note-line-short"><span class="vz-count">${verspaetungen}</span><span class="vz-liste">${verspListe}</span></span></div>`);
       // Besondere Bemerkungen IMMER (leer = Linie zum handschriftlichen Ausfuellen)
       notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
       const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
@@ -7165,9 +7166,11 @@ body.pdf-mode .btn-remove-overlay{display:none !important;}
 .vz-liste{display:none;}
 body.fz-liste .vz-count{display:none;}
 body.fz-liste .vz-liste{display:inline-block;font-size:7.5px;line-height:1.3;text-align:left;}
-body.fz-liste .note-row-fz .note-line-short:last-of-type{max-width:none;min-width:0;}
-/* Fehlzeiten-Zeile: Zahl schmal, damit 'Verspätungen' dichter an 'Fehltage' rueckt */
-.note-row-fz .note-line-short:first-of-type{max-width:18mm;min-width:12mm;}
+/* Buendiger rechter Rand: in geteilten Zeilen duerfen die Linien bis zum rechten Blockrand wachsen,
+   dadurch enden ALLE Linien (einzeln, gepaart, Fehlzeiten, Bemerkungen) auf derselben Senkrechten. */
+.note-row-split .note-line-short{max-width:none;}
+/* Fehlzeiten-Zeile: Zahlenfeld schmal, damit 'Verspätungen' dicht an 'Fehltage' rueckt */
+.note-row-fz .fz-first{flex:0 0 18mm;max-width:18mm;min-width:18mm;}
 .note-row-fz .note-label-inline{margin-left:2mm;}
 </style></head><body>
 <div style="text-align:center" class="no-print">
