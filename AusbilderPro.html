@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v798';
+const APP_VERSION = 'v799';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v799', d:'15.07.2026', items:['\ud83d\udd50 Variante „Gesamtzeit" zeigt jetzt zus\u00e4tzlich die Anzahl der Verspätungen: „Verspätungen: 3 (25 Min)" statt nur der Minuten']},
   {v:'v798', d:'15.07.2026', items:['\ud83c\udf93 Verspätungen je Kurstag: Es werden jetzt nur noch die tats\u00e4chlichen Kurstage gez\u00e4hlt \u2013 Berufsschultage (und Wochenenden) z\u00e4hlen nicht mit. Beispiel: Ist Mittwoch Berufsschule, ist der Donnerstag „Tag 3"']},
   {v:'v797', d:'15.07.2026', items:['\ud83d\udcac „Besondere Bemerkungen" steht jetzt direkt im Reiter Noten (statt im Reiter Person) \u2013 dort, wo sie auch auf der Bescheinigung erscheinen','\u2139\ufe0f Klar beschriftet: Der Text wird auf der Teilnahmebescheinigung gedruckt UND ist in der Kurshistorie f\u00fcr andere Ausbilder sichtbar. F\u00fcr rein private Notizen bleibt „Notiz (privat, nur f\u00fcr dich)" im Reiter Person']},
   {v:'v796', d:'15.07.2026', items:['\ud83d\udcc4 Bescheinigung wortgetreu wie das KHS-Original: Bei zwei zusammengeh\u00f6renden Noten wird der gemeinsame Wortstamm nur einmal gedruckt \u2013 \u201eFachkenntnisse (praktisch) ....... (theoretisch) .......\u201c. Die Notennamen bleiben in App, TN-Liste und Verwaltung vollst\u00e4ndig lesbar','\ud83d\udd24 Kein Doppelpunkt mehr bei Bezeichnungen, die in einer Klammer enden']},
@@ -6885,7 +6886,7 @@ function generateAlleBescheinigungenAusbilder(){
       });
       { const _nz=_notenZeilenHtml(gradeItems); if(_nz) notenHtmlParts.push(_nz); }
       // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-      notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short fz-first"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
+      notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short fz-first"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungen:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspaetungen} (${verspZeit})</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
       // Besondere Bemerkungen IMMER (leer = Linie zum handschriftlichen Ausfuellen)
       notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
       const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
@@ -7092,7 +7093,7 @@ body.fz-liste .vz-lbl-liste{display:inline;}
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="printAllCert()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
   <div style="margin:6px 0;font-size:12px;color:#334155"><label style="cursor:pointer;user-select:none"><input type="checkbox" onchange="toggleFehlzeitenBlank(this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen (Fehltage &amp; Verspätungen handschriftlich eintragen)</label></div>
-  <div style="margin:6px 0;font-size:12px;color:#334155">🕐 Verspätungen anzeigen als: <select onchange="setVerspModus(this.value)" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl (z. B. 2)</option><option value="sum">Gesamtzeit (z. B. 13 Min)</option><option value="list">Je Kurstag (z. B. T1 10 min · T3 3 min)</option></select></div>
+  <div style="margin:6px 0;font-size:12px;color:#334155">🕐 Verspätungen anzeigen als: <select onchange="setVerspModus(this.value)" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl (z. B. 2)</option><option value="sum">Anzahl + Gesamtzeit (z. B. 3 (13 Min))</option><option value="list">Je Kurstag (z. B. T1 10 min · T3 3 min)</option></select></div>
   <div style="margin:8px 0;display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:center">
     <span style="font-size:11px;color:#475569;align-self:center;margin-right:4px"><b>Standort:</b></span>
     <button class="bulk-btn bulk-btn-standort" onclick="setAllStandort('bonn')">Alle HBZ Bonn</button>
@@ -10176,7 +10177,7 @@ function generateBescheinigungAusbilder(){
     });
     { const _nz=_notenZeilenHtml(gradeItems); if(_nz) notenHtmlParts.push(_nz); }
     // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
-    notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short fz-first"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungszeit:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspZeit}</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
+    notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short fz-first"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungen:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspaetungen} (${verspZeit})</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
     // Besondere Bemerkungen IMMER (leer = Linie zum handschriftlichen Ausfuellen)
     notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
     const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
@@ -10314,7 +10315,7 @@ body.fz-liste .vz-lbl-liste{display:inline;}
 </div>
 <div class="no-print" style="text-align:center;margin:2px 0 6px;font-size:12px;color:#334155">
   <label style="cursor:pointer;user-select:none;margin:0 8px"><input type="checkbox" onchange="document.body.classList.toggle('fz-blank',this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen</label>
-  <span style="margin:0 8px">🕐 Verspätungen: <select onchange="document.body.classList.toggle('fz-zeit',this.value==='sum');document.body.classList.toggle('fz-liste',this.value==='list');" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl</option><option value="sum">Gesamtzeit</option><option value="list">Je Kurstag</option></select></span>
+  <span style="margin:0 8px">🕐 Verspätungen: <select onchange="document.body.classList.toggle('fz-zeit',this.value==='sum');document.body.classList.toggle('fz-liste',this.value==='list');" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl</option><option value="sum">Anzahl + Gesamtzeit</option><option value="list">Je Kurstag</option></select></span>
 </div>
 <div id="statusArea" class="no-print">${ausgTxt?'<div class="status-msg" style="background:#dcfce7;color:#166534">'+ausgTxt+'</div>':''}</div>
 
