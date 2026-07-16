@@ -1028,6 +1028,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div class="card-title"><span class="card-icon green" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>Aktive Betriebe</div>
           <div id="agActiveList"><div class="empty">Lädt…</div></div>
         </div>
+        <div class="card">
+          <div class="card-title">🔗 Azubis den Betrieben zuordnen</div>
+          <div style="font-size:.66rem;color:var(--mu);margin-bottom:10px;line-height:1.55">Verknüpft Azubis mit dem Betrieb, dessen Firmenname mit dem Betriebs-Feld aus der Handwerkskammer-Liste übereinstimmt. Groß-/Kleinschreibung und doppelte Leerzeichen sind egal, sonst muss der Name exakt passen.<br><b>Füllt nur Lücken</b> – bestehende Verknüpfungen und bewusst getrennte Zuordnungen bleiben unberührt.</div>
+          <button class="btn-sm" onclick="agZuordnungTrockenlauf()" style="width:100%;font-size:.72rem">🔍 Trockenlauf – es wird nichts geschrieben</button>
+          <div id="agZuPreview" style="display:none;margin-top:10px;padding:10px;background:var(--sur2);border-radius:8px;font-size:.66rem;line-height:1.6;max-height:340px;overflow:auto"></div>
+          <button id="agZuWriteBtn" class="btn-sm btn-ok" onclick="agZuordnungSchreiben()" style="display:none;width:100%;margin-top:6px;font-size:.72rem">✅ Jetzt zuordnen</button>
+        </div>
       </div>
 
       <div class="page" id="page-einstellungen">
@@ -1684,10 +1691,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 346';
+const APP_VERSION = 'Build 347';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 347', d:'15.07.2026', items:['\ud83d\udd17 Neues Werkzeug auf der Seite Betriebe: Azubis werden automatisch dem Betrieb zugeordnet, dessen Name mit dem Betriebs-Feld aus der Handwerkskammer-Liste \u00fcbereinstimmt. Erst Trockenlauf, dann schreiben \u2013 f\u00fcllt nur L\u00fccken','\u2139\ufe0f Betriebe k\u00f6nnen keine Azubis mehr selbst anlegen. Azubis entstehen ausschlie\u00dflich \u00fcber die KH-Liste, dadurch keine Dubletten mehr','\ud83d\udd13 Im TN-Profil steht jetzt der verkn\u00fcpfte Betrieb \u2013 mit Knopf zum L\u00f6sen. Das Betriebs-Feld aus der KH-Liste bleibt dabei erhalten, die automatische Zuordnung stellt die Verkn\u00fcpfung nicht wieder her']},
   {v:'Build 346', d:'15.07.2026', items:['\ud83c\udfed Betriebe: Pro Betrieb l\u00e4sst sich jetzt einstellen, welche Module er in BetriebPro sieht (Zeit/Mitarbeiter, Aufträge, Belege, Urlaub). Azubis + ÜbL, Meldungen und Einstellungen bleiben immer sichtbar','\u2139\ufe0f Neu registrierte Betriebe starten schlank mit Azubis + ÜbL \u2013 weitere Module schaltest du hier auf Wunsch frei. Bestehende Betriebe behalten alles']},
   {v:'Build 345', d:'15.07.2026', items:['\ud83d\udd0d Verspätungen je Kurstag: Schriftgr\u00f6\u00dfe passt sich automatisch an die Anzahl an \u2013 identisch zu AusbilderPro']},
   {v:'Build 344', d:'15.07.2026', items:['\ud83d\udd24 Verspätungen je Kurstag im Format „T1: 30min, T3: 3min" \u2013 identisch zu AusbilderPro']},
@@ -7948,6 +7956,33 @@ function reassignTNToKurs(e, newKursId){
   _dragTNId = null;
 }
 
+// Loest die Verknuepfung TN <-> Betrieb zentral aus der Verwaltung.
+// Gleiche Logik wie in ArbeitgeberPro: 'firma' bleibt als Kammerdatum stehen,
+// der Sperrvermerk verhindert, dass die automatische Zuordnung sie wieder herstellt.
+window.vpTrennFirma=function(tnId){
+  const t=_globalTN.find(x=>x.id===tnId);
+  if(!t||!t.firmaUid) return;
+  const name=((t.vorname||'')+' '+(t.nachname||'')).trim()||tnId;
+  if(!confirm('Verknüpfung von „'+name+'“ mit dem Betrieb lösen?\n\n• Der Betrieb sieht diesen Azubi danach nicht mehr\n• Das Betriebs-Feld aus der KH-Liste bleibt erhalten\n• Die automatische Zuordnung stellt sie NICHT wieder her')) return;
+  const uid=t.firmaUid;
+  db.collection('globalTN').doc(tnId).collection('firmaHistorie').add({
+    firmaUid:uid, firma:t.firma||'', bis:Date.now(), beendetVon:'hbz'
+  }).catch(()=>{});
+  const upd={
+    firmaUid: firebase.firestore.FieldValue.delete(),
+    arbeitgeberId: firebase.firestore.FieldValue.delete(),
+    betriebId: firebase.firestore.FieldValue.delete(),
+    _verknuepftSeit: firebase.firestore.FieldValue.delete()
+  };
+  upd['firmaGetrenntVon.'+uid]=Date.now();
+  db.collection('globalTN').doc(tnId).update(upd).then(()=>{
+    delete t.firmaUid;
+    const el=document.getElementById('tnFirmaLink');
+    if(el) el.innerHTML='<span style="color:var(--mu)">nicht verknüpft</span>';
+    toast('✓ Verknüpfung gelöst');
+  }).catch(e=>toast('Fehler: '+e.message,'bad'));
+};
+
 function openTNProfile(tnId){
   const t=_globalTN.find(x=>x.id===tnId);
   if(!t) return;
@@ -7971,6 +8006,7 @@ function openTNProfile(tnId){
     '<div><div style="font-size:1.05rem;font-weight:800">'+esc(name.trim())+'</div>'+
     '<div style="font-size:.72rem;color:var(--mu)">'+(t.beruf||'')+(t.ausbjahr?' / '+t.ausbjahr+'. Lehrjahr':'')+'</div></div></div>'+
     '<div class="profile-field"><span class="pf-label">Betrieb</span><span>'+(t.firma||'–')+'</span></div>'+
+    '<div class="profile-field"><span class="pf-label">Verknüpft mit</span><span id="tnFirmaLink">'+(t.firmaUid?'wird geladen…':'<span style="color:var(--mu)">nicht verknüpft</span>')+'</span></div>'+
     '<div class="profile-field"><span class="pf-label">Geburtsdatum</span><span>'+(t.geburtsdatum?fmtDE(t.geburtsdatum):'–')+'</span></div>'+
     '<div class="profile-field"><span class="pf-label">E-Mail</span><span>'+(t.email||'–')+'</span></div>'+
     '<div class="profile-field"><span class="pf-label">Telefon</span><span>'+(t.tel||'–')+'</span></div>'+
@@ -8118,6 +8154,18 @@ function openTNProfile(tnId){
       : '<button class="btn-sm" title="Archivieren - aus aktiven Listen ausblenden, Daten bleiben erhalten" onclick="archiveGlobalTN(\''+tnId+'\')" style="flex:1;background:rgba(245,158,11,.15);color:#d97706;border:none">📦 Archivieren</button>'
     )+'</div>';
   document.getElementById('tnModalBody').innerHTML=html;
+  // Verknuepften Betrieb aufloesen (firmaUid -> Firmenname) und Loesen-Knopf anbieten
+  if(t.firmaUid){
+    db.collection('users').doc(t.firmaUid).get().then(d=>{
+      const el=document.getElementById('tnFirmaLink');
+      if(!el) return;
+      const fn=(d.exists&&((d.data()||{}).firma||(d.data()||{}).email))||t.firmaUid;
+      el.innerHTML=esc(fn)+' <button onclick="vpTrennFirma(\''+esc(tnId)+'\')" title="Verknüpfung lösen" style="font-size:.55rem;padding:2px 7px;margin-left:6px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:4px;color:#ef4444;cursor:pointer;font-weight:700">lösen</button>';
+    }).catch(()=>{
+      const el=document.getElementById('tnFirmaLink');
+      if(el) el.textContent=t.firmaUid;
+    });
+  }
   document.getElementById('tnProfileModal').classList.add('open');
   // Attendance + Dokumente async laden
   loadTNProfileAttendance(tnId, t.aktiverKursId);
@@ -10362,6 +10410,110 @@ function collectFirmen(){
 
 // ── ARBEITGEBER ZUGÄNGE ──
 let _agUsers=[];
+// ─── AZUBIS DEN BETRIEBEN ZUORDNEN ───
+// Die Handwerkskammer ist die Wahrheit: globalTN.firma kommt aus der KH-Liste.
+// Ein Azubi wird nur einem Betrieb zugeordnet, der sich auch registriert hat.
+let _agZuPlan=null;
+
+// Firmennamen vergleichbar machen: Gross-/Kleinschreibung und Mehrfach-Leerzeichen egal,
+// sonst exakt. Rechtsformen werden BEWUSST nicht entfernt - sonst matcht "Müller GmbH"
+// auf "Müller e.K.", und eine falsche Zuordnung ist schlimmer als gar keine.
+function _firmaKey(v){ return String(v||'').trim().replace(/\s+/g,' ').toLowerCase(); }
+
+function agZuordnungTrockenlauf(){
+  const pv=document.getElementById('agZuPreview');
+  const wb=document.getElementById('agZuWriteBtn');
+  if(wb) wb.style.display='none';
+  _agZuPlan=null;
+  if(pv){ pv.style.display=''; pv.textContent='Lade Betriebe und Teilnehmer…'; }
+  Promise.all([
+    db.collection('users').where('role','==','arbeitgeber').get(),
+    db.collection('globalTN').get()
+  ]).then(([agSnap,tnSnap])=>{
+    // Firmenname -> Betrieb. Kommt ein Name doppelt vor, ist er mehrdeutig
+    // und wird komplett ausgelassen - lieber kein Treffer als der falsche Betrieb.
+    const map=new Map(), mehrdeutig=new Set();
+    agSnap.forEach(d=>{
+      const k=_firmaKey((d.data()||{}).firma);
+      if(!k) return;
+      if(map.has(k)) mehrdeutig.add(k);
+      map.set(k,{uid:d.id, firma:(d.data()||{}).firma||''});
+    });
+    const mehrdeutigNamen=Array.from(mehrdeutig).map(k=>(map.get(k)||{}).firma||k);
+    mehrdeutig.forEach(k=>map.delete(k));
+
+    const treffer=[]; const ohneTreffer=new Map(); let schonVerknuepft=0, gesperrt=0, ohneFirma=0;
+    tnSnap.forEach(d=>{
+      const t=d.data()||{};
+      if((t.typ||'')==='arbeitnehmer') return;
+      if(t.firmaUid){ schonVerknuepft++; return; }
+      const k=_firmaKey(t.firma);
+      if(!k){ ohneFirma++; return; }
+      const b=map.get(k);
+      if(!b){ ohneTreffer.set(t.firma, (ohneTreffer.get(t.firma)||0)+1); return; }
+      if(t.firmaGetrenntVon && t.firmaGetrenntVon[b.uid]){ gesperrt++; return; }
+      treffer.push({tnId:d.id, uid:b.uid, firma:b.firma, name:((t.vorname||'')+' '+(t.nachname||'')).trim()||d.id});
+    });
+    _agZuPlan=treffer;
+
+    // Nach Betrieb buendeln
+    const jeBetrieb=new Map();
+    treffer.forEach(x=>{ jeBetrieb.set(x.firma,(jeBetrieb.get(x.firma)||0)+1); });
+    let h='<div style="font-weight:800;margin-bottom:6px">Trockenlauf – es wurde nichts geschrieben</div>';
+    h+='<div style="margin-bottom:8px"><b style="color:#16a34a;font-size:.9rem">'+treffer.length+'</b> Azubis würden zugeordnet</div>';
+    if(jeBetrieb.size){
+      h+='<div style="margin-bottom:8px">'+Array.from(jeBetrieb.entries()).sort((a,b)=>b[1]-a[1])
+        .map(([f,n])=>'<div>· '+esc(f)+': <b>'+n+'</b></div>').join('')+'</div>';
+    }
+    h+='<div style="border-top:1px solid var(--brd);padding-top:6px;margin-top:6px;color:var(--mu)">'
+      +'<div>Bereits verknüpft, unberührt: '+schonVerknuepft+'</div>'
+      +'<div>Bewusst getrennt, übersprungen: '+gesperrt+'</div>'
+      +'<div>Ohne Betrieb in der KH-Liste: '+ohneFirma+'</div></div>';
+    if(mehrdeutigNamen.length){
+      h+='<div style="border-top:1px solid var(--brd);padding-top:6px;margin-top:6px;color:#dc2626">'
+        +'<b>Mehrdeutig – ausgelassen:</b> Diese Firmennamen sind bei mehreren Betrieben identisch:<br>'
+        +mehrdeutigNamen.map(f=>'· '+esc(f)).join('<br>')+'</div>';
+    }
+    if(ohneTreffer.size){
+      const liste=Array.from(ohneTreffer.entries()).sort((a,b)=>b[1]-a[1]);
+      h+='<div style="border-top:1px solid var(--brd);padding-top:6px;margin-top:6px">'
+        +'<b style="color:#d97706">Kein registrierter Betrieb ('+liste.length+' Namen):</b>'
+        +'<div style="color:var(--mu);margin-top:3px">Entweder hat sich der Betrieb nie registriert, oder der Name weicht ab – dann hilft „Betriebsnamen korrigieren“.</div>'
+        +liste.slice(0,40).map(([f,n])=>'<div>· '+esc(f||'(leer)')+': '+n+'</div>').join('')
+        +(liste.length>40?'<div style="color:var(--mu)">… und '+(liste.length-40)+' weitere</div>':'')+'</div>';
+    }
+    if(pv){ pv.innerHTML=h; }
+    if(wb && treffer.length) wb.style.display='';
+  }).catch(err=>{
+    if(pv) pv.textContent='Fehler: '+err.message;
+  });
+}
+
+function agZuordnungSchreiben(){
+  if(!_agZuPlan||!_agZuPlan.length){ toast('Nichts zuzuordnen','bad'); return; }
+  if(!confirm(_agZuPlan.length+' Azubis den Betrieben zuordnen?\n\nBestehende Verknüpfungen bleiben unberührt.')) return;
+  const plan=_agZuPlan.slice();
+  const bloecke=[];
+  for(let i=0;i<plan.length;i+=400) bloecke.push(plan.slice(i,i+400));
+  toast('⏳ Ordne '+plan.length+' Azubis zu…');
+  bloecke.reduce((kette,block)=>kette.then(()=>{
+    const batch=db.batch();
+    block.forEach(x=>{
+      batch.update(db.collection('globalTN').doc(x.tnId), {
+        firmaUid: x.uid,
+        _verknuepftSeit: Date.now(),
+        _verknuepftVon: 'kh-liste'
+      });
+    });
+    return batch.commit();
+  }), Promise.resolve()).then(()=>{
+    toast('✓ '+plan.length+' Azubis zugeordnet');
+    _agZuPlan=null;
+    const wb=document.getElementById('agZuWriteBtn'); if(wb) wb.style.display='none';
+    const pv=document.getElementById('agZuPreview'); if(pv) pv.innerHTML='<b style="color:#16a34a">✓ '+plan.length+' Azubis zugeordnet.</b> Die Betriebe sehen sie nach dem nächsten Neuladen ihrer App.';
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
+
 // Ein Haekchen pro Modul. Fehlt agModule komplett, gilt alles als sichtbar (Bestandsbetriebe).
 function _agModulChk(uid,key,label,m){
   const an = !m || m[key]!==false;

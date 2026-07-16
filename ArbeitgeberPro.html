@@ -359,10 +359,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                 <button class="uebl-tile active" id="azTile-kontakte" onclick="agAzPanel(event,'azp-kontakte')" title="Azubis mit Telefon und E-Mail"><span class="ic">👥</span>Azubis</button>
                 <button class="uebl-tile" id="azTile-uebl" onclick="agAzPanel(event,'azp-uebl')" title="Überbetriebliche Lehrgänge: Kurse, Anwesenheit, Noten"><span class="ic">🎓</span>ÜbL-Kurse</button>
                 <button class="uebl-tile" id="azTile-berichte" onclick="agAzPanel(event,'azp-berichte')" title="Wochenberichte der Azubis"><span class="ic">📒</span>Berichtsheft<span id="cntBerichte" style="font-size:.55rem;background:rgba(37,99,235,.12);color:var(--acc);padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
-                <button class="uebl-tile" onclick="openMaAnlegenModal('azubi')" title="Neuen Azubi anlegen"><span class="ic">🎓+</span>Azubi anlegen</button>
               </div>
               <div id="azp-kontakte">
                 <div id="agAzubiListe"><div class="empty">Lädt…</div></div>
+                <div style="margin-top:12px;padding:10px 12px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.12);border-radius:10px;font-size:.66rem;color:var(--mu);line-height:1.5">
+                  ℹ️ Deine Azubis erscheinen hier automatisch, sobald sie bei der Handwerkskammer für deinen Betrieb geführt werden. Fehlt jemand oder ist jemand dabei, der nicht zu dir gehört, melde dich bei der Verwaltung des HBZ.
+                </div>
               </div>
               <div id="azp-uebl" style="display:none">
                 <div class="ag-tiles" style="margin-bottom:10px">
@@ -3684,13 +3686,20 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
       return tn;
     });
   }).then(tn=>{
-    return tnRef.update({
+    // 'firma' wird bewusst NICHT geloescht: Das ist der Betriebsname aus der
+    // Handwerkskammer-Liste (Kammerdatum) und dient der automatischen Zuordnung als
+    // Schluessel. Geloescht wird nur die Verknuepfung selbst.
+    const upd={
       firmaUid: firebase.firestore.FieldValue.delete(),
-      firma: firebase.firestore.FieldValue.delete(),
       arbeitgeberId: firebase.firestore.FieldValue.delete(),
       betriebId: firebase.firestore.FieldValue.delete(),
       _verknuepftSeit: firebase.firestore.FieldValue.delete()
-    }).then(()=>tn);
+    };
+    // Sperrvermerk: Die automatische Zuordnung darf diesen TN nicht wieder
+    // demselben Betrieb zuschlagen. Ein Betriebswechsel bleibt moeglich,
+    // weil dann ein anderer Firmenname aus der KH-Liste kommt.
+    if(firmaUid) upd['firmaGetrenntVon.'+firmaUid]=Date.now();
+    return tnRef.update(upd).then(()=>tn);
   }).then(tn=>{
     const tnName=((tn.vorname||'')+' '+(tn.nachname||'')).trim()||'Mitarbeiter';
     const tnEmail=tn.kontaktEmail||tn.email||'';
