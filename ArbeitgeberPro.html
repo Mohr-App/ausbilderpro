@@ -355,52 +355,33 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div class="coll-body">
             <div class="abtab2 active" id="abtab-ma-azubis">
               <div id="agNotifBanner"></div>
-              <div class="card">
-                <div class="card-title">👥 Azubi-Kontakte</div>
+              <div class="ag-tiles" style="margin-bottom:12px">
+                <button class="uebl-tile active" id="azTile-kontakte" onclick="agAzPanel(event,'azp-kontakte')" title="Azubis mit Telefon und E-Mail"><span class="ic">👥</span>Azubis</button>
+                <button class="uebl-tile" id="azTile-uebl" onclick="agAzPanel(event,'azp-uebl')" title="Überbetriebliche Lehrgänge: Kurse, Anwesenheit, Noten"><span class="ic">🎓</span>ÜbL-Kurse</button>
+                <button class="uebl-tile" id="azTile-berichte" onclick="agAzPanel(event,'azp-berichte')" title="Wochenberichte der Azubis"><span class="ic">📒</span>Berichtsheft<span id="cntBerichte" style="font-size:.55rem;background:rgba(37,99,235,.12);color:var(--acc);padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
+                <button class="uebl-tile" onclick="openMaAnlegenModal('azubi')" title="Neuen Azubi anlegen"><span class="ic">🎓+</span>Azubi anlegen</button>
+              </div>
+              <div id="azp-kontakte">
                 <div id="agAzubiListe"><div class="empty">Lädt…</div></div>
               </div>
-              <!-- ÜBL-Kursansicht: ganz unten, da externe HBZ-Daten -->
-              <div id="ueblWrap" style="margin-top:14px;border-radius:12px;transition:background .2s,box-shadow .2s">
-                <button onclick="toggleUeblView()" id="ueblToggleBtn" style="width:100%;padding:12px 14px;background:#fff;border:1px solid var(--brd);border-radius:12px;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:'Sora',sans-serif;color:var(--tx);box-shadow:0 1px 2px rgba(0,0,0,.02)">
-                  <span style="font-size:1rem;width:28px;height:28px;border-radius:7px;background:rgba(245,158,11,.12);color:#d97706;display:flex;align-items:center;justify-content:center">🎓</span>
-                  <div style="flex:1;text-align:left"><div style="font-size:.78rem;font-weight:700">ÜBL-Kursansicht</div><div style="font-size:.6rem;color:var(--mu)">Lehrgänge, Anwesenheit, Noten</div></div>
-                  <span id="ueblArrow" style="font-size:.9rem;color:var(--mu)">▾</span>
-                </button>
-                <div id="ueblCollapse" style="display:none;padding:14px;background:#fff;border:1px solid var(--brd);border-top:none;border-radius:0 0 12px 12px;margin-top:-1px">
-                  <div id="azubiList"><div class="empty">Lädt…</div></div>
-                  <details class="coll-card" id="agHVKontaktCard" style="display:none;margin-top:14px">
-                    <summary>📞 Kontakt Verwaltung (HBZ)</summary>
-                    <div class="coll-body">
-                      <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
-                    </div>
-                  </details>
+              <div id="azp-uebl" style="display:none">
+                <div id="azubiList"><div class="empty">Lädt…</div></div>
+                <div id="agHVKontaktCard" style="display:none;margin-top:14px">
+                  <div class="ag-tiles">
+                    <button class="uebl-tile" style="grid-column:1 / -1" onclick="agTogTile(event,'agHVKontaktBody')" title="Kontakt zur Verwaltung (HBZ)"><span class="ic">📞</span>Kontakt Verwaltung (HBZ)</button>
+                  </div>
+                  <div id="agHVKontaktBody" style="display:none;margin-top:10px;padding:12px 14px;background:var(--sur2);border:1px solid var(--brd);border-radius:12px">
+                    <div id="agHVKontakt" style="display:flex;flex-direction:column;gap:8px"><div class="empty">Lädt…</div></div>
+                  </div>
                 </div>
               </div>
-              <button class="big-btn" onclick="openMaAnlegenModal('azubi')" style="margin-top:14px">
-                <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">🎓+</span>
-                <span class="bb-tx"><span class="bb-t">Azubi anlegen</span><span class="bb-s">Zugang für AzubiPro</span></span>
-                <span class="bb-arr">›</span>
-              </button>
+              <div id="azp-berichte" style="display:none">
+                <div id="agBerichteListe"><div class="empty">Lädt…</div></div>
+              </div>
             </div>
           </div>
         </details>
 
-        <!-- 📒 BERICHTSHEFTE -->
-        <details class="coll-card" id="sectBerichte" style="margin-bottom:10px;display:none">
-          <summary>
-            <span style="display:flex;align-items:center;gap:8px;flex:1">
-              <span style="font-size:1.05rem">📒</span>
-              <span>Berichtshefte</span>
-              <span id="cntBerichte" style="font-size:.6rem;background:rgba(37,99,235,.12);color:var(--acc);padding:2px 7px;border-radius:8px;font-weight:700">0</span>
-            </span>
-          </summary>
-          <div class="coll-body">
-            <div class="card">
-              <div class="card-title">📒 Wochenberichte der Azubis</div>
-              <div id="agBerichteListe"><div class="empty">Lädt…</div></div>
-            </div>
-          </div>
-        </details>
       </div>
 
       <!-- LIVE: Aufträge -->
@@ -1388,8 +1369,7 @@ function _applyAgModule(m){
   // Hat der Betrieb nur die ÜbL-Ansicht, direkt aufklappen - sonst liegt sie zu tief vergraben
   if(!zeit && !auftraege && !belege && !urlaub){
     const sa=document.getElementById('sectAzubis'); if(sa) sa.open=true;
-    const uc=document.getElementById('ueblCollapse');
-    if(uc && uc.style.display==='none' && typeof toggleUeblView==='function') toggleUeblView();
+    if(typeof agAzPanel==='function') agAzPanel(null,'azp-uebl');
   }
 
   // Wurde der aktive Reiter ausgeblendet, den ersten sichtbaren aktivieren
@@ -1859,7 +1839,7 @@ function loadAzubis(){
     _azubis.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
     console.warn('[loadAzubis] '+_azubis.length+' Mitarbeiter geladen, IDs:', _azubis.map(a=>a.id));
     renderStats();renderAzubiList();setupKursListeners();renderAusfallBanner();
-    const _sb=document.getElementById('sectBerichte'); if(_sb) _sb.style.display=_azubis.length?'':'none';
+    const _sb=document.getElementById('azTile-berichte'); if(_sb) _sb.style.display=_azubis.length?'':'none';
     checkAgBadges();
     setupLiveMeldungen();
     // MA-Karten sofort rendern (damit Live-Status-Updates ankommen, nicht erst beim Tab-Wechsel)
@@ -2432,7 +2412,27 @@ function renderAzubiList(){
   hint.style.cssText='font-size:.58rem;color:var(--mu);margin-bottom:10px;padding:0 4px';
   el.appendChild(hint);
   renderAGSyncStatus();
+  // Nach Lehrgang gruppieren: laufende Kurse zuerst, dann kommende, dann beendete, zuletzt "Ohne Lehrgang"
+  const gruppen=new Map();
   azubisOnly.forEach(a=>{
+    const k=a.aktiverKursId&&_kurse[a.aktiverKursId]&&_kurse[a.aktiverKursId].von?_kurse[a.aktiverKursId]:null;
+    const key=k?a.aktiverKursId:'_ohne';
+    if(!gruppen.has(key)) gruppen.set(key,{kurs:k,tn:[]});
+    gruppen.get(key).tn.push(a);
+  });
+  const _rang=g=>{
+    if(!g.kurs) return 3;
+    const k=g.kurs;
+    if(k.von&&k.bis&&k.von<=today&&today<=k.bis) return 0;
+    if(k.von&&today<k.von) return 1;
+    return 2;
+  };
+  const sortiert=Array.from(gruppen.values()).sort((x,y)=>
+    _rang(x)-_rang(y) || String((x.kurs&&x.kurs.von)||'').localeCompare(String((y.kurs&&y.kurs.von)||''))
+  );
+  sortiert.forEach(g=>{
+  el.appendChild(_kursKopfEl(g, today));
+  g.tn.forEach(a=>{
     const isArchived=false;
     const name=((a.vorname||'')+' '+(a.nachname||'')).trim();
     const init=((a.vorname||'?')[0]+(a.nachname||'?')[0]).toUpperCase();
@@ -2657,6 +2657,7 @@ function renderAzubiList(){
     });
     el.appendChild(card);el.appendChild(detail);
     if(openIds.has(a.id)){card.classList.add('expanded');detail.style.display='';}
+  });
   });
   loadHVKontakt();
 }
@@ -3239,7 +3240,10 @@ function _renderMaCard(az){
     +'<div style="font-size:.88rem;font-weight:800">'+esc(name)+'</div>'
     +(beruf||lj?'<div style="font-size:.65rem;color:var(--mu);margin-top:2px">'+esc([beruf,lj].filter(Boolean).join(' · '))+'</div>':'')
     +(statusBadges?'<div style="margin-top:5px;display:flex;flex-wrap:wrap;align-items:center">'+statusBadges+'</div>':'')
-    +(tel?'<a href="tel:'+esc(tel)+'" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:5px 12px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;text-decoration:none;font-size:.7rem;font-weight:700;color:#059669">📞 '+esc(tel)+'</a>':'')
+    +((tel||email)?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'
+      +(tel?'<a href="tel:'+esc(tel)+'" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.3);border-radius:8px;text-decoration:none;font-size:.7rem;font-weight:700;color:#059669">📞 '+esc(tel)+'</a>':'')
+      +(email?'<a href="mailto:'+esc(email)+'" onclick="event.stopPropagation()" title="'+esc(email)+'" style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.25);border-radius:8px;text-decoration:none;font-size:.7rem;font-weight:700;color:var(--acc);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">✉️ '+esc(email)+'</a>':'')
+      +'</div>':'')
     +(!tel&&!email?'<div style="font-size:.65rem;color:var(--mu);margin-top:4px">Keine Kontaktdaten hinterlegt</div>':'')
     +'</div>'
     +'<span style="color:var(--mu);font-size:1.4rem;flex-shrink:0;font-weight:300">›</span>'
@@ -3711,6 +3715,41 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
     }
   });
 }
+// Azubi-Bereich: Kachel waehlen - darunter ist immer nur ein Bereich sichtbar
+function agAzPanel(ev,id){
+  if(ev&&ev.stopPropagation) ev.stopPropagation();
+  ['azp-kontakte','azp-uebl','azp-berichte'].forEach(pid=>{
+    const el=document.getElementById(pid);
+    if(el) el.style.display = (pid===id) ? '' : 'none';
+  });
+  // Nur die Kacheln der obersten Reihe umschalten (die Kontakt-Kachel im ÜbL bleibt unberuehrt)
+  document.querySelectorAll('#abtab-ma-azubis > .ag-tiles .uebl-tile').forEach(b=>b.classList.remove('active'));
+  const btn = (ev && ev.currentTarget) || document.getElementById('azTile-'+String(id).replace('azp-',''));
+  if(btn && btn.classList) btn.classList.add('active');
+}
+
+// Kopfzeile einer Kurs-Gruppe in der ÜbL-Ansicht
+function _kursKopfEl(g, today){
+  const d=document.createElement('div');
+  const k=g.kurs;
+  let titel='Ohne Lehrgang', zeit='', status='', farbe='#94a3b8';
+  if(k){
+    titel='📚 '+(k.name||'Lehrgang');
+    zeit=fmtDE(k.von)+' – '+fmtDE(k.bis);
+    if(k.von&&k.bis&&k.von<=today&&today<=k.bis){ status='läuft'; farbe='#16a34a'; }
+    else if(k.von&&today<k.von){ status='kommt'; farbe='#d97706'; }
+    else { status='beendet'; farbe='#94a3b8'; }
+  }
+  d.style.cssText='display:flex;align-items:center;gap:8px;margin:14px 0 8px;padding:8px 10px;background:'+farbe+'14;border-left:3px solid '+farbe+';border-radius:0 8px 8px 0';
+  d.innerHTML='<div style="flex:1;min-width:0">'
+    +'<div style="font-size:.76rem;font-weight:800;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(titel)+'</div>'
+    +(zeit?'<div style="font-size:.6rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+zeit+'</div>':'')
+    +'</div>'
+    +(status?'<span style="font-size:.55rem;font-weight:800;padding:3px 8px;border-radius:5px;background:'+farbe+';color:#fff;flex-shrink:0;letter-spacing:.04em">'+status.toUpperCase()+'</span>':'')
+    +'<span style="font-size:.6rem;color:var(--mu);flex-shrink:0">'+g.tn.length+'\u00a0Azubi'+(g.tn.length===1?'':'s')+'</span>';
+  return d;
+}
+
 // Klappt den Bereich hinter einer Kachel auf/zu
 function agTogTile(ev,id){
   if(ev&&ev.stopPropagation) ev.stopPropagation();
