@@ -391,6 +391,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
               </div>
               <div id="azp-dokumente" style="display:none">
                 <div style="margin:4px 0 8px;padding-top:12px;border-top:2px solid var(--brd);font-size:.64rem;font-weight:800;color:var(--mu);letter-spacing:.06em">📁 DOKUMENTE</div>
+                <div class="ag-tiles" style="margin-bottom:10px">
+                  <button class="uebl-tile active" id="dokF-an" onclick="setDokFilter(event,'an')" title="Dateien, die du dem Azubi geschickt hast"><span class="ic">📤</span>An den Azubi</button>
+                  <button class="uebl-tile" id="dokF-von" onclick="setDokFilter(event,'von')" title="Dateien, die der Azubi dir geschickt hat"><span class="ic">📥</span>Vom Azubi</button>
+                </div>
+                <div id="dokTrenner" style="margin:14px 0 4px;padding-top:12px;border-top:2px solid var(--brd);font-size:.64rem;font-weight:800;color:var(--mu);letter-spacing:.06em">AN DEN AZUBI GESCHICKT</div>
                 <div id="agDokListe"><div class="empty">Lädt…</div></div>
               </div>
             </div>
@@ -2743,15 +2748,28 @@ function toggleAGPremium(){
 }
 
 // ── Dokumente-Austausch ──
+let _dokUnsub={};
 function loadDokumente(tnId){
   const el=document.getElementById('dokList_'+tnId);
   if(!el) return;
-  db.collection('globalTN').doc(tnId).collection('dokumente')
+  // Alten Listener abraeumen, sonst sammeln sie sich beim Umschalten an
+  if(_dokUnsub[tnId]){ try{_dokUnsub[tnId]();}catch(e){} delete _dokUnsub[tnId]; }
+  _dokUnsub[tnId]=db.collection('globalTN').doc(tnId).collection('dokumente')
     .orderBy('ts','desc').onSnapshot(snap=>{
-      if(snap.empty){el.innerHTML='<div style="color:var(--mu);font-size:.65rem;font-style:italic">Noch keine Dokumente</div>';return;}
-      let h='';
+      const el=document.getElementById('dokList_'+tnId);
+      if(!el) return;
+      let h='', gezeigt=0;
       snap.forEach(doc=>{
         const d=doc.data();
+        // WEISSLISTE: Der Betrieb sieht ausschliesslich den Austausch Betrieb <-> Azubi.
+        // Alles aus anderen Kanaelen (z.B. Unterlagen des Ausbilders an den Azubi) wird
+        // hier bewusst NICHT angezeigt. Weissliste statt Schwarzliste, damit kuenftige
+        // Rollen nicht versehentlich durchrutschen.
+        const rolle=String(d.vonRolle||'betrieb');
+        if(rolle!=='betrieb'&&rolle!=='azubi') return;
+        if(_dokFilter==='an'  && rolle!=='betrieb') return;
+        if(_dokFilter==='von' && rolle!=='azubi') return;
+        gezeigt++;
         const fName=d.fileName||d.name||'Dokument';
         const icon=fName.match(/\.pdf$/i)?'📕':fName.match(/\.(jpg|jpeg|png)$/i)?'🖼':'📄';
         const vonLabel=d.vonRolle==='azubi'?'<span style="color:#7c3aed;font-weight:700">Azubi</span>':'<span style="color:var(--acc);font-weight:700">Betrieb</span>';
@@ -2763,8 +2781,11 @@ function loadDokumente(tnId){
           +'<button onclick="event.stopPropagation();deleteDok(\''+tnId+'\',\''+doc.id+'\',\''+esc(fName)+'\')" style="font-size:.55rem;padding:3px 8px;border:1px solid rgba(239,68,68,.2);border-radius:5px;background:none;cursor:pointer;color:#ef4444">✕</button>'
           +'</div>';
       });
-      el.innerHTML=h;
-    },()=>{el.innerHTML='<div style="color:var(--mu);font-size:.65rem">Fehler beim Laden</div>';});
+      el.innerHTML = gezeigt ? h : '<div style="color:var(--mu);font-size:.65rem;font-style:italic">'+(_dokFilter==='von'?'Nichts vom Azubi erhalten':'Noch nichts geschickt')+'</div>';
+    },()=>{
+      const el=document.getElementById('dokList_'+tnId);
+      if(el) el.innerHTML='<div style="color:var(--mu);font-size:.65rem">Fehler beim Laden</div>';
+    });
 }
 
 function agUploadDok(tnId,input){
@@ -3808,6 +3829,19 @@ function agAzPanel(ev,id){
   }
 }
 
+// Dokumente-Bereich: zwischen gesendeten und empfangenen Dateien umschalten
+let _dokFilter='an';
+function setDokFilter(ev,f){
+  if(ev&&ev.stopPropagation) ev.stopPropagation();
+  _dokFilter=f;
+  document.querySelectorAll('#azp-dokumente > .ag-tiles .uebl-tile').forEach(b=>b.classList.remove('active'));
+  const btn=(ev&&ev.currentTarget)||document.getElementById('dokF-'+f);
+  if(btn&&btn.classList) btn.classList.add('active');
+  const tr=document.getElementById('dokTrenner');
+  if(tr) tr.textContent = (f==='von') ? 'VOM AZUBI ERHALTEN' : 'AN DEN AZUBI GESCHICKT';
+  renderAgDokumente();
+}
+
 // Dokumente je Azubi - frueher in der aufgeklappten Karte versteckt, jetzt eigener Bereich
 function renderAgDokumente(){
   const el=document.getElementById('agDokListe');
@@ -3829,8 +3863,10 @@ function renderAgDokumente(){
     return '<div style="margin-bottom:10px;padding:12px 14px;background:var(--sur);border:1px solid var(--brd);border-radius:12px">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
       +'<div style="font-size:.78rem;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(name)+'</div>'
-      +'<label style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600;flex-shrink:0">📤 Hochladen'
-      +'<input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="agUploadDok(\''+esc(a.id)+'\',this)"></label>'
+      +(_dokFilter==='an'
+        ? '<label style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600;flex-shrink:0">📤 Hochladen'
+          +'<input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="agUploadDok(\''+esc(a.id)+'\',this)"></label>'
+        : '')
       +'</div>'
       +'<div id="dokList_'+esc(a.id)+'" style="font-size:.7rem;color:var(--mu)">Lädt…</div></div>';
   }).join('');
