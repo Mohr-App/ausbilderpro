@@ -1708,10 +1708,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 350';
+const APP_VERSION = 'Build 351';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 351', d:'16.07.2026', items:['\ud83d\udd10 Ausbilder-Anlage: Das Login-Konto wird jetzt aus der Verwaltungs-Sitzung geschrieben. Behebt, dass die Rolle \u201eausbilder\u201c nie ankam \u2013 der Schreibvorgang wurde vorher durch die sofortige Abmeldung abgebrochen']},
   {v:'Build 350', d:'16.07.2026', items:['\ud83d\udd10 Ausbilder-Rollen: Haken je Zeile \u2013 die Rolle l\u00e4sst sich jetzt gezielt einzelnen Konten geben statt allen auf einmal']},
   {v:'Build 349', d:'16.07.2026', items:['\ud83d\udd10 Einstellungen: neue Karte \u201eAusbilder-Rollen\u201c. Zeigt, welchen Ausbilder-Konten die Rolle \u201eausbilder\u201c fehlt, und tr\u00e4gt sie auf Klick nach. Vorbereitung daf\u00fcr, dass k\u00fcnftig nur noch Ausbilder die Teilnehmerliste lesen d\u00fcrfen']},
   {v:'Build 348', d:'16.07.2026', items:['\ud83d\uddd3 Datumskorrektur: Die Eintr\u00e4ge Build 342 bis 347 waren versehentlich auf den 15.07. datiert \u2013 richtig ist der 16.07.2026']},
@@ -4302,10 +4303,15 @@ function createAusbAccount(){
   toast('Account wird erstellt…');
   _secondaryAuth.createUserWithEmailAndPassword(authEmail, pw).then(cred=>{
     const uid=cred.user.uid;
-    const secDb=_secondaryApp.firestore();
-    secDb.collection('users').doc(uid).set({email:authEmail, role:'ausbilder', name:a.name||''});
-    _secondaryAuth.signOut();
-    return db.collection('shared').doc('kursSettings').collection('ausbilder').doc(id).update({authUid:uid});
+    // Das User-Doc schreibt die ADMIN-Sitzung (db), nicht die Zweit-Sitzung des neuen
+    // Nutzers (secDb). Zwei Gruende:
+    //  1) Nur so greift isAdmin() in den Rules. Damit kann 'ausbilder' aus der
+    //     Selbst-Anlegen-Liste raus - niemand vergibt sich die Rolle mehr selbst.
+    //  2) Der Write wurde vorher NICHT abgewartet, direkt danach kam signOut() -
+    //     die Sitzung brach mitten im Schreiben weg und die Rolle kam nie an.
+    return db.collection('users').doc(uid).set({email:authEmail, role:'ausbilder', name:a.name||''})
+      .then(()=>{ _secondaryAuth.signOut(); })
+      .then(()=>db.collection('shared').doc('kursSettings').collection('ausbilder').doc(id).update({authUid:uid}));
   }).then(()=>{
     const st=document.getElementById('ausbAcctStatus'), cr=document.getElementById('ausbAcctCreate');
     if(cr)cr.style.display='none';
@@ -4354,13 +4360,12 @@ function saveAusbilder(){
     toast('Wird angelegt…');
     _secondaryAuth.createUserWithEmailAndPassword(authEmail, pw).then(cred=>{
       const uid=cred.user.uid;
-      // users/{uid} Doc mit Secondary DB
-      const secDb=_secondaryApp.firestore();
-      secDb.collection('users').doc(uid).set({email:authEmail, role:'ausbilder', name:name});
-      _secondaryAuth.signOut();
-      // Ausbilder-Datensatz speichern
-      data.authUid=uid;
-      return col.add(data);
+      // User-Doc aus der ADMIN-Sitzung (db) statt aus der Zweit-Sitzung (secDb):
+      // nur so greift isAdmin() in den Rules. Und der Write wird abgewartet, bevor
+      // signOut() die Sitzung schliesst - vorher ging die Rolle dabei verloren.
+      return db.collection('users').doc(uid).set({email:authEmail, role:'ausbilder', name:name})
+        .then(()=>{ _secondaryAuth.signOut(); })
+        .then(()=>{ data.authUid=uid; return col.add(data); });
     }).then(()=>{
       closeAddAusbModal();
       toast('✅ Ausbilder '+name+' angelegt – Login: '+authEmail);
