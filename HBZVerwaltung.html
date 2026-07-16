@@ -1708,10 +1708,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 349';
+const APP_VERSION = 'Build 350';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 350', d:'16.07.2026', items:['\ud83d\udd10 Ausbilder-Rollen: Haken je Zeile \u2013 die Rolle l\u00e4sst sich jetzt gezielt einzelnen Konten geben statt allen auf einmal']},
   {v:'Build 349', d:'16.07.2026', items:['\ud83d\udd10 Einstellungen: neue Karte \u201eAusbilder-Rollen\u201c. Zeigt, welchen Ausbilder-Konten die Rolle \u201eausbilder\u201c fehlt, und tr\u00e4gt sie auf Klick nach. Vorbereitung daf\u00fcr, dass k\u00fcnftig nur noch Ausbilder die Teilnehmerliste lesen d\u00fcrfen']},
   {v:'Build 348', d:'16.07.2026', items:['\ud83d\uddd3 Datumskorrektur: Die Eintr\u00e4ge Build 342 bis 347 waren versehentlich auf den 15.07. datiert \u2013 richtig ist der 16.07.2026']},
   {v:'Build 347', d:'16.07.2026', items:['\ud83d\udd17 Neues Werkzeug auf der Seite Betriebe: Azubis werden automatisch dem Betrieb zugeordnet, dessen Name mit dem Betriebs-Feld aus der Handwerkskammer-Liste \u00fcbereinstimmt. Erst Trockenlauf, dann schreiben \u2013 f\u00fcllt nur L\u00fccken','\u2139\ufe0f Betriebe k\u00f6nnen keine Azubis mehr selbst anlegen. Azubis entstehen ausschlie\u00dflich \u00fcber die KH-Liste, dadurch keine Dubletten mehr','\ud83d\udd13 Im TN-Profil steht jetzt der verkn\u00fcpfte Betrieb \u2013 mit Knopf zum L\u00f6sen. Das Betriebs-Feld aus der KH-Liste bleibt dabei erhalten, die automatische Zuordnung stellt die Verkn\u00fcpfung nicht wieder her']},
@@ -4164,17 +4165,22 @@ function ausbRollenPruefen(){
       h+='<span style="color:#16a34a;font-weight:700">✓ Es fehlt keine Rolle.</span>';
     } else {
       h+='<span style="color:#dc2626;font-weight:700">⚠ '+_ausbRollenPlan.length+' ohne passende Rolle:</span>';
+      h+='<div style="font-size:.6rem;color:var(--mu);margin-top:4px">Haken entfernen bei jedem, der KEIN Ausbilder ist.</div>';
       h+='<div style="margin-top:6px;max-height:200px;overflow-y:auto">';
-      _ausbRollenPlan.forEach(e=>{
+      _ausbRollenPlan.forEach((e,i)=>{
         const was = e.rolle==='' ? '<span style="color:#dc2626;font-weight:700">⚠ FEHLT</span>'
                                  : '<span style="color:#dc2626;font-weight:700">⚠ ist \''+esc(e.rolle)+'\'</span>';
-        h+='<div style="padding:4px 0;border-bottom:1px solid var(--brd)">'+esc(e.email)+(e.name?' · '+esc(e.name):'')+' — '+was+'</div>';
+        // onclick mit stopPropagation: sonst klappt toggleSCard die ganze Karte zu
+        h+='<label style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--brd);cursor:pointer" onclick="event.stopPropagation()">'
+          +'<input type="checkbox" class="ausbRollenChk" data-i="'+i+'" checked onclick="event.stopPropagation();_ausbRollenChkAendern()" style="flex-shrink:0;cursor:pointer">'
+          +'<span style="min-width:0">'+esc(e.email)+(e.name?' · '+esc(e.name):'')+' — '+was+'</span></label>';
       });
       h+='</div>';
       h+='<div style="margin-top:8px;padding:8px;background:rgba(220,38,38,.06);border-radius:6px;color:#dc2626;line-height:1.5">Bitte jede Zeile einzeln prüfen. Erkannt wird nur, <b>wer zuletzt AusbilderPro geöffnet hat</b> – ein Azubi, der die App einmal aufgerufen hat, steht hier ebenfalls. Dem darf keine Rolle gegeben werden.</div>';
       if(btn) btn.style.display='';
     }
     box.innerHTML=h;
+    _ausbRollenChkAendern();
     const cnt=document.getElementById('scCntRollen');
     if(cnt) cnt.textContent = _ausbRollenPlan.length ? (_ausbRollenPlan.length+' offen') : 'vollständig';
   }).catch(err=>{
@@ -4182,18 +4188,39 @@ function ausbRollenPruefen(){
   });
 }
 
+// Knopfbeschriftung an die Auswahl anpassen - und sperren, wenn nichts angehakt ist
+function _ausbRollenChkAendern(){
+  const btn=document.getElementById('ausbRollenBtn');
+  if(!btn) return;
+  const n=_ausbRollenGewaehlt().length;
+  btn.disabled = (n===0);
+  btn.textContent = n ? ('Rolle nachtragen ('+n+')') : 'Nichts ausgewählt';
+}
+
+// Genau die Zeilen, bei denen der Haken steht
+function _ausbRollenGewaehlt(){
+  const aus=[];
+  document.querySelectorAll('.ausbRollenChk').forEach(c=>{
+    if(c.checked){
+      const e=_ausbRollenPlan[parseInt(c.getAttribute('data-i'),10)];
+      if(e) aus.push(e);
+    }
+  });
+  return aus;
+}
+
 function ausbRollenSchreiben(){
-  if(!_ausbRollenPlan.length) return;
-  const liste=_ausbRollenPlan.map(e=>'· '+e.email+(e.name?' ('+e.name+')':'')).join('\n');
-  if(!confirm('Diesen '+_ausbRollenPlan.length+' Konten die Rolle \'ausbilder\' geben?\n\n'+liste+'\n\nNur fortfahren, wenn das WIRKLICH alles Ausbilder sind.\nDie Rolle gibt spaeter Lesezugriff auf alle Teilnehmer.')) return;
+  const plan=_ausbRollenGewaehlt();
+  if(!plan.length){ toast('Niemand ausgewählt','bad'); return; }
+  const liste=plan.map(e=>'· '+e.email+(e.name?' ('+e.name+')':'')).join('\n');
+  if(!confirm('Diesen '+plan.length+' Konten die Rolle \'ausbilder\' geben?\n\n'+liste+'\n\nNur fortfahren, wenn das WIRKLICH alles Ausbilder sind.\nDie Rolle gibt spaeter Lesezugriff auf alle Teilnehmer.')) return;
   const btn=document.getElementById('ausbRollenBtn');
   if(btn){ btn.disabled=true; btn.textContent='Schreibe…'; }
-  const plan=_ausbRollenPlan.slice();
   Promise.all(plan.map(e=>db.collection('users').doc(e.uid).set({role:'ausbilder'},{merge:true})))
     .then(()=>{
       toast('✓ '+plan.length+' Rollen nachgetragen');
       if(btn){ btn.disabled=false; btn.textContent='Rolle nachtragen'; }
-      ausbRollenPruefen();
+      ausbRollenPruefen();  // frisch einlesen: die Erledigten wandern nach "haben die Rolle"
     })
     .catch(err=>{
       toast('Fehler: '+(err.message||''),'bad');
