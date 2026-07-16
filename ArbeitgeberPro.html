@@ -365,6 +365,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                 <div id="agAzubiListe"><div class="empty">Lädt…</div></div>
               </div>
               <div id="azp-uebl" style="display:none">
+                <div class="ag-tiles" style="margin-bottom:10px">
+                  <button class="uebl-tile active" id="ueblF-aktuell" onclick="setUeblFilter(event,'aktuell')" title="Laufende und kommende Lehrgänge"><span class="ic">🟢</span>Aktuelle ÜbL<span id="ueblCntAktuell" style="font-size:.55rem;background:rgba(22,163,74,.12);color:#16a34a;padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
+                  <button class="uebl-tile" id="ueblF-vergangen" onclick="setUeblFilter(event,'vergangen')" title="Bereits beendete Lehrgänge"><span class="ic">📦</span>Vergangene ÜbL<span id="ueblCntVergangen" style="font-size:.55rem;background:rgba(148,163,184,.15);color:#64748b;padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
+                </div>
                 <div id="azubiList"><div class="empty">Lädt…</div></div>
                 <div id="agHVKontaktCard" style="display:none;margin-top:14px">
                   <div class="ag-tiles">
@@ -2430,7 +2434,21 @@ function renderAzubiList(){
   const sortiert=Array.from(gruppen.values()).sort((x,y)=>
     _rang(x)-_rang(y) || String((x.kurs&&x.kurs.von)||'').localeCompare(String((y.kurs&&y.kurs.von)||''))
   );
-  sortiert.forEach(g=>{
+  // Zaehler auf den Unterkacheln: wie viele Lehrgaenge stecken in welcher Gruppe
+  const nAkt=sortiert.filter(g=>_rang(g)!==2).length;
+  const nVer=sortiert.filter(g=>_rang(g)===2).length;
+  const _cA=document.getElementById('ueblCntAktuell'); if(_cA) _cA.textContent=nAkt;
+  const _cV=document.getElementById('ueblCntVergangen'); if(_cV) _cV.textContent=nVer;
+  // Nur die gewaehlte Gruppe zeigen. "Ohne Lehrgang" laeuft unter "Aktuell" mit,
+  // damit kein Azubi aus der Ansicht faellt.
+  const sichtbar=sortiert.filter(g=> _ueblFilter==='vergangen' ? _rang(g)===2 : _rang(g)!==2 );
+  if(!sichtbar.length){
+    const leer=document.createElement('div');
+    leer.className='empty';
+    leer.textContent = _ueblFilter==='vergangen' ? 'Noch keine beendeten Lehrgänge.' : 'Zurzeit ist kein Azubi in einem Lehrgang.';
+    el.appendChild(leer);
+  }
+  sichtbar.forEach(g=>{
   el.appendChild(_kursKopfEl(g, today));
   g.tn.forEach(a=>{
     const isArchived=false;
@@ -3715,6 +3733,17 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
     }
   });
 }
+// ÜbL-Bereich: zwischen aktuellen und vergangenen Lehrgaengen umschalten
+let _ueblFilter='aktuell';
+function setUeblFilter(ev,f){
+  if(ev&&ev.stopPropagation) ev.stopPropagation();
+  _ueblFilter=f;
+  document.querySelectorAll('#azp-uebl > .ag-tiles .uebl-tile').forEach(b=>b.classList.remove('active'));
+  const btn=(ev&&ev.currentTarget)||document.getElementById('ueblF-'+f);
+  if(btn&&btn.classList) btn.classList.add('active');
+  renderAzubiList();
+}
+
 // Azubi-Bereich: Kachel waehlen - darunter ist immer nur ein Bereich sichtbar
 function agAzPanel(ev,id){
   if(ev&&ev.stopPropagation) ev.stopPropagation();
