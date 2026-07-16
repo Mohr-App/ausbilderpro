@@ -3718,14 +3718,19 @@ function _doFirmaTrennung(tnId, firmaUid, firmaName, initiator){
 // Azubi-Bereich: Kachel waehlen - darunter ist immer nur ein Bereich sichtbar
 function agAzPanel(ev,id){
   if(ev&&ev.stopPropagation) ev.stopPropagation();
+  // Erneuter Klick auf die schon offene Kachel schliesst sie wieder
+  const ziel=document.getElementById(id);
+  const schonOffen = !!ziel && ziel.style.display!=='none';
   ['azp-kontakte','azp-uebl','azp-berichte'].forEach(pid=>{
     const el=document.getElementById(pid);
-    if(el) el.style.display = (pid===id) ? '' : 'none';
+    if(el) el.style.display = (pid===id && !schonOffen) ? '' : 'none';
   });
   // Nur die Kacheln der obersten Reihe umschalten (die Kontakt-Kachel im ÜbL bleibt unberuehrt)
   document.querySelectorAll('#abtab-ma-azubis > .ag-tiles .uebl-tile').forEach(b=>b.classList.remove('active'));
-  const btn = (ev && ev.currentTarget) || document.getElementById('azTile-'+String(id).replace('azp-',''));
-  if(btn && btn.classList) btn.classList.add('active');
+  if(!schonOffen){
+    const btn = (ev && ev.currentTarget) || document.getElementById('azTile-'+String(id).replace('azp-',''));
+    if(btn && btn.classList) btn.classList.add('active');
+  }
 }
 
 // Kopfzeile einer Kurs-Gruppe in der ÜbL-Ansicht
