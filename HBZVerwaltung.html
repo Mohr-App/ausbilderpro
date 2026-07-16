@@ -1708,10 +1708,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 351';
+const APP_VERSION = 'Build 352';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 352', d:'16.07.2026', items:['\ud83d\udd10 Ausbilder-Rollen pr\u00fcft jetzt die Ausbilder-Liste statt der Konten-Sammlung. Findet dadurch auch Logins, deren Konto-Dokument komplett fehlt \u2013 die waren vorher unsichtbar und konnten sich nicht anmelden']},
   {v:'Build 351', d:'16.07.2026', items:['\ud83d\udd10 Ausbilder-Anlage: Das Login-Konto wird jetzt aus der Verwaltungs-Sitzung geschrieben. Behebt, dass die Rolle \u201eausbilder\u201c nie ankam \u2013 der Schreibvorgang wurde vorher durch die sofortige Abmeldung abgebrochen']},
   {v:'Build 350', d:'16.07.2026', items:['\ud83d\udd10 Ausbilder-Rollen: Haken je Zeile \u2013 die Rolle l\u00e4sst sich jetzt gezielt einzelnen Konten geben statt allen auf einmal']},
   {v:'Build 349', d:'16.07.2026', items:['\ud83d\udd10 Einstellungen: neue Karte \u201eAusbilder-Rollen\u201c. Zeigt, welchen Ausbilder-Konten die Rolle \u201eausbilder\u201c fehlt, und tr\u00e4gt sie auf Klick nach. Vorbereitung daf\u00fcr, dass k\u00fcnftig nur noch Ausbilder die Teilnehmerliste lesen d\u00fcrfen']},
@@ -4136,6 +4137,18 @@ function renderAusbListSettings(){
 // VerwaltungPro legt neue Ausbilder bereits so an - aeltere Konten haben die Rolle
 // womoeglich nicht. Fehlt sie, waere AusbilderPro fuer diese Person unbrauchbar.
 // Deshalb: erst zeigen, was fehlt, und nur auf ausdruecklichen Klick schreiben.
+// ── Ausbilder-Rollen pruefen und reparieren ──
+// Massgeblich ist die Ausbilder-Liste (shared/kursSettings/ausbilder), NICHT die
+// users-Sammlung: Wer ein Auth-Konto hat, dessen users/{uid}-Dokument aber fehlt,
+// taucht in users gar nicht auf und waere sonst unsichtbar. Genau das war der
+// Fall bei Konten, die vor Build 351 angelegt wurden - dort brach signOut() den
+// Schreibvorgang ab, das Auth-Konto entstand, das Dokument nie.
+//
+// Vier Zustaende je Ausbilder:
+//   ok        - users/{authUid} existiert und hat role 'ausbilder'
+//   kein_doc  - Auth-Konto da, users/{authUid} fehlt komplett  -> anlegen
+//   rolle     - Dokument da, Rolle fehlt oder ist eine andere  -> setzen
+//   kein_login- keine authUid, es gibt nichts zu reparieren    -> nur Hinweis
 let _ausbRollenPlan=[];
 function ausbRollenPruefen(){
   const box=document.getElementById('ausbRollenPreview');
@@ -4145,39 +4158,55 @@ function ausbRollenPruefen(){
   box.innerHTML='Prüfe…';
   if(btn) btn.style.display='none';
   _ausbRollenPlan=[];
-  db.collection('users').get().then(snap=>{
-    const hat=[];
-    snap.forEach(doc=>{
-      const d=doc.data()||{};
-      const rolle=String(d.role||'');
-      if(rolle==='ausbilder'){ hat.push(d.email||doc.id); return; }
-      // Verwaltung/Admin haben ohnehin Vollzugriff - die brauchen keine Ausbilder-Rolle
-      if(rolle==='admin'||rolle==='verwaltung') return;
-      // Einziges Merkmal, an dem sich ein Ausbilder erkennen laesst. ACHTUNG: lastApp
-      // ist vom Nutzer selbst setzbar, also KEIN Ausweis - deshalb muss ein Mensch
-      // jede Zeile pruefen, bevor geschrieben wird.
-      if(d.lastApp!=='AusbilderPro') return;
-      _ausbRollenPlan.push({uid:doc.id, email:d.email||'(ohne Mail)', name:d.ausbilderName||d.name||'', rolle:rolle});
-    });
-    const gesamt=hat.length+_ausbRollenPlan.length;
-    let h='<b>'+gesamt+' Konten arbeiten mit AusbilderPro</b><br>';
-    h+='<span style="color:#16a34a">✓ '+hat.length+' haben die Rolle</span><br>';
+  const liste=(_ausbilder||[]).slice();
+  if(!liste.length){ box.innerHTML='Ausbilder-Liste noch nicht geladen – bitte erneut versuchen.'; return; }
+
+  // Je Ausbilder mit Login das User-Dokument holen
+  Promise.all(liste.map(a=>{
+    const uid=a.authUid||'';
+    if(!uid) return Promise.resolve({a:a, uid:'', zustand:'kein_login', rolle:''});
+    return db.collection('users').doc(uid).get()
+      .then(doc=>{
+        if(!doc.exists) return {a:a, uid:uid, zustand:'kein_doc', rolle:''};
+        const rolle=String((doc.data()||{}).role||'');
+        if(rolle==='ausbilder') return {a:a, uid:uid, zustand:'ok', rolle:rolle};
+        if(rolle==='admin'||rolle==='verwaltung') return {a:a, uid:uid, zustand:'ok', rolle:rolle};
+        return {a:a, uid:uid, zustand:'rolle', rolle:rolle};
+      })
+      .catch(()=>({a:a, uid:uid, zustand:'fehler', rolle:''}));
+  })).then(res=>{
+    const ok=res.filter(r=>r.zustand==='ok');
+    const ohneLogin=res.filter(r=>r.zustand==='kein_login');
+    const fehler=res.filter(r=>r.zustand==='fehler');
+    _ausbRollenPlan = res.filter(r=>r.zustand==='kein_doc'||r.zustand==='rolle')
+                         .map(r=>({uid:r.uid, email:r.a.loginEmail||r.a.email||'', name:r.a.name||'', zustand:r.zustand, rolle:r.rolle}));
+
+    let h='<b>'+liste.length+' Ausbilder in der Liste</b><br>';
+    h+='<span style="color:#16a34a">✓ '+ok.length+' haben die Rolle</span><br>';
+    if(ohneLogin.length){
+      h+='<span style="color:var(--mu)">· '+ohneLogin.length+' ohne Login-Account ('+ohneLogin.map(r=>esc(r.a.name||'?')).join(', ')+') – nichts zu tun</span><br>';
+    }
+    if(fehler.length){
+      h+='<span style="color:#dc2626">· '+fehler.length+' nicht lesbar</span><br>';
+    }
     if(!_ausbRollenPlan.length){
-      h+='<span style="color:#16a34a;font-weight:700">✓ Es fehlt keine Rolle.</span>';
+      h+='<span style="color:#16a34a;font-weight:700">✓ Alles in Ordnung.</span>';
     } else {
-      h+='<span style="color:#dc2626;font-weight:700">⚠ '+_ausbRollenPlan.length+' ohne passende Rolle:</span>';
-      h+='<div style="font-size:.6rem;color:var(--mu);margin-top:4px">Haken entfernen bei jedem, der KEIN Ausbilder ist.</div>';
+      h+='<span style="color:#dc2626;font-weight:700">⚠ '+_ausbRollenPlan.length+' zu reparieren:</span>';
+      h+='<div style="font-size:.6rem;color:var(--mu);margin-top:4px">Haken entfernen bei jedem, der KEINE Ausbilder-Rechte bekommen soll.</div>';
       h+='<div style="margin-top:6px;max-height:200px;overflow-y:auto">';
       _ausbRollenPlan.forEach((e,i)=>{
-        const was = e.rolle==='' ? '<span style="color:#dc2626;font-weight:700">⚠ FEHLT</span>'
-                                 : '<span style="color:#dc2626;font-weight:700">⚠ ist \''+esc(e.rolle)+'\'</span>';
-        // onclick mit stopPropagation: sonst klappt toggleSCard die ganze Karte zu
+        let was;
+        if(e.zustand==='kein_doc') was='<span style="color:#dc2626;font-weight:700">⚠ Konto ohne Dokument</span>';
+        else if(e.rolle==='')     was='<span style="color:#dc2626;font-weight:700">⚠ Rolle FEHLT</span>';
+        else                      was='<span style="color:#dc2626;font-weight:700">⚠ Rolle ist \''+esc(e.rolle)+'\'</span>';
+        // stopPropagation: sonst klappt toggleSCard die Karte beim Anhaken zu
         h+='<label style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--brd);cursor:pointer" onclick="event.stopPropagation()">'
           +'<input type="checkbox" class="ausbRollenChk" data-i="'+i+'" checked onclick="event.stopPropagation();_ausbRollenChkAendern()" style="flex-shrink:0;cursor:pointer">'
-          +'<span style="min-width:0">'+esc(e.email)+(e.name?' · '+esc(e.name):'')+' — '+was+'</span></label>';
+          +'<span style="min-width:0">'+esc(e.name||e.email||'?')+(e.email?' · '+esc(e.email):'')+' — '+was+'</span></label>';
       });
       h+='</div>';
-      h+='<div style="margin-top:8px;padding:8px;background:rgba(220,38,38,.06);border-radius:6px;color:#dc2626;line-height:1.5">Bitte jede Zeile einzeln prüfen. Erkannt wird nur, <b>wer zuletzt AusbilderPro geöffnet hat</b> – ein Azubi, der die App einmal aufgerufen hat, steht hier ebenfalls. Dem darf keine Rolle gegeben werden.</div>';
+      h+='<div style="margin-top:8px;padding:8px;background:rgba(220,38,38,.06);border-radius:6px;color:#dc2626;line-height:1.5">Die Rolle gibt später Lesezugriff auf <b>alle Teilnehmer</b>. Nur vergeben, wo es wirklich ein Ausbilder ist.</div>';
       if(btn) btn.style.display='';
     }
     box.innerHTML=h;
@@ -4188,6 +4217,7 @@ function ausbRollenPruefen(){
     box.innerHTML='<span style="color:#dc2626">Fehler beim Lesen: '+esc(err.message||'')+'</span>';
   });
 }
+
 
 // Knopfbeschriftung an die Auswahl anpassen - und sperren, wenn nichts angehakt ist
 function _ausbRollenChkAendern(){
@@ -4217,7 +4247,14 @@ function ausbRollenSchreiben(){
   if(!confirm('Diesen '+plan.length+' Konten die Rolle \'ausbilder\' geben?\n\n'+liste+'\n\nNur fortfahren, wenn das WIRKLICH alles Ausbilder sind.\nDie Rolle gibt spaeter Lesezugriff auf alle Teilnehmer.')) return;
   const btn=document.getElementById('ausbRollenBtn');
   if(btn){ btn.disabled=true; btn.textContent='Schreibe…'; }
-  Promise.all(plan.map(e=>db.collection('users').doc(e.uid).set({role:'ausbilder'},{merge:true})))
+  // merge:true deckt beide Faelle ab - fehlendes Dokument wird angelegt,
+  // vorhandenes ergaenzt. E-Mail/Name nur mitschreiben, wenn wir sie kennen.
+  Promise.all(plan.map(e=>{
+    const daten={role:'ausbilder'};
+    if(e.email) daten.email=e.email;
+    if(e.name)  daten.name=e.name;
+    return db.collection('users').doc(e.uid).set(daten,{merge:true});
+  }))
     .then(()=>{
       toast('✓ '+plan.length+' Rollen nachgetragen');
       if(btn){ btn.disabled=false; btn.textContent='Rolle nachtragen'; }
