@@ -1150,6 +1150,23 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             </div>
           </div>
 
+          <!-- AUSBILDER-ROLLEN KARTE -->
+          <div class="card scard" title="Auf-/Zuklappen" onclick="toggleSCard(this)">
+            <div class="scard-hdr">
+              <div style="font-size:.85rem;font-weight:700">Ausbilder-Rollen</div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span class="scard-cnt" id="scCntRollen" style="font-size:.55rem;color:var(--mu)">ungeprüft</span>
+                <span class="scard-arr">▸</span>
+              </div>
+            </div>
+            <div class="scard-body">
+              <div style="font-size:.66rem;color:var(--mu);margin-bottom:10px;line-height:1.55">Jedes Ausbilder-Konto braucht die Rolle <b>ausbilder</b>. Nur daran erkennen die Sicherheitsregeln einen Ausbilder – ohne sie kann AusbilderPro die Teilnehmerliste nicht mehr laden, sobald der Zugriff eingeschränkt wird.</div>
+              <button class="btn-sm" onclick="event.stopPropagation();ausbRollenPruefen()" style="width:100%;font-size:.72rem">🔍 Rollen prüfen – es wird nichts geändert</button>
+              <div id="ausbRollenPreview" style="display:none;margin-top:10px;padding:10px;background:var(--sur2);border-radius:8px;font-size:.66rem;line-height:1.6"></div>
+              <button id="ausbRollenBtn" class="btn-sm btn-ok" onclick="event.stopPropagation();ausbRollenSchreiben()" style="display:none;width:100%;margin-top:8px;font-size:.72rem">Rolle nachtragen</button>
+            </div>
+          </div>
+
           <!-- LEHRGANGSARTEN KARTE -->
           <div class="card scard" title="Auf-/Zuklappen" onclick="toggleSCard(this)">
             <div class="scard-hdr">
@@ -1691,10 +1708,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 348';
+const APP_VERSION = 'Build 349';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 349', d:'16.07.2026', items:['\ud83d\udd10 Einstellungen: neue Karte \u201eAusbilder-Rollen\u201c. Zeigt, welchen Ausbilder-Konten die Rolle \u201eausbilder\u201c fehlt, und tr\u00e4gt sie auf Klick nach. Vorbereitung daf\u00fcr, dass k\u00fcnftig nur noch Ausbilder die Teilnehmerliste lesen d\u00fcrfen']},
   {v:'Build 348', d:'16.07.2026', items:['\ud83d\uddd3 Datumskorrektur: Die Eintr\u00e4ge Build 342 bis 347 waren versehentlich auf den 15.07. datiert \u2013 richtig ist der 16.07.2026']},
   {v:'Build 347', d:'16.07.2026', items:['\ud83d\udd17 Neues Werkzeug auf der Seite Betriebe: Azubis werden automatisch dem Betrieb zugeordnet, dessen Name mit dem Betriebs-Feld aus der Handwerkskammer-Liste \u00fcbereinstimmt. Erst Trockenlauf, dann schreiben \u2013 f\u00fcllt nur L\u00fccken','\u2139\ufe0f Betriebe k\u00f6nnen keine Azubis mehr selbst anlegen. Azubis entstehen ausschlie\u00dflich \u00fcber die KH-Liste, dadurch keine Dubletten mehr','\ud83d\udd13 Im TN-Profil steht jetzt der verkn\u00fcpfte Betrieb \u2013 mit Knopf zum L\u00f6sen. Das Betriebs-Feld aus der KH-Liste bleibt dabei erhalten, die automatische Zuordnung stellt die Verkn\u00fcpfung nicht wieder her']},
   {v:'Build 346', d:'16.07.2026', items:['\ud83c\udfed Betriebe: Pro Betrieb l\u00e4sst sich jetzt einstellen, welche Module er in BetriebPro sieht (Zeit/Mitarbeiter, Aufträge, Belege, Urlaub). Azubis + ÜbL, Meldungen und Einstellungen bleiben immer sichtbar','\u2139\ufe0f Neu registrierte Betriebe starten schlank mit Azubis + ÜbL \u2013 weitere Module schaltest du hier auf Wunsch frei. Bestehende Betriebe behalten alles']},
@@ -4108,6 +4126,79 @@ function renderAusbListSettings(){
       +'</div>';
     el.appendChild(row);
   });
+}
+
+// ── Ausbilder-Rollen pruefen und nachtragen ──
+// Die Firestore-Rules sollen kuenftig durchsetzen: nur Ausbilder duerfen den TN-Pool
+// lesen. Erkennbar ist ein Ausbilder ausschliesslich an role:'ausbilder' im User-Doc.
+// VerwaltungPro legt neue Ausbilder bereits so an - aeltere Konten haben die Rolle
+// womoeglich nicht. Fehlt sie, waere AusbilderPro fuer diese Person unbrauchbar.
+// Deshalb: erst zeigen, was fehlt, und nur auf ausdruecklichen Klick schreiben.
+let _ausbRollenPlan=[];
+function ausbRollenPruefen(){
+  const box=document.getElementById('ausbRollenPreview');
+  const btn=document.getElementById('ausbRollenBtn');
+  if(!box) return;
+  box.style.display='';
+  box.innerHTML='Prüfe…';
+  if(btn) btn.style.display='none';
+  _ausbRollenPlan=[];
+  db.collection('users').get().then(snap=>{
+    const hat=[];
+    snap.forEach(doc=>{
+      const d=doc.data()||{};
+      const rolle=String(d.role||'');
+      if(rolle==='ausbilder'){ hat.push(d.email||doc.id); return; }
+      // Verwaltung/Admin haben ohnehin Vollzugriff - die brauchen keine Ausbilder-Rolle
+      if(rolle==='admin'||rolle==='verwaltung') return;
+      // Einziges Merkmal, an dem sich ein Ausbilder erkennen laesst. ACHTUNG: lastApp
+      // ist vom Nutzer selbst setzbar, also KEIN Ausweis - deshalb muss ein Mensch
+      // jede Zeile pruefen, bevor geschrieben wird.
+      if(d.lastApp!=='AusbilderPro') return;
+      _ausbRollenPlan.push({uid:doc.id, email:d.email||'(ohne Mail)', name:d.ausbilderName||d.name||'', rolle:rolle});
+    });
+    const gesamt=hat.length+_ausbRollenPlan.length;
+    let h='<b>'+gesamt+' Konten arbeiten mit AusbilderPro</b><br>';
+    h+='<span style="color:#16a34a">✓ '+hat.length+' haben die Rolle</span><br>';
+    if(!_ausbRollenPlan.length){
+      h+='<span style="color:#16a34a;font-weight:700">✓ Es fehlt keine Rolle.</span>';
+    } else {
+      h+='<span style="color:#dc2626;font-weight:700">⚠ '+_ausbRollenPlan.length+' ohne passende Rolle:</span>';
+      h+='<div style="margin-top:6px;max-height:200px;overflow-y:auto">';
+      _ausbRollenPlan.forEach(e=>{
+        const was = e.rolle==='' ? '<span style="color:#dc2626;font-weight:700">⚠ FEHLT</span>'
+                                 : '<span style="color:#dc2626;font-weight:700">⚠ ist \''+esc(e.rolle)+'\'</span>';
+        h+='<div style="padding:4px 0;border-bottom:1px solid var(--brd)">'+esc(e.email)+(e.name?' · '+esc(e.name):'')+' — '+was+'</div>';
+      });
+      h+='</div>';
+      h+='<div style="margin-top:8px;padding:8px;background:rgba(220,38,38,.06);border-radius:6px;color:#dc2626;line-height:1.5">Bitte jede Zeile einzeln prüfen. Erkannt wird nur, <b>wer zuletzt AusbilderPro geöffnet hat</b> – ein Azubi, der die App einmal aufgerufen hat, steht hier ebenfalls. Dem darf keine Rolle gegeben werden.</div>';
+      if(btn) btn.style.display='';
+    }
+    box.innerHTML=h;
+    const cnt=document.getElementById('scCntRollen');
+    if(cnt) cnt.textContent = _ausbRollenPlan.length ? (_ausbRollenPlan.length+' offen') : 'vollständig';
+  }).catch(err=>{
+    box.innerHTML='<span style="color:#dc2626">Fehler beim Lesen: '+esc(err.message||'')+'</span>';
+  });
+}
+
+function ausbRollenSchreiben(){
+  if(!_ausbRollenPlan.length) return;
+  const liste=_ausbRollenPlan.map(e=>'· '+e.email+(e.name?' ('+e.name+')':'')).join('\n');
+  if(!confirm('Diesen '+_ausbRollenPlan.length+' Konten die Rolle \'ausbilder\' geben?\n\n'+liste+'\n\nNur fortfahren, wenn das WIRKLICH alles Ausbilder sind.\nDie Rolle gibt spaeter Lesezugriff auf alle Teilnehmer.')) return;
+  const btn=document.getElementById('ausbRollenBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Schreibe…'; }
+  const plan=_ausbRollenPlan.slice();
+  Promise.all(plan.map(e=>db.collection('users').doc(e.uid).set({role:'ausbilder'},{merge:true})))
+    .then(()=>{
+      toast('✓ '+plan.length+' Rollen nachgetragen');
+      if(btn){ btn.disabled=false; btn.textContent='Rolle nachtragen'; }
+      ausbRollenPruefen();
+    })
+    .catch(err=>{
+      toast('Fehler: '+(err.message||''),'bad');
+      if(btn){ btn.disabled=false; btn.textContent='Rolle nachtragen'; }
+    });
 }
 
 function openAddAusbModal(){
