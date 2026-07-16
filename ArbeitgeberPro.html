@@ -359,6 +359,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                 <button class="uebl-tile active" id="azTile-kontakte" onclick="agAzPanel(event,'azp-kontakte')" title="Azubis mit Telefon und E-Mail"><span class="ic">👥</span>Azubis</button>
                 <button class="uebl-tile" id="azTile-uebl" onclick="agAzPanel(event,'azp-uebl')" title="Überbetriebliche Lehrgänge: Kurse, Anwesenheit, Noten"><span class="ic">🎓</span>ÜbL-Kurse</button>
                 <button class="uebl-tile" id="azTile-berichte" onclick="agAzPanel(event,'azp-berichte')" title="Wochenberichte der Azubis"><span class="ic">📒</span>Berichtsheft<span id="cntBerichte" style="font-size:.55rem;background:rgba(37,99,235,.12);color:var(--acc);padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
+                <button class="uebl-tile" id="azTile-dokumente" onclick="agAzPanel(event,'azp-dokumente')" title="Dokumente mit deinen Azubis austauschen"><span class="ic">📁</span>Dokumente</button>
               </div>
               <div id="azp-kontakte">
                 <div id="agAzubiListe"><div class="empty">Lädt…</div></div>
@@ -371,6 +372,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                   <button class="uebl-tile active" id="ueblF-aktuell" onclick="setUeblFilter(event,'aktuell')" title="Laufende und kommende Lehrgänge"><span class="ic">🟢</span>Aktuelle ÜbL<span id="ueblCntAktuell" style="font-size:.55rem;background:rgba(22,163,74,.12);color:#16a34a;padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
                   <button class="uebl-tile" id="ueblF-vergangen" onclick="setUeblFilter(event,'vergangen')" title="Bereits beendete Lehrgänge"><span class="ic">📦</span>Vergangene ÜbL<span id="ueblCntVergangen" style="font-size:.55rem;background:rgba(148,163,184,.15);color:#64748b;padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
                 </div>
+                <div id="ueblTrenner" style="margin:14px 0 4px;padding-top:12px;border-top:2px solid var(--brd);font-size:.64rem;font-weight:800;color:var(--mu);letter-spacing:.06em">AKTUELLE LEHRGÄNGE</div>
                 <div id="azubiList"><div class="empty">Lädt…</div></div>
                 <div id="agHVKontaktCard" style="display:none;margin-top:14px">
                   <div class="ag-tiles">
@@ -383,6 +385,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
               </div>
               <div id="azp-berichte" style="display:none">
                 <div id="agBerichteListe"><div class="empty">Lädt…</div></div>
+              </div>
+              <div id="azp-dokumente" style="display:none">
+                <div id="agDokListe"><div class="empty">Lädt…</div></div>
               </div>
             </div>
           </div>
@@ -2418,36 +2423,44 @@ function renderAzubiList(){
   hint.style.cssText='font-size:.58rem;color:var(--mu);margin-bottom:10px;padding:0 4px';
   el.appendChild(hint);
   renderAGSyncStatus();
-  // Nach Lehrgang gruppieren: laufende Kurse zuerst, dann kommende, dann beendete, zuletzt "Ohne Lehrgang"
-  const gruppen=new Map();
+  // ── Gruppierung nach Lehrgang ──
+  // AKTUELL   = Lehrgaenge, die laufen oder noch kommen.
+  // VERGANGEN = beendete: aus der kursHistory jedes Azubis, plus aktive Kurse, deren Ende vorbei ist.
+  // Azubis OHNE Lehrgang tauchen in der ÜbL-Ansicht bewusst nicht auf - die stehen in der Azubis-Kachel.
+  const gAkt=new Map(), gVer=new Map();
+  const _add=(map,key,kurs,a)=>{
+    if(!map.has(key)) map.set(key,{kursId:key,kurs:kurs||{},tn:[]});
+    const g=map.get(key);
+    if(kurs&&kurs.von&&!(g.kurs&&g.kurs.von)) g.kurs=kurs;
+    if(!g.tn.some(x=>x.id===a.id)) g.tn.push(a);
+  };
   azubisOnly.forEach(a=>{
-    const k=a.aktiverKursId&&_kurse[a.aktiverKursId]&&_kurse[a.aktiverKursId].von?_kurse[a.aktiverKursId]:null;
-    const key=k?a.aktiverKursId:'_ohne';
-    if(!gruppen.has(key)) gruppen.set(key,{kurs:k,tn:[]});
-    gruppen.get(key).tn.push(a);
+    const kid=a.aktiverKursId;
+    const k=(kid&&_kurse[kid]&&_kurse[kid].von)?_kurse[kid]:null;
+    if(k) _add((k.bis&&today>k.bis)?gVer:gAkt, kid, k, a);
+    (a.kursHistory||[]).forEach(h=>{
+      if(!h||!h.kursId||h.kursId===kid) return;
+      if(h.abgebrochen||h.entfernt||h.nichtErschienen) return;
+      // Kursdaten wenn geladen, sonst Name/Zeitraum aus der Historie
+      const kk=(_kurse[h.kursId]&&_kurse[h.kursId].von)?_kurse[h.kursId]:{name:h.kursName,von:h.von,bis:h.bis};
+      _add(gVer, h.kursId, kk, a);
+    });
   });
   const _rang=g=>{
-    if(!g.kurs) return 3;
-    const k=g.kurs;
+    const k=g.kurs||{};
     if(k.von&&k.bis&&k.von<=today&&today<=k.bis) return 0;
     if(k.von&&today<k.von) return 1;
     return 2;
   };
-  const sortiert=Array.from(gruppen.values()).sort((x,y)=>
-    _rang(x)-_rang(y) || String((x.kurs&&x.kurs.von)||'').localeCompare(String((y.kurs&&y.kurs.von)||''))
-  );
-  // Zaehler auf den Unterkacheln: wie viele Lehrgaenge stecken in welcher Gruppe
-  const nAkt=sortiert.filter(g=>_rang(g)!==2).length;
-  const nVer=sortiert.filter(g=>_rang(g)===2).length;
-  const _cA=document.getElementById('ueblCntAktuell'); if(_cA) _cA.textContent=nAkt;
-  const _cV=document.getElementById('ueblCntVergangen'); if(_cV) _cV.textContent=nVer;
-  // Nur die gewaehlte Gruppe zeigen. "Ohne Lehrgang" laeuft unter "Aktuell" mit,
-  // damit kein Azubi aus der Ansicht faellt.
-  const sichtbar=sortiert.filter(g=> _ueblFilter==='vergangen' ? _rang(g)===2 : _rang(g)!==2 );
+  const _cA=document.getElementById('ueblCntAktuell'); if(_cA) _cA.textContent=gAkt.size;
+  const _cV=document.getElementById('ueblCntVergangen'); if(_cV) _cV.textContent=gVer.size;
+  const sichtbar = (_ueblFilter==='vergangen')
+    ? Array.from(gVer.values()).sort((x,y)=>String((y.kurs&&y.kurs.bis)||'').localeCompare(String((x.kurs&&x.kurs.bis)||'')))
+    : Array.from(gAkt.values()).sort((x,y)=>_rang(x)-_rang(y)||String((x.kurs&&x.kurs.von)||'').localeCompare(String((y.kurs&&y.kurs.von)||'')));
   if(!sichtbar.length){
     const leer=document.createElement('div');
     leer.className='empty';
-    leer.textContent = _ueblFilter==='vergangen' ? 'Noch keine beendeten Lehrgänge.' : 'Zurzeit ist kein Azubi in einem Lehrgang.';
+    leer.textContent = (_ueblFilter==='vergangen') ? 'Noch keine beendeten Lehrgänge.' : 'Zurzeit ist kein Azubi in einem Lehrgang.';
     el.appendChild(leer);
   }
   sichtbar.forEach(g=>{
@@ -2456,7 +2469,9 @@ function renderAzubiList(){
     const isArchived=false;
     const name=((a.vorname||'')+' '+(a.nachname||'')).trim();
     const init=((a.vorname||'?')[0]+(a.nachname||'?')[0]).toUpperCase();
-    const kurs=a.aktiverKursId&&_kurse[a.aktiverKursId]&&_kurse[a.aktiverKursId].von?_kurse[a.aktiverKursId]:null;
+    // Kurs dieser Gruppe (im Bereich "Vergangene" ist das ein Kurs aus der Historie, nicht der aktive)
+    const _kid=g.kursId||a.aktiverKursId;
+    const kurs=(_kid&&_kurse[_kid]&&_kurse[_kid].von)?_kurse[_kid]:((g.kurs&&g.kurs.von)?g.kurs:null);
     const kursLaeuft=kurs&&kurs.von&&kurs.bis&&today>=kurs.von&&today<=kurs.bis;
     const kursGeplant=kurs&&kurs.von&&today<kurs.von;
     const td=kurs&&kurs.tnData?kurs.tnData[a.id]:null;
@@ -2579,7 +2594,8 @@ function renderAzubiList(){
 
       // ─── Baustein: weitere Lehrgänge ───
       let hHist='';
-      const hist=(a.kursHistory||[]).filter(hh=>hh.kursId!==a.aktiverKursId&&!hh.abgebrochen&&!hh.entfernt&&!hh.nichtErschienen).sort((x,y)=>(y.von||'').localeCompare(x.von||''));
+      // Alle anderen Lehrgaenge - also ohne den, der in dieser Gruppe gerade gezeigt wird
+      const hist=(a.kursHistory||[]).filter(hh=>hh.kursId!==_kid&&!hh.abgebrochen&&!hh.entfernt&&!hh.nichtErschienen).sort((x,y)=>(y.von||'').localeCompare(x.von||''));
       if(hist.length){
         hHist+='<div style="font-size:.68rem;font-weight:800;color:var(--mu);letter-spacing:.04em;margin-bottom:6px">📅 WEITERE LEHRGÄNGE ('+hist.length+')</div>';
         hist.forEach(hh=>{
@@ -2652,22 +2668,6 @@ function renderAzubiList(){
       });
       uh+='</div>';
       detail.innerHTML+=uh;
-    }
-    // Dokumente-Austausch
-    const dokWrap=document.createElement('div');
-    dokWrap.style.cssText='margin-top:8px;padding:12px 14px;background:var(--sur);border:2px solid rgba(37,99,235,.15);border-radius:10px';
-    if(_agPremium){
-      dokWrap.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:.7rem;font-weight:800;color:var(--acc)">📄 DOKUMENTE</div>'
-        +'<label style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600">📤 Hochladen<input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="agUploadDok(\''+a.id+'\',this)"></label></div>'
-        +'<div id="dokList_'+a.id+'" style="font-size:.7rem;color:var(--mu)">Lädt…</div>';
-      detail.appendChild(dokWrap);
-      loadDokumente(a.id);
-    } else {
-      dokWrap.style.borderColor='var(--brd)';
-      dokWrap.innerHTML='<div style="font-size:.7rem;font-weight:800;color:var(--mu);margin-bottom:4px">📄 DOKUMENTE</div>'
-        +'<div style="font-size:.65rem;color:var(--mu);margin-bottom:8px">Dokumente direkt mit Ihren Azubis austauschen.</div>'
-        +'<button title="Cloud-Sync ist während der Testphase noch nicht verfügbar" onclick="toast(\'☁ Cloud-Sync ist während der Testphase noch nicht verfügbar.\')" style="font-size:.62rem;padding:5px 12px;border:1.5px solid var(--brd);border-radius:6px;background:var(--sur2);color:var(--mu);cursor:pointer;font-weight:600">☁ Cloud-Sync – folgt in Kürze</button>';
-      detail.appendChild(dokWrap);
     }
     card.addEventListener('click',()=>{
       const isOpen=detail.style.display!=='none';
@@ -3750,7 +3750,39 @@ function setUeblFilter(ev,f){
   document.querySelectorAll('#azp-uebl > .ag-tiles .uebl-tile').forEach(b=>b.classList.remove('active'));
   const btn=(ev&&ev.currentTarget)||document.getElementById('ueblF-'+f);
   if(btn&&btn.classList) btn.classList.add('active');
+  const tr=document.getElementById('ueblTrenner');
+  if(tr) tr.textContent = (f==='vergangen') ? 'BEENDETE LEHRGÄNGE' : 'AKTUELLE LEHRGÄNGE';
   renderAzubiList();
+  // Anwesenheit und Noten vergangener Lehrgaenge erst bei Bedarf nachladen
+  if(f==='vergangen') _ladeVergangeneKurse().then(()=>renderAzubiList());
+}
+
+// Vergangene Lehrgaenge stehen nur in a.kursHistory - dort sind Name und Zeitraum drin,
+// aber keine Anwesenheit/Noten. Die Kursdaten laden wir erst, wenn die Kachel geoeffnet
+// wird; das spart Lesevorgaenge, solange niemand hinschaut.
+let _vergangeneGeladen=false;
+function _ladeVergangeneKurse(){
+  if(_vergangeneGeladen) return Promise.resolve();
+  _vergangeneGeladen=true;
+  const ids=new Set();
+  _azubis.forEach(a=>(a.kursHistory||[]).forEach(h=>{
+    if(!h||!h.kursId) return;
+    if(h.abgebrochen||h.entfernt||h.nichtErschienen) return;
+    if(_kurse[h.kursId]&&_kurse[h.kursId].von) return;
+    ids.add(h.kursId);
+  }));
+  if(!ids.size) return Promise.resolve();
+  const base=db.collection('shared').doc('kurse').collection('list');
+  return Promise.all(Array.from(ids).map(id=>
+    base.doc(id).get().then(doc=>{
+      if(!doc.exists) return;
+      _kurse[id]=Object.assign(_kurse[id]||{}, doc.data());
+      return base.doc(id).collection('teilnehmer').get().then(snap=>{
+        const td={}; snap.forEach(x=>td[x.id]=x.data());
+        _kurse[id].tnData=td;
+      }).catch(()=>{});
+    }).catch(()=>{})
+  ));
 }
 
 // Azubi-Bereich: Kachel waehlen - darunter ist immer nur ein Bereich sichtbar
@@ -3759,7 +3791,7 @@ function agAzPanel(ev,id){
   // Erneuter Klick auf die schon offene Kachel schliesst sie wieder
   const ziel=document.getElementById(id);
   const schonOffen = !!ziel && ziel.style.display!=='none';
-  ['azp-kontakte','azp-uebl','azp-berichte'].forEach(pid=>{
+  ['azp-kontakte','azp-uebl','azp-berichte','azp-dokumente'].forEach(pid=>{
     const el=document.getElementById(pid);
     if(el) el.style.display = (pid===id && !schonOffen) ? '' : 'none';
   });
@@ -3768,7 +3800,37 @@ function agAzPanel(ev,id){
   if(!schonOffen){
     const btn = (ev && ev.currentTarget) || document.getElementById('azTile-'+String(id).replace('azp-',''));
     if(btn && btn.classList) btn.classList.add('active');
+    if(id==='azp-dokumente') renderAgDokumente();
   }
+}
+
+// Dokumente je Azubi - frueher in der aufgeklappten Karte versteckt, jetzt eigener Bereich
+function renderAgDokumente(){
+  const el=document.getElementById('agDokListe');
+  if(!el) return;
+  const azubis=_azubis.filter(a=>{
+    const t=(a.typ||'').toLowerCase().trim();
+    return t==='azubi' || (!t && a.ausbjahr);
+  });
+  if(!azubis.length){ el.innerHTML='<div class="empty">Noch keine Azubis.</div>'; return; }
+  if(!_agPremium){
+    el.innerHTML='<div style="padding:14px;background:var(--sur2);border:1px solid var(--brd);border-radius:12px;font-size:.72rem;color:var(--tx);line-height:1.55">'
+      +'<div style="font-weight:800;margin-bottom:6px">📁 Dokumente</div>'
+      +'Tausche Dateien direkt mit deinen Azubis aus – Verträge, Bescheinigungen, Nachweise.'
+      +'<div style="font-size:.65rem;color:var(--mu);margin-top:8px">☁ Cloud-Sync ist während der Testphase noch nicht verfügbar.</div></div>';
+    return;
+  }
+  el.innerHTML=azubis.map(a=>{
+    const name=((a.vorname||'')+' '+(a.nachname||'')).trim()||'Azubi';
+    return '<div style="margin-bottom:10px;padding:12px 14px;background:var(--sur);border:1px solid var(--brd);border-radius:12px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
+      +'<div style="font-size:.78rem;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(name)+'</div>'
+      +'<label style="font-size:.6rem;padding:4px 10px;border:1.5px solid rgba(37,99,235,.3);border-radius:6px;background:rgba(37,99,235,.06);color:var(--acc);cursor:pointer;font-weight:600;flex-shrink:0">📤 Hochladen'
+      +'<input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="agUploadDok(\''+esc(a.id)+'\',this)"></label>'
+      +'</div>'
+      +'<div id="dokList_'+esc(a.id)+'" style="font-size:.7rem;color:var(--mu)">Lädt…</div></div>';
+  }).join('');
+  azubis.forEach(a=>loadDokumente(a.id));
 }
 
 // Kopfzeile einer Kurs-Gruppe in der ÜbL-Ansicht
