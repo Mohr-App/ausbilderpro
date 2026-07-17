@@ -2761,14 +2761,21 @@ function loadDokumente(tnId){
       let h='', gezeigt=0;
       snap.forEach(doc=>{
         const d=doc.data();
-        // WEISSLISTE: Der Betrieb sieht ausschliesslich den Austausch Betrieb <-> Azubi.
-        // Alles aus anderen Kanaelen (z.B. Unterlagen des Ausbilders an den Azubi) wird
-        // hier bewusst NICHT angezeigt. Weissliste statt Schwarzliste, damit kuenftige
-        // Rollen nicht versehentlich durchrutschen.
-        const rolle=String(d.vonRolle||'betrieb');
-        if(rolle!=='betrieb'&&rolle!=='azubi') return;
-        if(_dokFilter==='an'  && rolle!=='betrieb') return;
-        if(_dokFilter==='von' && rolle!=='azubi') return;
+        // WEISSLISTE: Der Betrieb sieht ausschliesslich den BEWUSSTEN Austausch mit dem Azubi:
+        //   vom Betrieb an den Azubi : vonRolle 'arbeitgeber'
+        //   vom Azubi an den Betrieb : vonRolle 'azubi' UND fuerRolle 'arbeitgeber'
+        // Bewusst NICHT sichtbar:
+        //   - die privaten Dokumente des Azubis (vonRolle 'azubi' OHNE fuerRolle),
+        //     die er in AzubiPro unter "Eigene Dokumente" ablegt
+        //   - alles aus anderen Kanaelen, z.B. Unterlagen des Ausbilders (vonRolle 'ausbilder')
+        // Weissliste statt Schwarzliste, damit kuenftige Rollen nicht versehentlich durchrutschen.
+        const rolle=String(d.vonRolle||'');
+        const fuer=String(d.fuerRolle||'');
+        const vomBetrieb = (rolle==='arbeitgeber');
+        const vomAzubi   = (rolle==='azubi' && fuer==='arbeitgeber');
+        if(!vomBetrieb && !vomAzubi) return;
+        if(_dokFilter==='an'  && !vomBetrieb) return;
+        if(_dokFilter==='von' && !vomAzubi) return;
         gezeigt++;
         const fName=d.fileName||d.name||'Dokument';
         const icon=fName.match(/\.pdf$/i)?'📕':fName.match(/\.(jpg|jpeg|png)$/i)?'🖼':'📄';
