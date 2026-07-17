@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v803';
+const APP_VERSION = 'v804';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v804', d:'17.07.2026', items:['\ud83d\udcbe Speichern beim Schlie\u00dfen: Wer eine \u00c4nderung machte und die App sofort schloss, verlor sie \u2013 die Cloud-Speicherung wartete 1,5 Sekunden und wurde beim Schlie\u00dfen nicht nachgeholt. Jetzt wird beim Wegschalten sofort gespeichert','\u26a0 Schutz gegen zwei Ger\u00e4te: Wurde zwischenzeitlich auf einem anderen Ger\u00e4t gearbeitet, wird der neuere Stand nicht mehr wortlos \u00fcberschrieben \u2013 es kommt eine Nachfrage','\ud83d\udd12 Der beim Anmelden vorgefundene Stand wird je Sitzung als Vorg\u00e4nger gesichert (Data \u203a state_prev)','\ud83d\udd52 Die Cloud-Anzeige zeigt jetzt, von wann der Stand ist']},
   {v:'v803', d:'16.07.2026', items:['\ud83d\uddd3 Datumskorrektur: Die Eintr\u00e4ge v795 bis v802 waren versehentlich auf den 15.07. datiert \u2013 richtig ist der 16.07.2026. Nur das Protokoll war betroffen, an den Funktionen \u00e4ndert sich nichts']},
   {v:'v802', d:'16.07.2026', items:['\ud83d\udd04 Fehltage werden jetzt je Kurstag mitsynchronisiert \u2013 der Betrieb sieht in BetriebPro dadurch, an welchen Kurstagen gefehlt wurde (entschuldigt / unentschuldigt / krank), nicht nur die Anzahl']},
   {v:'v801', d:'16.07.2026', items:['\ud83d\udd0d Verspätungen je Kurstag: Die Schrift passt sich jetzt automatisch an \u2013 bei 1\u20132 Verspätungen gro\u00df und gut lesbar (15px), bei vielen entsprechend kleiner, damit immer alles in eine Zeile passt']},
@@ -2217,7 +2218,12 @@ let _saveTimer = null;
 let _autoExportTimer = null;
 
 function persist(){
-  if(!_fbUid || (_dataOwner && _dataOwner !== _fbUid)) return; // Schutz: nie fremde Daten speichern
+  // Schutz: nie fremde UND nie veraltete Daten speichern.
+  // Frueher stand hier (_dataOwner && _dataOwner !== _fbUid) - _dataOwner ist aber
+  // erst gesetzt, WENN der Cloud-Stand geladen ist (fbLoadData). Im Fenster zwischen
+  // Anmeldung und Ladeende griff der Schutz also nicht, und ein persist() haette den
+  // alten localStorage-Stand in die Cloud geschrieben.
+  if(!_fbUid || _dataOwner !== _fbUid) return;
   localStorage.setItem(_lsKey('ap_v1'), JSON.stringify(S));
   _changeCount++;
   showSaveInd();
@@ -13537,41 +13543,154 @@ function fbErrMsg(e){
 }
 
 // Cloud Save (debounced)
+// ═══════════════════════════════════════════════════════════
+// Cloud-Speicherung des Zustands
+//
+// Drei Probleme, die hier geloest werden:
+//  1) Die Speicherung war um 1,5 s entprellt und es gab KEIN Speichern beim
+//     Schliessen. Wer die letzte Aenderung machte und den Laptop zuklappte,
+//     verlor sie - auch mit nur einem Geraet. (16.07.2026: ein ganzer
+//     Berufsschultag fuer 12 TN.)
+//  2) Geschrieben wurde blind mit .set() - ein zweites Geraet mit aelterem
+//     Stand ueberschrieb den neueren wortlos.
+//  3) Es gab keinen Weg zurueck.
+//
+// Jetzt: Versionszaehler v + Transaktion. Ist der Cloud-Stand neuer als der
+// geladene, wird NICHT geschrieben, sondern gefragt. Zaehler statt Zeitstempel,
+// weil serverTimestamp() seinen Wert erst nach dem Schreiben kennt und Serverzeit
+// fuer so einen Vergleich nicht monoton genug ist. Der Zeitstempel bleibt - aber
+// nur zum Anzeigen.
+// ═══════════════════════════════════════════════════════════
+let _stateV = 0;            // Version des Cloud-Stands, den wir geladen haben
+let _stateTs = null;        // Zeitpunkt dieses Stands (nur Anzeige)
+let _prevGesichert = false; // state_prev nur einmal je Sitzung
+let _konfliktOffen = false; // solange offen: nicht speichern
+
 function fbSave(){
-  if(!_fbUid)return;
-  if(_dataOwner && _dataOwner !== _fbUid) return; // SCHUTZ: nie Daten eines anderen Users speichern
+  if(!_fbUid) return;
+  if(_dataOwner !== _fbUid) return;   // erst wenn geladen
+  if(_konfliktOffen) return;          // erst den Konflikt klaeren
   clearTimeout(_syncTimer);
-  _syncTimer=setTimeout(()=>{
-    const ci=document.getElementById('cloudInd');
-    ci.textContent='☁ Speichert…';
-    // Plain JSON speichern (Komprimierung deaktiviert - Abwaerts-Kompatibilitaet
-    // mit aelteren Clients die kein LZString haben. Daten sind klein genug.)
-    const rawJson = JSON.stringify(S);
-    const approxBytes = rawJson.length;
-    // Sicherheits-Check: warnen wenn nahe am 1MB-Limit
-    if(approxBytes > 900000){
-      ci.textContent='⚠ Daten groß';
-      ci.style.color='#f59e0b';
-      _showStorageWarning(rawJson.length, approxBytes, false);
-      // trotzdem versuchen zu speichern (vielleicht passt's noch)
-    }
-    _db.collection('users').doc(_fbUid).collection('data').doc('state')
-      .set({s:rawJson, c:false, ts:firebase.firestore.FieldValue.serverTimestamp()})
-      .then(()=>{
-        ci.textContent='☁ Gespeichert ✓';
-        ci.style.color='';
-        setTimeout(()=>{ if(_fbUid) ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||''); },3000);
-      })
-      .catch((err)=>{
-        ci.textContent='☁ Fehler ✗';
-        ci.style.color='#ef4444';
-        console.error('Cloud-Save fehlgeschlagen:', err);
-        if(err && (err.code==='invalid-argument' || /longer than|exceeds|maximum/i.test(err.message||''))){
-          _showStorageWarning(rawJson.length, approxBytes, false);
-        }
-      });
-  }, 1500);
+  _syncTimer=setTimeout(()=>{ _syncTimer=null; _fbSaveJetzt(); }, 1500);
 }
+
+// Sofort speichern, ohne die 1,5 s abzuwarten (beim Schliessen/Wegschalten).
+// Firestore legt den Schreibvorgang lokal in die Warteschlange - er geht auch
+// dann noch raus, wenn der Deckel zufaellt.
+function fbSaveFlush(){
+  if(!_syncTimer) return;
+  clearTimeout(_syncTimer); _syncTimer=null;
+  _fbSaveJetzt();
+}
+
+function _fbSaveJetzt(){
+  if(!_fbUid || _dataOwner !== _fbUid || _konfliktOffen) return Promise.resolve();
+  const ci=document.getElementById('cloudInd');
+  if(ci) ci.textContent='☁ Speichert…';
+  const rawJson = JSON.stringify(S);
+  const approxBytes = rawJson.length;
+  if(approxBytes > 900000){
+    if(ci){ ci.textContent='⚠ Daten groß'; ci.style.color='#f59e0b'; }
+    _showStorageWarning(rawJson.length, approxBytes, false);
+  }
+  const ref  = _db.collection('users').doc(_fbUid).collection('data').doc('state');
+  const pRef = _db.collection('users').doc(_fbUid).collection('data').doc('state_prev');
+
+  return _db.runTransaction(tx=>{
+    return tx.get(ref).then(doc=>{
+      const cloudV = (doc.exists && typeof doc.data().v==='number') ? doc.data().v : 0;
+      // Cloud ist neuer als das, was wir geladen haben -> ein anderes Geraet war da
+      if(doc.exists && cloudV > _stateV){
+        return {konflikt:true, ts:doc.data().ts, v:cloudV};
+      }
+      // Vorgaenger einmal je Sitzung wegsichern: das ist genau der Stand, den wir
+      // beim Anmelden vorgefunden haben - der Rueckweg, falls hier etwas schiefgeht.
+      if(!_prevGesichert && doc.exists && doc.data().s){
+        tx.set(pRef, {s:doc.data().s, c:doc.data().c===true, v:cloudV,
+                      ts:doc.data().ts||null,
+                      gesichertAm:firebase.firestore.FieldValue.serverTimestamp()});
+      }
+      tx.set(ref, {s:rawJson, c:false, v:_stateV+1,
+                   ts:firebase.firestore.FieldValue.serverTimestamp()});
+      return {konflikt:false, v:_stateV+1};
+    });
+  }).then(res=>{
+    if(res.konflikt){ _zeigeKonflikt(res.ts); return; }
+    _stateV = res.v;
+    _stateTs = new Date();
+    _prevGesichert = true;
+    if(ci){
+      ci.textContent='☁ Gespeichert ✓';
+      ci.style.color='';
+      setTimeout(()=>{ if(_fbUid) _cloudIndStand(); },3000);
+    }
+  }).catch(err=>{
+    if(ci){ ci.textContent='☁ Fehler ✗'; ci.style.color='#ef4444'; }
+    console.error('Cloud-Save fehlgeschlagen:', err);
+    if(err && (err.code==='invalid-argument' || /longer than|exceeds|maximum/i.test(err.message||''))){
+      _showStorageWarning(rawJson.length, approxBytes, false);
+    }
+  });
+}
+
+// Anzeige: nicht nur "Gespeichert", sondern von wann der Stand ist
+function _cloudIndStand(){
+  const ci=document.getElementById('cloudInd');
+  if(!ci) return;
+  if(_stateTs){
+    const hh=String(_stateTs.getHours()).padStart(2,'0'), mm=String(_stateTs.getMinutes()).padStart(2,'0');
+    ci.textContent='☁ Stand '+hh+':'+mm;
+  } else {
+    ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||'');
+  }
+  ci.style.color='';
+}
+
+// Konflikt: ein anderes Geraet hat inzwischen gespeichert.
+// Es gibt hier keine gute Option - nur eine bewusste Entscheidung.
+function _zeigeKonflikt(cloudTs){
+  if(_konfliktOffen) return;
+  _konfliktOffen = true;
+  const ci=document.getElementById('cloudInd');
+  if(ci){ ci.textContent='⚠ Konflikt'; ci.style.color='#ef4444'; }
+  let wann='';
+  try{ const d=cloudTs&&cloudTs.toDate?cloudTs.toDate():null;
+       if(d) wann=' um '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(e){}
+  const ov=document.createElement('div');
+  ov.id='konfliktOverlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;max-width:460px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+    +'<div style="font-size:1.05rem;font-weight:800;color:#dc2626;margin-bottom:10px">⚠ Auf einem anderen Gerät wurde gearbeitet</div>'
+    +'<div style="font-size:.82rem;color:#0f172a;line-height:1.6;margin-bottom:8px">In der Cloud liegt ein <b>neuerer Stand</b>'+wann+' – vermutlich von einem anderen Rechner oder Tablet.</div>'
+    +'<div style="font-size:.82rem;color:#0f172a;line-height:1.6;margin-bottom:16px">Deine Änderungen hier sind <b>noch nicht gespeichert</b>. Es geht in jedem Fall etwas verloren – entscheide bewusst:</div>'
+    +'<button onclick="_konfliktNeuLaden()" style="width:100%;padding:12px;margin-bottom:8px;border:0;border-radius:9px;background:#2563eb;color:#fff;font-weight:700;font-size:.82rem;cursor:pointer">Neu laden – den anderen Stand übernehmen</button>'
+    +'<div style="font-size:.66rem;color:#64748b;margin:-4px 0 12px;text-align:center">Deine Änderungen auf diesem Gerät gehen verloren</div>'
+    +'<button onclick="_konfliktUeberschreiben()" style="width:100%;padding:12px;margin-bottom:8px;border:1.5px solid #dc2626;border-radius:9px;background:#fff;color:#dc2626;font-weight:700;font-size:.82rem;cursor:pointer">Trotzdem überschreiben – meinen Stand behalten</button>'
+    +'<div style="font-size:.66rem;color:#64748b;margin:-4px 0 12px;text-align:center">Der Stand vom anderen Gerät geht verloren</div>'
+    +'<button onclick="_konfliktSpaeter()" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;color:#475569;font-weight:600;font-size:.78rem;cursor:pointer">Später entscheiden – nichts speichern</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
+function _konfliktNeuLaden(){ location.reload(); }
+function _konfliktSpaeter(){
+  const ov=document.getElementById('konfliktOverlay'); if(ov) ov.remove();
+  // _konfliktOffen bleibt true: es wird nichts geschrieben, bis er sich entscheidet
+}
+function _konfliktUeberschreiben(){
+  const ov=document.getElementById('konfliktOverlay'); if(ov) ov.remove();
+  _db.collection('users').doc(_fbUid).collection('data').doc('state').get().then(d=>{
+    // Version hochziehen, damit der naechste Schreibvorgang durchgeht
+    _stateV = (d.exists && typeof d.data().v==='number') ? d.data().v : 0;
+    _konfliktOffen = false;
+    _prevGesichert = false;   // der ueberschriebene Stand wird als Vorgaenger gesichert
+    _fbSaveJetzt();
+  });
+}
+
+// Speichern beim Wegschalten/Schliessen - DAS ist der eigentliche Datenverlust-Fix
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') fbSaveFlush(); });
+window.addEventListener('pagehide', fbSaveFlush);
+
 // Warnung wenn Daten zu groß fuer Firestore-Doc werden
 function _showStorageWarning(jsonLen, payloadBytes, wasCompressed){
   if(document.getElementById('storageWarnModal')) return;
@@ -13646,6 +13765,12 @@ function fbLoadData(){
           S.katOrder=S.katOrder.filter(id=>S.kats[id]);
           fixSelection();
           localStorage.setItem(_lsKey('ap_v1'),JSON.stringify(S));
+          // Version des geladenen Stands merken - dagegen vergleicht fbSave spaeter.
+          // Bestandsdokumente ohne v zaehlen als 0, die erste Speicherung setzt 1.
+          _stateV = (typeof doc.data().v==='number') ? doc.data().v : 0;
+          try{ _stateTs = doc.data().ts && doc.data().ts.toDate ? doc.data().ts.toDate() : null; }catch(e){ _stateTs=null; }
+          _prevGesichert = false;  // je Sitzung einmal sichern
+          _konfliktOffen = false;
           _dataOwner=_fbUid; // Daten gehören diesem User
         }catch(e){ console.error('State-Load fehlgeschlagen:',e); }
       }
@@ -13670,7 +13795,7 @@ function fbLoadData(){
       }).catch(()=>{}).finally(()=>{
         loadAusbilder(); // Profilname in Header (nach evtl. Firestore-Load)
       });
-      ci.textContent='☁ '+(_auth.currentUser?.email?.split('@')[0]||'');
+      _cloudIndStand();
     })
     .catch(()=>{
       _dataOwner=_fbUid;
