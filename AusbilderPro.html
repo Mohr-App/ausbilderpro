@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v813';
+const APP_VERSION = 'v814';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v814', d:'17.07.2026', items:['\ud83d\udcc4 „Noten untereinander": Bei bis zu 4 Noten bleibt die Schrift jetzt in voller Gr\u00f6\u00dfe \u2013 sie wurde vorher grundlos verkleinert und wirkte verloren. Ab 6 Noten unver\u00e4ndert']},
   {v:'v813', d:'17.07.2026', items:['\u21a9 Standard-Bescheinigung wieder exakt wie fr\u00fcher: Verkleinert wird erst ab 8 Zeilen (v810 hatte das versehentlich auf 7 gezogen)','\ud83d\udcc4 „Noten untereinander" hat jetzt eine eigene Staffel und beeinflusst den Standard nicht mehr']},
   {v:'v812', d:'17.07.2026', items:['\ud83d\udd0e Bei „Noten untereinander" wird die Schrift jetzt deutlich kleiner \u2013 eine Stufe reichte nicht, bei 6 Noten fehlte weiterhin die Zeile mit Fehltagen und Versp\u00e4tungen','\ud83d\udcd0 Neue, kleinste Schriftstufe f\u00fcr Lehrg\u00e4nge mit vielen Noten']},
   {v:'v811', d:'17.07.2026', items:['\ud83d\udcc4 Bei „Noten untereinander" wird die Schrift eine Stufe kleiner \u2013 dieselben Noten brauchen dort mehr Zeilen. Bei 6 Noten wurden die Fehltage sonst weiterhin abgeschnitten','\ud83d\udcda Gilt auch f\u00fcr Sammel-Bescheinigungen']},
@@ -6958,7 +6959,7 @@ function generateAlleBescheinigungenAusbilder(){
       const _zeilen=(notenHtmlParts.join('').match(/class="note-row/g)||[]).length;
       const _unt = !!(inst && inst.beschNotenUntereinander===true);
       const _kl = _unt
-        ? (_zeilen>=11?' noten-xxxs':_zeilen>=7?' noten-xxs':_zeilen>=5?' noten-sm':'')
+        ? (_zeilen>=11?' noten-xxxs':_zeilen>=7?' noten-xxs':'')
         : (_zeilen>=13?' noten-xxs' :_zeilen>=11?' noten-xs':_zeilen>=8?' noten-sm':'');
       const notenHtml=notenHtmlParts.length?`<div class="noten-block${_kl}">${notenHtmlParts.join('')}</div>`:'';
       return `<div class="page">
@@ -7399,8 +7400,12 @@ setTimeout(function(){
     // Untereinander: eigene Staffel, weil derselbe Inhalt dort fast doppelt so
     // viele Zeilen braucht. 6 Noten sind gepaart 4 Zeilen, untereinander 7 -
     // genau dafuer paart das KHS-Original.
+    // Untereinander bis 6 Zeilen NICHT verkleinern: Die Regel "ab 5 Zeilen sm" war
+    // vorsorglich erfunden - der Standard verkleinert bei 5 Zeilen auch nicht. Bei
+    // 4 Noten (5 Zeilen) wirkte die Bescheinigung dadurch grundlos klein und leer.
+    // Ab 7 Zeilen (6 Noten) bleibt noten-xxs: dort passt es genau.
     var st = _untNoten
-      ? (rows>=11 ? 'noten-xxxs' : rows>=7 ? 'noten-xxs' : rows>=5 ? 'noten-sm' : '')
+      ? (rows>=11 ? 'noten-xxxs' : rows>=7 ? 'noten-xxs' : '')
       : (rows>=13 ? 'noten-xxs'  : rows>=11 ? 'noten-xs' : rows>=8 ? 'noten-sm' : '');
     if(st) block.classList.add(st);
   });
@@ -10603,8 +10608,12 @@ setTimeout(function(){
   // Untereinander: eigene Staffel, weil derselbe Inhalt dort fast doppelt so
   // viele Zeilen braucht. 6 Noten sind gepaart 4 Zeilen, untereinander 7 -
   // genau dafuer paart das KHS-Original.
+  // Untereinander bis 6 Zeilen NICHT verkleinern: Die Regel "ab 5 Zeilen sm" war
+  // vorsorglich erfunden - der Standard verkleinert bei 5 Zeilen auch nicht. Bei
+  // 4 Noten (5 Zeilen) wirkte die Bescheinigung dadurch grundlos klein und leer.
+  // Ab 7 Zeilen (6 Noten) bleibt noten-xxs: dort passt es genau.
   var st = _untNoten
-    ? (rows>=11 ? 'noten-xxxs' : rows>=7 ? 'noten-xxs' : rows>=5 ? 'noten-sm' : '')
+    ? (rows>=11 ? 'noten-xxxs' : rows>=7 ? 'noten-xxs' : '')
     : (rows>=13 ? 'noten-xxs'  : rows>=11 ? 'noten-xs' : rows>=8 ? 'noten-sm' : '');
   if(st) block.classList.add(st);
 },50);
