@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v808';
+const APP_VERSION = 'v809';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v809', d:'17.07.2026', items:['\u2696 Die Warnung in der Bescheinigung meldet sich nicht mehr wegen ein paar Pixeln \u2013 Bildschirm und Drucker rechnen unterschiedlich. Sie greift nur noch, wenn tats\u00e4chlich eine ganze Zeile fehlen w\u00fcrde','\ud83d\udd27 Behoben: Die Messung lief doppelt und verschob dabei das Layout, das sie gerade gemessen hat']},
   {v:'v808', d:'17.07.2026', items:['\ud83d\udcc4 Bescheinigung schneidet nichts mehr stillschweigend ab: Statt Zeilen zu z\u00e4hlen wird jetzt gemessen, ob der Inhalt auf die Seite passt \u2013 und so lange verkleinert, bis er passt','\u26a0 Passt es selbst dann nicht, erscheint eine rote Warnung im Bescheinigungs-Fenster (wird nicht mitgedruckt), statt unten heimlich zu kappen','\ud83d\udd0e Behoben: Bei 6 Noten plus Fehltage (7 Zeilen) griff das Verkleinern nicht \u2013 die Schwelle lag bei 8. Die letzte Note und die Fehltage fehlten auf dem Ausdruck','\ud83d\udcda Gilt auch f\u00fcr Sammel-Bescheinigungen \u2013 dort wurde bisher \u00fcberhaupt nicht verkleinert']},
   {v:'v807', d:'17.07.2026', items:['\ud83d\udcc4 Bescheinigung: Noten k\u00f6nnen wieder untereinander gedruckt werden \u2013 je Lehrgang anklickbar in der Kopfzeile neben Kurstage und Beginn. Ohne Haken bleibt das KHS-Format (ab 4 Noten paarweise nebeneinander)','\u21aa Neue Lehrg\u00e4nge \u00fcbernehmen die Einstellung vom zuletzt angelegten Lehrgang desselben Kurses','\ud83d\udd0d Die Schrift wird bei vielen Noten weiterhin automatisch kleiner \u2013 gez\u00e4hlt werden Zeilen, das greift in beiden Varianten','\ud83d\udcac Bei „Noten untereinander" entf\u00e4llt die leere Bemerkungs-Linie, um Platz zu sparen \u2013 ein eingetragener Bemerkungs-Text bleibt aber immer stehen','\ud83d\udcda Sammel-Bescheinigungen verkleinern jetzt ebenfalls automatisch \u2013 das fehlte dort bisher ganz']},
   {v:'v806', d:'17.07.2026', items:['\ud83d\udcbe Speichern beim Schlie\u00dfen greift jetzt wirklich: Der Schreibvorgang geht in die lokale Warteschlange und wird beim n\u00e4chsten Start nachgeholt \u2013 auch nach Absturz oder leerem Akku','\u2705 Kein Fehlalarm mehr: Ist der eigene Schreibvorgang beim Schlie\u00dfen angekommen, wird das erkannt, statt einen Konflikt zu melden']},
@@ -7375,19 +7376,27 @@ async function insertSigStempelBulk(){
 //
 // Jetzt wird der tatsaechliche Ueberlauf gemessen und stufenweise verkleinert.
 // Reicht die kleinste Stufe nicht, wird sichtbar gewarnt statt heimlich gekappt.
+var _FIT_TOL=12;      // Toleranz in px (~3mm)
+var _fitGelaufen=false;
 function _notenFitten(){
+  if(_fitGelaufen) return;   // nur EINMAL messen - sonst misst der zweite Lauf
+  _fitGelaufen=true;         // ein Layout, das der erste selbst veraendert hat
   var betroffen=[];
   document.querySelectorAll('.page').forEach(function(page){
     var c=page.querySelector('.page-content');
     var block=page.querySelector('.noten-block');
     if(!c||!block) return;
     block.classList.remove('noten-sm','noten-xs','noten-xxs');
-    if(c.scrollHeight<=c.clientHeight+1) return;          // passt schon
+    // Toleranz 12px (~3mm): Der Bildschirm rechnet in Pixeln, der Drucker in
+    // Millimetern - ein paar Pixel Unterschied sind normal und bedeuten NICHT,
+    // dass etwas fehlt. Eine echte abgeschnittene Zeile ist selbst in der
+    // kleinsten Stufe ueber 20px hoch. Mit 1px Toleranz gab es Fehlalarm bei 6px.
+    if(c.scrollHeight<=c.clientHeight+_FIT_TOL) return;   // passt
     var stufen=['noten-sm','noten-xs','noten-xxs'], ok=false;
     for(var i=0;i<stufen.length;i++){
       block.classList.remove('noten-sm','noten-xs','noten-xxs');
       block.classList.add(stufen[i]);
-      if(c.scrollHeight<=c.clientHeight+1){ ok=true; break; }
+      if(c.scrollHeight<=c.clientHeight+_FIT_TOL){ ok=true; break; }
     }
     if(!ok){
       var zuviel=c.scrollHeight-c.clientHeight;
@@ -7400,7 +7409,9 @@ function _notenFitten(){
   if(betroffen.length) _fitWarnung(betroffen);
 }
 function _fitWarnung(liste){
+  if(document.getElementById('fitWarn')) return;
   var w=document.createElement('div');
+  w.id='fitWarn';
   w.className='no-print';
   w.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;'
     +'padding:12px 16px;font:700 13px/1.5 system-ui,sans-serif;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.3)';
@@ -7408,11 +7419,13 @@ function _fitWarnung(liste){
     +'(z.B. die letzte Note oder die Fehltage).<br>'
     +'<span style="font-weight:400;font-size:12px">Betroffen: '+liste.join(' \u00b7 ')
     +' \u2013 bitte Noten reduzieren oder Bemerkung k\u00fcrzen. Nicht ungepr\u00fcft ausdrucken.</span>';
+  // Bewusst KEIN paddingTop auf body: das wuerde das Layout verschieben, das
+  // gerade gemessen wurde. Das Banner ueberlagert (position:fixed) und wird
+  // beim Drucken ausgeblendet (.no-print).
   document.body.appendChild(w);
-  document.body.style.paddingTop='60px';
 }
-setTimeout(_notenFitten,60);
-window.addEventListener('load',function(){ setTimeout(_notenFitten,150); });
+if(document.readyState==='complete') setTimeout(_notenFitten,150);
+else window.addEventListener('load',function(){ setTimeout(_notenFitten,150); });
 function printAllCert(){
   try{
     const ids=[];
@@ -10594,19 +10607,27 @@ setTimeout(_loadPositions,100);
 //
 // Jetzt wird der tatsaechliche Ueberlauf gemessen und stufenweise verkleinert.
 // Reicht die kleinste Stufe nicht, wird sichtbar gewarnt statt heimlich gekappt.
+var _FIT_TOL=12;      // Toleranz in px (~3mm)
+var _fitGelaufen=false;
 function _notenFitten(){
+  if(_fitGelaufen) return;   // nur EINMAL messen - sonst misst der zweite Lauf
+  _fitGelaufen=true;         // ein Layout, das der erste selbst veraendert hat
   var betroffen=[];
   document.querySelectorAll('.page').forEach(function(page){
     var c=page.querySelector('.page-content');
     var block=page.querySelector('.noten-block');
     if(!c||!block) return;
     block.classList.remove('noten-sm','noten-xs','noten-xxs');
-    if(c.scrollHeight<=c.clientHeight+1) return;          // passt schon
+    // Toleranz 12px (~3mm): Der Bildschirm rechnet in Pixeln, der Drucker in
+    // Millimetern - ein paar Pixel Unterschied sind normal und bedeuten NICHT,
+    // dass etwas fehlt. Eine echte abgeschnittene Zeile ist selbst in der
+    // kleinsten Stufe ueber 20px hoch. Mit 1px Toleranz gab es Fehlalarm bei 6px.
+    if(c.scrollHeight<=c.clientHeight+_FIT_TOL) return;   // passt
     var stufen=['noten-sm','noten-xs','noten-xxs'], ok=false;
     for(var i=0;i<stufen.length;i++){
       block.classList.remove('noten-sm','noten-xs','noten-xxs');
       block.classList.add(stufen[i]);
-      if(c.scrollHeight<=c.clientHeight+1){ ok=true; break; }
+      if(c.scrollHeight<=c.clientHeight+_FIT_TOL){ ok=true; break; }
     }
     if(!ok){
       var zuviel=c.scrollHeight-c.clientHeight;
@@ -10619,7 +10640,9 @@ function _notenFitten(){
   if(betroffen.length) _fitWarnung(betroffen);
 }
 function _fitWarnung(liste){
+  if(document.getElementById('fitWarn')) return;
   var w=document.createElement('div');
+  w.id='fitWarn';
   w.className='no-print';
   w.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;'
     +'padding:12px 16px;font:700 13px/1.5 system-ui,sans-serif;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.3)';
@@ -10627,11 +10650,15 @@ function _fitWarnung(liste){
     +'(z.B. die letzte Note oder die Fehltage).<br>'
     +'<span style="font-weight:400;font-size:12px">Betroffen: '+liste.join(' \u00b7 ')
     +' \u2013 bitte Noten reduzieren oder Bemerkung k\u00fcrzen. Nicht ungepr\u00fcft ausdrucken.</span>';
+  // Bewusst KEIN paddingTop auf body: das wuerde das Layout verschieben, das
+  // gerade gemessen wurde. Das Banner ueberlagert (position:fixed) und wird
+  // beim Drucken ausgeblendet (.no-print).
   document.body.appendChild(w);
-  document.body.style.paddingTop='60px';
 }
-setTimeout(_notenFitten,60);
-window.addEventListener('load',function(){ setTimeout(_notenFitten,120); });
+// Erst nach 'load' messen - vorher sind Schriften und Logos nicht fertig und
+// die Hoehen stimmen nicht. Ein einziger Ausloeser, _fitGelaufen sperrt Doppellaeufe.
+if(document.readyState==='complete') setTimeout(_notenFitten,120);
+else window.addEventListener('load',function(){ setTimeout(_notenFitten,120); });
 function lockGuard(){ try{ return !!(window.opener && window.opener.kursGesperrt && window.opener.kursGesperrt()); }catch(e){ return false; } }
 function toggleStandort(ort){ if(lockGuard())return;
   var bonn=document.querySelector('.cb-bonn');
