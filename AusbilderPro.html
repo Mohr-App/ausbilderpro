@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v804';
+const APP_VERSION = 'v805';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v805', d:'17.07.2026', items:['\ud83d\udcbe \u00c4nderungen \u00fcberleben jetzt jedes Schlie\u00dfen \u2013 auch Absturz oder leeren Akku. Wer die App direkt nach einer \u00c4nderung schloss, verlor sie bisher; beim n\u00e4chsten Start wurde der lokale Stand \u00fcberschrieben. Jetzt wird er erkannt und hochgeladen']},
   {v:'v804', d:'17.07.2026', items:['\ud83d\udcbe Speichern beim Schlie\u00dfen: Wer eine \u00c4nderung machte und die App sofort schloss, verlor sie \u2013 die Cloud-Speicherung wartete 1,5 Sekunden und wurde beim Schlie\u00dfen nicht nachgeholt. Jetzt wird beim Wegschalten sofort gespeichert','\u26a0 Schutz gegen zwei Ger\u00e4te: Wurde zwischenzeitlich auf einem anderen Ger\u00e4t gearbeitet, wird der neuere Stand nicht mehr wortlos \u00fcberschrieben \u2013 es kommt eine Nachfrage','\ud83d\udd12 Der beim Anmelden vorgefundene Stand wird je Sitzung als Vorg\u00e4nger gesichert (Data \u203a state_prev)','\ud83d\udd52 Die Cloud-Anzeige zeigt jetzt, von wann der Stand ist']},
   {v:'v803', d:'16.07.2026', items:['\ud83d\uddd3 Datumskorrektur: Die Eintr\u00e4ge v795 bis v802 waren versehentlich auf den 15.07. datiert \u2013 richtig ist der 16.07.2026. Nur das Protokoll war betroffen, an den Funktionen \u00e4ndert sich nichts']},
   {v:'v802', d:'16.07.2026', items:['\ud83d\udd04 Fehltage werden jetzt je Kurstag mitsynchronisiert \u2013 der Betrieb sieht in BetriebPro dadurch, an welchen Kurstagen gefehlt wurde (entschuldigt / unentschuldigt / krank), nicht nur die Anzahl']},
@@ -2225,6 +2226,15 @@ function persist(){
   // alten localStorage-Stand in die Cloud geschrieben.
   if(!_fbUid || _dataOwner !== _fbUid) return;
   localStorage.setItem(_lsKey('ap_v1'), JSON.stringify(S));
+  // Merker: es gibt Aenderungen, die noch NICHT in der Cloud sind.
+  // Synchron und unfehlbar - im Gegensatz zu jedem Netzwerkaufruf. Ueberlebt
+  // Tab-schliessen, Absturz, leeren Akku. Beim naechsten Start wertet
+  // fbLoadData ihn aus und wirft die Aenderungen nicht mehr weg.
+  // Die Basis-Version dazu: gegen die wurde lokal gearbeitet.
+  try{
+    localStorage.setItem(_lsKey('ap_dirty'), '1');
+    localStorage.setItem(_lsKey('ap_dirtyBase'), String(_stateV));
+  }catch(e){}
   _changeCount++;
   showSaveInd();
   // Cloud-Sync (hook wird von Firebase-Block gesetzt)
@@ -13619,6 +13629,8 @@ function _fbSaveJetzt(){
     _stateV = res.v;
     _stateTs = new Date();
     _prevGesichert = true;
+    // Erst JETZT ist die Cloud auf Stand - Merker weg
+    try{ localStorage.removeItem(_lsKey('ap_dirty')); localStorage.removeItem(_lsKey('ap_dirtyBase')); }catch(e){}
     if(ci){
       ci.textContent='☁ Gespeichert ✓';
       ci.style.color='';
@@ -13764,13 +13776,67 @@ function fbLoadData(){
           Object.keys(S.kats).forEach(id=>{ if(!S.katOrder.includes(id)) S.katOrder.push(id); });
           S.katOrder=S.katOrder.filter(id=>S.kats[id]);
           fixSelection();
+          // ── Ungespeicherte lokale Aenderungen? ──
+          // Der localStorage wird in persist() SYNCHRON geschrieben, die Cloud
+          // erst 1,5s spaeter. Wer die App vorher schliesst, hat seine Arbeit nur
+          // lokal. Frueher hat fbLoadData sie hier wortlos ueberschrieben - genau
+          // so ging am 16.07.2026 ein ganzer Berufsschultag verloren.
+          const cloudV = (typeof doc.data().v==='number') ? doc.data().v : 0;
+          const dirty  = localStorage.getItem(_lsKey('ap_dirty')) === '1';
+          const base   = parseInt(localStorage.getItem(_lsKey('ap_dirtyBase'))||'-1', 10);
+          const lokal  = localStorage.getItem(_lsKey('ap_v1'));
+          if(dirty && lokal && base === cloudV){
+            // Niemand anders war seitdem dran -> unsere lokalen Aenderungen sind die
+            // neueren. Lokalen Stand behalten und gleich hochschreiben.
+            try{
+              S = JSON.parse(lokal);
+              console.warn('[State] Ungespeicherte Aenderungen gefunden – lokaler Stand behalten und hochgeladen.');
+              _stateV = cloudV; _stateTs = null;
+              _prevGesichert = false; _konfliktOffen = false;
+              _dataOwner = _fbUid;
+              if(!S.katOrder)S.katOrder=[];
+              Object.keys(S.kats).forEach(id=>{ if(!S.katOrder.includes(id)) S.katOrder.push(id); });
+              S.katOrder=S.katOrder.filter(id=>S.kats[id]);
+              fixSelection();
+              setTimeout(()=>{ _fbSaveJetzt(); }, 800);
+              renderAll(); loadHBZKurse(); loadBerufeFromFirestore(); resolveAllPoolTnIds();
+              syncSeatNamesFromFirestore(); loadTNPhotos(); checkAusbNotifications();
+              checkFirstLoginPwHint(); checkDsgvoConsent();
+              const ci2=document.getElementById('cloudInd');
+              if(ci2){ ci2.textContent='☁ Lädt hoch…'; }
+              return;
+            }catch(e){ console.error('[State] Lokaler Stand unlesbar, nehme Cloud:',e); }
+          }
+          if(dirty && lokal && base !== cloudV){
+            // Echter Konflikt: hier gibt es ungespeicherte Aenderungen UND ein anderes
+            // Geraet hat seitdem gespeichert. Der Cloud-Stand gewinnt (er ist der
+            // gemeinsame), aber der lokale wird NICHT weggeworfen - und der Nutzer
+            // erfaehrt davon. Stilles Verschieben waere genau der Fehler von gestern.
+            console.warn('[State] Lokale Aenderungen + fremder Cloud-Stand – Konflikt.');
+            try{
+              localStorage.setItem(_lsKey('ap_konflikt'), lokal);
+              localStorage.setItem(_lsKey('ap_konfliktAm'), new Date().toISOString());
+              _db.collection('users').doc(_fbUid).collection('data').doc('state_konflikt')
+                 .set({s:lokal, c:false, basis:base,
+                       gesichertAm:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+            }catch(e){}
+            setTimeout(()=>{
+              alert('⚠ Ungespeicherte Änderungen gefunden\n\n'
+                +'Auf diesem Gerät gab es Änderungen, die nicht mehr in die Cloud kamen – '
+                +'gleichzeitig wurde auf einem anderen Gerät gearbeitet.\n\n'
+                +'Angezeigt wird jetzt der Stand aus der Cloud. Deine lokalen Änderungen '
+                +'sind NICHT verloren: sie liegen gesichert unter Data › state_konflikt.\n\n'
+                +'Melde dich bei Bedarf – sie lassen sich zurückholen.');
+            }, 1200);
+          }
           localStorage.setItem(_lsKey('ap_v1'),JSON.stringify(S));
           // Version des geladenen Stands merken - dagegen vergleicht fbSave spaeter.
           // Bestandsdokumente ohne v zaehlen als 0, die erste Speicherung setzt 1.
-          _stateV = (typeof doc.data().v==='number') ? doc.data().v : 0;
+          _stateV = cloudV;
           try{ _stateTs = doc.data().ts && doc.data().ts.toDate ? doc.data().ts.toDate() : null; }catch(e){ _stateTs=null; }
           _prevGesichert = false;  // je Sitzung einmal sichern
           _konfliktOffen = false;
+          try{ localStorage.removeItem(_lsKey('ap_dirty')); localStorage.removeItem(_lsKey('ap_dirtyBase')); }catch(e){}
           _dataOwner=_fbUid; // Daten gehören diesem User
         }catch(e){ console.error('State-Load fehlgeschlagen:',e); }
       }
