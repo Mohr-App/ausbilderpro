@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v811';
+const APP_VERSION = 'v812';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v812', d:'17.07.2026', items:['\ud83d\udd0e Bei „Noten untereinander" wird die Schrift jetzt deutlich kleiner \u2013 eine Stufe reichte nicht, bei 6 Noten fehlte weiterhin die Zeile mit Fehltagen und Versp\u00e4tungen','\ud83d\udcd0 Neue, kleinste Schriftstufe f\u00fcr Lehrg\u00e4nge mit vielen Noten']},
   {v:'v811', d:'17.07.2026', items:['\ud83d\udcc4 Bei „Noten untereinander" wird die Schrift eine Stufe kleiner \u2013 dieselben Noten brauchen dort mehr Zeilen. Bei 6 Noten wurden die Fehltage sonst weiterhin abgeschnitten','\ud83d\udcda Gilt auch f\u00fcr Sammel-Bescheinigungen']},
   {v:'v810', d:'17.07.2026', items:['\u21a9 Zur\u00fcckgenommen: Die Bescheinigung verkleinert wieder nach Zeilenzahl statt nach Messung. Die Messung war unbrauchbar \u2013 Bildschirm und Drucker rechnen unterschiedlich, dadurch wurde JEDE Bescheinigung verkleinert, auch die mit drei Noten','\ud83d\udcc4 Standard sieht wieder aus wie gewohnt','\ud83d\udd27 Bleibt: Ab 7 Zeilen wird verkleinert (vorher ab 8). Genau da fehlten bei 6 Noten die letzte Note und die Fehltage']},
   {v:'v809', d:'17.07.2026', items:['\u2696 Die Warnung in der Bescheinigung meldet sich nicht mehr wegen ein paar Pixeln \u2013 Bildschirm und Drucker rechnen unterschiedlich. Sie greift nur noch, wenn tats\u00e4chlich eine ganze Zeile fehlen w\u00fcrde','\ud83d\udd27 Behoben: Die Messung lief doppelt und verschob dabei das Layout, das sie gerade gemessen hat']},
@@ -6956,7 +6957,9 @@ function generateAlleBescheinigungenAusbilder(){
       const _zeilen=(notenHtmlParts.join('').match(/class="note-row/g)||[]).length;
       let _kl=_zeilen>=13?' noten-xxs':_zeilen>=11?' noten-xs':_zeilen>=7?' noten-sm':'';
       if(inst && inst.beschNotenUntereinander===true){
-        if(_kl===' noten-sm') _kl=' noten-xs'; else if(_kl===' noten-xs') _kl=' noten-xxs';
+        if(_kl===' noten-sm') _kl=' noten-xxs';
+        else if(_kl===' noten-xs'||_kl===' noten-xxs') _kl=' noten-xxxs';
+        else if(!_kl && _zeilen>=5) _kl=' noten-sm';
       }
       const notenHtml=notenHtmlParts.length?`<div class="noten-block${_kl}">${notenHtmlParts.join('')}</div>`:'';
       return `<div class="page">
@@ -7073,6 +7076,12 @@ h1{text-align:center;font-size:22pt;font-weight:bold;font-style:italic;margin:4m
 .noten-block.noten-xxs .note-row{margin:0.7mm 0;font-size:9.5pt;}
 .noten-block.noten-xxs .note-line{font-size:11pt;min-height:8pt;padding:0 1mm;}
 .noten-block.noten-xxs .note-label{min-width:42mm;}
+/* Kleinste Stufe: nur fuer "Noten untereinander" mit vielen Noten. Da braucht
+   derselbe Inhalt doppelt so viele Zeilen wie in der gepaarten KHS-Darstellung. */
+.noten-block.noten-xxxs .note-row{margin:0.3mm 0;font-size:8.5pt;}
+.noten-block.noten-xxxs .note-line{font-size:10pt;min-height:7pt;padding:0 0.8mm;}
+.noten-block.noten-xxxs .note-label{min-width:38mm;}
+.noten-block.noten-xxxs .note-line-long{font-size:8.5pt;}
 
 /* Ausbildungsnachweis */
 .ausbildungsnachweis{margin:3mm 0 1mm 0;font-size:12pt;line-height:1.35;}
@@ -7390,8 +7399,10 @@ setTimeout(function(){
     var rows=block.querySelectorAll('.note-row').length;
     var st = rows>=13 ? 'noten-xxs' : rows>=11 ? 'noten-xs' : rows>=7 ? 'noten-sm' : '';
     if(_untNoten){
-      if(st==='noten-sm') st='noten-xs';
-      else if(st==='noten-xs') st='noten-xxs';
+      if(st==='noten-sm') st='noten-xxs';
+      else if(st==='noten-xs') st='noten-xxxs';
+      else if(st==='noten-xxs') st='noten-xxxs';
+      else if(!st && rows>=5) st='noten-sm';
     }
     if(st) block.classList.add(st);
   });
@@ -10327,6 +10338,12 @@ h1{text-align:center;font-size:22pt;font-weight:bold;font-style:italic;margin:4m
 .noten-block.noten-xxs .note-row{margin:0.7mm 0;font-size:9.5pt;}
 .noten-block.noten-xxs .note-line{font-size:11pt;min-height:8pt;padding:0 1mm;}
 .noten-block.noten-xxs .note-label{min-width:42mm;}
+/* Kleinste Stufe: nur fuer "Noten untereinander" mit vielen Noten. Da braucht
+   derselbe Inhalt doppelt so viele Zeilen wie in der gepaarten KHS-Darstellung. */
+.noten-block.noten-xxxs .note-row{margin:0.3mm 0;font-size:8.5pt;}
+.noten-block.noten-xxxs .note-line{font-size:10pt;min-height:7pt;padding:0 0.8mm;}
+.noten-block.noten-xxxs .note-label{min-width:38mm;}
+.noten-block.noten-xxxs .note-line-long{font-size:8.5pt;}
 .ausbildungsnachweis{margin:3mm 0 1mm 0;font-size:12pt;line-height:1.35;}
 .radio{display:inline-block;width:12pt;height:12pt;border:1pt solid #000;border-radius:50%;vertical-align:middle;margin:0 2pt;cursor:pointer;position:relative;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
 .radio-dot{display:none;position:absolute;top:2pt;left:2pt;width:6pt;height:6pt;background:#000;border-radius:50%;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
@@ -10586,9 +10603,14 @@ setTimeout(function(){
   if(!block) return;
   var rows=block.querySelectorAll('.note-row').length;
   var st = rows>=13 ? 'noten-xxs' : rows>=11 ? 'noten-xs' : rows>=7 ? 'noten-sm' : '';
+  // Untereinander zwei Stufen kleiner: eine reichte nicht - bei 6 Noten (7 Zeilen)
+  // wurden die Fehltage weiterhin abgeschnitten. Fuer den Notenblock bleiben real
+  // nur ~34mm; die gepaarte KHS-Darstellung braucht dafuer 4 Zeilen, untereinander 7.
   if(_untNoten){
-    if(st==='noten-sm') st='noten-xs';
-    else if(st==='noten-xs') st='noten-xxs';
+    if(st==='noten-sm') st='noten-xxs';
+    else if(st==='noten-xs') st='noten-xxxs';
+    else if(st==='noten-xxs') st='noten-xxxs';
+    else if(!st && rows>=5) st='noten-sm';
   }
   if(st) block.classList.add(st);
 },50);
