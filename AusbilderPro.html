@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v806';
+const APP_VERSION = 'v807';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v807', d:'17.07.2026', items:['\ud83d\udcc4 Bescheinigung: Noten k\u00f6nnen wieder untereinander gedruckt werden \u2013 je Lehrgang anklickbar in der Kopfzeile neben Kurstage und Beginn. Ohne Haken bleibt das KHS-Format (ab 4 Noten paarweise nebeneinander)','\u21aa Neue Lehrg\u00e4nge \u00fcbernehmen die Einstellung vom zuletzt angelegten Lehrgang desselben Kurses','\ud83d\udd0d Die Schrift wird bei vielen Noten weiterhin automatisch kleiner \u2013 gez\u00e4hlt werden Zeilen, das greift in beiden Varianten','\ud83d\udcac Bei „Noten untereinander" entf\u00e4llt die leere Bemerkungs-Linie, um Platz zu sparen \u2013 ein eingetragener Bemerkungs-Text bleibt aber immer stehen','\ud83d\udcda Sammel-Bescheinigungen verkleinern jetzt ebenfalls automatisch \u2013 das fehlte dort bisher ganz']},
   {v:'v806', d:'17.07.2026', items:['\ud83d\udcbe Speichern beim Schlie\u00dfen greift jetzt wirklich: Der Schreibvorgang geht in die lokale Warteschlange und wird beim n\u00e4chsten Start nachgeholt \u2013 auch nach Absturz oder leerem Akku','\u2705 Kein Fehlalarm mehr: Ist der eigene Schreibvorgang beim Schlie\u00dfen angekommen, wird das erkannt, statt einen Konflikt zu melden']},
   {v:'v805', d:'17.07.2026', items:['\ud83d\udcbe \u00c4nderungen \u00fcberleben jetzt jedes Schlie\u00dfen \u2013 auch Absturz oder leeren Akku. Wer die App direkt nach einer \u00c4nderung schloss, verlor sie bisher; beim n\u00e4chsten Start wurde der lokale Stand \u00fcberschrieben. Jetzt wird er erkannt und hochgeladen']},
   {v:'v804', d:'17.07.2026', items:['\ud83d\udcbe Speichern beim Schlie\u00dfen: Wer eine \u00c4nderung machte und die App sofort schloss, verlor sie \u2013 die Cloud-Speicherung wartete 1,5 Sekunden und wurde beim Schlie\u00dfen nicht nachgeholt. Jetzt wird beim Wegschalten sofort gespeichert','\u26a0 Schutz gegen zwei Ger\u00e4te: Wurde zwischenzeitlich auf einem anderen Ger\u00e4t gearbeitet, wird der neuere Stand nicht mehr wortlos \u00fcberschrieben \u2013 es kommt eine Nachfrage','\ud83d\udd12 Der beim Anmelden vorgefundene Stand wird je Sitzung als Vorg\u00e4nger gesichert (Data \u203a state_prev)','\ud83d\udd52 Die Cloud-Anzeige zeigt jetzt, von wann der Stand ist']},
@@ -3582,6 +3583,7 @@ function saveNewInst(){
   // sonst (brandneue Kursart) vom global letzten Lehrgang. Sitzplaetze (Belegung) bleiben leer.
   const prevInstances2=Object.values(S.kats[dpKatId]?.instances||{});
   let lastLabels={};
+  let lastBeschUnt=false;   // Bescheinigungs-Darstellung vom letzten Lehrgang uebernehmen
   let lastRows=null;
   let lastSeatCnt=13;
   let lastNextSeatNum=13;
@@ -3597,6 +3599,7 @@ function saveNewInst(){
   }
   if(_srcLayout){
     if(_srcLayout.seatLabels) lastLabels=JSON.parse(JSON.stringify(_srcLayout.seatLabels));
+    if(_srcLayout.beschNotenUntereinander===true) lastBeschUnt=true;
     if(_srcLayout.rows) lastRows=JSON.parse(JSON.stringify(_srcLayout.rows));
     if(_srcLayout.seatCnt) lastSeatCnt=_srcLayout.seatCnt;
     if(_srcLayout.nextSeatNum) lastNextSeatNum=_srcLayout.nextSeatNum;
@@ -3626,6 +3629,7 @@ function saveNewInst(){
   }
   const myEmail=(_auth?.currentUser?.email||'').toLowerCase();
   const instData={sD,sM,sY,eD,eM,eY,rows,seatCnt,seats:{},nextSeatNum,seatLabels:lastLabels,kurstage:5,
+    beschNotenUntereinander:lastBeschUnt,
     standalone:true, createdBy:myEmail};
   _pendingSeatSetup=null; // reset nach Verwendung
 
@@ -3762,11 +3766,14 @@ function _kurstagNr(inst, dateStr, bsSet){
 // Gepaart wird von UNTEN, damit die ersten Noten (z.B. Fuehrung, Mitarbeit) einzeln stehen bleiben -
 // wie im alten Papier-Formular: 4 Noten -> Fuehrung / Mitarbeit / Fachkenntnisse prakt.+theor. nebeneinander.
 // Regel zaehlt nur, matcht NICHT auf Notennamen - die bleiben frei aenderbar.
-function _notenZeilenHtml(items){
+// untereinander=true -> jede Note in eigener Zeile (die alte Darstellung).
+// Sonst ab 4 Noten paarweise nebeneinander wie im KHS-Original. Das automatische
+// Verkleinern zaehlt ZEILEN (nicht Noten) und greift daher in beiden Varianten.
+function _notenZeilenHtml(items, untereinander){
   const n=(items||[]).length;
   if(!n) return '';
   const rows=[];
-  if(n<=3){ items.forEach(it=>rows.push([it])); }
+  if(untereinander===true || n<=3){ items.forEach(it=>rows.push([it])); }
   else {
     const pairsNeeded=n-3;                          // 4->1, 5->2, 6->3
     const singles=Math.max(0, n-2*pairsNeeded);     // 4->2, 5->1, 6->0
@@ -3879,7 +3886,7 @@ function renderMain(){
     : '<button class="hdr-lock-btn" onclick="event.stopPropagation();kursAbschliessen()" title="Kurs abschließen – danach schreibgeschützt">🔒 Kurs abschließen</button>';
   el.innerHTML=
     (_lock?'<div style="margin:8px 0;padding:10px 14px;background:rgba(5,150,105,.10);border:1.5px solid rgba(5,150,105,.4);border-radius:10px;font-size:.74rem;font-weight:700;color:#047857;line-height:1.5">✓ Kurs abgeschlossen — schreibgeschützt, keine Änderungen möglich.</div>':'')+
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span><span style="font-size:.62rem;color:#64748b;margin-left:10px">🕢 <input type="time" value="'+_instBeginn(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateBeginn(this.value)" onclick="event.stopPropagation()" title="Kursbeginn – ab dieser Zeit greifen die Erinnerungen (roter Haken / Fehltag-Rahmen). Gilt auch als Standard für neue Lehrgänge"> Beginn</span>'+'</div><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button>'+_lockBtn+'</div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span><span style="font-size:.62rem;color:#64748b;margin-left:10px">🕢 <input type="time" value="'+_instBeginn(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateBeginn(this.value)" onclick="event.stopPropagation()" title="Kursbeginn – ab dieser Zeit greifen die Erinnerungen (roter Haken / Fehltag-Rahmen). Gilt auch als Standard für neue Lehrgänge"> Beginn</span>'+'</div><label title="Bescheinigung: jede Note in einer eigenen Zeile statt paarweise nebeneinander" style="font-size:.62rem;color:#64748b;margin-left:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none">📄 <input type="checkbox" '+(inst.beschNotenUntereinander===true?'checked':'')+' onclick="event.stopPropagation();toggleBeschNotenLayout(this.checked)" style="width:12px;height:12px;cursor:pointer;accent-color:#2563eb">Noten untereinander</label><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button>'+_lockBtn+'</div></div>'
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="kursact-close" onclick="toggleKursActions()" title="Schließen" aria-label="Schließen">✕</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="markAlleAnwesend()" title="Alle TN heute als anwesend markieren (für leere Tage)">✓ Alle anwesend</button>'
@@ -4286,6 +4293,14 @@ function quickMarkAllPresent(){
 // Kursbeginn (fuer Erinnerungen): pro Lehrgang inst.beginn, sonst konto-weiter Standard S.beginnDefault, sonst 07:30
 function _instBeginn(inst){ return (inst&&inst.beginn)||S.beginnDefault||'07:30'; }
 function _instBeginnMins(inst){ const m=/^(\d{1,2}):(\d{2})$/.exec(_instBeginn(inst)); return m?(+m[1])*60+(+m[2]):450; }
+// Bescheinigungs-Darstellung je Lehrgang: Noten untereinander statt paarweise.
+// Neue Lehrgaenge derselben Kategorie erben die Einstellung (siehe lastBeschUnt).
+function toggleBeschNotenLayout(an){
+  const inst=curInst(); if(!inst) return;
+  inst.beschNotenUntereinander = (an===true);
+  persist();
+  toast(an ? 'Noten werden untereinander gedruckt' : 'Noten werden paarweise gedruckt', 'ok');
+}
 function updateBeginn(v){
   const inst=curInst(); if(!inst) return;
   if(!/^\d{2}:\d{2}$/.test(v||'')){ toast('Ungültige Zeit','bad'); return; }
@@ -6920,12 +6935,23 @@ function generateAlleBescheinigungenAusbilder(){
         val=String(val||'').trim();
         if(val) gradeItems.push({label:esc(String(g.label).trim()), val:gradeOut(val)});
       });
-      { const _nz=_notenZeilenHtml(gradeItems); if(_nz) notenHtmlParts.push(_nz); }
+      { const _nz=_notenZeilenHtml(gradeItems, inst && inst.beschNotenUntereinander===true); if(_nz) notenHtmlParts.push(_nz); }
       // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
       notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short fz-first"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungen:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspaetungen} (${verspZeit})</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
-      // Besondere Bemerkungen IMMER (leer = Linie zum handschriftlichen Ausfuellen)
-      notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
-      const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
+      // Besondere Bemerkungen: normalerweise IMMER (leer = Linie zum handschriftlichen
+      // Ausfuellen). Bei "Noten untereinander" braucht der Block mehr Zeilen - dann
+      // entfaellt die LEERE Linie, um Platz zu sparen. Ein tatsaechlich eingetragener
+      // Text bleibt aber immer stehen: er gehoert zur Bescheinigung und darf nicht
+      // stillschweigend verschwinden. Der Ausbilder entscheidet damit selbst.
+      if(!(inst && inst.beschNotenUntereinander===true) || String(bemerkung||'').trim())
+        notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
+      // Auto-Verkleinern: Die Einzel-Bescheinigung setzt die Klasse per Skript nach
+      // dem Rendern. Hier entsteht nur ein HTML-String, in dem kein Skript laeuft -
+      // also wird direkt beim Bauen gezaehlt. Vorher wurde im Sammel-PDF gar nicht
+      // verkleinert, die CSS-Klassen lagen ungenutzt herum.
+      const _zeilen=(notenHtmlParts.join('').match(/class="note-row/g)||[]).length;
+      const _kl=_zeilen>=13?' noten-xxs':_zeilen>=11?' noten-xs':_zeilen>=8?' noten-sm':'';
+      const notenHtml=notenHtmlParts.length?`<div class="noten-block${_kl}">${notenHtmlParts.join('')}</div>`:'';
       return `<div class="page">
   <div class="khs-logo"><img src="data:image/png;base64,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" alt="KHS Logo"></div>
 <div class="page-content">
@@ -10211,11 +10237,16 @@ function generateBescheinigungAusbilder(){
       val=String(val||'').trim();
       if(val) gradeItems.push({label:esc(String(g.label).trim()), val:gradeOut(val)});
     });
-    { const _nz=_notenZeilenHtml(gradeItems); if(_nz) notenHtmlParts.push(_nz); }
+    { const _nz=_notenZeilenHtml(gradeItems, inst && inst.beschNotenUntereinander===true); if(_nz) notenHtmlParts.push(_nz); }
     // Fehltage + Verspaetungen IMMER anzeigen (auch bei 0)
     notenHtmlParts.push(`<div class="note-row note-row-split note-row-fz"><span class="note-label">Fehltage:</span><span class="note-line note-line-short fz-first"><span class="fz-num">${fehltage}</span></span><span class="note-label-inline vz-lbl-count">Verspätungen:</span><span class="note-label-inline vz-lbl-time">Verspätungen:</span><span class="note-label-inline vz-lbl-liste">Verspätungen:</span><span class="note-line note-line-short"><span class="fz-num"><span class="vz-count">${verspaetungen}</span><span class="vz-time">${verspaetungen} (${verspZeit})</span><span class="vz-liste">${verspListe}</span></span></span></div>`);
-    // Besondere Bemerkungen IMMER (leer = Linie zum handschriftlichen Ausfuellen)
-    notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
+    // Besondere Bemerkungen: normalerweise IMMER (leer = Linie zum handschriftlichen
+    // Ausfuellen). Bei "Noten untereinander" braucht der Block mehr Zeilen - dann
+    // entfaellt die LEERE Linie, um Platz zu sparen. Ein tatsaechlich eingetragener
+    // Text bleibt aber immer stehen: er gehoert zur Bescheinigung und darf nicht
+    // stillschweigend verschwinden. Der Ausbilder entscheidet damit selbst.
+      if(!(inst && inst.beschNotenUntereinander===true) || String(bemerkung||'').trim())
+      notenHtmlParts.push(`<div class="note-row"><span class="note-label">Besondere Bemerkungen:</span><span class="note-line note-line-long">${esc(String(bemerkung||''))}</span></div>`);
     const notenHtml=notenHtmlParts.length?`<div class="noten-block">${notenHtmlParts.join('')}</div>`:'';
     const w=window.open('','_blank');
     if(!w){toast('Popup blockiert – bitte Popups erlauben','bad');return;}
