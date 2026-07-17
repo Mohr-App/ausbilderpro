@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v814';
+const APP_VERSION = 'v815';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v815', d:'17.07.2026', items:['\ud83d\udd0d „TN+": Die Suche findet jetzt ALLE Teilnehmer. Bisher wurden nur 500 von 2175 geladen \u2013 wer nicht dabei war, konnte nie gefunden werden. Das war der Grund f\u00fcr die Teilnehmer, die sich nicht in den Pool holen lie\u00dfen','\u26a1 Die Liste wird nur noch einmal je Sitzung geladen statt bei jedem \u00d6ffnen','\u26a0 Scheitert das Laden, steht das jetzt im Suchfeld \u2013 vorher wurde der Fehler stumm verschluckt und die Suche fand einfach nichts']},
   {v:'v814', d:'17.07.2026', items:['\ud83d\udcc4 „Noten untereinander": Bei bis zu 4 Noten bleibt die Schrift jetzt in voller Gr\u00f6\u00dfe \u2013 sie wurde vorher grundlos verkleinert und wirkte verloren. Ab 6 Noten unver\u00e4ndert']},
   {v:'v813', d:'17.07.2026', items:['\u21a9 Standard-Bescheinigung wieder exakt wie fr\u00fcher: Verkleinert wird erst ab 8 Zeilen (v810 hatte das versehentlich auf 7 gezogen)','\ud83d\udcc4 „Noten untereinander" hat jetzt eine eigene Staffel und beeinflusst den Standard nicht mehr']},
   {v:'v812', d:'17.07.2026', items:['\ud83d\udd0e Bei „Noten untereinander" wird die Schrift jetzt deutlich kleiner \u2013 eine Stufe reichte nicht, bei 6 Noten fehlte weiterhin die Zeile mit Fehltagen und Versp\u00e4tungen','\ud83d\udcd0 Neue, kleinste Schriftstufe f\u00fcr Lehrg\u00e4nge mit vielen Noten']},
@@ -9162,8 +9163,28 @@ function openManualTNModal(){ if(lockGuard())return;
   // Existierende TN aus globalTN laden (fuer Autocomplete)
   // Filter: alles AUSSER explizit als Arbeitnehmer/Mitarbeiter markiert,
   // damit auch Legacy-Docs ohne typ-Feld erscheinen.
-  if(_db){
-    _db.collection('globalTN').limit(500).get().then(snap=>{
+  //
+  // Frueher stand hier limit(500) - bei 2175 Teilnehmern wurden also nur die
+  // ersten 500 geladen, die Firestore zufaellig liefert. Wer nicht dabei war,
+  // konnte NIE gefunden werden. Das war der Grund fuer die "paar Ausnahmen",
+  // die sich nicht in den Pool holen liessen. Die Suche selbst (Praefix +
+  // Tippfehler-Toleranz) laeuft im Browser und braucht die Liste vollstaendig.
+  //
+  // Jetzt: einmal je Sitzung laden statt bei jedem Oeffnen. Das war vorher
+  // 500 Lesevorgaenge pro Klick auf "TN+"; jetzt sind es alle, aber nur einmal.
+  _mtLadeTnListe();
+  // Berufsgruppen-Dropdown befuellen (aus Firestore shared/kursSettings/berufe)
+  mtPopulateBerufe();
+  document.getElementById('manualTNModal').classList.add('open');
+}
+
+let _mtListePromise = null;   // Cache je Sitzung
+let _mtListeFehler = '';
+function _mtLadeTnListe(force){
+  if(!_db) return Promise.resolve();
+  if(_mtListePromise && !force) return _mtListePromise;
+  _mtListeFehler='';
+  _mtListePromise = _db.collection('globalTN').get().then(snap=>{
       _mtSuggestionList=[];
       snap.forEach(doc=>{
         const d=doc.data();
@@ -9181,11 +9202,16 @@ function openManualTNModal(){ if(lockGuard())return;
           aktiverKursId:d.aktiverKursId||''
         });
       });
-    }).catch(()=>{});
-  }
-  // Berufsgruppen-Dropdown befuellen (aus Firestore shared/kursSettings/berufe)
-  mtPopulateBerufe();
-  document.getElementById('manualTNModal').classList.add('open');
+      console.log('[TN-Suche]', _mtSuggestionList.length, 'Teilnehmer geladen');
+    }).catch(err=>{
+      // Frueher: .catch(()=>{}) - jeder Fehler wurde stumm verschluckt und die
+      // Suche fand einfach nichts. Genau dieses Schweigen hat den 500er-Fehler
+      // jahrelang versteckt.
+      _mtListePromise = null;   // beim naechsten Oeffnen neu versuchen
+      _mtListeFehler = err && err.code ? err.code : 'Fehler';
+      console.error('[TN-Suche] Laden fehlgeschlagen:', err);
+    });
+  return _mtListePromise;
 }
 
 // Autocomplete-State
@@ -9205,6 +9231,11 @@ function mtSearchSuggestions(){
   // DIAG: Status-Header
   const total = _mtSuggestionList.length;
   // Wenn noch nichts geladen wurde -> Hinweis
+  if(!total && _mtListeFehler){
+    container.innerHTML = '<div style="padding:8px 10px;font-size:.7rem;color:#dc2626;font-weight:700">⚠ Teilnehmerliste konnte nicht geladen werden ('+_mtListeFehler+'). Bitte Modal schließen und erneut öffnen.</div>';
+    container.style.display = 'block';
+    return;
+  }
   if(!total){
     container.innerHTML = '<div style="padding:8px 10px;font-size:.7rem;color:var(--mu)">⏳ Lade TN-Daten... (oder keine vorhanden)</div>';
     container.style.display = 'block';
