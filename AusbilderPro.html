@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v807';
+const APP_VERSION = 'v808';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v808', d:'17.07.2026', items:['\ud83d\udcc4 Bescheinigung schneidet nichts mehr stillschweigend ab: Statt Zeilen zu z\u00e4hlen wird jetzt gemessen, ob der Inhalt auf die Seite passt \u2013 und so lange verkleinert, bis er passt','\u26a0 Passt es selbst dann nicht, erscheint eine rote Warnung im Bescheinigungs-Fenster (wird nicht mitgedruckt), statt unten heimlich zu kappen','\ud83d\udd0e Behoben: Bei 6 Noten plus Fehltage (7 Zeilen) griff das Verkleinern nicht \u2013 die Schwelle lag bei 8. Die letzte Note und die Fehltage fehlten auf dem Ausdruck','\ud83d\udcda Gilt auch f\u00fcr Sammel-Bescheinigungen \u2013 dort wurde bisher \u00fcberhaupt nicht verkleinert']},
   {v:'v807', d:'17.07.2026', items:['\ud83d\udcc4 Bescheinigung: Noten k\u00f6nnen wieder untereinander gedruckt werden \u2013 je Lehrgang anklickbar in der Kopfzeile neben Kurstage und Beginn. Ohne Haken bleibt das KHS-Format (ab 4 Noten paarweise nebeneinander)','\u21aa Neue Lehrg\u00e4nge \u00fcbernehmen die Einstellung vom zuletzt angelegten Lehrgang desselben Kurses','\ud83d\udd0d Die Schrift wird bei vielen Noten weiterhin automatisch kleiner \u2013 gez\u00e4hlt werden Zeilen, das greift in beiden Varianten','\ud83d\udcac Bei „Noten untereinander" entf\u00e4llt die leere Bemerkungs-Linie, um Platz zu sparen \u2013 ein eingetragener Bemerkungs-Text bleibt aber immer stehen','\ud83d\udcda Sammel-Bescheinigungen verkleinern jetzt ebenfalls automatisch \u2013 das fehlte dort bisher ganz']},
   {v:'v806', d:'17.07.2026', items:['\ud83d\udcbe Speichern beim Schlie\u00dfen greift jetzt wirklich: Der Schreibvorgang geht in die lokale Warteschlange und wird beim n\u00e4chsten Start nachgeholt \u2013 auch nach Absturz oder leerem Akku','\u2705 Kein Fehlalarm mehr: Ist der eigene Schreibvorgang beim Schlie\u00dfen angekommen, wird das erkannt, statt einen Konflikt zu melden']},
   {v:'v805', d:'17.07.2026', items:['\ud83d\udcbe \u00c4nderungen \u00fcberleben jetzt jedes Schlie\u00dfen \u2013 auch Absturz oder leeren Akku. Wer die App direkt nach einer \u00c4nderung schloss, verlor sie bisher; beim n\u00e4chsten Start wurde der lokale Stand \u00fcberschrieben. Jetzt wird er erkannt und hochgeladen']},
@@ -7362,6 +7363,56 @@ async function insertSigStempelBulk(){
   _applyStempelPosAll();
   _attachDragToAll();
 }
+// ═══════════════════════════════════════════════════════════
+// Noten-Block auf die Seite bringen: MESSEN statt zaehlen.
+//
+// Vorher: rows>=8 -> noten-sm, rows>=11 -> noten-xs, rows>=13 -> noten-xxs.
+// Das war geraten. Eine lange Bemerkung umbricht auf zwei Zeilen Hoehe, zaehlt
+// aber als eine. Und bei genau 7 Zeilen (6 Noten + Fehltage) griff gar nichts,
+// obwohl der Block schon ueberlief: .page-content hat overflow:hidden und kappt
+// STILL. Am 17.07.2026 fehlten so die 6. Note UND die Fehltage auf dem Ausdruck -
+// auf einem Papier, das zur Gesellenpruefung geht.
+//
+// Jetzt wird der tatsaechliche Ueberlauf gemessen und stufenweise verkleinert.
+// Reicht die kleinste Stufe nicht, wird sichtbar gewarnt statt heimlich gekappt.
+function _notenFitten(){
+  var betroffen=[];
+  document.querySelectorAll('.page').forEach(function(page){
+    var c=page.querySelector('.page-content');
+    var block=page.querySelector('.noten-block');
+    if(!c||!block) return;
+    block.classList.remove('noten-sm','noten-xs','noten-xxs');
+    if(c.scrollHeight<=c.clientHeight+1) return;          // passt schon
+    var stufen=['noten-sm','noten-xs','noten-xxs'], ok=false;
+    for(var i=0;i<stufen.length;i++){
+      block.classList.remove('noten-sm','noten-xs','noten-xxs');
+      block.classList.add(stufen[i]);
+      if(c.scrollHeight<=c.clientHeight+1){ ok=true; break; }
+    }
+    if(!ok){
+      var zuviel=c.scrollHeight-c.clientHeight;
+      var nb=page.querySelector('.body-block b');
+      var nam=nb?nb.textContent:'';
+      betroffen.push((nam.trim()||'Bescheinigung')+' ('+Math.round(zuviel)+'px)');
+      console.warn('[Bescheinigung] Passt nicht auf die Seite:', nam.trim(), zuviel+'px zu viel');
+    }
+  });
+  if(betroffen.length) _fitWarnung(betroffen);
+}
+function _fitWarnung(liste){
+  var w=document.createElement('div');
+  w.className='no-print';
+  w.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;'
+    +'padding:12px 16px;font:700 13px/1.5 system-ui,sans-serif;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.3)';
+  w.innerHTML='\u26a0 Der Inhalt passt nicht auf die Seite \u2013 beim Ausdruck w\u00fcrde unten etwas fehlen '
+    +'(z.B. die letzte Note oder die Fehltage).<br>'
+    +'<span style="font-weight:400;font-size:12px">Betroffen: '+liste.join(' \u00b7 ')
+    +' \u2013 bitte Noten reduzieren oder Bemerkung k\u00fcrzen. Nicht ungepr\u00fcft ausdrucken.</span>';
+  document.body.appendChild(w);
+  document.body.style.paddingTop='60px';
+}
+setTimeout(_notenFitten,60);
+window.addEventListener('load',function(){ setTimeout(_notenFitten,150); });
 function printAllCert(){
   try{
     const ids=[];
@@ -10531,15 +10582,56 @@ async function _loadPositions(){
 }
 // Position laden bei Tab-Start
 setTimeout(_loadPositions,100);
-// Auto-Compact Noten wenn zu viele Eintraege
-setTimeout(()=>{
-  const block=document.querySelector('.noten-block');
-  if(!block) return;
-  const rows=block.querySelectorAll('.note-row').length;
-  if(rows>=13) block.classList.add('noten-xxs');
-  else if(rows>=11) block.classList.add('noten-xs');
-  else if(rows>=8) block.classList.add('noten-sm');
-},50);
+// ═══════════════════════════════════════════════════════════
+// Noten-Block auf die Seite bringen: MESSEN statt zaehlen.
+//
+// Vorher: rows>=8 -> noten-sm, rows>=11 -> noten-xs, rows>=13 -> noten-xxs.
+// Das war geraten. Eine lange Bemerkung umbricht auf zwei Zeilen Hoehe, zaehlt
+// aber als eine. Und bei genau 7 Zeilen (6 Noten + Fehltage) griff gar nichts,
+// obwohl der Block schon ueberlief: .page-content hat overflow:hidden und kappt
+// STILL. Am 17.07.2026 fehlten so die 6. Note UND die Fehltage auf dem Ausdruck -
+// auf einem Papier, das zur Gesellenpruefung geht.
+//
+// Jetzt wird der tatsaechliche Ueberlauf gemessen und stufenweise verkleinert.
+// Reicht die kleinste Stufe nicht, wird sichtbar gewarnt statt heimlich gekappt.
+function _notenFitten(){
+  var betroffen=[];
+  document.querySelectorAll('.page').forEach(function(page){
+    var c=page.querySelector('.page-content');
+    var block=page.querySelector('.noten-block');
+    if(!c||!block) return;
+    block.classList.remove('noten-sm','noten-xs','noten-xxs');
+    if(c.scrollHeight<=c.clientHeight+1) return;          // passt schon
+    var stufen=['noten-sm','noten-xs','noten-xxs'], ok=false;
+    for(var i=0;i<stufen.length;i++){
+      block.classList.remove('noten-sm','noten-xs','noten-xxs');
+      block.classList.add(stufen[i]);
+      if(c.scrollHeight<=c.clientHeight+1){ ok=true; break; }
+    }
+    if(!ok){
+      var zuviel=c.scrollHeight-c.clientHeight;
+      var nb=page.querySelector('.body-block b');
+      var nam=nb?nb.textContent:'';
+      betroffen.push((nam.trim()||'Bescheinigung')+' ('+Math.round(zuviel)+'px)');
+      console.warn('[Bescheinigung] Passt nicht auf die Seite:', nam.trim(), zuviel+'px zu viel');
+    }
+  });
+  if(betroffen.length) _fitWarnung(betroffen);
+}
+function _fitWarnung(liste){
+  var w=document.createElement('div');
+  w.className='no-print';
+  w.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;'
+    +'padding:12px 16px;font:700 13px/1.5 system-ui,sans-serif;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.3)';
+  w.innerHTML='\u26a0 Der Inhalt passt nicht auf die Seite \u2013 beim Ausdruck w\u00fcrde unten etwas fehlen '
+    +'(z.B. die letzte Note oder die Fehltage).<br>'
+    +'<span style="font-weight:400;font-size:12px">Betroffen: '+liste.join(' \u00b7 ')
+    +' \u2013 bitte Noten reduzieren oder Bemerkung k\u00fcrzen. Nicht ungepr\u00fcft ausdrucken.</span>';
+  document.body.appendChild(w);
+  document.body.style.paddingTop='60px';
+}
+setTimeout(_notenFitten,60);
+window.addEventListener('load',function(){ setTimeout(_notenFitten,120); });
 function lockGuard(){ try{ return !!(window.opener && window.opener.kursGesperrt && window.opener.kursGesperrt()); }catch(e){ return false; } }
 function toggleStandort(ort){ if(lockGuard())return;
   var bonn=document.querySelector('.cb-bonn');
