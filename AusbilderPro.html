@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v818';
+const APP_VERSION = 'v819';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v819', d:'06.08.2026', items:['\ud83d\udce7 Im Ausbilder-Chat wird jetzt die dienstliche Adresse (khs-handwerk.de) angezeigt statt der pers\u00f6nlichen Anmelde-Adresse']},
   {v:'v818', d:'06.08.2026', items:['\ud83d\udcac Chat zeigt jetzt zuverl\u00e4ssig alle Ausbilder mit Namen \u2013 auch dich selbst f\u00fcr die anderen. Die Liste kommt nur noch aus den Ausbilder-Stammdaten (Name + Konto-Verkn\u00fcpfung), nicht mehr \u00fcber einen Umweg, den normale Konten gar nicht lesen d\u00fcrfen']},
   {v:'v817', d:'06.08.2026', items:['\u21a9 Chat-\u00c4nderung aus v816 zur\u00fcckgenommen: Sie lud die komplette Nutzerliste, was normale Ausbilder-Konten nicht d\u00fcrfen \u2013 dadurch war die Kontaktliste f\u00fcr alle au\u00dfer dem Admin leer. Vorerst zur\u00fcck zum bew\u00e4hrten Stand; der richtige Fix folgt']},
   {v:'v815', d:'17.07.2026', items:['\ud83d\udd0d „TN+": Die Suche findet jetzt ALLE Teilnehmer. Bisher wurden nur 500 von 2175 geladen \u2013 wer nicht dabei war, konnte nie gefunden werden. Das war der Grund f\u00fcr die Teilnehmer, die sich nicht in den Pool holen lie\u00dfen','\u26a1 Die Liste wird nur noch einmal je Sitzung geladen statt bei jedem \u00d6ffnen','\u26a0 Scheitert das Laden, steht das jetzt im Suchfeld \u2013 vorher wurde der Fehler stumm verschluckt und die Suche fand einfach nichts']},
@@ -15140,8 +15141,10 @@ function loadAusbilderListe(){
       if(gesehen[uid]) return;         // jeden nur einmal
       gesehen[uid]=1;
       const vn=(d.vorname||'').trim(), nn=(d.nachname||'').trim();
-      const fullName=(vn+' '+nn).trim()||(d.name||'').trim()||((d.loginEmail||d.email||'').split('@')[0])||'Unbekannt';
-      _chatUsers[uid]={email:(d.loginEmail||d.email||'').toLowerCase(),name:fullName,berufGruppeId:d.berufId||'',photoUrl:d.photoUrl||''};
+      const fullName=(vn+' '+nn).trim()||(d.name||'').trim()||((d.email||d.loginEmail||'').split('@')[0])||'Unbekannt';
+      // Anzeige-Mail: Kontakt-Mail (KH-Adresse) bevorzugen, loginEmail nur als Notnagel.
+      // Die Chat-ADRESSIERUNG laeuft ueber uid (startChatWith), nicht ueber diese Mail - reine Anzeige.
+      _chatUsers[uid]={email:(d.email||d.loginEmail||'').toLowerCase(),name:fullName,berufGruppeId:d.berufId||'',photoUrl:d.photoUrl||''};
       arr.push({uid:uid,..._chatUsers[uid]});
     });
     if(_fbUid&&_auth?.currentUser){
