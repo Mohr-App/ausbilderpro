@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v817';
+const APP_VERSION = 'v818';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v818', d:'06.08.2026', items:['\ud83d\udcac Chat zeigt jetzt zuverl\u00e4ssig alle Ausbilder mit Namen \u2013 auch dich selbst f\u00fcr die anderen. Die Liste kommt nur noch aus den Ausbilder-Stammdaten (Name + Konto-Verkn\u00fcpfung), nicht mehr \u00fcber einen Umweg, den normale Konten gar nicht lesen d\u00fcrfen']},
   {v:'v817', d:'06.08.2026', items:['\u21a9 Chat-\u00c4nderung aus v816 zur\u00fcckgenommen: Sie lud die komplette Nutzerliste, was normale Ausbilder-Konten nicht d\u00fcrfen \u2013 dadurch war die Kontaktliste f\u00fcr alle au\u00dfer dem Admin leer. Vorerst zur\u00fcck zum bew\u00e4hrten Stand; der richtige Fix folgt']},
   {v:'v815', d:'17.07.2026', items:['\ud83d\udd0d „TN+": Die Suche findet jetzt ALLE Teilnehmer. Bisher wurden nur 500 von 2175 geladen \u2013 wer nicht dabei war, konnte nie gefunden werden. Das war der Grund f\u00fcr die Teilnehmer, die sich nicht in den Pool holen lie\u00dfen','\u26a1 Die Liste wird nur noch einmal je Sitzung geladen statt bei jedem \u00d6ffnen','\u26a0 Scheitert das Laden, steht das jetzt im Suchfeld \u2013 vorher wurde der Fehler stumm verschluckt und die Suche fand einfach nichts']},
   {v:'v814', d:'17.07.2026', items:['\ud83d\udcc4 „Noten untereinander": Bei bis zu 4 Noten bleibt die Schrift jetzt in voller Gr\u00f6\u00dfe \u2013 sie wurde vorher grundlos verkleinert und wirkte verloren. Ab 6 Noten unver\u00e4ndert']},
@@ -14139,6 +14140,21 @@ function checkAusbNotifications(){
       if(snap.empty) return;
       const docRef=snap.docs[0].ref;
       _myAusbDocId=snap.docs[0].id;
+      // Selbstheilung: eigene uid + loginEmail in den Ausbilder-Eintrag schreiben,
+      // falls noch nicht vorhanden. Der Chat findet Kontakte ueber die uid; ohne
+      // sie erscheint man bei den anderen als "Unbekannt". Laeuft still im
+      // Hintergrund, einmal pro Konto, sobald sich jemand einloggt.
+      (function(){
+        const cur=snap.docs[0].data()||{};
+        const patch={};
+        if(!cur.uid && _fbUid) patch.uid=_fbUid;
+        if(!cur.loginEmail && email) patch.loginEmail=email;
+        if(Object.keys(patch).length){
+          docRef.set(patch,{merge:true})
+            .then(()=>console.log('[Chat] Ausbilder-Eintrag ergaenzt:',Object.keys(patch).join(', ')))
+            .catch(err=>console.warn('[Chat] uid-Selbstheilung fehlgeschlagen:',err.code||err));
+        }
+      })();
       // Echtzeit-Listener auf Ausbilder-Dokument
       _ausbNotifUnsub=docRef.onSnapshot(doc=>{
         if(!doc.exists) return;
@@ -15105,45 +15121,33 @@ function updateChatUnreadBadge(){
 let _ausbStammCache=null;
 function loadAusbilderListe(){
   if(!_db) return Promise.resolve([]);
-  // 1) Stammdaten aus shared/kursSettings/ausbilder (echte Namen)
-  const stammPromise=_ausbStammCache?Promise.resolve(_ausbStammCache):_db.collection('shared').doc('kursSettings').collection('ausbilder').get().then(snap=>{
-    const m={};
-    snap.forEach(doc=>{
-      const d=doc.data();
-      const vn=(d.vorname||'').trim();
-      const nn=(d.nachname||'').trim();
-      const fullName=(vn+' '+nn).trim()||(d.name||'').trim();
-      const rec={name:fullName,berufId:d.berufId||'',vorname:vn,nachname:nn};
-      // Eintrag sowohl über Kontakt-Mail ALS AUCH über Login-Mail auffindbar machen
-      const keys=[(d.email||'').toLowerCase(),(d.loginEmail||'').toLowerCase()].filter(Boolean);
-      keys.forEach(k=>{ if(!m[k] || (fullName && !(m[k].name||'').trim())) m[k]=rec; });
-    });
-    _ausbStammCache=m;
-    return m;
-  }).catch(err=>{console.warn('Ausbilder-Stamm:',err);return{};});
-  // 2) Aktive AusbilderPro-Nutzer aus users
-  const usersPromise=_db.collection('users').where('lastApp','==','AusbilderPro').get();
-  return Promise.all([stammPromise,usersPromise]).then(([stamm,snap])=>{
+  // Quelle ist AUSSCHLIESSLICH shared/kursSettings/ausbilder.
+  //
+  // Frueher wurde zusaetzlich users gelesen (erst where('lastApp'), in v816 dann
+  // users.get()). Beides war falsch: ein normales Ausbilder-Konto darf users gar
+  // nicht lesen (am rechtelosen Konto belegt: permission-denied). Die ausbilder-
+  // Liste ist fuer alle lesbar und enthaelt Name UND uid - mehr braucht der Chat
+  // nicht. Ein Chat wird ueber die uid gestartet (startChatWith), nicht ueber die
+  // Mail. Kontakte ohne loginEmail (aber mit uid) werden so ebenfalls erfasst.
+  return _db.collection('shared').doc('kursSettings').collection('ausbilder').get().then(snap=>{
     const arr=[];
+    const gesehen={};
     snap.forEach(doc=>{
-      if(doc.id===_fbUid) return; // Sich selbst raus
       const d=doc.data();
-      const email=(d.email||'').toLowerCase();
-      const stammData=stamm[email]||{};
-      const displayName=stammData.name || d.ausbilderName || d.name || d.profil?.name || (email?email.split('@')[0]:'Unbekannt');
-      _chatUsers[doc.id]={email:d.email||'',name:displayName,berufGruppeId:stammData.berufId||d.berufGruppeId||'',photoUrl:d.photoUrl||''};
-      arr.push({uid:doc.id,...(_chatUsers[doc.id])});
+      const uid=(d.uid||'').trim();
+      if(!uid) return;                 // ohne uid nicht adressierbar -> nicht anzeigen
+      if(uid===_fbUid) return;         // sich selbst raus
+      if(gesehen[uid]) return;         // jeden nur einmal
+      gesehen[uid]=1;
+      const vn=(d.vorname||'').trim(), nn=(d.nachname||'').trim();
+      const fullName=(vn+' '+nn).trim()||(d.name||'').trim()||((d.loginEmail||d.email||'').split('@')[0])||'Unbekannt';
+      _chatUsers[uid]={email:(d.loginEmail||d.email||'').toLowerCase(),name:fullName,berufGruppeId:d.berufId||'',photoUrl:d.photoUrl||''};
+      arr.push({uid:uid,..._chatUsers[uid]});
     });
-    // Eigene UID auch cachen
     if(_fbUid&&_auth?.currentUser){
-      const myEmail=(_auth.currentUser.email||'').toLowerCase();
-      const myStamm=stamm[myEmail]||{};
-      // Eigenes photoUrl aus users-Doc separat laden (sich selbst gefiltert oben)
-      _db.collection('users').doc(_fbUid).get().then(d=>{
-        _chatUsers[_fbUid]={email:_auth.currentUser.email,name:myStamm.name||((getAusbilderProfil&&getAusbilderProfil().name)||'').trim()||myEmail.split('@')[0],berufGruppeId:myStamm.berufId||'',photoUrl:d.data()?.photoUrl||''};
-      }).catch(()=>{
-        _chatUsers[_fbUid]={email:_auth.currentUser.email,name:myStamm.name||((getAusbilderProfil&&getAusbilderProfil().name)||'').trim()||myEmail.split('@')[0],berufGruppeId:myStamm.berufId||'',photoUrl:''};
-      });
+      const me=snap.docs.map(x=>x.data()).find(x=>(x.uid||'')===_fbUid);
+      const myName=me?(((me.vorname||'')+' '+(me.nachname||'')).trim()||me.name||''):((getAusbilderProfil&&getAusbilderProfil().name)||'');
+      _chatUsers[_fbUid]={email:(_auth.currentUser.email||''),name:myName,berufGruppeId:(me&&me.berufId)||'',photoUrl:(me&&me.photoUrl)||''};
     }
     arr.sort((a,b)=>(a.name||'').localeCompare(b.name||'','de',{sensitivity:'base'}));
     return arr;
