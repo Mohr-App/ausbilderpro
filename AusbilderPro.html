@@ -1955,9 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v819';
+const APP_VERSION = 'v820';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v820', d:'06.08.2026', items:['\u2705 Von der Verwaltung entfernte Teilnehmer k\u00f6nnen jetzt direkt im Pool best\u00e4tigt werden: Knopf „\u2713 Best\u00e4tigen" auf der Kachel. Vorher stand nur „Wird entfernt", ohne dass klar war, dass der Ausbilder handeln muss','\ud83d\udd34 Die Kachel sagt jetzt „Wird entfernt \u2013 dein Klick n\u00f6tig"']},
   {v:'v819', d:'06.08.2026', items:['\ud83d\udce7 Im Ausbilder-Chat wird jetzt die dienstliche Adresse (khs-handwerk.de) angezeigt statt der pers\u00f6nlichen Anmelde-Adresse']},
   {v:'v818', d:'06.08.2026', items:['\ud83d\udcac Chat zeigt jetzt zuverl\u00e4ssig alle Ausbilder mit Namen \u2013 auch dich selbst f\u00fcr die anderen. Die Liste kommt nur noch aus den Ausbilder-Stammdaten (Name + Konto-Verkn\u00fcpfung), nicht mehr \u00fcber einen Umweg, den normale Konten gar nicht lesen d\u00fcrfen']},
   {v:'v817', d:'06.08.2026', items:['\u21a9 Chat-\u00c4nderung aus v816 zur\u00fcckgenommen: Sie lud die komplette Nutzerliste, was normale Ausbilder-Konten nicht d\u00fcrfen \u2013 dadurch war die Kontaktliste f\u00fcr alle au\u00dfer dem Admin leer. Vorerst zur\u00fcck zum bew\u00e4hrten Stand; der richtige Fix folgt']},
@@ -8688,6 +8689,43 @@ function _deleteTnManuellKomplett(tnId, kursId, inst, nm){
   });
 }
 
+// Von der Verwaltung vorgemerkte Entfernung quittieren.
+// Kein confirm (bewusst), keine Mail, keine App-Info - die sind beim Vormerken in
+// VP schon rausgegangen (pendingRemoval + kurs_entfernt + Mails). Hier wird nur
+// noch endgueltig aus dem Kurs entfernt und der Warn-Status aufgeraeumt.
+// Der TN-Datensatz in globalTN bleibt (Kammerliste), nur die Kurszuordnung geht.
+function _quittiereEntfernung(tnId, kursId, inst){
+  if(!_db||!kursId||!tnId) return;
+  const col=_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer');
+  // 1. aus der Kurs-Teilnehmerliste loeschen (das ist der von Fix 5 geschuetzte Delete)
+  col.doc(tnId).delete().then(()=>{
+    // 2. globalTN aufraeumen: aktiverKursId (von VP bewusst stehen gelassen) + pendingRemoval + kursHistory
+    return _db.collection('globalTN').doc(tnId).get().then(g=>{
+      if(!g.exists) return;
+      const data=g.data(); const upd={};
+      if(data.aktiverKursId===kursId) upd.aktiverKursId=firebase.firestore.FieldValue.delete();
+      if(data.pendingRemoval) upd.pendingRemoval=firebase.firestore.FieldValue.delete();
+      if(data.pendingRemovalKurs) upd.pendingRemovalKurs=firebase.firestore.FieldValue.delete();
+      upd.kursHistory=(data.kursHistory||[]).filter(h=>h.kursId!==kursId);
+      return _db.collection('globalTN').doc(tnId).update(upd);
+    });
+  }).then(()=>{
+    // 3. Sitzplatz freiraeumen (lokal)
+    if(inst){
+      Object.keys(inst.seats||{}).forEach(sid=>{
+        if(inst.seats[sid]&&inst.seats[sid].poolTnId===tnId){ inst.seats[sid]={}; }
+      });
+    }
+    if(_tnPending) delete _tnPending[tnId];
+    const ov=document.getElementById('ov'); if(ov) ov.classList.remove('open');
+    persist();renderSeats();loadPool();
+    toast('\u2713 Entfernung best\u00e4tigt \u2013 Teilnehmer ist raus');
+  }).catch(err=>{
+    console.error('[Quittieren] fehlgeschlagen:',err);
+    toast('Fehler: '+(err.code||err.message),'bad');
+  });
+}
+
 // Echter selbstregistrierter Azubi: wie bisher mit Mail + Benachrichtigung
 function _deleteTnEchterAzubi(tnId, kursId, inst, nm){
   if(!confirm('⚠️ "'+(nm||'Teilnehmer')+'" aus diesem Kurs entfernen?\n\nTyp: per App REGISTRIERTER Azubi (aktives Konto).\n\nFolgende Aktionen werden ausgelöst:\n• TN wird aus dem Kurs entfernt\n• App-Benachrichtigung in AzubiPro\n• E-Mail an Azubi (sofern Adresse hinterlegt)\n• E-Mail an Arbeitgeber (sofern hinterlegt)\n\nFortfahren?')) return Promise.resolve();
@@ -12530,7 +12568,19 @@ function loadPool(){
         }
         card.innerHTML='<div class="pool-avatar"'+(isPending?' style="background:rgba(239,68,68,.2);color:#ef4444"':'')+'>'+initials+'</div>'
           +'<div style="flex:1;min-width:0"><div class="pool-name">'+esc(fullName)+'</div>'
-          +'<div class="pool-sub">'+(isPending?'<span style="color:#ef4444;font-weight:700">🔴 Wird entfernt</span>':isUnbestaetigt?'<span style="color:#ef4444;font-weight:700">⚠️ noch nicht bestätigt</span>':isPlaced?'✓ Platziert':urlConf?'<span style="color:#f59e0b;font-weight:700">🏖 '+urlConf.days+'d Urlaub</span>':(d.wunschSitzplatz?'<span style="color:#10b981;font-weight:600">🪑 Platz '+esc(d.wunschSitzplatz)+'</span> · ':'')+esc(d.firma||d.beruf||''))+'</div></div>';
+          +'<div class="pool-sub">'+(isPending?'<span style="color:#ef4444;font-weight:700">🔴 Wird entfernt \u2013 dein Klick n\u00f6tig</span>':isUnbestaetigt?'<span style="color:#ef4444;font-weight:700">⚠️ noch nicht bestätigt</span>':isPlaced?'✓ Platziert':urlConf?'<span style="color:#f59e0b;font-weight:700">🏖 '+urlConf.days+'d Urlaub</span>':(d.wunschSitzplatz?'<span style="color:#10b981;font-weight:600">🪑 Platz '+esc(d.wunschSitzplatz)+'</span> · ':'')+esc(d.firma||d.beruf||''))+'</div></div>';
+        if(isPending){
+          // Quittier-Knopf: der TN wurde von der Verwaltung zur Entfernung vorgemerkt
+          // (App-Info + Mails sind beim Vormerken schon rausgegangen). Der Ausbilder
+          // nimmt zur Kenntnis und vollzieht damit das endgueltige Entfernen - ohne
+          // erneute Benachrichtigung.
+          const qbtn=document.createElement('button');
+          qbtn.textContent='\u2713 Best\u00e4tigen';
+          qbtn.title='Endg\u00fcltig aus dem Kurs entfernen';
+          qbtn.style.cssText='margin-left:auto;flex:none;padding:4px 10px;font-size:.7rem;font-weight:700;background:#ef4444;color:#fff;border:none;border-radius:6px;cursor:pointer';
+          qbtn.addEventListener('click',ev=>{ ev.stopPropagation(); _quittiereEntfernung(doc.id, kursId, curInst()); });
+          card.appendChild(qbtn);
+        }
         card.addEventListener('dragstart',e=>{
           _poolDragId=fullName; _poolDragTnId=doc.id; _poolDragKursId=kursId;
           e.dataTransfer.setData('text/plain',fullName);
