@@ -1955,10 +1955,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v816';
+const APP_VERSION = 'v817';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
-  {v:'v816', d:'06.08.2026', items:['\ud83d\udcac Chat: Ausbilder werden jetzt zuverl\u00e4ssig mit Namen angezeigt. Bisher verschwand aus der Liste, wer zuletzt in VerwaltungPro statt AusbilderPro war \u2013 die anderen sahen ihn als \u201eUnbekannt\u201c']},
+  {v:'v817', d:'06.08.2026', items:['\u21a9 Chat-\u00c4nderung aus v816 zur\u00fcckgenommen: Sie lud die komplette Nutzerliste, was normale Ausbilder-Konten nicht d\u00fcrfen \u2013 dadurch war die Kontaktliste f\u00fcr alle au\u00dfer dem Admin leer. Vorerst zur\u00fcck zum bew\u00e4hrten Stand; der richtige Fix folgt']},
   {v:'v815', d:'17.07.2026', items:['\ud83d\udd0d „TN+": Die Suche findet jetzt ALLE Teilnehmer. Bisher wurden nur 500 von 2175 geladen \u2013 wer nicht dabei war, konnte nie gefunden werden. Das war der Grund f\u00fcr die Teilnehmer, die sich nicht in den Pool holen lie\u00dfen','\u26a1 Die Liste wird nur noch einmal je Sitzung geladen statt bei jedem \u00d6ffnen','\u26a0 Scheitert das Laden, steht das jetzt im Suchfeld \u2013 vorher wurde der Fehler stumm verschluckt und die Suche fand einfach nichts']},
   {v:'v814', d:'17.07.2026', items:['\ud83d\udcc4 „Noten untereinander": Bei bis zu 4 Noten bleibt die Schrift jetzt in voller Gr\u00f6\u00dfe \u2013 sie wurde vorher grundlos verkleinert und wirkte verloren. Ab 6 Noten unver\u00e4ndert']},
   {v:'v813', d:'17.07.2026', items:['\u21a9 Standard-Bescheinigung wieder exakt wie fr\u00fcher: Verkleinert wird erst ab 8 Zeilen (v810 hatte das versehentlich auf 7 gezogen)','\ud83d\udcc4 „Noten untereinander" hat jetzt eine eigene Staffel und beeinflusst den Standard nicht mehr']},
@@ -15113,50 +15113,26 @@ function loadAusbilderListe(){
       const vn=(d.vorname||'').trim();
       const nn=(d.nachname||'').trim();
       const fullName=(vn+' '+nn).trim()||(d.name||'').trim();
-      const loginEmail=(d.loginEmail||'').toLowerCase();
-      const rec={name:fullName,berufId:d.berufId||'',vorname:vn,nachname:nn,loginEmail:loginEmail};
+      const rec={name:fullName,berufId:d.berufId||'',vorname:vn,nachname:nn};
       // Eintrag sowohl über Kontakt-Mail ALS AUCH über Login-Mail auffindbar machen
-      const keys=[(d.email||'').toLowerCase(),loginEmail].filter(Boolean);
+      const keys=[(d.email||'').toLowerCase(),(d.loginEmail||'').toLowerCase()].filter(Boolean);
       keys.forEach(k=>{ if(!m[k] || (fullName && !(m[k].name||'').trim())) m[k]=rec; });
     });
     _ausbStammCache=m;
     return m;
   }).catch(err=>{console.warn('Ausbilder-Stamm:',err);return{};});
-  // 2) ALLE users laden (nicht mehr nach lastApp filtern!)
-  //
-  // Frueher: where('lastApp','==','AusbilderPro'). lastApp wird aber nur beim
-  // FRISCHEN Login gesetzt und von jeder App ueberschrieben - wer zuletzt in VP
-  // war, fiel aus der Liste und erschien bei den anderen als "Unbekannt".
-  // Belegt am 06.08.2026: in AusbilderPro eingeloggt, lastApp trotzdem
-  // 'VerwaltungPro', Kollegen sahen Stefan nicht.
-  //
-  // Jetzt ist die AUSBILDER-LISTE die Quelle (wer echter Ausbilder ist), und
-  // users dient nur noch dazu, die Chat-UID ueber die loginEmail nachzuschlagen.
-  // Sichtbarkeit haengt damit an der Rolle, nicht am zuletzt geoeffneten Tab.
-  const usersPromise=_db.collection('users').get();
+  // 2) Aktive AusbilderPro-Nutzer aus users
+  const usersPromise=_db.collection('users').where('lastApp','==','AusbilderPro').get();
   return Promise.all([stammPromise,usersPromise]).then(([stamm,snap])=>{
     const arr=[];
-    // users nach Login-Mail indizieren -> UID + photoUrl
-    const byEmail={};
     snap.forEach(doc=>{
+      if(doc.id===_fbUid) return; // Sich selbst raus
       const d=doc.data();
-      const em=(d.email||'').toLowerCase();
-      if(em) byEmail[em]={uid:doc.id,photoUrl:d.photoUrl||'',ausbilderName:d.ausbilderName||d.name||''};
-    });
-    // Aus der Ausbilder-Stammliste die eindeutigen Ausbilder ziehen
-    const gesehen={};
-    Object.keys(stamm).forEach(key=>{
-      const st=stamm[key];
-      const loginEmail=(st.loginEmail||'').toLowerCase();
-      if(!loginEmail) return;                       // ohne Login-Mail nicht zuordenbar
-      if(gesehen[loginEmail]) return;               // jeder Ausbilder nur einmal
-      const u=byEmail[loginEmail];
-      if(!u) return;                                // (noch) kein users-Konto -> kann nicht chatten
-      if(u.uid===_fbUid) { gesehen[loginEmail]=1; return; } // sich selbst raus
-      gesehen[loginEmail]=1;
-      const displayName=st.name || u.ausbilderName || loginEmail.split('@')[0] || 'Unbekannt';
-      _chatUsers[u.uid]={email:loginEmail,name:displayName,berufGruppeId:st.berufId||'',photoUrl:u.photoUrl||''};
-      arr.push({uid:u.uid,..._chatUsers[u.uid]});
+      const email=(d.email||'').toLowerCase();
+      const stammData=stamm[email]||{};
+      const displayName=stammData.name || d.ausbilderName || d.name || d.profil?.name || (email?email.split('@')[0]:'Unbekannt');
+      _chatUsers[doc.id]={email:d.email||'',name:displayName,berufGruppeId:stammData.berufId||d.berufGruppeId||'',photoUrl:d.photoUrl||''};
+      arr.push({uid:doc.id,...(_chatUsers[doc.id])});
     });
     // Eigene UID auch cachen
     if(_fbUid&&_auth?.currentUser){
