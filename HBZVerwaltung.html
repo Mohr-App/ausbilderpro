@@ -1708,10 +1708,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 354';
+const APP_VERSION = 'Build 355';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 355', d:'07.08.2026', items:['\ud83c\udfaf Import gleicht jetzt zuerst \u00fcber die Lehrlingsnummer ab (eindeutig) und erst danach \u00fcber Name+Geburtsdatum. L\u00f6st die bisher \u201eunsicheren\u201c F\u00e4lle bei Namensdubletten mit gleichem Geburtsdatum. Bestehender Namensabgleich bleibt als Fallback']},
   {v:'Build 354', d:'06.08.2026', items:['\ud83d\udd11 Import erkennt und speichert jetzt die Lehrlingsnummer aus der Kammerliste (eindeutige Nummer je Azubi). Grundlage f\u00fcr sicheren Abgleich und die neue Registrierung. \u00c4ndert nichts am bisherigen Anmeldeweg']},
   {v:'Build 353', d:'06.08.2026', items:['\ud83d\udd0d In der Teilnehmer-Liste eines Kurses werden lange Namen und die Beruf/Firma-Zeile jetzt vollst\u00e4ndig angezeigt, wenn man mit der Maus dar\u00fcber f\u00e4hrt (Tooltip)']},
   {v:'Build 352', d:'16.07.2026', items:['\ud83d\udd10 Ausbilder-Rollen pr\u00fcft jetzt die Ausbilder-Liste statt der Konten-Sammlung. Findet dadurch auch Logins, deren Konto-Dokument komplett fehlt \u2013 die waren vorher unsichtbar und konnten sich nicht anmelden']},
@@ -4959,6 +4960,7 @@ function impAnalysiere(){
   // Bestand-Index aufbauen (anonymisierte ausschließen) - mit id + Stammdaten für Lehrjahr-Backfill + VP-Abgleich
   const bestand=(_globalTN||[]).filter(t=>!_impIsAnon(t.vorname)).map(t=>({
     id:t.id, toks:_impTokens(t.vorname,t.nachname), geb:_impGeb(t.geburtsdatum),
+    lehrlingsnr:(t.lehrlingsnr||'').toString().trim(),
     name:((t.vorname||'')+' '+(t.nachname||'')).trim(), ausbjahr:(t.ausbjahr||'').toString().trim(),
     vorname:(t.vorname||''), nachname:(t.nachname||''), firma:(t.firma||''), beruf:(t.beruf||''),
     adresse:(t.adresse||''), plz:(t.plz||'').toString(), ort:(t.ort||''),
@@ -4966,6 +4968,17 @@ function impAnalysiere(){
     betriebTelefon:(t.betriebTelefon||''),
     selfRegistered:(t.selfRegistered===true)
   }));
+  // Lehrlingsnummer-Index: nr -> Bestands-TN (nur eindeutige; Dubletten-Nummern ausgeschlossen).
+  // Baustein 1c: erlaubt eindeutigen Abgleich VOR dem Namen+Geburtsdatum-Weg. Loest genau die
+  // Faelle, die ueber Namen unsicher waren (Namensdubletten mit gleichem Geburtsdatum).
+  const _lnrIndex={}; const _lnrDup=new Set();
+  bestand.forEach(b=>{
+    const nr=b.lehrlingsnr;
+    if(!nr) return;
+    if(_lnrIndex[nr]!==undefined){ _lnrDup.add(nr); }   // Nummer doppelt im Bestand -> nicht vertrauen
+    else _lnrIndex[nr]=b;
+  });
+  _lnrDup.forEach(nr=>{ delete _lnrIndex[nr]; });
   // E-Mail-Index der ANONYMISIERTEN Pilot-TN (Ghost-Erkennung; Pilot-Mails sind individuell)
   const anonEmail={};
   (_globalTN||[]).forEach(t=>{ if(_impIsAnon(t.vorname)){ const e=_impEmail(t.email); if(e) anonEmail[e]=t; } });
@@ -5004,6 +5017,12 @@ function impAnalysiere(){
     // (z.B. "Ali Reza"), durch die echte Neue faelschlich als "unsicher" uebersprungen wurden.
     const nnToks=_impNorm(nn).split(' ').filter(Boolean);
     let kat='neu', nameHitGeb=null, hitBest=null;
+    // Baustein 1c: ZUERST ueber die Lehrlingsnummer abgleichen - eindeutig, kein Rateweg.
+    // Nur wenn Zeile UND ein Bestands-TN dieselbe (eindeutige) Nummer haben.
+    const _zeilenLnr=_impMapping.lehrlingsnr?(row[_impMapping.lehrlingsnr]||'').toString().trim():'';
+    if(_zeilenLnr && _lnrIndex[_zeilenLnr]){
+      kat='schon'; hitBest=_lnrIndex[_zeilenLnr];
+    } else
     for(const b of bestand){
       if(!_impTokenMatch(toks,b.toks)) continue;
       if(nnToks.length && !nnToks.some(t=>b.toks.has(t))) continue; // Nachname muss passen
