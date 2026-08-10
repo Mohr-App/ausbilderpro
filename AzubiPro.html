@@ -194,7 +194,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="text-align:center;color:#059669;margin-bottom:8px;animation:joinArrowBounce 1.4s ease-in-out infinite">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </div>
-        <button class="btn" onclick="startJoinWizard()" style="background:linear-gradient(135deg,#059669,#10b981)" title="Zum ersten Mal hier – Verknüpfung mit deinem Lehrgang starten">✨ Erstes Mal hier – Verknüpfung starten</button>
+        <button class="btn" onclick="joinShowKontoErst()" style="background:linear-gradient(135deg,#059669,#10b981)" title="Zum ersten Mal hier – Verknüpfung mit deinem Lehrgang starten">✨ Erstes Mal hier – Verknüpfung starten</button>
         <div style="display:flex;align-items:center;gap:10px;margin:10px 2px;color:var(--mu)"><div style="flex:1;height:1px;background:var(--brd)"></div><span style="font-size:.7rem;font-weight:700">oder</span><div style="flex:1;height:1px;background:var(--brd)"></div></div>
         <button class="btn" onclick="joinShowLogin()" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Schon mal hier gewesen">Schon mal hier gewesen</button>
         <div style="font-size:.66rem;color:var(--mu);text-align:center;margin-top:12px;line-height:1.5">Neu hier? Tippe „Erstes Mal hier" – wir richten alles für dich ein.</div>
@@ -211,6 +211,57 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="btn" onclick="submitJoinLogin()" style="margin-top:8px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Anmelden & beitreten">Anmelden & Lehrgang beitreten</button>
         <button class="btn" onclick="doResetJoin()" title="Passwort vergessen" style="background:var(--sur2);box-shadow:none;color:var(--mu);font-size:.7rem;padding:9px;margin-top:6px">Passwort vergessen</button>
       </div>
+      <!-- ═══ WEG 1: KONTO ZUERST (nach "Erstes Mal hier") ═══ -->
+      <div id="joinKontoErst" style="display:none">
+        <button onclick="joinKontoErstBack()" title="Zurück zur Auswahl" style="display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--mu);cursor:pointer;font-size:.72rem;margin-bottom:10px;padding:2px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>Zurück
+        </button>
+        <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+          <div style="font-weight:700;color:#059669;font-size:.8rem;margin-bottom:4px">Erstelle zuerst dein Konto</div>
+          <div style="font-size:.7rem;color:var(--mu);line-height:1.5">Damit nur <b>du</b> in die App kommst. Danach ordnen wir dich deinem Lehrgang zu.</div>
+        </div>
+        <div><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jKeEmail" autocomplete="email" placeholder="deine@email.de"></div>
+        <div style="margin-top:6px"><label class="fl">Passwort <span style="color:#ef4444">*</span></label><input class="fi" type="password" id="jKePasswort" autocomplete="new-password" placeholder="mind. 6 Zeichen"></div>
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:.66rem;color:var(--mu);line-height:1.4;cursor:pointer"><input type="checkbox" id="jKeDsgvo" style="margin-top:2px;flex:none"><span>Ich akzeptiere die Datenschutzerklärung und Nutzungsbedingungen.</span></label>
+        <div class="err" id="jKeErr"></div>
+        <button class="btn" id="jKeBtn" onclick="submitKontoErstellen()" style="margin-top:10px;background:linear-gradient(135deg,#059669,#10b981)">Konto erstellen &amp; weiter</button>
+      </div>
+
+      <!-- ═══ WEG 1: Weiche "Wie finden wir dich?" (nach Konto-Anlage, eingeloggt) ═══ -->
+      <div id="joinFindeWeiche" style="display:none">
+        <div style="text-align:center;font-size:.74rem;color:var(--mu);font-weight:700;margin-bottom:4px">Konto erstellt ✓</div>
+        <div style="text-align:center;font-size:.68rem;color:var(--mu);margin-bottom:12px">Wie sollen wir dich in der Teilnehmerliste finden?</div>
+        <button class="btn" onclick="joinWeicheNameGeb()" style="background:linear-gradient(135deg,#059669,#10b981)">Mit Name und Geburtsdatum</button>
+        <div style="display:flex;align-items:center;gap:10px;margin:10px 2px;color:var(--mu)"><div style="flex:1;height:1px;background:var(--brd)"></div><span style="font-size:.62rem">oder</span><div style="flex:1;height:1px;background:var(--brd)"></div></div>
+        <button class="btn" onclick="joinWeicheLnr()" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6)">Mit Lehrlingsnummer</button>
+        <div style="font-size:.62rem;color:var(--mu);text-align:center;margin-top:6px;line-height:1.4">Falls deine Lehrlingsnummer auf der Kurseinladung steht.</div>
+      </div>
+
+      <!-- ═══ WEG 1: Name+Geburtsdatum-Maske (nach Weiche, eingeloggt) ═══ -->
+      <div id="joinNameGebForm" style="display:none">
+        <button onclick="joinNgBack()" title="Zurück" style="display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--mu);cursor:pointer;font-size:.72rem;margin-bottom:10px;padding:2px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>Zurück
+        </button>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:8px">Wir suchen dich in der Teilnehmerliste.</div>
+        <div><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="jNgVorname" autocomplete="given-name"></div>
+        <div style="margin-top:6px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="jNgNachname" autocomplete="family-name"></div>
+        <div style="margin-top:6px"><label class="fl">Geburtsdatum <span style="color:#ef4444">*</span></label><input type="date" class="fi" id="jNgGeb"></div>
+        <div class="err" id="jNgErr"></div>
+        <button class="btn" id="jNgBtn" onclick="joinNgWeiter()" style="margin-top:10px;background:linear-gradient(135deg,#059669,#10b981)">Weiter</button>
+      </div>
+
+      <!-- ═══ WEG 1: Lehrlingsnummer-Maske (nach Weiche, eingeloggt) ═══ -->
+      <div id="joinLnrForm2" style="display:none">
+        <button onclick="joinLnr2Back()" title="Zurück" style="display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--mu);cursor:pointer;font-size:.72rem;margin-bottom:10px;padding:2px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>Zurück
+        </button>
+        <div style="font-size:.72rem;color:var(--mu);margin-bottom:8px">Die Nummer steht auf deiner Kurseinladung.</div>
+        <div><label class="fl">Lehrlingsnummer <span style="color:#ef4444">*</span></label><input class="fi" id="jLnr2" inputmode="numeric" autocomplete="off" placeholder="z.B. 24637"></div>
+        <div style="margin-top:6px"><label class="fl">Geburtsdatum <span style="color:#ef4444">*</span></label><input type="date" class="fi" id="jLnr2Geb"></div>
+        <div class="err" id="jLnr2Err"></div>
+        <button class="btn" id="jLnr2Btn" onclick="joinLnr2Weiter()" style="margin-top:10px;background:linear-gradient(135deg,#1d4ed8,#3b82f6)">Weiter</button>
+      </div>
+
       <!-- ═══ BAUSTEIN 2: Weiche "Hast du deine Lehrlingsnummer?" ═══ -->
       <div id="joinLnrChoice" style="display:none">
         <button onclick="joinBackToChoiceFromLnr()" title="Zurück" style="display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--mu);cursor:pointer;font-size:.72rem;margin-bottom:10px;padding:2px">
@@ -1134,7 +1185,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v295'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v296'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -2062,6 +2113,175 @@ function sendWelcomeEmail(email, name, kursName){
 let _wizStep = 1;
 const _WIZ_TOTAL = 5;
 
+// ═══════════════════════════════════════════════════════════════════
+// WEG 1: Konto zuerst. Neuer Einstieg nach "Erstes Mal hier".
+// Legt zuerst das Konto an (eingeloggt), DANN kommt die Weiche Name/Nummer,
+// DANN die Suche (jetzt erlaubt, weil eingeloggt). _registering schuetzt vor
+// dem Auth-Handler, damit er waehrend des Vorgangs nicht wegnavigiert.
+// Der alte submitJoinRegistration bleibt als Fallback erhalten.
+// ═══════════════════════════════════════════════════════════════════
+function joinShowKontoErst(){
+  var c=document.getElementById('joinChoice'); if(c) c.style.display='none';
+  var k=document.getElementById('joinKontoErst'); if(k) k.style.display='block';
+  var em=document.getElementById('jKeEmail'); if(em) em.focus();
+}
+function joinKontoErstBack(){
+  var k=document.getElementById('joinKontoErst'); if(k) k.style.display='none';
+  var c=document.getElementById('joinChoice'); if(c) c.style.display='block';
+}
+function submitKontoErstellen(){
+  const errEl=document.getElementById('jKeErr'); errEl.style.color=''; errEl.textContent='';
+  const email=(document.getElementById('jKeEmail').value||'').trim().toLowerCase();
+  const passwort=document.getElementById('jKePasswort').value||'';
+  if(!email){ errEl.textContent='Bitte E-Mail eingeben'; return; }
+  if(passwort.length<6){ errEl.textContent='Passwort muss mindestens 6 Zeichen haben'; return; }
+  if(!document.getElementById('jKeDsgvo')?.checked){ errEl.textContent='Bitte Datenschutzerkl\u00e4rung und Nutzungsbedingungen akzeptieren'; return; }
+  if(!_joinKursId){ errEl.textContent='Kein Kurs-Link erkannt'; return; }
+  const btn=document.getElementById('jKeBtn'); if(btn) btn.disabled=true;
+  _registering=true;  // schuetzt vor dem Auth-Handler bis zum Ende von Weg 1
+  errEl.style.color='var(--acc)'; errEl.textContent='Konto wird erstellt\u2026';
+  // DSGVO fuer spaeter merken (wird beim Verknuepfen in den Datensatz geschrieben)
+  window._weg1Dsgvo={datenschutz:true,nutzungsbedingungen:true,zeitpunkt:new Date().toISOString(),ip:'',version:'1.0'};
+  window._weg1Email=email;
+  auth.createUserWithEmailAndPassword(email, passwort).then(cred=>{
+    // Konto da, Nutzer eingeloggt. KEINE Selbstheilung bei belegter Mail (Stefan-Wunsch).
+    window._weg1Uid=cred.user.uid;
+    if(btn) btn.disabled=false;
+    errEl.textContent='';
+    // -> Weiche zeigen
+    var k=document.getElementById('joinKontoErst'); if(k) k.style.display='none';
+    var w=document.getElementById('joinFindeWeiche'); if(w) w.style.display='block';
+  }).catch(err=>{
+    _registering=false;
+    if(btn) btn.disabled=false;
+    errEl.style.color='#ef4444';
+    if(err.code==='auth/email-already-in-use'){
+      errEl.innerHTML='Diese E-Mail ist bereits vergeben.<br><small>Bitte melde dich an (\u201eSchon mal hier gewesen\u201c) oder nutze eine andere Adresse.</small>';
+    } else if(err.code==='auth/invalid-email'){ errEl.textContent='Ung\u00fcltige E-Mail-Adresse'; }
+    else if(err.code==='auth/weak-password'){ errEl.textContent='Passwort zu schwach (mind. 6 Zeichen)'; }
+    else { errEl.textContent='Fehler: '+(err.message||err.code||'unbekannt'); }
+    console.warn('[Weg1] Konto-Anlage:', err);
+  });
+}
+// ── WEG 1 / 2-2: Suche im EINGELOGGTEN Zustand (Konto ist schon da) ──
+// Beide Weichen nutzen dieselbe Verknuepfung _weg1Verknuepfen(match).
+
+// Name+Geburtsdatum: benutzt den bestehenden schlanken Wizard NICHT, sondern
+// eine kleine eigene Maske. Wir zeigen dafuer joinLnrForm um? Nein - eigene Felder.
+function joinWeicheNameGeb(){
+  var w=document.getElementById('joinFindeWeiche'); if(w) w.style.display='none';
+  var f=document.getElementById('joinNameGebForm'); if(f) f.style.display='block';
+  var e=document.getElementById('jNgVorname'); if(e) e.focus();
+}
+function joinWeicheLnr(){
+  var w=document.getElementById('joinFindeWeiche'); if(w) w.style.display='none';
+  var f=document.getElementById('joinLnrForm2'); if(f) f.style.display='block';
+  var e=document.getElementById('jLnr2'); if(e) e.focus();
+}
+// Name+Geburtsdatum -> suchen -> "Bist du das?" -> verknuepfen
+function joinNgWeiter(){
+  const errEl=document.getElementById('jNgErr'); errEl.style.color=''; errEl.textContent='';
+  const vn=(document.getElementById('jNgVorname').value||'').trim();
+  const nn=(document.getElementById('jNgNachname').value||'').trim();
+  const geb=_normGeb(document.getElementById('jNgGeb').value||'');
+  if(!vn||!nn){ errEl.textContent='Bitte Vor- und Nachnamen eingeben'; return; }
+  if(!geb){ errEl.textContent='Bitte Geburtsdatum eingeben'; return; }
+  const btn=document.getElementById('jNgBtn'); if(btn) btn.disabled=true;
+  errEl.style.color='var(--acc)'; errEl.textContent='\ud83d\udd0e Wir suchen dich\u2026';
+  _azubiFindMatch(vn, nn, geb).then(m=>{
+    if(btn) btn.disabled=false;
+    if(m && m.alreadyLinked){ errEl.style.color='#ef4444'; errEl.textContent='Dieser Datensatz ist bereits mit einem Konto verkn\u00fcpft.'; return; }
+    if(!m){
+      // Behelfsbruecke A: kein Match -> trotzdem neuer Datensatz + in Kurs
+      errEl.textContent=''; _weg1NeuAnlegen({vorname:vn, nachname:nn, geburtsdatum:geb});
+      return;
+    }
+    errEl.textContent='';
+    _azubiShowFoundYou(m).then(istIch=>{ if(istIch) _weg1Verknuepfen(m); });
+  }).catch(e=>{ if(btn) btn.disabled=false; errEl.style.color='#ef4444'; errEl.textContent='Fehler bei der Suche.'; console.warn('[Weg1] NameGeb:', e); });
+}
+// Lehrlingsnummer -> suchen -> "Bist du das?" -> verknuepfen
+function joinLnr2Weiter(){
+  const errEl=document.getElementById('jLnr2Err'); errEl.style.color=''; errEl.textContent='';
+  const nr=(document.getElementById('jLnr2').value||'').trim();
+  const geb=_normGeb(document.getElementById('jLnr2Geb').value||'');
+  if(!nr){ errEl.textContent='Bitte deine Lehrlingsnummer eingeben'; return; }
+  if(!geb){ errEl.textContent='Bitte dein Geburtsdatum eingeben'; return; }
+  const btn=document.getElementById('jLnr2Btn'); if(btn) btn.disabled=true;
+  errEl.style.color='var(--acc)'; errEl.textContent='\ud83d\udd0e Wir suchen dich\u2026';
+  _azubiFindByLehrlingsnr(nr, geb).then(m=>{
+    if(btn) btn.disabled=false;
+    if(m && m.alreadyLinked){ errEl.style.color='#ef4444'; errEl.textContent='Dieser Datensatz ist bereits mit einem Konto verkn\u00fcpft.'; return; }
+    if(!m){ errEl.style.color='#ef4444'; errEl.textContent='Keine \u00dcbereinstimmung. Pr\u00fcfe Lehrlingsnummer und Geburtsdatum.'; return; }
+    errEl.textContent='';
+    _azubiShowFoundYou(m).then(istIch=>{ if(istIch) _weg1Verknuepfen(m); });
+  }).catch(e=>{ if(btn) btn.disabled=false; errEl.style.color='#ef4444'; errEl.textContent='Fehler bei der Suche.'; console.warn('[Weg1] Lnr:', e); });
+}
+// GEMEINSAME Verknuepfung: gefundenen Datensatz mit dem (in 2-1 angelegten) Konto
+// verbinden + in Kurs eintragen. Konto ist schon da (window._weg1Uid/_weg1Email).
+function _weg1Verknuepfen(match){
+  const uid=window._weg1Uid, email=window._weg1Email;
+  if(!uid||!email||!match||!match.id){ alert('Verkn\u00fcpfung fehlgeschlagen \u2013 bitte von vorne.'); return; }
+  const tnId=match.id;
+  const dsgvo=window._weg1Dsgvo||{datenschutz:true,nutzungsbedingungen:true,zeitpunkt:new Date().toISOString(),version:'1.0'};
+  return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get().then(kd=>{
+    const k=kd.exists?kd.data():{};
+    const _kh={kursId:_joinKursId, kursName:k.name||'', von:k.von||'', bis:k.bis||'', addedAt:Date.now()};
+    const linkData={
+      email:email, kontaktEmail:email, aktiverKursId:_joinKursId,
+      kursHistory:firebase.firestore.FieldValue.arrayUnion(_kh),
+      verknuepftUid:uid, verknuepftAm:Date.now(),
+      bestaetigungAngefordert:_freigabePflichtCache===true,
+      dsgvoZustimmung:dsgvo, emailCheckAktiv:true, selfRegistered:true
+    };
+    return db.collection('globalTN').doc(tnId).update(linkData).then(()=>{
+      const col=db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).collection('teilnehmer');
+      const neu={ vorname:match.vorname, nachname:match.nachname, beruf:match.beruf||'', berufGruppe:match.berufGruppeId||'',
+        kontaktEmail:email, status:'active', selfRegistered:true, bestaetigungAngefordert:_freigabePflichtCache===true,
+        kenntnisAm:Date.now(), kenntnisVon:email, addedAt:Date.now() };
+      return col.doc(tnId).set(neu,{merge:true}).catch(()=>{}).then(()=>{
+        return db.collection('users').doc(uid).set({email:email, role:'azubi'},{merge:true});
+      }).then(()=>{
+        _queueWelcomeMail(uid, email, ((match.vorname||'')+' '+(match.nachname||'')).trim(), k.name||'');
+      });
+    });
+  }).then(()=>{ _weg1Fertig(); }).catch(err=>{ console.warn('[Weg1] Verknuepfen:', err); alert('Fehler: '+(err.message||err.code||'unbekannt')); });
+}
+// Behelfsbruecke A: kein Match -> neuen Datensatz anlegen + in Kurs
+function _weg1NeuAnlegen(basis){
+  const uid=window._weg1Uid, email=window._weg1Email;
+  if(!uid||!email){ alert('Anlage fehlgeschlagen \u2013 bitte von vorne.'); return; }
+  const dsgvo=window._weg1Dsgvo||{datenschutz:true,nutzungsbedingungen:true,zeitpunkt:new Date().toISOString(),version:'1.0'};
+  return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get().then(kd=>{
+    const k=kd.exists?kd.data():{};
+    const _kh={kursId:_joinKursId, kursName:k.name||'', von:k.von||'', bis:k.bis||'', addedAt:Date.now()};
+    const tnData={
+      vorname:basis.vorname, nachname:basis.nachname, geburtsdatum:basis.geburtsdatum||'',
+      email:email, kontaktEmail:email, aktiverKursId:_joinKursId,
+      kursHistory:[_kh], verknuepftUid:uid, verknuepftAm:Date.now(),
+      bestaetigungAngefordert:_freigabePflichtCache===true,
+      dsgvoZustimmung:dsgvo, emailCheckAktiv:true, selfRegistered:true, addedAt:Date.now()
+    };
+    return db.collection('globalTN').add(tnData).then(ref=>{
+      const col=db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).collection('teilnehmer');
+      const neu={ vorname:basis.vorname, nachname:basis.nachname, kontaktEmail:email, status:'active',
+        selfRegistered:true, bestaetigungAngefordert:_freigabePflichtCache===true,
+        kenntnisAm:Date.now(), kenntnisVon:email, addedAt:Date.now() };
+      return col.doc(ref.id).set(neu,{merge:true}).catch(()=>{}).then(()=>{
+        return db.collection('users').doc(uid).set({email:email, role:'azubi'},{merge:true});
+      }).then(()=>{ _queueWelcomeMail(uid, email, ((basis.vorname||'')+' '+(basis.nachname||'')).trim(), k.name||''); });
+    });
+  }).then(()=>{ _weg1Fertig(); }).catch(err=>{ console.warn('[Weg1] NeuAnlegen:', err); alert('Fehler: '+(err.message||err.code||'unbekannt')); });
+}
+// Abschluss: URL bereinigen, Kurs sichern, Auto-Checkin, neu laden
+function _weg1Fertig(){
+  window.history.replaceState({},'',window.location.pathname);
+  const _regKursId=_joinKursId; _joinKursId=null;
+  setTimeout(()=>{ try{ _autoCheckinBeiRegistrierung(_regKursId); }catch(e){} location.reload(); }, 1200);
+}
+
+function joinNgBack(){ var f=document.getElementById('joinNameGebForm'); if(f) f.style.display='none'; var w=document.getElementById('joinFindeWeiche'); if(w) w.style.display='block'; }
+function joinLnr2Back(){ var f=document.getElementById('joinLnrForm2'); if(f) f.style.display='none'; var w=document.getElementById('joinFindeWeiche'); if(w) w.style.display='block'; }
 function startJoinWizard(){
   // Schritt 0: erst den Lehrgang bestätigen lassen, bevor Daten eingegeben werden
   var c=document.getElementById('joinChoice'); if(c) c.style.display='none';
