@@ -1708,10 +1708,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 353';
+const APP_VERSION = 'Build 354';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 354', d:'06.08.2026', items:['\ud83d\udd11 Import erkennt und speichert jetzt die Lehrlingsnummer aus der Kammerliste (eindeutige Nummer je Azubi). Grundlage f\u00fcr sicheren Abgleich und die neue Registrierung. \u00c4ndert nichts am bisherigen Anmeldeweg']},
   {v:'Build 353', d:'06.08.2026', items:['\ud83d\udd0d In der Teilnehmer-Liste eines Kurses werden lange Namen und die Beruf/Firma-Zeile jetzt vollst\u00e4ndig angezeigt, wenn man mit der Maus dar\u00fcber f\u00e4hrt (Tooltip)']},
   {v:'Build 352', d:'16.07.2026', items:['\ud83d\udd10 Ausbilder-Rollen pr\u00fcft jetzt die Ausbilder-Liste statt der Konten-Sammlung. Findet dadurch auch Logins, deren Konto-Dokument komplett fehlt \u2013 die waren vorher unsichtbar und konnten sich nicht anmelden']},
   {v:'Build 351', d:'16.07.2026', items:['\ud83d\udd10 Ausbilder-Anlage: Das Login-Konto wird jetzt aus der Verwaltungs-Sitzung geschrieben. Behebt, dass die Rolle \u201eausbilder\u201c nie ankam \u2013 der Schreibvorgang wurde vorher durch die sofortige Abmeldung abgebrochen']},
@@ -4665,6 +4666,7 @@ function populateStandortSelect(selectId, selectedId){
 const IMP_FIELDS=[
   {key:'vorname',label:'Vorname',required:true},
   {key:'nachname',label:'Nachname',required:true},
+  {key:'lehrlingsnr',label:'Lehrlingsnummer'},
   {key:'email',label:'E-Mail'},
   {key:'tel',label:'Telefon'},
   {key:'firma',label:'Betrieb / Firma'},
@@ -4737,6 +4739,7 @@ function impAutoMap(){
   const synonyms={
     vorname:['vorname','first','firstname','first_name','vname','given'],
     nachname:['nachname','last','lastname','last_name','name','nname','family','surname'],
+    lehrlingsnr:['lehrlingsnummer','lehrlingsnr','lehrlingnr','lehrling','azubinummer','azubinr','lnr'],
     email:['email','e-mail','mail','e_mail','emailadresse'],
     tel:['tel','telefon','phone','mobile','mobil','handy','telefonnummer'],
     firma:['firma','betriebname','betrieb','company','unternehmen','arbeitgeber','ausbildungsbetrieb'],
@@ -5268,6 +5271,7 @@ async function doImport(){
     const tnData={
       vorname: vn,
       nachname: nn,
+      lehrlingsnr:(row[_impMapping.lehrlingsnr]||'').toString().trim(),
       email:(row[_impMapping.email]||'').toString().trim().toLowerCase(),
       tel: (row[_impMapping.tel]||'').toString().trim(),
       firma:(row[_impMapping.firma]||'').toString().trim(),
