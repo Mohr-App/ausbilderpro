@@ -225,6 +225,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:.66rem;color:var(--mu);line-height:1.4;cursor:pointer"><input type="checkbox" id="jKeDsgvo" style="margin-top:2px;flex:none"><span>Ich akzeptiere die Datenschutzerklärung und Nutzungsbedingungen.</span></label>
         <div class="err" id="jKeErr"></div>
         <button class="btn" id="jKeBtn" onclick="submitKontoErstellen()" style="margin-top:10px;background:linear-gradient(135deg,#059669,#10b981)">Konto erstellen &amp; weiter</button>
+        <div style="text-align:center;margin-top:12px;font-size:.7rem;color:var(--mu)">Schon ein Konto? <button onclick="joinKontoErstZuLogin()" style="background:none;border:none;color:var(--acc);cursor:pointer;font-size:.7rem;text-decoration:underline;padding:0">Hier anmelden</button></div>
       </div>
 
       <!-- ═══ WEG 1: Weiche "Wie finden wir dich?" (nach Konto-Anlage, eingeloggt) ═══ -->
@@ -1193,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v297'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v299'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -1952,6 +1953,8 @@ function submitJoinLogin(){
         return;
       }
 
+      // SCHRITT 4: erst Kursbestaetigung, dann beitreten (kein Vertun)
+      window._loginDoJoin=function(){
       // Kursinfo laden für History
       return db.collection('shared').doc('kurse').collection('list').doc(_joinKursId).get().then(kDoc=>{
         const kd=kDoc.exists?kDoc.data():{};
@@ -2009,6 +2012,11 @@ function submitJoinLogin(){
           _autoCheckinBeiRegistrierung(savedKursId);
         });
       });
+      };
+      // Kursbestaetigung anzeigen; erst "Ja" ruft _loginDoJoin()
+      errEl.textContent="";
+      _loginPendingErrEl=errEl;
+      _weg1ZeigeKursBestaetigungLogin();
     });
   }).catch(err=>{
     _registering=false;
@@ -2128,6 +2136,10 @@ const _WIZ_TOTAL = 5;
 // dem Auth-Handler, damit er waehrend des Vorgangs nicht wegnavigiert.
 // Der alte submitJoinRegistration bleibt als Fallback erhalten.
 // ═══════════════════════════════════════════════════════════════════
+function joinKontoErstZuLogin(){
+  var k=document.getElementById('joinKontoErst'); if(k) k.style.display='none';
+  joinShowLogin();  // bestehender, funktionierender Login-Weg (submitJoinLogin tritt korrekt bei)
+}
 function joinShowKontoErst(){
   var c=document.getElementById('joinChoice'); if(c) c.style.display='none';
   var k=document.getElementById('joinKontoErst'); if(k) k.style.display='block';
@@ -2293,9 +2305,24 @@ function _weg1ZeigeKursBestaetigung(match){
   }
   var c=document.getElementById('weg1ConfirmKurs'); if(c) c.style.display='block';
 }
+let _loginPendingErrEl=null;
+function _weg1ZeigeKursBestaetigungLogin(){
+  // Login-Modus: nach erfolgreichem Login Kursbestaetigung zeigen; "Ja" -> _loginDoJoin
+  window._weg1LoginMode=true;
+  var lf=document.getElementById('joinLoginForm'); if(lf) lf.style.display='none';
+  var box=document.getElementById('weg1ConfirmKursBox');
+  if(box){ var nm=(_joinKursName||'').trim(); box.innerHTML='<div style="font-weight:800;font-size:.9rem">'+esc(nm||'Lehrgang')+'</div>'; }
+  var c=document.getElementById('weg1ConfirmKurs'); if(c) c.style.display='block';
+}
 function weg1ConfirmKursYes(){
   var c=document.getElementById('weg1ConfirmKurs'); if(c) c.style.display='none';
   var btn=document.getElementById('weg1ConfirmBtn'); if(btn) btn.disabled=true;
+  if(window._weg1LoginMode){
+    window._weg1LoginMode=false;
+    if(typeof window._loginDoJoin==='function'){ window._loginDoJoin(); } else { alert('Beitritt fehlgeschlagen \u2013 bitte neu anmelden.'); }
+    if(btn) btn.disabled=false;
+    return;
+  }
   var m=_weg1PendingMatch;
   if(!m){ alert('Kein Datensatz \u2013 bitte von vorne.'); return; }
   if(m._neu){ _weg1NeuAnlegen({vorname:m.vorname, nachname:m.nachname, geburtsdatum:m.geburtsdatum}); }
@@ -2303,8 +2330,14 @@ function weg1ConfirmKursYes(){
 }
 function weg1ConfirmKursNo(){
   var c=document.getElementById('weg1ConfirmKurs'); if(c) c.style.display='none';
+  if(window._weg1LoginMode){
+    window._weg1LoginMode=false;
+    if(_loginPendingErrEl){ _loginPendingErrEl.style.color='var(--mu)'; _loginPendingErrEl.textContent='Beitritt abgebrochen.'; }
+    _registering=false;
+    var lf=document.getElementById('joinLoginForm'); if(lf) lf.style.display='block';
+    return;
+  }
   _weg1PendingMatch=null;
-  // zurueck zur Weiche
   var w=document.getElementById('joinFindeWeiche'); if(w) w.style.display='block';
 }
 function _weg1Fertig(){
