@@ -194,7 +194,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="text-align:center;color:#059669;margin-bottom:8px;animation:joinArrowBounce 1.4s ease-in-out infinite">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </div>
-        <button class="btn" onclick="joinShowLnrChoice()" style="background:linear-gradient(135deg,#059669,#10b981)" title="Zum ersten Mal hier – Verknüpfung mit deinem Lehrgang starten">✨ Erstes Mal hier – Verknüpfung starten</button>
+        <button class="btn" onclick="startJoinWizard()" style="background:linear-gradient(135deg,#059669,#10b981)" title="Zum ersten Mal hier – Verknüpfung mit deinem Lehrgang starten">✨ Erstes Mal hier – Verknüpfung starten</button>
         <div style="display:flex;align-items:center;gap:10px;margin:10px 2px;color:var(--mu)"><div style="flex:1;height:1px;background:var(--brd)"></div><span style="font-size:.7rem;font-weight:700">oder</span><div style="flex:1;height:1px;background:var(--brd)"></div></div>
         <button class="btn" onclick="joinShowLogin()" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6)" title="Schon mal hier gewesen">Schon mal hier gewesen</button>
         <div style="font-size:.66rem;color:var(--mu);text-align:center;margin-top:12px;line-height:1.5">Neu hier? Tippe „Erstes Mal hier" – wir richten alles für dich ein.</div>
@@ -220,7 +220,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="btn" onclick="startJoinWizard()" style="background:linear-gradient(135deg,#059669,#10b981)">Mit Name und Geburtsdatum</button>
         <div style="font-size:.64rem;color:var(--mu);text-align:center;margin:6px 2px 14px;line-height:1.4">Du gibst deine Daten von Hand ein &ndash; funktioniert immer.</div>
         <div style="display:flex;align-items:center;gap:10px;margin:10px 2px;color:var(--mu)"><div style="flex:1;height:1px;background:var(--brd)"></div><span style="font-size:.62rem">oder</span><div style="flex:1;height:1px;background:var(--brd)"></div></div>
-        <button class="btn" onclick="joinStartLnrWeg()" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6)">Mit Lehrlingsnummer (schneller)</button>
+        <button class="btn" onclick="joinStartLnrWeg()" style="display:none;background:linear-gradient(135deg,#1d4ed8,#3b82f6)">Mit Lehrlingsnummer (schneller)</button>
         <div style="font-size:.64rem;color:var(--mu);text-align:center;margin-top:6px;line-height:1.4">Falls deine Lehrlingsnummer auf der Kurseinladung steht.</div>
       </div>
 
@@ -1134,7 +1134,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v294'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v295'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -2375,7 +2375,7 @@ function joinLnrWeiter(){
     }
     if(!m){
       errEl.style.color='#ef4444';
-      errEl.innerHTML='Keine \u00dcbereinstimmung.<br><small style="opacity:.8">Gesucht: Nr "'+nr+'" + Geb "'+geb+'" \u00b7 Query fand '+((window._lnrDiag&&window._lnrDiag.queryTreffer)||0)+'</small>';
+      errEl.textContent='Keine \u00dcbereinstimmung. Pr\u00fcfe Lehrlingsnummer und Geburtsdatum \u2013 oder nutze den Weg mit Name und Geburtsdatum.';
       return;
     }
     // Treffer -> "Bist du das?" (dieselbe Bestätigung wie der lange Weg)
