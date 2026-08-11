@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v300'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v301'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -3562,6 +3562,8 @@ function saveHomeSitzplatz(){
     if(_tnData.aktiverKursId){
       db.collection('shared').doc('kurse').collection('list').doc(_tnData.aktiverKursId)
         .collection('teilnehmer').doc(_tnId).update({wunschSitzplatz:nr}).catch(()=>{});
+      // Sitzplatzeingabe im Kursraum = Anwesenheit (geschuetzt: nur Kurstage/freigegeben)
+      try{ _autoCheckinBeiRegistrierung(_tnData.aktiverKursId); }catch(e){}
     }
     toast('✓ Platz '+nr+' gespeichert!');
     loadKurse(); // Karte neu rendern
@@ -7696,6 +7698,10 @@ function savePlatznummerFromPopup(){
   db.collection('globalTN').doc(_tnId).update({wunschSitzplatz:nr}).then(function(){
     _tnData.wunschSitzplatz=nr;
     if(_tnData.aktiverKursId){ db.collection('shared').doc('kurse').collection('list').doc(_tnData.aktiverKursId).collection('teilnehmer').doc(_tnId).update({wunschSitzplatz:nr}).catch(function(){}); }
+    // Sitzplatzeingabe im Kursraum = Anwesenheit fuer heute. Nutzt den geschuetzten
+    // Auto-Checkin (nur an Kurstagen via _checkinTagesSperre, nur wenn freigegeben,
+    // kein Doppel-Checkin). Ohne aktiven Kurs passiert nichts.
+    if(_tnData.aktiverKursId){ try{ _autoCheckinBeiRegistrierung(_tnData.aktiverKursId); }catch(e){} }
     toast('✓ Platz '+nr+' gespeichert!');
     _closeSimplePopup();
     try{ loadKurse(); }catch(e){}
