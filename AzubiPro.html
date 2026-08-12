@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v302'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v303'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -7412,14 +7412,20 @@ function markNotifRead(filteredIdx){
       if(h.kursId===kursId) return {...h, entfernt:true};
       return h;
     });
-    // Schritt 1: globalTN updaten (als Admin-ähnliche Felder)
-    db.collection('globalTN').doc(_tnId).update({
+    // aktiverKursId NUR nullen, wenn der aktive Kurs auch der ENTFERNTE ist.
+    // Sonst hat der Azubi inzwischen einen neuen Kurs - der bleibt unberuehrt.
+    const _entferntIstAktiv = (!kursId) || (_tnData.aktiverKursId===kursId) || (!_tnData.aktiverKursId);
+    const _upd={
       benachrichtigungen:notifs,
-      aktiverKursId:null,
-      pendingRemoval:null,
-      pendingRemovalKurs:null,
       kursHistory:hist
-    }).then(()=>{
+    };
+    if(_entferntIstAktiv){
+      _upd.aktiverKursId=null;
+      _upd.pendingRemoval=null;
+      _upd.pendingRemovalKurs=null;
+    }
+    // Schritt 1: globalTN updaten
+    db.collection('globalTN').doc(_tnId).update(_upd).then(()=>{
       // Schritt 2: Aus Kurs-Subcollection entfernen
       if(kursId){
         return db.collection('shared').doc('kurse').collection('list').doc(kursId)
@@ -7427,7 +7433,7 @@ function markNotifRead(filteredIdx){
       }
     }).then(()=>{
       _tnData.benachrichtigungen=notifs;
-      _tnData.aktiverKursId=null;
+      if(_entferntIstAktiv) _tnData.aktiverKursId=null;
       _tnData.kursHistory=hist;
       loadKurse();
       checkBenachrichtigungen();
