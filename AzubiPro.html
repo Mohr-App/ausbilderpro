@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v303'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v304'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -2212,8 +2212,15 @@ function joinNgWeiter(){
     if(btn) btn.disabled=false;
     if(m && m.alreadyLinked){ errEl.style.color='#ef4444'; errEl.textContent='Dieser Datensatz ist bereits mit einem Konto verkn\u00fcpft.'; return; }
     if(!m){
-      // Behelfsbruecke A: kein Match -> trotzdem neuer Datensatz + in Kurs
-      errEl.textContent=''; _weg1ZeigeKursBestaetigung({_neu:true, vorname:vn, nachname:nn, geburtsdatum:geb});
+      // Kein Match -> erst warnen (Tippfehler abfangen). Nur bei "trotzdem fortfahren"
+      // wird neu angelegt (echter Neuzugang, wird beim naechsten TN-Import uebernommen).
+      errEl.textContent='';
+      _azubiShowNoMatch(vn, nn, geb).then(trotzdem=>{
+        if(trotzdem){
+          _weg1ZeigeKursBestaetigung({_neu:true, vorname:vn, nachname:nn, geburtsdatum:geb});
+        }
+        // sonst: zurueck in der Maske, Nutzer korrigiert die Eingabe
+      });
       return;
     }
     errEl.textContent='';
