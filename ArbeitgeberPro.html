@@ -206,21 +206,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .coll-card[open],details.card[open],.help-section.open{background:linear-gradient(135deg,rgba(37,99,235,.28),rgba(5,150,105,.28))!important;border-color:rgba(37,99,235,.7)!important;border-width:2px!important;box-shadow:0 6px 20px rgba(37,99,235,.25)!important;transition:background .2s,border-color .2s,box-shadow .2s}
 .coll-card[open] .coll-card,.coll-card[open] details.card,.coll-card[open] .help-section,details.card[open] .coll-card,details.card[open] details.card,details.card[open] .help-section,.help-section.open .coll-card,.help-section.open details.card,.help-section.open .help-section{background:#fff!important;border-color:rgba(37,99,235,.4)!important;border-width:2px!important;box-shadow:none!important}
 .coll-card summary:hover,details.card summary:hover,.help-section .help-section-header:hover{background:rgba(255,255,255,.25)!important}
-
-/* ===== AG LITE-MODUS: nur Azubi-UEBL-Ansicht ===== */
-body.lite-modus #agnav-auswertung,
-body.lite-modus #agnav-belege { display:none !important; }
-/* operative Live-Tabs aus (heute/auftraege/meldungen) - nur mitarbeiter bleibt */
-body.lite-modus #agLiveTabs .stab[data-tab="heute"],
-body.lite-modus #agLiveTabs .stab[data-tab="auftraege"],
-body.lite-modus #agLiveTabs .stab[data-tab="meldungen"] { display:none !important; }
-/* im Mitarbeiter-Tab: Arbeitnehmer-Sektion + Ehemalige-Card aus */
-body.lite-modus #abtab-ma-arbeitnehmer { display:none !important; }
-body.lite-modus #abtab-mitarbeiter > details { display:none !important; }
-/* Azubi-Kacheln: nur UEBL (Kontakte/Berichte/Dokumente aus) */
-body.lite-modus #azTile-kontakte,
-body.lite-modus #azTile-berichte,
-body.lite-modus #azTile-dokumente { display:none !important; }
 </style>
 <script src="https://js-de.sentry-cdn.com/954a236264f49755ae54bc9f69f05762.min.js" crossorigin="anonymous"></script>
 </head>
@@ -1375,7 +1360,6 @@ const db=firebase.firestore();
 db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 
 let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};
-let _agModus='voll'; // 'voll' | 'lite' - wird beim Login aus users/{uid}.agModus gelesen
 
 // ─── MODUL-SICHTBARKEIT ───
 // Die HBZ schaltet pro Betrieb frei, was er sehen soll (users/{uid}.agModule).
@@ -1549,11 +1533,8 @@ auth.onAuthStateChanged(user=>{
       if(d.agStatus==='pending'){
         db.collection('users').doc(user.uid).update({agStatus:'aktiv'}).catch(()=>{});
       }
-      // Lite/Voll-Modus lesen (Default voll)
-      _agModus = (d.agModus==='lite') ? 'lite' : 'voll';
       // Freigeschaltet → App laden
       document.getElementById('appWrap').style.display='';
-      applyLiteMode();
       loadUserData();
     });
   } else {
@@ -2945,36 +2926,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   }catch(e){}
 });
 
-// Lite-Modus: reduziert ArbeitgeberPro auf die AG-relevante Ansicht (nur Azubis:
-// ÜBL + Anwesenheit). Operative Bereiche (Aufträge/Angebote/Zeiterfassung/Auswertung/
-// Belege) werden ausgeblendet. Voll-Modus (Default): nichts ändert sich. Reversibel -
-// alles haengt an _agModus, kein Loeschen.
-function applyLiteMode(){
-  const lite = (_agModus==='lite');
-  // Ausblendungen laufen ueber CSS-Klasse am Body (stabil auch bei Neu-Rendern).
-  document.body.classList.toggle('lite-modus', lite);
-  if(lite){
-    // Nach Aufbau: Mitarbeiter-Tab oeffnen und UEBL-Panel zeigen. Verzoegert, weil
-    // loadUserData/loadAzubis erst nach dem Login den Tab-Inhalt aufbauen.
-    const _openUebl=()=>{
-      try{ if(typeof showAgLiveTab==='function') showAgLiveTab('mitarbeiter'); }catch(e){}
-      try{
-        // UEBL-Panel direkt sichtbar schalten (agAzPanel togglet - hier explizit setzen)
-        ['azp-kontakte','azp-uebl','azp-berichte','azp-dokumente'].forEach(pid=>{
-          const el=document.getElementById(pid); if(el) el.style.display=(pid==='azp-uebl')?'':'none';
-        });
-        const t=document.getElementById('azTile-uebl'); if(t&&t.classList) t.classList.add('active');
-        const k=document.getElementById('azTile-kontakte'); if(k&&k.classList) k.classList.remove('active');
-        if(typeof setUeblFilter==='function') setUeblFilter(null,'aktuell');
-      }catch(e){}
-    };
-    setTimeout(_openUebl, 400);
-    setTimeout(_openUebl, 1200);
-  }
-}
 function showAgPage(id){
-  // Im Lite-Modus operative Bereiche gar nicht erst oeffnen
-  if(_agModus==='lite' && (id==='auswertung' || id==='belege')) id='live';
   
   // Legacy-IDs auf neue mappen (Back-compat falls irgendwo alter Code ruft)
   const legacyMap={betrieb:'live',azubis:'einstellungen',uebl:'einstellungen',home:'einstellungen'};
