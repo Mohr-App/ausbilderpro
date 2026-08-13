@@ -1360,6 +1360,7 @@ const db=firebase.firestore();
 db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 
 let _uid=null,_email='',_firma='',_azubis=[],_kurse={},_kursListeners={};
+let _agModus='voll'; // 'voll' | 'lite' - wird beim Login aus users/{uid}.agModus gelesen
 
 // ─── MODUL-SICHTBARKEIT ───
 // Die HBZ schaltet pro Betrieb frei, was er sehen soll (users/{uid}.agModule).
@@ -1533,8 +1534,11 @@ auth.onAuthStateChanged(user=>{
       if(d.agStatus==='pending'){
         db.collection('users').doc(user.uid).update({agStatus:'aktiv'}).catch(()=>{});
       }
+      // Lite/Voll-Modus lesen (Default voll)
+      _agModus = (d.agModus==='lite') ? 'lite' : 'voll';
       // Freigeschaltet → App laden
       document.getElementById('appWrap').style.display='';
+      applyLiteMode();
       loadUserData();
     });
   } else {
@@ -2926,7 +2930,30 @@ window.addEventListener('DOMContentLoaded',()=>{
   }catch(e){}
 });
 
+// Lite-Modus: reduziert ArbeitgeberPro auf die AG-relevante Ansicht (nur Azubis:
+// ÜBL + Anwesenheit). Operative Bereiche (Aufträge/Angebote/Zeiterfassung/Auswertung/
+// Belege) werden ausgeblendet. Voll-Modus (Default): nichts ändert sich. Reversibel -
+// alles haengt an _agModus, kein Loeschen.
+function applyLiteMode(){
+  const lite = (_agModus==='lite');
+  const setDisp=(id,show)=>{ const el=document.getElementById(id); if(el) el.style.display= show?'':'none'; };
+  // a) Haupt-Nav: Auswertung + Belege ausblenden (Live + Einstellungen bleiben)
+  setDisp('agnav-auswertung', !lite);
+  setDisp('agnav-belege', !lite);
+  // b) Im Live-Bereich die operativen Sub-Tabs ausblenden (Heute/Mitarbeiter/Aufträge/Meldungen)
+  document.querySelectorAll('#agpage-live .stab').forEach(b=>{ b.style.display = lite?'none':''; });
+  // c) In der Azubi-Ansicht nur ÜBL zeigen (Kontakte/Berichte/Dokumente aus)
+  ['azTile-kontakte','azTile-berichte','azTile-dokumente'].forEach(id=> setDisp(id, !lite));
+  // d) Im Lite-Modus direkt die Azubi-/ÜBL-Ansicht als Start zeigen
+  if(lite){
+    // die operativen Live-Tab-Panels ausblenden, Azubi-Panel zeigen
+    try{ if(typeof agAzPanel==='function') agAzPanel(null,'azp-uebl'); }catch(e){}
+  }
+}
 function showAgPage(id){
+  // Im Lite-Modus operative Bereiche gar nicht erst oeffnen
+  if(_agModus==='lite' && (id==='auswertung' || id==='belege')) id='live';
+  
   // Legacy-IDs auf neue mappen (Back-compat falls irgendwo alter Code ruft)
   const legacyMap={betrieb:'live',azubis:'einstellungen',uebl:'einstellungen',home:'einstellungen'};
   if(legacyMap[id]) id=legacyMap[id];

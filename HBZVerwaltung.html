@@ -1708,10 +1708,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 355';
+const APP_VERSION = 'Build 356';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 356', d:'12.08.2026', items:['\ud83c\udfe2 Arbeitgeber-Zug\u00e4nge: Modus-Schalter Lite/Voll je Betrieb. Im Lite-Modus sieht der Arbeitgeber nur \u00dcBL-Termine + Anwesenheit seiner Azubis (kein Auftrag/Angebot/Zeiterfassung). Umschaltbar mit einem Klick in der Betriebsliste.']},
   {v:'Build 355', d:'07.08.2026', items:['\ud83c\udfaf Import gleicht jetzt zuerst \u00fcber die Lehrlingsnummer ab (eindeutig) und erst danach \u00fcber Name+Geburtsdatum. L\u00f6st die bisher \u201eunsicheren\u201c F\u00e4lle bei Namensdubletten mit gleichem Geburtsdatum. Bestehender Namensabgleich bleibt als Fallback']},
   {v:'Build 354', d:'06.08.2026', items:['\ud83d\udd11 Import erkennt und speichert jetzt die Lehrlingsnummer aus der Kammerliste (eindeutige Nummer je Azubi). Grundlage f\u00fcr sicheren Abgleich und die neue Registrierung. \u00c4ndert nichts am bisherigen Anmeldeweg']},
   {v:'Build 353', d:'06.08.2026', items:['\ud83d\udd0d In der Teilnehmer-Liste eines Kurses werden lange Namen und die Beruf/Firma-Zeile jetzt vollst\u00e4ndig angezeigt, wenn man mit der Maus dar\u00fcber f\u00e4hrt (Tooltip)']},
@@ -10784,6 +10785,18 @@ function loadAGUsers(){
     renderAGList();
   });
 }
+function toggleAgModus(uid){
+  const a=_agUsers.find(x=>x.uid===uid); if(!a) return;
+  const neu=(a.agModus==='lite')?'voll':'lite';
+  const txt = neu==='lite'
+    ? 'Betrieb "'+(a.firma||'?')+'" auf LITE stellen?\n\nDer Arbeitgeber sieht dann nur noch ÜBL-Termine + Anwesenheit seiner Azubis (kein Auftrag/Angebot/Zeiterfassung).'
+    : 'Betrieb "'+(a.firma||'?')+'" auf VOLL (Vollzugriff) stellen?\n\nDer Arbeitgeber erhält wieder alle Funktionen.';
+  if(!confirm(txt)) return;
+  db.collection('users').doc(uid).update({agModus:neu}).then(()=>{
+    a.agModus=neu; renderAGList();
+    toast('✓ '+(a.firma||'Betrieb')+' → '+(neu==='lite'?'Lite':'Voll'));
+  }).catch(e=>{ alert('Fehler: '+(e.message||e.code)); });
+}
 function renderAGList(){
   const scCnt=document.getElementById('scCntAG');if(scCnt)scCnt.textContent=_agUsers.length;
   const el=document.getElementById('agListSettings');
@@ -10794,8 +10807,10 @@ function renderAGList(){
     const tnCount=_globalTN.filter(t=>t.firma===a.firma).length;
     const row=document.createElement('div');
     row.className='settings-row';
+    const _modus=(a.agModus==='lite')?'lite':'voll';
+    const _modusBtn='<button class="s-act-btn" title="'+(_modus==='lite'?'Lite-Modus (nur ÜBL+Anwesenheit) – klicken für Vollzugriff':'Vollzugriff – klicken für Lite-Modus')+'" onclick="toggleAgModus(\''+a.uid+'\')" style="font-size:.6rem;font-weight:700;padding:3px 8px;border-radius:6px;'+(_modus==='lite'?'background:rgba(37,99,235,.12);color:#2563eb':'background:rgba(16,185,129,.12);color:#059669')+'">'+(_modus==='lite'?'LITE':'VOLL')+'</button>';
     row.innerHTML='<div><div class="settings-row-name">🏢 '+esc(a.firma||'?')+'</div><div class="settings-row-sub">'+esc(a.email||'')+(tnCount?' · '+tnCount+' Azubi'+(tnCount>1?'s':''):'')+'</div></div>'
-      +'<div class="settings-row-actions"><button class="s-act-btn" title="Bearbeiten" onclick="editAGZugang(\''+a.uid+'\')">Bearbeiten</button></div>';
+      +'<div class="settings-row-actions">'+_modusBtn+'<button class="s-act-btn" title="Bearbeiten" onclick="editAGZugang(\''+a.uid+'\')">Bearbeiten</button></div>';
     el.appendChild(row);
   });
 }
