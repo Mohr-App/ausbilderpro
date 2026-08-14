@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v306'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v307'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -3822,6 +3822,7 @@ function _sendKursBeitrittMails(kd, kursId){
       +(zeitraum?'<div style="font-size:.82rem;color:#1e3a8a">📅 '+esc(zeitraum)+'</div>':'')
       +'</div>'
       +'<p style="margin:0;font-size:.78rem;color:#475569">In AzubiPro siehst du alle Kursdetails und kannst dich bei Bedarf krank/später melden.</p>'
+      +'<div style="text-align:center;margin-top:14px"><a href="https://mohr-app.github.io/ausbilderpro/AzubiPro.html" style="display:inline-block;padding:9px 18px;background:#059669;color:#fff;text-decoration:none;border-radius:8px;font-size:.82rem;font-weight:700">AzubiPro öffnen</a></div>'
       +'</div></div>';
     db.collection('mail').add({
       to: tnEmail,
@@ -3837,16 +3838,17 @@ function _sendKursBeitrittMails(kd, kursId){
         if(!u.email) return;
         const agHtml='<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f8fafc">'
           +'<div style="text-align:center;margin-bottom:20px;padding:18px;background:linear-gradient(135deg,#2563eb,#3b82f6);border-radius:12px">'
-          +'<div style="font-size:1.3rem;font-weight:800;color:#fff">📚 Mitarbeiter im Lehrgang</div>'
+          +'<div style="font-size:1.3rem;font-weight:800;color:#fff">📚 Auszubildende/r im Lehrgang</div>'
           +'</div>'
           +'<div style="padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:12px">'
           +'<p style="margin:0 0 12px;font-size:.9rem;color:#1e293b">Hallo,</p>'
-          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">Ihr Mitarbeiter <b>'+esc(tnName)+'</b> ist soeben einem Lehrgang beigetreten:</p>'
+          +'<p style="margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.55">Ihr/e Auszubildende/r <b>'+esc(tnName)+'</b> ist soeben einem Lehrgang beigetreten:</p>'
           +'<div style="padding:14px;background:#eff6ff;border:2px solid #bfdbfe;border-radius:10px;margin-bottom:12px">'
           +'<div style="font-size:.95rem;font-weight:800;color:#1e40af;margin-bottom:6px">📚 '+esc(kursName)+'</div>'
           +(zeitraum?'<div style="font-size:.82rem;color:#1e3a8a">📅 '+esc(zeitraum)+'</div>':'')
           +'</div>'
-          +'<p style="margin:0;font-size:.78rem;color:#475569">In diesem Zeitraum ist der Mitarbeiter zur überbetrieblichen Lehrunterweisung freigestellt.</p>'
+          +'<p style="margin:0;font-size:.78rem;color:#475569">In diesem Zeitraum ist der/die Auszubildende zur überbetrieblichen Lehrunterweisung freigestellt.</p>'
+          +'<div style="text-align:center;margin-top:14px"><a href="https://mohr-app.github.io/ausbilderpro/ArbeitgeberPro.html" style="display:inline-block;padding:9px 18px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-size:.82rem;font-weight:700">ArbeitgeberPro öffnen</a></div>'
           +'</div></div>';
         db.collection('mail').add({
           to: u.email,

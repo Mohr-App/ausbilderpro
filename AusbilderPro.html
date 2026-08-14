@@ -1958,7 +1958,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v824';
+const APP_VERSION = 'v825';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
   {v:'v821', d:'06.08.2026', items:['\ud83d\udd0d Im Teilnehmerpool werden abgeschnittene Namen und Firmen jetzt vollst\u00e4ndig angezeigt, wenn man mit der Maus \u00fcber die Kachel f\u00e4hrt (Tooltip)']},
@@ -3309,17 +3309,42 @@ function linkHBZKurs(kursId, kursData, targetKatId){
 
   // Neuen Lehrgang (Instance) anlegen + verknüpfen
   const instId=gid();
-  const rows=[
+  // Tischbeschriftungen/Layout vom letzten Lehrgang uebernehmen (wie im "Neuer
+  // Lehrgang"-Dialog): erst aus dieser Kursart, sonst vom global letzten. Die
+  // Belegung (seats) bleibt leer - nur Beschriftungen/Struktur wandern mit.
+  let rows=[
     {id:'r1',label:'',seats:[...DEFAULT_LEFT]},
     {id:'r2',label:'',seats:[...DEFAULT_RIGHT]}
   ];
+  let _lhSeatCnt=13, _lhNextSeatNum=13, _lhLabels={}, _lhBeschUnt=false;
+  (function(){
+    const prevI=Object.values(S.kats[targetKatId]?.instances||{});
+    let src=null;
+    if(prevI.length){
+      src=[...prevI].sort((a,b)=>{
+        const da=a.sY+'-'+String(a.sM).padStart(2,'0')+'-'+String(a.sD).padStart(2,'0');
+        const db2=b.sY+'-'+String(b.sM).padStart(2,'0')+'-'+String(b.sD).padStart(2,'0');
+        return db2>da?1:db2<da?-1:0;
+      })[0];
+    } else if(typeof _globalLastLayout==='function'){
+      src=_globalLastLayout();
+    }
+    if(src){
+      if(src.rows) rows=JSON.parse(JSON.stringify(src.rows)).map(r=>({...r}));
+      if(src.seatCnt) _lhSeatCnt=src.seatCnt;
+      if(src.nextSeatNum) _lhNextSeatNum=src.nextSeatNum;
+      if(src.seatLabels) _lhLabels=JSON.parse(JSON.stringify(src.seatLabels));
+      if(src.beschNotenUntereinander===true) _lhBeschUnt=true;
+    }
+  })();
   // Notenkategorien: nutze ausbilder-eigene Default-Konfiguration (aus Profil)
   const _tpl=_getGradeTemplate();
   const _hasTpl=_hasGradeTemplate();
   S.kats[targetKatId].instances[instId]={
     sD:von.d, sM:von.m, sY:von.y,
     eD:bis.d, eM:bis.m, eY:bis.y,
-    rows, seatCnt:13, seats:{}, nextSeatNum:13, seatLabels:{},
+    rows, seatCnt:_lhSeatCnt, seats:{}, nextSeatNum:_lhNextSeatNum, seatLabels:_lhLabels,
+    beschNotenUntereinander:_lhBeschUnt,
     sharedKursId: kursId,
     werkzeug: kursData.werkzeug||[],
     berufsschultage: kursData.berufsschultage||[],
