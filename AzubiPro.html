@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v305'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v306'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -2363,10 +2363,27 @@ function weg1ConfirmKursNo(){
   _weg1PendingMatch=null;
   var w=document.getElementById('joinFindeWeiche'); if(w) w.style.display='block';
 }
+// Sitzplatzeingabe darf stempeln bei: frischem QR-Scan ODER direkt nach Weg-1-Beitritt
+// (sessionStorage-Marker ueberlebt NUR den Weg-1-Reload im selben Tab - nicht App-Neustart
+// oder Folgetage; damit bleibt der Schutz "kein taegliches Einstempeln per Sitzplatz").
+// Bei Erfolg wird der Marker verbraucht (einmalig).
+function _sitzplatzDarfStempeln(){
+  if(!_tnData || !_tnData.aktiverKursId) return false;
+  if(_checkinKursId && _checkinKursId===_tnData.aktiverKursId) return true;
+  try{
+    const m=sessionStorage.getItem('weg1FrischKursId');
+    if(m && m===_tnData.aktiverKursId){ sessionStorage.removeItem('weg1FrischKursId'); return true; }
+  }catch(e){}
+  return false;
+}
 function _weg1Fertig(){
   window.history.replaceState({},'',window.location.pathname);
   const _regKursId=_joinKursId; _joinKursId=null;
-  setTimeout(()=>{ try{ _autoCheckinBeiRegistrierung(_regKursId); }catch(e){} location.reload(); }, 1200);
+  // Kein Auto-Checkin hier: (a) der reload schoss die async-Kette ab (Write kam nie an),
+  // (b) Konzept ist "Anwesenheit bei Sitzplatzeingabe", nicht beim Beitritt. Stattdessen
+  // Marker ueber den Reload retten - die Sitzplatzeingabe direkt danach darf stempeln.
+  try{ if(_regKursId) sessionStorage.setItem('weg1FrischKursId', _regKursId); }catch(e){}
+  setTimeout(()=>{ location.reload(); }, 1200);
 }
 
 function joinNgBack(){ var f=document.getElementById('joinNameGebForm'); if(f) f.style.display='none'; var w=document.getElementById('joinFindeWeiche'); if(w) w.style.display='block'; }
@@ -3585,8 +3602,8 @@ function saveHomeSitzplatz(){
     if(_tnData.aktiverKursId){
       db.collection('shared').doc('kurse').collection('list').doc(_tnData.aktiverKursId)
         .collection('teilnehmer').doc(_tnId).update({wunschSitzplatz:nr}).catch(()=>{});
-      // Nur bei frischem QR-Scan einstempeln (siehe savePlatznummerFromPopup)
-      if(_checkinKursId && _checkinKursId===_tnData.aktiverKursId){
+      // Einstempeln bei frischem QR-Scan ODER direkt nach Weg-1-Beitritt (Marker)
+      if(_sitzplatzDarfStempeln()){
         try{ _autoCheckinBeiRegistrierung(_tnData.aktiverKursId); }catch(e){}
       }
     }
@@ -7729,11 +7746,10 @@ function savePlatznummerFromPopup(){
   db.collection('globalTN').doc(_tnId).update({wunschSitzplatz:nr}).then(function(){
     _tnData.wunschSitzplatz=nr;
     if(_tnData.aktiverKursId){ db.collection('shared').doc('kurse').collection('list').doc(_tnData.aktiverKursId).collection('teilnehmer').doc(_tnId).update({wunschSitzplatz:nr}).catch(function(){}); }
-    // Sitzplatzeingabe stempelt NUR bei frischem QR-Scan ein (erster Kurstag / gerade
-    // gescannt): _checkinKursId ist nur nach einem echten Scan gesetzt und stimmt dann
-    // mit dem aktiven Kurs ueberein. An Folgetagen (App nur geoeffnet, kein Scan) ist
-    // _checkinKursId null -> kein Stempeln, der TN muss regulaer den Raum-QR scannen.
-    if(_tnData.aktiverKursId && _checkinKursId && _checkinKursId===_tnData.aktiverKursId){
+    // Einstempeln bei frischem QR-Scan ODER direkt nach Weg-1-Beitritt (Marker).
+    // An Folgetagen (kein Scan, kein Marker) stempelt die Sitzplatzeingabe NICHT -
+    // der TN scannt regulaer den Raum-QR.
+    if(_sitzplatzDarfStempeln()){
       try{ _autoCheckinBeiRegistrierung(_tnData.aktiverKursId); }catch(e){}
     }
     toast('✓ Platz '+nr+' gespeichert!');
