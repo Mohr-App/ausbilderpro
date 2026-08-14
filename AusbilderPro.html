@@ -1955,7 +1955,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v822';
+const APP_VERSION = 'v823';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
   {v:'v821', d:'06.08.2026', items:['\ud83d\udd0d Im Teilnehmerpool werden abgeschnittene Namen und Firmen jetzt vollst\u00e4ndig angezeigt, wenn man mit der Maus \u00fcber die Kachel f\u00e4hrt (Tooltip)']},
@@ -12561,14 +12561,14 @@ function loadPool(){
         const urlConf=getTnUrlaubConflict(doc.id);
         const isPending=!!_tnPending[doc.id];
         const isUnbestaetigt = _freigabePflicht && !!d.bestaetigungAngefordert && !d.bestaetigtAm;
-        if(isPending){ card.style.opacity='.5'; card.style.borderColor='rgba(239,68,68,.4)'; card.draggable=false; }
+        if(isPending){ card.draggable=false; }
         else if(isUnbestaetigt){ card.classList.add('pool-card-unbestaetigt'); }
         if(_kursLaeuftP && !isPlaced && !isPending){
           card.classList.add('pool-card-fehlt');
           card.title='\u26a0 '+fullName+' \u2013 Nicht angetreten? \u2192 In den Container \u201eNicht angetreten\u201c ziehen (Verwaltung wird informiert). Doch da? Auf einen Sitzplatz ziehen.';
         }
-        card.innerHTML='<div class="pool-avatar"'+(isPending?' style="background:rgba(239,68,68,.2);color:#ef4444"':'')+'>'+initials+'</div>'
-          +'<div style="flex:1;min-width:0"><div class="pool-name" title="'+esc(fullName)+(d.firma?' \u2013 '+esc(d.firma):'')+'">'+esc(fullName)+'</div>'
+        card.innerHTML='<div class="pool-avatar"'+(isPending?' style="background:rgba(239,68,68,.2);color:#ef4444;opacity:.5"':'')+'>'+initials+'</div>'
+          +'<div style="flex:1;min-width:0'+(isPending?';opacity:.5':'')+'"><div class="pool-name" title="'+esc(fullName)+(d.firma?' \u2013 '+esc(d.firma):'')+'">'+esc(fullName)+'</div>'
           +'<div class="pool-sub" title="'+esc(fullName+(d.firma?' \u2013 '+d.firma:'')+(d.beruf?' \u00b7 '+d.beruf:''))+'">'+(isPending?'<span style="color:#ef4444;font-weight:700">🔴 Wird entfernt \u2013 dein Klick n\u00f6tig</span>':isUnbestaetigt?'<span style="color:#ef4444;font-weight:700">⚠️ noch nicht bestätigt</span>':isPlaced?'✓ Platziert':urlConf?'<span style="color:#f59e0b;font-weight:700">🏖 '+urlConf.days+'d Urlaub</span>':(d.wunschSitzplatz?'<span style="color:#10b981;font-weight:600">🪑 Platz '+esc(d.wunschSitzplatz)+'</span> · ':'')+esc(d.firma||d.beruf||''))+'</div></div>';
         if(isPending){
           // Quittier-Knopf: der TN wurde von der Verwaltung zur Entfernung vorgemerkt
