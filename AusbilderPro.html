@@ -1956,7 +1956,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v827';
+const APP_VERSION = 'v828';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
   {v:'v821', d:'06.08.2026', items:['\ud83d\udd0d Im Teilnehmerpool werden abgeschnittene Namen und Firmen jetzt vollst\u00e4ndig angezeigt, wenn man mit der Maus \u00fcber die Kachel f\u00e4hrt (Tooltip)']},
@@ -7476,6 +7476,14 @@ function removeAllSigStempelBulk(){
 function getAusbilderProfil(){
   try{return JSON.parse(localStorage.getItem(_lsKey('ausbilderProfil'))||'{}');}catch(e){return{};}
 }
+// Antwort-Adresse fuer ausgehende Azubi-/AG-Mails: die im Profil hinterlegte
+// Kontakt-/Dienstmail ("E-Mail (fuer Azubis sichtbar)"). Fallback: Login-Mail.
+// Grund: Login-Mail kann privat sein - Antworten liefen sonst dorthin.
+function _replyToMail(){
+  const p=(getAusbilderProfil().email||'').trim();
+  if(p && p.indexOf('@')>0) return p;
+  return _auth?.currentUser?.email||'';
+}
 
 // ─── STEMPEL + SIGNATUR (PIN-verschluesselt) ───
 async function _deriveKey(pin, salt){
@@ -9422,7 +9430,7 @@ function _sendNeuerKursMailAP(tnInfo, kursInfo){
     +'</div>';
   _db.collection('mail').add({
     to: email,
-    replyTo: _auth?.currentUser?.email||'',
+    replyTo: _replyToMail(),
     message: {
       subject: 'Neuer Lehrgang: '+kursName+(zeitraum?' ('+zeitraum+')':''),
       html: html
@@ -9452,7 +9460,7 @@ function _sendNeuerKursMailAP(tnInfo, kursInfo){
           +'</div></div>';
         _db.collection('mail').add({
           to: u.email,
-          replyTo: _auth?.currentUser?.email||'',
+          replyTo: _replyToMail(),
           message: {
             subject: 'Lehrgang für '+fullName+': '+kursName+(zeitraum?' ('+zeitraum+')':''),
             html: agHtml
@@ -9723,7 +9731,7 @@ function _sendAusbilderBestaetigung(typ, kursLabel, datumDE, wann, tnCount, ausb
   }
   _db.collection('mail').add({
     to: ausbilderEmail,
-    replyTo: _auth?.currentUser?.email||'',
+    replyTo: _replyToMail(),
     message: {
       subject: subject,
       html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
@@ -11222,7 +11230,7 @@ function sendTnEmail(tnData, subject, htmlBody){
     +'</div>';
   _db.collection('mail').add({
     to: email,
-    replyTo: _auth?.currentUser?.email||'',
+    replyTo: _replyToMail(),
     message: {
       subject: subject,
       html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
@@ -11271,7 +11279,7 @@ function sendAgEmail(tnData, subject, htmlBody, fallbackEmail){
     +'</div>'
     +'<p style="margin:16px 0 0;font-size:.7rem;color:#9ca3af;text-align:center">Diese E-Mail wurde automatisch von AusbilderPro Suite versendet.</p>'
     +'</div>';
-  const _sendTo=(toEmail)=>{ if(!toEmail) return; _db.collection('mail').add({ to: toEmail, replyTo: _auth?.currentUser?.email||'', message:{ subject: subject, html: _msgHtml } }).catch(()=>{}); };
+  const _sendTo=(toEmail)=>{ if(!toEmail) return; _db.collection('mail').add({ to: toEmail, replyTo: _replyToMail(), message:{ subject: subject, html: _msgHtml } }).catch(()=>{}); };
   if(firma){
     _db.collection('users').where('firma','==',firma).where('role','==','arbeitgeber').get().then(snap=>{
       let sent=false;
@@ -11310,7 +11318,7 @@ function sendKursAusfallEmailAG(tnData, kursLabel, datumDE, ausbilderName, wann)
       if(!u.email) return;
       _db.collection('mail').add({
         to: u.email,
-        replyTo: _auth?.currentUser?.email||'',
+        replyTo: _replyToMail(),
         message: {
           subject: subject,
           html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
@@ -11350,7 +11358,7 @@ function sendAusbilderSpaeterEmailAG(tnData, kursLabel, datumDE, ausbilderName, 
       if(!u.email) return;
       _db.collection('mail').add({
         to: u.email,
-        replyTo: _auth?.currentUser?.email||'',
+        replyTo: _replyToMail(),
         message: {
           subject: subject,
           html: '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">'
