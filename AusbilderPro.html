@@ -1498,8 +1498,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   <div id="mtAuswahlSub" style="font-size:.7rem;color:#111;margin-top:2px;line-height:1.5"></div>
   <button type="button" onclick="mtClearSelection()" style="margin-top:6px;background:none;border:none;color:var(--acc);font-size:.66rem;text-decoration:underline;cursor:pointer;padding:0;font-family:inherit">andere Person wählen</button>
 </div>
-<div class="fg" style="margin-top:10px"><label class="fl">Sitzplatznummer</label><input class="fi" id="mtSitzplatz" type="number" min="1" placeholder="z.B. 5" style="max-width:120px"></div>
-<div style="font-size:.62rem;color:var(--mu);margin-top:8px;line-height:1.45">Nicht in der Liste? Neue Teilnehmer legt nur die Verwaltung an – bitte dort melden.</div>
+<div style="font-size:.62rem;color:var(--mu);margin-top:10px;line-height:1.45">Nicht in der Liste? Neue Teilnehmer legt nur die Verwaltung an – bitte dort melden.</div>
 <button class="bsave" id="mtSaveBtn" title="✓ Zum Kurs hinzufügen" onclick="saveManualTN()" style="margin-top:12px" disabled>✓ Zum Kurs hinzufügen</button>
 </div></div></div>
 
@@ -1957,7 +1956,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v826';
+const APP_VERSION = 'v827';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
   {v:'v821', d:'06.08.2026', items:['\ud83d\udd0d Im Teilnehmerpool werden abgeschnittene Namen und Firmen jetzt vollst\u00e4ndig angezeigt, wenn man mit der Maus \u00fcber die Kachel f\u00e4hrt (Tooltip)']},
@@ -9208,7 +9207,6 @@ function _qrLateMins(zeit){ // 'HH:MM' → Minuten nach 7:30 (0 wenn puenktlich)
 
 function openManualTNModal(){ if(lockGuard())return;
   document.getElementById('mtSuche').value='';
-  document.getElementById('mtSitzplatz').value='';
   // Suggestion-State reset (Liste selbst bleibt gecacht - _mtLadeTnListe)
   mtClearSelection();
   const sg = document.getElementById('mtSuggBox');
@@ -9329,8 +9327,7 @@ function mtPickExisting(tnId){
   if(box) box.style.display='block';
   const c=document.getElementById('mtSuggBox');
   if(c){c.style.display='none'; c.innerHTML='';}
-  const sb=document.getElementById('mtSaveBtn'); if(sb) sb.disabled=false;
-  const sp=document.getElementById('mtSitzplatz'); if(sp) sp.focus();
+  const sb=document.getElementById('mtSaveBtn'); if(sb){ sb.disabled=false; sb.focus(); }
 }
 function mtClearSelection(){
   _mtSelectedExistingId = null;
@@ -9349,7 +9346,6 @@ function saveManualTN(){
   if(!_mtSelectedExistingId){toast('Bitte zuerst einen Teilnehmer aus der Liste wählen','bad');return;}
   const t=_mtSuggestionList.find(x=>x.id===_mtSelectedExistingId);
   if(!t){toast('Auswahl ungültig – bitte erneut suchen','bad');return;}
-  const wunschSitzplatz=(document.getElementById('mtSitzplatz').value||'').trim();
   const existingTnId = _mtSelectedExistingId;
   const histEntry = {
     kursId: kursId,
@@ -9366,9 +9362,7 @@ function saveManualTN(){
     const cur = doc.data();
     const hist = Array.isArray(cur.kursHistory)?cur.kursHistory:[];
     if(!hist.some(h=>h.kursId===kursId)) hist.push(histEntry);
-    const upd={ aktiverKursId: kursId, kursHistory: hist };
-    if(wunschSitzplatz) upd.wunschSitzplatz=wunschSitzplatz;
-    return _db.collection('globalTN').doc(existingTnId).set(upd,{merge:true}).then(()=>cur);
+    return _db.collection('globalTN').doc(existingTnId).set({ aktiverKursId: kursId, kursHistory: hist },{merge:true}).then(()=>cur);
   }).then(cur=>{
     // 2. Kurs-TN-Subcollection: Kopie der Stammdaten aus dem Datensatz (nicht aus Eingaben)
     return _db.collection('shared').doc('kurse').collection('list').doc(kursId)
@@ -9376,7 +9370,7 @@ function saveManualTN(){
         vorname:cur.vorname||'', nachname:cur.nachname||'', firma:cur.firma||'',
         beruf:cur.beruf||'', berufGruppeId:cur.berufGruppeId||'', ausbjahr:cur.ausbjahr||'',
         kontaktEmail:cur.kontaktEmail||cur.email||'', kontaktTelefon:cur.kontaktTelefon||'',
-        wunschSitzplatz, status:'active', addedAt: Date.now()
+        status:'active', addedAt: Date.now()
       },{merge:true}).then(()=>cur);
   }).then(cur=>{
     // Cache nachziehen, damit die naechste Suche den aktuellen Kurs kennt

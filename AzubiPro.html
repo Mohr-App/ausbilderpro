@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v308'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v309'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -7337,8 +7337,20 @@ function loadKurse(){
     }
 
     el.innerHTML=html;
+    // Frisch beigetreten (Weg-1-Marker) und noch kein Sitzplatz -> Platznummer-Popup
+    // direkt oeffnen, damit der Azubi ohne Suchen einstempeln kann. Einmal je Sitzung;
+    // Marker bleibt bis zur Eingabe erhalten (X schliesst nur das Popup).
+    try{ _weg1PlatzPopupAuto(); }catch(e){}
     });
   });
+}
+function _weg1PlatzPopupAuto(){
+  if(window._weg1PlatzPopupGezeigt) return;
+  let m=null; try{ m=sessionStorage.getItem('weg1FrischKursId'); }catch(e){}
+  if(!m || !_tnData || m!==_tnData.aktiverKursId) return;
+  if(String(_tnData.wunschSitzplatz||'').trim()) return;
+  window._weg1PlatzPopupGezeigt=true;
+  setTimeout(()=>{ try{ openPlatznummer(true); }catch(e){} }, 400);
 }
 
 // ── Benachrichtigungen ──
@@ -7744,9 +7756,12 @@ function openKurshistorie(){
 }
 function openKursunterlagen(){ var c=document.getElementById('docsBetriebCard'); if(c) c.style.display='none'; showPage('docs'); }
 function openAlleDokumente(){ var c=document.getElementById('docsBetriebCard'); if(c) c.style.display=''; showPage('docs'); }
-function openPlatznummer(){
+function openPlatznummer(willkommen){
   const cur=(_tnData&&_tnData.wunschSitzplatz)||'';
-  const inner='<div style="font-size:.75rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Dein Ausbilder nennt dir deine Platznummer. Trag sie hier ein.</div>'
+  const intro=willkommen
+    ? '<div style="font-size:.78rem;color:#065f46;font-weight:700;margin-bottom:6px">Willkommen im Lehrgang! 🎉</div><div style="font-size:.75rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Trag deine Platznummer ein – damit bist du für heute anwesend gemeldet. Dein Ausbilder nennt dir die Nummer.</div>'
+    : '<div style="font-size:.75rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Dein Ausbilder nennt dir deine Platznummer. Trag sie hier ein.</div>';
+  const inner=intro
     +'<input id="platzInput" class="fi" type="number" min="1" inputmode="numeric" placeholder="z.B. 12" value="'+esc(cur)+'" style="margin-bottom:10px;text-align:center;font-size:1.1rem;font-weight:800">'
     +'<button onclick="savePlatznummerFromPopup()" class="btn" style="width:100%" title="Platz speichern">✓ Platz speichern</button>';
   _showSimplePopup('Meine Platznummer', inner);
