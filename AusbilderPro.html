@@ -1290,7 +1290,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
         <div class="pool-sb-title">👥 Teilnehmerpool</div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:stretch">
-          <button class="pool-hide-btn" id="poolAddTnBtn" onclick="openManualTNModal()" title="Teilnehmer manuell zum Kurs hinzufügen" style="background:linear-gradient(135deg,#2563eb,#059669);border:none;color:#fff;font-weight:800;display:none;text-align:center;box-shadow:0 3px 10px rgba(37,99,235,.3)">＋ TN</button>
+          <button class="pool-hide-btn" id="poolAddTnBtn" onclick="openManualTNModal()" title="Teilnehmer aus der Kammerliste zum Kurs zuordnen" style="background:linear-gradient(135deg,#2563eb,#059669);border:none;color:#fff;font-weight:800;display:none;text-align:center;box-shadow:0 3px 10px rgba(37,99,235,.3)">＋ TN</button>
         </div>
       </div>
     </div>
@@ -1488,20 +1488,19 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <!-- MANUELL TN HINZUFÜGEN MODAL -->
 <div class="ov" id="manualTNModal">
 <div class="modal" style="max-width:400px">
-<div class="mhd"><div class="mtit">👤 Teilnehmer manuell hinzufügen</div><button class="xcls" onclick="document.getElementById('manualTNModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
+<div class="mhd"><div class="mtit">👤 Teilnehmer aus der Liste zuordnen</div><button class="xcls" onclick="document.getElementById('manualTNModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
 <div class="mbdy">
-<div class="fg"><label class="fl">Vorname <span style="color:#ef4444">*</span></label><input class="fi" id="mtVorname" placeholder="Max" oninput="mtSearchSuggestions()" autocomplete="off"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">Nachname <span style="color:#ef4444">*</span></label><input class="fi" id="mtNachname" placeholder="Mustermann" oninput="mtSearchSuggestions()" autocomplete="off"></div>
-<div id="mtSuggBox" style="display:none;margin-top:6px;border:1.5px solid rgba(37,99,235,.3);border-radius:8px;background:#fff;max-height:240px;overflow-y:auto"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">Betrieb</label><input class="fi" id="mtBetrieb" placeholder="Firma GmbH"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">Beruf / Fachrichtung (laut Liste)</label><input class="fi" id="mtBeruf" placeholder="z. B. Elektroniker/in, FR Energie- und Gebäudetechnik"></div>
-<div class="fg" style="margin-top:6px"><label class="fl">Lehrjahr <span style="color:#ef4444">*</span></label><select class="fi" id="mtLehrjahr"><option value="">–</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
-<div style="display:flex;gap:8px;margin-top:6px">
-<div class="fg" style="flex:1"><label class="fl">E-Mail</label><input class="fi" id="mtEmail" type="email" placeholder="max@firma.de"></div>
-<div class="fg" style="flex:1"><label class="fl">Telefon</label><input class="fi" id="mtTelefon" type="tel" placeholder="+49 …"></div>
+<div class="fg"><label class="fl">Suche (Name oder Betrieb)</label><input class="fi" id="mtSuche" placeholder="z. B. Müller oder Elektro Schmitz" oninput="mtSearchSuggestions()" autocomplete="off"></div>
+<div id="mtSuggBox" style="display:none;margin-top:6px;border:1.5px solid rgba(37,99,235,.3);border-radius:8px;background:#fff;max-height:260px;overflow-y:auto"></div>
+<div id="mtAuswahl" style="display:none;margin-top:10px;padding:10px 12px;border:1.5px solid rgba(5,150,105,.35);border-radius:8px;background:rgba(5,150,105,.05)">
+  <div style="font-size:.62rem;color:var(--mu);font-weight:600;margin-bottom:4px">Ausgewählt (Stammdaten aus der Kammerliste)</div>
+  <div id="mtAuswahlName" style="font-weight:800;font-size:.86rem;color:#111"></div>
+  <div id="mtAuswahlSub" style="font-size:.7rem;color:#111;margin-top:2px;line-height:1.5"></div>
+  <button type="button" onclick="mtClearSelection()" style="margin-top:6px;background:none;border:none;color:var(--acc);font-size:.66rem;text-decoration:underline;cursor:pointer;padding:0;font-family:inherit">andere Person wählen</button>
 </div>
-<div class="fg" style="margin-top:6px"><label class="fl">Sitzplatznummer</label><input class="fi" id="mtSitzplatz" type="number" min="1" placeholder="z.B. 5" style="max-width:120px"></div>
-<button class="bsave" title="✓ Hinzufügen" onclick="saveManualTN()" style="margin-top:12px">✓ Hinzufügen</button>
+<div class="fg" style="margin-top:10px"><label class="fl">Sitzplatznummer</label><input class="fi" id="mtSitzplatz" type="number" min="1" placeholder="z.B. 5" style="max-width:120px"></div>
+<div style="font-size:.62rem;color:var(--mu);margin-top:8px;line-height:1.45">Nicht in der Liste? Neue Teilnehmer legt nur die Verwaltung an – bitte dort melden.</div>
+<button class="bsave" id="mtSaveBtn" title="✓ Zum Kurs hinzufügen" onclick="saveManualTN()" style="margin-top:12px" disabled>✓ Zum Kurs hinzufügen</button>
 </div></div></div>
 
 <!-- DATE PICKER MODAL -->
@@ -1728,7 +1727,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <div class="tp active" id="tp-info">
         <div id="seatLeerHinweis" style="display:none;padding:10px 12px;margin-bottom:10px;background:rgba(245,158,11,.08);border:1.5px solid rgba(245,158,11,.3);border-radius:10px;font-size:.74rem;color:#92400e;line-height:1.5">
-          ℹ <b>Leerer Sitzplatz.</b> Bitte erst über <b>＋ TN</b> in der rechten Sidebar einen Teilnehmer anlegen, dann per Drag & Drop oder Tap auf diesen Sitz ziehen. So erscheint der TN auch in der VerwaltungPro-Kursliste.
+          ℹ <b>Leerer Sitzplatz.</b> Bitte erst über <b>＋ TN</b> in der rechten Sidebar einen Teilnehmer aus der Kammerliste zuordnen, dann per Drag & Drop oder Tap auf diesen Sitz ziehen. So erscheint der TN auch in der VerwaltungPro-Kursliste.
         </div>
 
         <!-- Persönliche Daten -->
@@ -1958,7 +1957,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v825';
+const APP_VERSION = 'v826';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
   {v:'v821', d:'06.08.2026', items:['\ud83d\udd0d Im Teilnehmerpool werden abgeschnittene Namen und Firmen jetzt vollst\u00e4ndig angezeigt, wenn man mit der Maus \u00fcber die Kachel f\u00e4hrt (Tooltip)']},
@@ -3562,7 +3561,7 @@ function poolEmptyGuideHtml(state){
     ? '<button onclick="openQRModal()" class="pool-guide-btn pool-guide-btn-primary" title="QR-Code anzeigen">📱 QR-Code anzeigen</button>'
     : '<button onclick="activateFirestore()" class="pool-guide-btn pool-guide-btn-primary" title="Kurs aktivieren – dann QR-Code verfügbar">🔗 Kurs aktivieren</button>';
   const tnBtn = hasKurs
-    ? '<button onclick="openManualTNModal()" class="pool-guide-btn" title="Teilnehmer manuell hinzufügen">➕ TN hinzufügen</button>'
+    ? '<button onclick="openManualTNModal()" class="pool-guide-btn" title="Teilnehmer aus der Liste zuordnen">➕ TN zuordnen</button>'
     : '<button onclick="activateFirestore()" class="pool-guide-btn" title="Kurs aktivieren – dann kann manuell TN eingetragen werden">🔗 Kurs zuerst aktivieren</button>';
 
   return ''
@@ -3937,7 +3936,7 @@ function renderMain(){
     +'<button class="tbtn main-docs-btn ka-b" onclick="openEmailBestaetigung()" title="Übersicht: welche Azubis ihre E-Mail-Adresse bestätigt haben">📧 E-Mail-Bestätigung</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="generateBetriebslisteAusbilder()" title="PDF-Liste der Ausbildungsbetriebe mit Telefonnummern">🏢 Betriebsliste</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="generateAlleBescheinigungenAusbilder()" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen</button>'
-    +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g btn-grad" onclick="openManualTNModal()" title="Teilnehmer manuell zum Kurs hinzufügen">👤+ TN</button><button class="tbtn main-docs-btn ka-b" onclick="openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button><button class="tbtn main-docs-btn ka-g btn-grad" onclick="openQRAttModal()" title="QR-Anwesenheit: Azubis checken per Scan + GPS-Standortprüfung selbst ein">📡 QR-Anwesenheit</button>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
+    +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g btn-grad" onclick="openManualTNModal()" title="Teilnehmer aus der Kammerliste zum Kurs zuordnen">👤+ TN</button><button class="tbtn main-docs-btn ka-b" onclick="openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button><button class="tbtn main-docs-btn ka-g btn-grad" onclick="openQRAttModal()" title="QR-Anwesenheit: Azubis checken per Scan + GPS-Standortprüfung selbst ein">📡 QR-Anwesenheit</button>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
     +'<button class="tbtn main-docs-btn ka-g" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Diesen Lehrgang in einen anderen Kurs verschieben">↔ Lehrgang verschieben</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="showAktionsVerlauf()" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">📋 Aktions-Verlauf</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="refreshTNStammdaten()" title="Beruf/Fachrichtung aller platzierten TN aus den Stammdaten (KH-Liste) auffrischen">🔄 TN-Daten auffrischen</button>'
@@ -6581,8 +6580,8 @@ async function recoverOrphanSeats(){
   // Übersicht
   const summary=probleme.map(p=>{
     const nmStr=(p.vn?p.vn+' '+p.nn:p.seat.name)+' ('+p.kursName+')';
-    if(p.typ==='orphan') return '➕ '+nmStr+' – nicht in DB';
-    if(p.typ==='globalTNFehlt') return '⚠ '+nmStr+' – globalTN-Eintrag fehlt';
+    if(p.typ==='orphan') return '⏭ '+nmStr+' – nicht in DB (wird NICHT angelegt: über +TN aus Liste zuordnen, sonst Verwaltung)';
+    if(p.typ==='globalTNFehlt') return '⏭ '+nmStr+' – globalTN-Eintrag fehlt (wird NICHT angelegt: über +TN aus Liste zuordnen, sonst Verwaltung)';
     if(p.typ==='verknuepfungKaputt'){
       const teile=[];
       if(!p.aktKursOk) teile.push('aktiverKursId='+p.currentAktKurs);
@@ -6615,21 +6614,12 @@ async function recoverOrphanSeats(){
         angelegtVon:(_auth&&_auth.currentUser&&_auth.currentUser.email)||''
       };
       let tnId;
-      if(p.typ==='orphan'){
-        const ref=await _db.collection('globalTN').add(tnData);
-        tnId=ref.id;
-        // poolTnId am Sitz nachziehen
-        const k=S.kats[p.katId];
-        const i=k && k.instances && k.instances[p.instId];
-        const ss=i && i.seats && i.seats[p.sid];
-        if(ss){ss.poolTnId=tnId; ss.poolKursId=p.kursId;}
-        persist();
-        angelegt++;
-      } else if(p.typ==='globalTNFehlt'){
-        // Sitz hat poolTnId, aber globalTN fehlt → mit dieser ID neu anlegen
-        await _db.collection('globalTN').doc(p.seat.poolTnId).set(tnData);
-        tnId=p.seat.poolTnId;
-        angelegt++;
+      if(p.typ==='orphan' || p.typ==='globalTNFehlt'){
+        // Ausbilder legt keine globalTN-Datensaetze an (auch nicht per Recovery).
+        // Solche Sitze werden nur gemeldet: TN ueber +TN aus der Liste zuordnen,
+        // fehlt er in der Liste -> Verwaltung.
+        uebersprungen++;
+        continue;
       } else if(p.typ==='verknuepfungKaputt'){
         // globalTN-Doc fixieren (aktiverKursId)
         // Status-Marker (status/wiederholer) NUR entfernen wenn die Kurs
@@ -9217,17 +9207,10 @@ function _qrLateMins(zeit){ // 'HH:MM' → Minuten nach 7:30 (0 wenn puenktlich)
 }
 
 function openManualTNModal(){ if(lockGuard())return;
-  document.getElementById('mtVorname').value='';
-  document.getElementById('mtNachname').value='';
-  document.getElementById('mtBetrieb').value='';
-  { const _mb=document.getElementById('mtBeruf'); if(_mb) _mb.value=''; }
-  document.getElementById('mtLehrjahr').value='';
-  document.getElementById('mtEmail').value='';
-  document.getElementById('mtTelefon').value='';
+  document.getElementById('mtSuche').value='';
   document.getElementById('mtSitzplatz').value='';
-  // Suggestion-State reset
-  _mtSelectedExistingId = null;
-  _mtSuggestionList = [];
+  // Suggestion-State reset (Liste selbst bleibt gecacht - _mtLadeTnListe)
+  mtClearSelection();
   const sg = document.getElementById('mtSuggBox');
   if(sg){sg.style.display='none'; sg.innerHTML='';}
   // Existierende TN aus globalTN laden (fuer Autocomplete)
@@ -9242,10 +9225,9 @@ function openManualTNModal(){ if(lockGuard())return;
   //
   // Jetzt: einmal je Sitzung laden statt bei jedem Oeffnen. Das war vorher
   // 500 Lesevorgaenge pro Klick auf "TN+"; jetzt sind es alle, aber nur einmal.
-  _mtLadeTnListe();
-  // Berufsgruppen-Dropdown befuellen (aus Firestore shared/kursSettings/berufe)
-  mtPopulateBerufe();
+  _mtLadeTnListe().then(()=>mtSearchSuggestions());
   document.getElementById('manualTNModal').classList.add('open');
+  setTimeout(()=>{ const f=document.getElementById('mtSuche'); if(f) f.focus(); },50);
 }
 
 let _mtListePromise = null;   // Cache je Sitzung
@@ -9289,46 +9271,45 @@ let _mtSuggestionList = [];
 let _mtSelectedExistingId = null;
 
 function mtSearchSuggestions(){
-  // Wenn Auswahl bereits getroffen + User aendert Namen -> Auswahl loesen
-  if(_mtSelectedExistingId) _mtSelectedExistingId = null;
-  const v=(document.getElementById('mtVorname').value||'').trim().toLowerCase();
-  const n=(document.getElementById('mtNachname').value||'').trim().toLowerCase();
+  const q=(document.getElementById('mtSuche').value||'').trim().toLowerCase();
   const container=document.getElementById('mtSuggBox');
   if(!container) return;
-  if(v.length < 2 && n.length < 2){
+  if(q.length < 2){
     container.style.display='none'; container.innerHTML=''; return;
   }
-  // DIAG: Status-Header
   const total = _mtSuggestionList.length;
-  // Wenn noch nichts geladen wurde -> Hinweis
   if(!total && _mtListeFehler){
     container.innerHTML = '<div style="padding:8px 10px;font-size:.7rem;color:#dc2626;font-weight:700">⚠ Teilnehmerliste konnte nicht geladen werden ('+_mtListeFehler+'). Bitte Modal schließen und erneut öffnen.</div>';
     container.style.display = 'block';
     return;
   }
   if(!total){
-    container.innerHTML = '<div style="padding:8px 10px;font-size:.7rem;color:var(--mu)">⏳ Lade TN-Daten... (oder keine vorhanden)</div>';
+    container.innerHTML = '<div style="padding:8px 10px;font-size:.7rem;color:var(--mu)">⏳ Lade Teilnehmerliste…</div>';
     container.style.display = 'block';
     return;
   }
-  const queryNorm = _normNameFuzzy(v, n);
+  // Suche ueber Vorname, Nachname UND Firma. Mehrere Woerter = alle muessen
+  // irgendwo treffen ("mueller elektro" -> Name Mueller bei Firma Elektro...).
+  // Tippfehler-Toleranz (Levenshtein<=2) auf den vollen Namen.
+  const words=q.split(/\s+/).filter(Boolean);
   const hits = _mtSuggestionList.filter(t=>{
-    const tNorm = _normNameFuzzy(t.vorname, t.nachname);
-    const vn = (t.vorname||'').toLowerCase();
-    const nn = (t.nachname||'').toLowerCase();
-    if(v && vn.startsWith(v) && (!n || nn.startsWith(n))) return true;
-    if(n && nn.startsWith(n) && (!v || vn.startsWith(v))) return true;
-    if(v && n && _levenshtein(queryNorm, tNorm) <= 2) return true;
+    const vn=(t.vorname||'').toLowerCase(), nn=(t.nachname||'').toLowerCase(), fi=(t.firma||'').toLowerCase();
+    const hay=vn+' '+nn+' '+fi;
+    if(words.every(w=>hay.includes(w))) return true;
+    if(words.length<=2 && _levenshtein(_normNameFuzzy(words[0]||'', words[1]||''), _normNameFuzzy(t.vorname,t.nachname)) <= 2) return true;
+    if(words.length<=2 && _levenshtein(_normNameFuzzy(words[1]||'', words[0]||''), _normNameFuzzy(t.vorname,t.nachname)) <= 2) return true;
     return false;
-  }).slice(0, 6);
+  });
+  hits.sort((x,y)=>((x.nachname||'')+(x.vorname||'')).localeCompare((y.nachname||'')+(y.vorname||''),'de'));
+  const shown=hits.slice(0,12);
   if(!hits.length){
-    container.innerHTML = '<div style="padding:8px 10px;font-size:.7rem;color:var(--mu)">Kein Treffer in '+total+' vorhandenen TN. Wird neu angelegt.</div>';
+    container.innerHTML = '<div style="padding:10px 12px;font-size:.72rem;color:#b91c1c;font-weight:700;line-height:1.5">Kein Treffer in der Kammerliste ('+total+' Teilnehmer).<br><span style="font-weight:500;color:#7f1d1d">Neue Teilnehmer legt nur die Verwaltung an – bitte dort melden.</span></div>';
     container.style.display = 'block';
     return;
   }
-  let html = '<div style="font-size:.62rem;color:var(--mu);padding:6px 10px;background:rgba(37,99,235,.06);border-bottom:1px solid var(--brd);font-weight:600">💡 Vorhandene TN ('+hits.length+' von '+total+') — anklicken um zu übernehmen</div>';
-  hits.forEach(t=>{
-    const sub = [t.beruf, t.firma, t.ausbjahr?(t.ausbjahr+'. LJ'):''].filter(Boolean).join(' · ');
+  let html = '<div style="font-size:.62rem;color:var(--mu);padding:6px 10px;background:rgba(37,99,235,.06);border-bottom:1px solid var(--brd);font-weight:600">'+hits.length+' Treffer'+(hits.length>shown.length?' (die ersten '+shown.length+')':'')+' — anklicken zum Zuordnen</div>';
+  shown.forEach(t=>{
+    const sub = [t.firma, t.beruf, t.ausbjahr?(t.ausbjahr+'. LJ'):''].filter(Boolean).join(' · ');
     html += '<button type="button" onclick="mtPickExisting(\''+t.id+'\')" style="width:100%;text-align:left;padding:8px 10px;background:#fff;border:none;border-bottom:1px solid var(--brd);cursor:pointer;font-family:Sora,sans-serif;display:block">'
       + '<div style="font-weight:700;font-size:.74rem;color:var(--tx)">'+esc(((t.vorname||'')+' '+(t.nachname||'')).trim())+'</div>'
       + (sub ? '<div style="font-size:.62rem;color:var(--mu);margin-top:1px">'+esc(sub)+'</div>' : '')
@@ -9342,118 +9323,70 @@ function mtPickExisting(tnId){
   const t = _mtSuggestionList.find(x=>x.id===tnId);
   if(!t) return;
   _mtSelectedExistingId = tnId;
-  document.getElementById('mtVorname').value = t.vorname;
-  document.getElementById('mtNachname').value = t.nachname;
-  document.getElementById('mtBetrieb').value = t.firma;
-  document.getElementById('mtEmail').value = t.kontaktEmail;
-  document.getElementById('mtTelefon').value = t.kontaktTelefon;
-  // Beruf-Text 1:1 aus dem Stammdatensatz (Liste hat Hoheit)
-  { const _mb=document.getElementById('mtBeruf'); if(_mb) _mb.value=t.beruf||''; }
-  if(t.ausbjahr) document.getElementById('mtLehrjahr').value = t.ausbjahr;
-  // Suggestions ausblenden
+  const box=document.getElementById('mtAuswahl');
+  document.getElementById('mtAuswahlName').textContent=((t.vorname||'')+' '+(t.nachname||'')).trim();
+  document.getElementById('mtAuswahlSub').textContent=[t.firma, t.beruf, t.ausbjahr?(t.ausbjahr+'. Lehrjahr'):'', t.kontaktEmail].filter(Boolean).join(' · ');
+  if(box) box.style.display='block';
   const c=document.getElementById('mtSuggBox');
   if(c){c.style.display='none'; c.innerHTML='';}
-  toast('TN übernommen: '+t.vorname+' '+t.nachname);
+  const sb=document.getElementById('mtSaveBtn'); if(sb) sb.disabled=false;
+  const sp=document.getElementById('mtSitzplatz'); if(sp) sp.focus();
+}
+function mtClearSelection(){
+  _mtSelectedExistingId = null;
+  const box=document.getElementById('mtAuswahl'); if(box) box.style.display='none';
+  const sb=document.getElementById('mtSaveBtn'); if(sb) sb.disabled=true;
+  const f=document.getElementById('mtSuche'); if(f && f.value.trim().length>=2) mtSearchSuggestions();
 }
 
 function saveManualTN(){
   const inst=curInst();
   if(!inst||!inst.sharedKursId){toast('Kein Kurs verknüpft','bad');return;}
   const kursId=inst.sharedKursId;
-  let vorname=(document.getElementById('mtVorname').value||'').trim();
-  let nachname=(document.getElementById('mtNachname').value||'').trim();
-  if(!vorname||!nachname){toast('Bitte Vor- und Nachname eingeben','bad');return;}
-  const firma=(document.getElementById('mtBetrieb').value||'').trim();
-  // Beruf als Freitext (Original-Schreibweise der KH-Liste); Gruppen-Zuordnung braucht es nicht mehr
-  const beruf=(document.getElementById('mtBeruf')?.value||'').trim();
-  const berufGruppeId='';
-  const ausbjahr=document.getElementById('mtLehrjahr').value||'';
-  if(!ausbjahr){toast('Bitte Lehrjahr wählen','bad');return;}
-  const kontaktEmail=(document.getElementById('mtEmail').value||'').trim();
-  const kontaktTelefon=(document.getElementById('mtTelefon').value||'').trim();
-  const wunschSitzplatz=(document.getElementById('mtSitzplatz').value||'').trim();
-
   if(!_db){toast('Nicht verbunden','bad');return;}
-
-  // globalTN-Dokument erstellen
-  const tnData={
-    vorname, nachname, firma, beruf, berufGruppeId, ausbjahr,
-    kontaktEmail, kontaktTelefon, wunschSitzplatz,
-    typ: 'azubi',
-    aktiverKursId: kursId,
-    kursHistory: [{
-      kursId: kursId,
-      kursName: S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs',
-      von: inst.sY+'-'+inst.sM+'-'+inst.sD,
-      bis: inst.eY+'-'+inst.eM+'-'+inst.eD,
-      addedAt: Date.now()
-    }],
-    manuellAngelegt: true,
-    angelegtVon: _auth?.currentUser?.email||''
+  // Ausbilder legt NIE neue Teilnehmer an - nur Zuordnung eines Bestand-TN aus der
+  // Kammerliste (globalTN). Neuanlage ausschliesslich ueber VP/Import.
+  if(!_mtSelectedExistingId){toast('Bitte zuerst einen Teilnehmer aus der Liste wählen','bad');return;}
+  const t=_mtSuggestionList.find(x=>x.id===_mtSelectedExistingId);
+  if(!t){toast('Auswahl ungültig – bitte erneut suchen','bad');return;}
+  const wunschSitzplatz=(document.getElementById('mtSitzplatz').value||'').trim();
+  const existingTnId = _mtSelectedExistingId;
+  const histEntry = {
+    kursId: kursId,
+    kursName: S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs',
+    von: inst.sY+'-'+inst.sM+'-'+inst.sD,
+    bis: inst.eY+'-'+inst.eM+'-'+inst.eD,
+    addedAt: Date.now()
   };
-
-  // Wenn der Ausbilder einen existierenden TN aus dem Vorschlag-Dropdown
-  // ausgewaehlt hat: kein neues globalTN-Doc anlegen, sondern bestehendes
-  // dem aktuellen Kurs zuweisen (verhindert Duplikate von vornherein).
-  if(_mtSelectedExistingId){
-    const existingTnId = _mtSelectedExistingId;
-    _mtSelectedExistingId = null;
-    const histEntry = {
-      kursId: kursId,
-      kursName: S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs',
-      von: inst.sY+'-'+inst.sM+'-'+inst.sD,
-      bis: inst.eY+'-'+inst.eM+'-'+inst.eD,
-      addedAt: Date.now()
-    };
-    // 1. globalTN-Update: aktiverKursId, kursHistory ergaenzt; manuell aktualisierte
-    //    Felder (Beruf, Firma, Lehrjahr usw.) ueberschreiben nur wenn vom Ausbilder
-    //    bewusst angepasst (alle Felder werden uebernommen, falls Ausbilder geaendert hat)
-    _db.collection('globalTN').doc(existingTnId).get().then(doc=>{
-      const cur = doc.exists?doc.data():{};
-      const hist = Array.isArray(cur.kursHistory)?cur.kursHistory:[];
-      if(!hist.some(h=>h.kursId===kursId)) hist.push(histEntry);
-      return _db.collection('globalTN').doc(existingTnId).set({
-        vorname, nachname, firma, beruf, berufGruppeId, ausbjahr,
-        kontaktEmail, kontaktTelefon, wunschSitzplatz,
-        aktiverKursId: kursId,
-        kursHistory: hist
-      },{merge:true});
-    }).then(()=>{
-      // 2. In Kurs-TN-Subcollection eintragen (manuellAngelegt false, weil TN existierte)
-      return _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-        .collection('teilnehmer').doc(existingTnId).set({
-          vorname, nachname, firma, beruf, berufGruppeId, ausbjahr,
-          kontaktEmail, kontaktTelefon, wunschSitzplatz,
-          status: 'active',
-          addedAt: Date.now()
-        },{merge:true});
-    }).then(()=>{
-      document.getElementById('manualTNModal').classList.remove('open');
-      toast(vorname+' '+nachname+' zum Kurs hinzugefügt ✓');
-      loadPool();
-      // Option 2: KEINE Mail beim Vorsortieren - Willkommens-Mail kommt erst,
-      // wenn der Azubi den Kurs in AzubiPro aktiv bestaetigt (kenntnisAm).
-    }).catch(err=>toast('Fehler: '+err.message,'bad'));
-    return;
-  }
-
-  _db.collection('globalTN').add(tnData).then(ref=>{
-    // In Kurs-TN-Subcollection eintragen
+  const sb=document.getElementById('mtSaveBtn'); if(sb) sb.disabled=true;
+  // 1. globalTN: nur Kurs-Zuordnung (aktiverKursId, kursHistory, wunschSitzplatz).
+  //    Stammdaten (Name/Firma/Beruf/LJ/Kontakt) bleiben unangetastet - Liste ist heilig.
+  _db.collection('globalTN').doc(existingTnId).get().then(doc=>{
+    if(!doc.exists) throw new Error('Datensatz nicht mehr vorhanden');
+    const cur = doc.data();
+    const hist = Array.isArray(cur.kursHistory)?cur.kursHistory:[];
+    if(!hist.some(h=>h.kursId===kursId)) hist.push(histEntry);
+    const upd={ aktiverKursId: kursId, kursHistory: hist };
+    if(wunschSitzplatz) upd.wunschSitzplatz=wunschSitzplatz;
+    return _db.collection('globalTN').doc(existingTnId).set(upd,{merge:true}).then(()=>cur);
+  }).then(cur=>{
+    // 2. Kurs-TN-Subcollection: Kopie der Stammdaten aus dem Datensatz (nicht aus Eingaben)
     return _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-      .collection('teilnehmer').doc(ref.id).set({
-        vorname, nachname, firma, beruf, berufGruppeId, ausbjahr,
-        kontaktEmail, kontaktTelefon, wunschSitzplatz,
-        status: 'active',
-        manuellAngelegt: true,
-        addedAt: Date.now()
-      }).then(()=>ref.id);
-  }).then(tnId=>{
+      .collection('teilnehmer').doc(existingTnId).set({
+        vorname:cur.vorname||'', nachname:cur.nachname||'', firma:cur.firma||'',
+        beruf:cur.beruf||'', berufGruppeId:cur.berufGruppeId||'', ausbjahr:cur.ausbjahr||'',
+        kontaktEmail:cur.kontaktEmail||cur.email||'', kontaktTelefon:cur.kontaktTelefon||'',
+        wunschSitzplatz, status:'active', addedAt: Date.now()
+      },{merge:true}).then(()=>cur);
+  }).then(cur=>{
+    // Cache nachziehen, damit die naechste Suche den aktuellen Kurs kennt
+    t.aktiverKursId=kursId;
     document.getElementById('manualTNModal').classList.remove('open');
-    toast(vorname+' '+nachname+' hinzugefügt ✓');
+    toast((cur.vorname||'')+' '+(cur.nachname||'')+' zum Kurs hinzugefügt ✓');
     loadPool();
     // Option 2: KEINE Mail beim Vorsortieren - Willkommens-Mail kommt erst,
     // wenn der Azubi den Kurs in AzubiPro aktiv bestaetigt (kenntnisAm).
-  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+  }).catch(err=>{ if(sb) sb.disabled=false; toast('Fehler: '+err.message,'bad'); });
 }
 
 // E-Mail an Azubi senden wenn er einem neuen Lehrgang zugewiesen wurde.
@@ -12759,7 +12692,7 @@ function openEmptySeatChooser(seatId){
       m.onclick = function(e){ if(e.target===m) closeSeatPicker(); };
       document.body.appendChild(m);
     }
-    m.innerHTML = '<div class="modal" style="max-width:420px"><div class="mhd"><div class="mtit">👤 Sitzplatz belegen</div><button class="xcls" onclick="closeSeatPicker()" title="Schließen">×</button></div><div class="mbdy" style="text-align:center;padding:14px"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-weight:700;font-size:.85rem;margin-bottom:6px">Pool ist leer</div><div style="font-size:.72rem;color:#64748b;margin-bottom:14px;line-height:1.55">Es sind noch keine Teilnehmer im Pool. Lege zuerst einen Teilnehmer an, dann kannst du ihn auf einen Sitzplatz setzen.</div><button onclick="closeSeatPicker();openManualTNModal()" style="width:100%;padding:11px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.78rem">+ Teilnehmer anlegen</button></div></div>';
+    m.innerHTML = '<div class="modal" style="max-width:420px"><div class="mhd"><div class="mtit">👤 Sitzplatz belegen</div><button class="xcls" onclick="closeSeatPicker()" title="Schließen">×</button></div><div class="mbdy" style="text-align:center;padding:14px"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-weight:700;font-size:.85rem;margin-bottom:6px">Pool ist leer</div><div style="font-size:.72rem;color:#64748b;margin-bottom:14px;line-height:1.55">Es sind noch keine Teilnehmer im Pool. Ordne zuerst einen Teilnehmer aus der Liste zu, dann kannst du ihn auf einen Sitzplatz setzen.</div><button onclick="closeSeatPicker();openManualTNModal()" style="width:100%;padding:11px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.78rem">+ Teilnehmer aus Liste zuordnen</button></div></div>';
     m.classList.add('open');
     return;
   }
@@ -12777,7 +12710,7 @@ function openEmptySeatChooser(seatId){
   // Bereits platzierte TN ausfiltern (sind eh schon auf einem Sitz)
   const available = Array.from(cards).filter(card=>!card.classList.contains('placed'));
   if(!available.length){
-    body.innerHTML = '<div style="text-align:center;padding:14px"><div style="font-size:2rem;margin-bottom:8px">✓</div><div style="font-weight:700;font-size:.82rem;margin-bottom:6px">Alle Pool-TN sind bereits platziert</div><div style="font-size:.7rem;color:#64748b;margin-bottom:14px;line-height:1.55">Lege einen weiteren Teilnehmer an, um ihn auf diesen Sitzplatz zu setzen.</div><button onclick="closeSeatPicker();openManualTNModal()" style="width:100%;padding:11px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.78rem">+ Neuen Teilnehmer anlegen</button></div>';
+    body.innerHTML = '<div style="text-align:center;padding:14px"><div style="font-size:2rem;margin-bottom:8px">✓</div><div style="font-weight:700;font-size:.82rem;margin-bottom:6px">Alle Pool-TN sind bereits platziert</div><div style="font-size:.7rem;color:#64748b;margin-bottom:14px;line-height:1.55">Ordne einen weiteren Teilnehmer aus der Liste zu, um ihn auf diesen Sitzplatz zu setzen.</div><button onclick="closeSeatPicker();openManualTNModal()" style="width:100%;padding:11px 14px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.78rem">+ Teilnehmer aus Liste zuordnen</button></div>';
     modal.classList.add('open');
     return;
   }
@@ -12798,7 +12731,7 @@ function openEmptySeatChooser(seatId){
     if(sub) html += '<div style="font-size:.62rem;color:var(--mu)">'+sub+'</div>';
     html += '</button>';
   });
-  html += '<button onclick="closeSeatPicker();openManualTNModal()" style="width:100%;padding:10px 12px;margin-top:8px;background:rgba(37,99,235,.08);border:1px dashed rgba(37,99,235,.4);border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-size:.74rem;color:var(--acc);font-weight:700">+ Neuen Teilnehmer anlegen</button>';
+  html += '<button onclick="closeSeatPicker();openManualTNModal()" style="width:100%;padding:10px 12px;margin-top:8px;background:rgba(37,99,235,.08);border:1px dashed rgba(37,99,235,.4);border-radius:8px;cursor:pointer;font-family:Sora,sans-serif;font-size:.74rem;color:var(--acc);font-weight:700">+ Teilnehmer aus Liste zuordnen</button>';
   body.innerHTML = html;
   modal.classList.add('open');
 }

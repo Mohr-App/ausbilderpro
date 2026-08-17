@@ -8,23 +8,74 @@ service cloud.firestore {
          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'verwaltung');
     }
 
+    // Ausbilder brauchen den gesamten Teilnehmer-Pool: TN suchen, Kurse besetzen,
+    // Namenssuche, Dubletten finden. Deshalb eine eigene Rolle - vergeben wird sie
+    // ausschliesslich von VerwaltungPro aus der Admin-Sitzung (siehe users-Regeln).
+    function isAusbilder() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ausbilder';
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // FIX 1 (KRITISCH): Rechteausweitung ueber das eigene role-Feld
+    //
+    // Vorher stand hier eine einzige Regel:
+    //     allow read, write: if request.auth != null && request.auth.uid == uid;
+    // Damit durfte jeder sein EIGENES User-Dokument komplett schreiben - auch das
+    // Feld 'role'. Wer sich role:'admin' eintraegt, liefert ab dann in isAdmin()
+    // ueberall true: Vollzugriff auf alle Teilnehmer, alle Kurse, den Audit-Log.
+    //
+    // Jetzt: Schreibrechte bleiben, aber 'role' ist fuer den Nutzer selbst tabu.
+    // Rollen vergibt ausschliesslich die Verwaltung (isAdmin).
+    // ─────────────────────────────────────────────────────────────
     match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null && request.auth.uid == uid;
       allow read, write: if isAdmin();
-      // Lookup für firmaCode-Verknüpfung: jeder authentifizierte User darf
-      // Arbeitgeber-User-Docs lesen (enthält keine sensiblen Daten - nur firma/firmaCode/role/email)
+
+      // Anlegen: Selbstregistrierung darf eine Rolle setzen - aber nur eine, die
+      // KEINE zusaetzlichen Rechte verleiht. 'admin' und 'verwaltung' sind damit
+      // ausgeschlossen: die Rechteausweitung ist zu.
+      //
+      // Diese Liste enthaelt exakt die Rollen, die die Apps selbst vergeben:
+      //   arbeitgeber  - AG-Selbstregistrierung (ArbeitgeberPro)
+      //   azubi        - AzubiPro-Registrierung
+      //   arbeitnehmer - MitarbeiterPro (schreibt genau diesen Wert beim Login!)
+      //
+      // 'ausbilder' steht bewusst NICHT hier: die Rolle gibt Lesezugriff auf ALLE
+      // Teilnehmer. Sie wird ausschliesslich von VerwaltungPro vergeben, und zwar
+      // aus der Admin-Sitzung - da greift die isAdmin()-Regel oben.
+      // AusbilderPro selbst hat keine Registrierung; beim Login legt es das Dokument
+      // ohne role an, das ist hier ausdruecklich erlaubt (kein 'role' im Payload).
+      allow create: if request.auth != null && request.auth.uid == uid
+        && (!('role' in request.resource.data)
+            || request.resource.data.role in ['arbeitgeber','azubi','arbeitnehmer']);
+
+      // Aendern: alles ausser 'role'. Wer eine Rolle hat, behaelt sie; wer keine
+      // hat, kann sich auch keine geben. Rollenwechsel macht nur die Verwaltung.
+      //
+      // WICHTIG: affectedKeys() listet nur GEAENDERTE Felder. Die Apps schreiben bei
+      // jedem Login role mit (AzubiPro 'azubi', ArbeitgeberPro 'arbeitgeber',
+      // MitarbeiterPro 'arbeitnehmer') - solange der Wert derselbe bleibt, ist das
+      // keine Aenderung und laeuft durch. Nur ein echter Rollenwechsel wird geblockt.
+      allow update: if request.auth != null && request.auth.uid == uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']);
+
+      // Loeschen des eigenen Kontos bleibt erlaubt
+      allow delete: if request.auth != null && request.auth.uid == uid;
+
+      // Lookup fuer firmaCode-Verknuepfung: jeder authentifizierte User darf
+      // Arbeitgeber-User-Docs lesen (enthaelt keine sensiblen Daten - nur firma/firmaCode/role/email)
       allow read: if request.auth != null
         && resource.data.role == 'arbeitgeber';
-      // AG kann seine MA-User lesen (firma muss übereinstimmen)
+      // AG kann seine MA-User lesen (firma muss uebereinstimmen)
       allow read: if request.auth != null
         && resource.data.role == 'mitarbeiter';
-      // Ausbilder dürfen Stammdaten anderer Ausbilder lesen (für Chat-Liste + Avatare)
+      // Ausbilder duerfen Stammdaten anderer Ausbilder lesen (fuer Chat-Liste + Avatare)
+      // HINWEIS: lastApp ist vom Nutzer selbst setzbar und daher KEIN Ausweis.
+      // Fuer Lesezugriff auf Namen/Avatare ist das vertretbar - fuer Rechte NICHT.
       allow read: if request.auth != null
         && resource.data.lastApp == 'AusbilderPro';
-      // Profilbild-URL darf vom eigenen User aktualisiert werden
-      allow update: if request.auth != null
-        && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrl']);
+
       match /{sub}/{subDoc} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
         allow read, write: if isAdmin();
@@ -43,7 +94,7 @@ service cloud.firestore {
         allow write: if isAdmin();
         // Standalone: Ausbilder darf Kurse erstellen
         allow create: if request.auth != null && docId == 'kurse' && sub == 'list';
-        // Standalone: Ausbilder darf eigene Kurse löschen
+        // Standalone: Ausbilder darf eigene Kurse loeschen
         allow delete: if request.auth != null && docId == 'kurse' && sub == 'list'
           && resource.data.createdBy == request.auth.token.email;
         allow update: if request.auth != null
@@ -54,7 +105,7 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['berufsschultage']);
         allow update: if request.auth != null
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['kurstage']);
-        // Kurs abschließen / wieder öffnen (Schreibschutz-Flag am Kurs)
+        // Kurs abschliessen / wieder oeffnen (Schreibschutz-Flag am Kurs)
         allow update: if request.auth != null
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['abgeschlossen','abgeschlossenAm','abgeschlossenVon']);
         // QR-Anwesenheit: Ausbilder setzt Kurs-Standort + Radius (Geofence)
@@ -82,8 +133,8 @@ service cloud.firestore {
           && (subDoc == request.auth.token.email
               || resource.data.loginEmail == request.auth.token.email
               || request.resource.data.loginEmail == request.auth.token.email);
-        // Gemeinsame Nachschlage-Listen (Lehrgangsarten, Berufe, Räume, Standorte):
-        // jeder eingeloggte Ausbilder darf Einträge ergänzen/aktualisieren
+        // Gemeinsame Nachschlage-Listen (Lehrgangsarten, Berufe, Raeume, Standorte):
+        // jeder eingeloggte Ausbilder darf Eintraege ergaenzen/aktualisieren
         allow create, update: if request.auth != null
           && docId == 'kursSettings'
           && (sub == 'lehrgangsarten' || sub == 'berufe' || sub == 'raeume' || sub == 'standorte');
@@ -92,13 +143,42 @@ service cloud.firestore {
           allow write: if isAdmin();
           // Selbstregistrierung: Azubi darf sich in Kurs eintragen
           allow create: if request.auth != null && deep == 'teilnehmer';
-          // Ausbilder darf TN aus Kurs löschen
-          allow delete: if request.auth != null && deep == 'teilnehmer';
-          allow update: if request.auth != null
+          // ─────────────────────────────────────────────────────────────
+          // FIX 5: Teilnehmer aus dem Kurs entfernen
+          //
+          // Vorher: allow delete: if request.auth != null && deep == 'teilnehmer';
+          // Jeder eingeloggte Nutzer konnte jeden beliebigen Teilnehmer aus jedem
+          // beliebigen Kurs werfen - samt Noten und Anwesenheit.
+          // ─────────────────────────────────────────────────────────────
+          // Ausbilder und Verwaltung: jeden TN
+          allow delete: if (isAusbilder() || isAdmin()) && deep == 'teilnehmer';
+          // Azubi: ausschliesslich den EIGENEN Eintrag. Kein "Kurs verlassen"-Knopf -
+          // der Fall entsteht in markNotifRead() (AzubiPro Z.6929): Der Ausbilder hat
+          // den Azubi aus dem Kurs genommen, der Azubi liest die Meldung 'kurs_entfernt',
+          // und die App raeumt dabei seinen Kurs-Eintrag ab.
+          // deepDoc ist die globalTN-ID; ueber verknuepftUid pruefen wir, dass es der
+          // eigene Datensatz ist.
+          allow delete: if request.auth != null && deep == 'teilnehmer'
+            && get(/databases/$(database)/documents/globalTN/$(deepDoc)).data.verknuepftUid == request.auth.uid;
+          // ─────────────────────────────────────────────────────────────
+          // FIX 4 (KRITISCH): Noten, Anwesenheit, Bescheinigung
+          //
+          // Vorher: allow update: if request.auth != null && hasOnly([...]);
+          // Die Regel prueft, WELCHE Felder geschrieben werden - aber nicht, WER
+          // schreibt. Jeder eingeloggte Nutzer konnte bei JEDEM Teilnehmer Noten
+          // aendern, Anwesenheit faelschen oder eine Bescheinigung ausstellen.
+          //
+          // Geschrieben wird das ausschliesslich von AusbilderPro und VerwaltungPro.
+          // ArbeitgeberPro und MitarbeiterPro LESEN nur (0 Schreibzugriffe).
+          // AzubiPro schreibt nur wunschSitzplatz, kenntnisAm und den Selbstbeitritt
+          // - dafuer gibt es eigene Regeln weiter unten.
+          // ─────────────────────────────────────────────────────────────
+          allow update: if (isAusbilder() || isAdmin())
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-              ['status','attTotal','attPresent','attAbsentE','attAbsentU','attSick','attBerufsschule','attLate','attEarly','attPercent','attLastSync','noten_mitarbeit','noten_fuehrung','noten_praxis','noten_extra','werkzeugStatus','werkzeugFehlt','bemerkung','bemerkungVon','bescheinigungSignatur','bescheinigungStempel','bescheinigungDatum','bescheinigungVon','bescheinigungAusgestellt']
+              ['status','attTotal','attPresent','attAbsentE','attAbsentU','attSick','attBerufsschule','attLate','attEarly','attPercent','attLastSync','attLateDetails','attAbsentDetails','noten_mitarbeit','noten_fuehrung','noten_praxis','noten_extra','noten_extra_labels','werkzeugStatus','werkzeugFehlt','bemerkung','bemerkungVon','bescheinigungSignatur','bescheinigungStempel','bescheinigungSigPos','bescheinigungStempelPos','bescheinigungNachweis','bescheinigungStandort','bescheinigungDatum','bescheinigungVon','bescheinigungAusgestellt','wiederholer','finalAbsentMailSent']
             );
-          allow update: if request.auth != null
+          // Ausbilder-Freigabe des Teilnehmers - AzubiPro liest das nur (Z.4084)
+          allow update: if (isAusbilder() || isAdmin())
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
               ['bestaetigtAm','bestaetigtVon']
             );
@@ -109,8 +189,9 @@ service cloud.firestore {
             );
           allow update: if request.auth != null
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['wunschSitzplatz']);
-          // Merge-Operation: Ausbilder fuehrt manuellen + selbst-registrierten Eintrag zusammen
-          allow update: if request.auth != null
+          // Merge-Operation: Ausbilder fuehrt manuellen + selbst-registrierten Eintrag
+          // zusammen. mergedFromManual schreibt ausschliesslich AusbilderPro.
+          allow update: if (isAusbilder() || isAdmin())
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
               ['firma','beruf','berufGruppeId','ausbjahr','kontaktEmail','kontaktTelefon','wunschSitzplatz','mergedFromManual']
             );
@@ -120,27 +201,122 @@ service cloud.firestore {
               ['vorname','nachname','firma','beruf','ausbjahr','kontaktEmail','kontaktTelefon','status','addedAt','selfRegistered','bestaetigungAngefordert']
             );
           allow create, delete: if request.auth != null && deep == 'dokumente';
-          // Meldungen: Azubi darf erstellen, Ausbilder darf lesen/löschen
+          // Meldungen: Azubi darf erstellen, Ausbilder darf lesen/loeschen
           allow create: if request.auth != null && deep == 'meldungen';
           allow delete: if request.auth != null && deep == 'meldungen';
           allow update: if request.auth != null && deep == 'meldungen'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gelesen','gelesenVon','gelesenAm']);
-          // QR-Anwesenheit Check-ins: Azubi erstellt (nur fuer sich, heute, einmal - DocId tnId_datum
-          // verhindert Doppel-Check-in), kein Update (kein Manipulieren), Ausbilder darf aufraeumen
+          // ─────────────────────────────────────────────────────────────
+          // FIX 6: Anwesenheit fuer FREMDE melden
+          //
+          // Die alte Regel prueft, dass die Dokument-ID zum Inhalt passt (verhindert
+          // Doppel-Check-in) - aber NICHT, ob die tnId dem Absender gehoert. Ein Azubi
+          // konnte eine fremde tnId eintragen und jemanden anwesend melden, der gar
+          // nicht da ist. Das landet ueber die Anwesenheit in der Bescheinigung, die
+          // zur Gesellenpruefung eingereicht wird.
+          //
+          // Jetzt: Der Azubi nur fuer sich selbst. Ausbilder/Verwaltung fuer jeden -
+          // das braucht tnFreigeben() (AusbilderPro Z.8285): Bei der Freigabe wird der
+          // Azubi gleich anwesend gesetzt, weil er bis dahin nicht einchecken konnte.
+          // ─────────────────────────────────────────────────────────────
           allow create: if request.auth != null && deep == 'checkins'
             && request.resource.data.keys().hasAll(['tnId','datum','zeit'])
-            && deepDoc == request.resource.data.tnId + '_' + request.resource.data.datum;
-          allow delete: if request.auth != null && deep == 'checkins';
+            && deepDoc == request.resource.data.tnId + '_' + request.resource.data.datum
+            && (isAusbilder() || isAdmin()
+                || get(/databases/$(database)/documents/globalTN/$(request.resource.data.tnId)).data.verknuepftUid == request.auth.uid);
+          // tnFreigeben() schreibt mit merge:true - das ist ein Update, wenn der
+          // Eintrag schon existiert. Deshalb hier ebenfalls erlaubt, aber nur fuer
+          // Ausbilder/Verwaltung: der Azubi darf einen Check-in nicht nachtraeglich
+          // veraendern.
+          allow update: if (isAusbilder() || isAdmin()) && deep == 'checkins';
+          // Aufraeumen: Ausbilder/Verwaltung (AusbilderPro Z.6367 beim Sitzplatzwechsel)
+          allow delete: if (isAusbilder() || isAdmin()) && deep == 'checkins';
         }
       }
     }
 
     match /globalTN/{doc} {
+      // ═════════════════════════════════════════════════════════════
+      // FIX 3: ZURUECKGENOMMEN am 17.07.2026 - BEWUSST OFFEN, BEFRISTET
+      //
+      // Fix 3 war am 16.07. eingespielt und schraenkte das Lesen so ein:
+      //   firmaUid | firmaPending.firmaUid | verknuepftUid | email == token.email
+      //   | isAusbilder() | isAdmin()
+      //
+      // Damit war das Loch zu (nachgewiesen: vorher 5 fremde Nachnamen per
+      // Browserkonsole lesbar, nachher permission-denied).
+      //
+      // ABER: Es hat die Selbstregistrierung in AzubiPro erschlagen.
+      // _azubiFindMatch() (AzubiPro Z.2218) sucht den Bestands-Datensatz per
+      //   db.collection('globalTN').where('geburtsdatum','==',geb).get()
+      // Diese Abfrage MUSS fremde Datensaetze lesen - genau das, was Fix 3
+      // verhindert. Folge seit 16.07. 18:00: "nicht in der Liste gefunden",
+      // und der Azubi legt eine Dublette an, obwohl er in der Kammerliste steht.
+      // Der Rechtefehler war unsichtbar, weil Z.2230 ihn in .catch() faengt und
+      // in "kein Treffer" verwandelt.
+      //
+      // Ein schmalerer Weg wurde geprueft und verworfen:
+      //   allow read: if request.auth != null && resource.data.verknuepftUid == null;
+      //   + where('verknuepftUid','==',null) in AzubiPro
+      // Gemessen am 17.07.2026: von 3.166 Datensaetzen fehlt das Feld bei 3.072
+      // komplett (VP loescht es per FieldValue.delete(), der Import setzt es nie).
+      // Firestore findet mit == null nur Felder, die WIRKLICH null sind - die
+      // Abfrage haette nichts gefunden. Und selbst mit Migration waeren noch
+      // ~2.000 von 3.166 lesbar gewesen: viel Aufwand, wenig Gewinn.
+      //
+      // DAHER bis auf Weiteres wieder offen fuer alle Eingeloggten.
+      // Das ist eine bewusste, befristete Entscheidung des Betreibers -
+      // kein Versehen. Abgewogen wurde gegen: Dubletten in der Kammerliste
+      // bei jedem Neuzugang.
+      //
+      // ERSETZT WERDEN SOLL DAS DURCH (geplant, ~3 Wochen):
+      //   Eine Cloud Function fuer den Abgleich. Der Azubi schickt Name +
+      //   Geburtsdatum, der Server prueft und antwortet nur "passt / passt nicht"
+      //   (+ tnId). Nie liegen fremde Daten im Browser. Danach kann diese Regel
+      //   wieder auf die Fassung von Fix 3 gesetzt werden - sie steht oben in
+      //   der Historie und im Git-Verlauf.
+      //
+      // WAS WEITERHIN GESCHUETZT IST: Fix 1 (Rechteausweitung), Fix 2 (Loeschen),
+      // Fix 4 (Noten faelschen), Fix 5 (TN aus Kursen werfen), Fix 6 (fremde
+      // Anwesenheit). Offen ist nur das LESEN der Kammerliste - fuer Nutzer mit
+      // einem Konto, nicht fuer die Oeffentlichkeit.
+      // ═════════════════════════════════════════════════════════════
       allow read: if request.auth != null;
+
       allow write: if isAdmin();
-      allow delete: if request.auth != null;
-      // Selbstregistrierung + manuelles Anlegen
-      allow create: if request.auth != null;
+
+      // ─────────────────────────────────────────────────────────────
+      // FIX 2 (KRITISCH): Loeschen beliebiger Teilnehmer
+      //
+      // Vorher: allow delete: if request.auth != null;
+      // Damit konnte JEDER eingeloggte Nutzer JEDEN der ~3.000 Datensaetze
+      // loeschen - ein einziger Aufruf aus der Browserkonsole genuegte.
+      //
+      // Jetzt: Verwaltung darf alles. Ausbilder duerfen nur das loeschen, was
+      // AusbilderPro tatsaechlich loescht (_deleteTnManuellKomplett): manuell
+      // angelegte Eintraege OHNE eigenes Konto und OHNE Betriebs-Verknuepfung.
+      // Echte Azubi-Konten und importierte KH-Datensaetze mit Verknuepfung
+      // sind damit geschuetzt.
+      // ─────────────────────────────────────────────────────────────
+      allow delete: if isAdmin();
+      allow delete: if request.auth != null
+        && (!('selfRegistered' in resource.data) || resource.data.selfRegistered != true)
+        && (!('verknuepftUid' in resource.data) || resource.data.verknuepftUid == null);
+
+      // ─────────────────────────────────────────────────────────────
+      // FIX 7 (17.08.2026): Neue TN-Datensaetze anlegen
+      //
+      // Vorher: allow create: if request.auth != null;
+      // Jeder Eingeloggte - auch ein Ausbilder - konnte neue Teilnehmer in die
+      // Kammerliste schreiben (AusbilderPro "+TN" bei Kein-Treffer, Recovery).
+      //
+      // Jetzt: Neuanlage NUR durch Verwaltung/Admin (isAdmin, ueber 'allow write'
+      // oben) oder durch den Azubi fuer sich selbst (Selbstregistrierung:
+      // verknuepftUid == eigene UID). Ausbilder ordnen ausschliesslich Bestand
+      // zu - "Liste ist heilig".
+      // ─────────────────────────────────────────────────────────────
+      allow create: if request.auth != null
+        && request.resource.data.verknuepftUid == request.auth.uid;
       // Verknuepfter Azubi: Verifizierungs-Status in den Datensatz spiegeln (fuer Ausbilder-Marker)
       allow update: if request.auth != null
         && resource.data.verknuepftUid == request.auth.uid
@@ -150,7 +326,7 @@ service cloud.firestore {
         && resource.data.verknuepftUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email','kontaktEmail','emailBestaetigt'])
         && request.resource.data.email == request.auth.token.email;
-      // Schritt 3 – Selbst-Verknuepfung (Claim) eines UNBEANSPRUCHTEN Bestand-TN:
+      // Schritt 3 - Selbst-Verknuepfung (Claim) eines UNBEANSPRUCHTEN Bestand-TN:
       // nur auf eigene UID, nur mit eigener Login-Mail, nur diese Felder, nur wenn noch frei.
       // ausbjahr: der Azubi gibt sein Lehrjahr bei der Anmeldung an und korrigiert damit den Import-Schaetzwert.
       allow update: if request.auth != null
@@ -160,11 +336,11 @@ service cloud.firestore {
         && (!('verknuepftUid' in resource.data) || resource.data.verknuepftUid == null)
         && request.resource.data.verknuepftUid == request.auth.uid
         && request.resource.data.email == request.auth.token.email;
-      // Schritt 3c – Ausbilder-Freigabe markiert die Verknuepfung als freigegeben (schuetzt vor spaeterem Un-Claim)
+      // Schritt 3c - Ausbilder-Freigabe markiert die Verknuepfung als freigegeben (schuetzt vor spaeterem Un-Claim)
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verknuepftFreigegebenAm'])
         && resource.data.verknuepftUid != null;
-      // Schritt 3c – Ablehnen: Claim einer NOCH NICHT freigegebenen Verknuepfung zuruecksetzen
+      // Schritt 3c - Ablehnen: Claim einer NOCH NICHT freigegebenen Verknuepfung zuruecksetzen
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verknuepftUid','verknuepftAm','email','bestaetigungAngefordert'])
         && resource.data.verknuepftUid != null
@@ -189,7 +365,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
           ['firma','beruf','berufGruppeId','ausbjahr','kontaktEmail','kontaktTelefon','wunschSitzplatz','aktiverKursId','kursHistory','mergedFromManual']
         );
-      // Firmencode-Verknüpfung: Azubi verknüpft sich mit Arbeitgeber
+      // Firmencode-Verknuepfung: Azubi verknuepft sich mit Arbeitgeber
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId']);
       // Firmencode-Verknuepfungs-Antrag (pending) - Azubi setzt es bei Code-Eingabe
@@ -198,9 +374,14 @@ service cloud.firestore {
       // AG genehmigt: setzt firmaUid/firma + loescht firmaPending + setzt Verknuepfungs-Beginn
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','firmaPending','_verknuepftSeit']);
-      // Trennen: Verknuepfungs-Felder loeschen (Daten bleiben fuer Aufbewahrungspflicht)
+      // Trennen: Verknuepfungs-Felder loeschen (Daten bleiben fuer Aufbewahrungspflicht).
+      // 'firma' bleibt als Kammerdatum erhalten, firmaGetrenntVon sperrt die
+      // automatische Wieder-Zuordnung aus der KH-Liste.
       allow update: if request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','_verknuepftSeit']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','firma','arbeitgeberId','betriebId','_verknuepftSeit','firmaGetrenntVon']);
+      // Automatische Zuordnung aus der KH-Liste (VerwaltungPro)
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['firmaUid','_verknuepftSeit','_verknuepftVon']);
       // AG darf Stammdaten seiner verknuepften MAs editieren (Vorname/Nachname/Geb./Adresse/Tel/Email/Beruf/Lehrjahr/Foto)
       allow update: if request.auth != null
         && resource.data.firmaUid == request.auth.uid
@@ -304,31 +485,31 @@ service cloud.firestore {
         && request.auth.uid in request.resource.data.participants
         && request.resource.data.createdBy == request.auth.uid;
 
-      // Update 1: Nachrichten-Metadaten (lastMessage/unread) – jeder Teilnehmer
+      // Update 1: Nachrichten-Metadaten (lastMessage/unread) - jeder Teilnehmer
       allow update: if request.auth != null
         && request.auth.uid in resource.data.participants
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','unread']);
 
-      // Update 2: Gruppenname ändern – nur Admin
+      // Update 2: Gruppenname aendern - nur Admin
       allow update: if request.auth != null
         && resource.data.type == 'group'
         && resource.data.admin == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
 
-      // Update 3: Mitglied hinzufügen/entfernen – nur Admin (in Gruppen)
+      // Update 3: Mitglied hinzufuegen/entfernen - nur Admin (in Gruppen)
       allow update: if request.auth != null
         && resource.data.type == 'group'
         && resource.data.admin == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants','joinedAt','unread']);
 
-      // Update 4: Selbst verlassen (Gruppen) – inkl. Admin-Übergabe
+      // Update 4: Selbst verlassen (Gruppen) - inkl. Admin-Uebergabe
       allow update: if request.auth != null
         && resource.data.type == 'group'
         && request.auth.uid in resource.data.participants
         && !(request.auth.uid in request.resource.data.participants)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants','joinedAt','admin','unread']);
 
-      // Löschen: nur Admin einer leeren Gruppe (Aufräum-Fall)
+      // Loeschen: nur Admin einer leeren Gruppe (Aufraeum-Fall)
       allow delete: if request.auth != null
         && resource.data.createdBy == request.auth.uid
         && resource.data.participants.size() <= 1;
@@ -369,8 +550,8 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Warteschlange für die kombinierte Willkommens-/Bestätigungsmail (Cloud Function sendWelcomeMail).
-    // Azubi darf nur einen Auftrag für sich selbst anlegen; die Cloud Function (Admin) verarbeitet + löscht ihn.
+    // Warteschlange fuer die kombinierte Willkommens-/Bestaetigungsmail (Cloud Function sendWelcomeMail).
+    // Azubi darf nur einen Auftrag fuer sich selbst anlegen; die Cloud Function (Admin) verarbeitet + loescht ihn.
     match /welcomeQueue/{id} {
       allow create: if request.auth != null
                     && request.resource.data.uid == request.auth.uid;
