@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v309'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v310'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -1328,12 +1328,16 @@ auth.onAuthStateChanged(u=>{
     findTN(_email).then(found=>{
       if(_registering) return;
       if(found){
+        try{ localStorage.removeItem('weg1Pending'); }catch(e){}   // Weg 1 ist durch
         // Fingerabdruck-Sperre aktiviert? -> Sperrbildschirm (danach _enterApp), sonst direkt _enterApp
         if(_bioSupported() && _bioEnabled(_email)){
           _showBioLock();
         } else {
           _enterApp();
         }
+      } else if(_weg1Wiederaufnahme(u)){
+        // Weg 1 war unterbrochen (Reload nach Konto-Anlage): eingeloggt bleiben,
+        // direkt zur Weiche zurueck. Kein signOut, keine "kein Konto"-Meldung.
       } else {
         auth.signOut();
         showErr('Kein Teilnehmer-Konto für diese E-Mail gefunden.\nBitte kontaktiere die Verwaltung.');
@@ -1933,6 +1937,7 @@ function submitJoinLogin(){
         window._weg1Uid=cred.user.uid;
         window._weg1Email=email.toLowerCase();
         window._weg1Dsgvo=window._weg1Dsgvo||{datenschutz:true,nutzungsbedingungen:true,zeitpunkt:new Date().toISOString(),ip:'',version:'1.0'};
+        try{ localStorage.setItem('weg1Pending', JSON.stringify({uid:cred.user.uid, kursId:_joinKursId, email:email.toLowerCase()})); }catch(e){}
         errEl.textContent='';
         var lf=document.getElementById('joinLoginForm'); if(lf) lf.style.display='none';
         var wh=document.getElementById('joinFindeWeicheHead'); if(wh) wh.textContent='Angemeldet \u2713 \u2013 Konto ist da, nur die Zuordnung fehlt noch';
@@ -2175,6 +2180,10 @@ function submitKontoErstellen(){
   auth.createUserWithEmailAndPassword(email, passwort).then(cred=>{
     // Konto da, Nutzer eingeloggt. KEINE Selbstheilung bei belegter Mail (Stefan-Wunsch).
     window._weg1Uid=cred.user.uid;
+    // Reload-Schutz: Marker persistent, damit ein Neustart der Seite (App zu/auf,
+    // Android wirft PWA aus dem Speicher) NICHT im Auth-Listener zum signOut fuehrt,
+    // sondern in _weg1Wiederaufnahme() direkt zur Weiche zurueckkehrt.
+    try{ localStorage.setItem('weg1Pending', JSON.stringify({uid:cred.user.uid, kursId:_joinKursId, email:email})); }catch(e){}
     if(btn) btn.disabled=false;
     errEl.textContent='';
     // -> Weiche zeigen
@@ -2387,7 +2396,34 @@ function _sitzplatzDarfStempeln(){
   }catch(e){}
   return false;
 }
+// Weg 1 nach Reload fortsetzen: Konto existiert (eingeloggt), aber kein globalTN.
+// Bedingung: persistenter Marker passt zur UID ODER die Seite haengt noch am ?join=-Link.
+// Zeigt den Beitritts-Screen direkt mit der Weiche; _registering schuetzt ab hier wieder.
+function _weg1Wiederaufnahme(u){
+  let mk=null; try{ mk=JSON.parse(localStorage.getItem('weg1Pending')||'null'); }catch(e){}
+  if(mk && mk.uid!==u.uid) mk=null;               // fremder Marker (anderes Konto) -> ignorieren
+  const kursId=_joinKursId || (mk&&mk.kursId) || null;
+  if(!kursId) return false;                        // kein Kurs bekannt -> normaler Fehlerweg
+  _joinKursId=kursId;
+  _registering=true;
+  window._weg1Uid=u.uid;
+  window._weg1Email=(u.email||'').toLowerCase();
+  window._weg1Dsgvo=window._weg1Dsgvo||{datenschutz:true,nutzungsbedingungen:true,zeitpunkt:new Date().toISOString(),ip:'',version:'1.0'};
+  try{ localStorage.setItem('weg1Pending', JSON.stringify({uid:u.uid, kursId:kursId, email:window._weg1Email})); }catch(e){}
+  // Screen: joinWrap sichtbar, Auswahl/Login/KontoErst weg, Weiche an
+  document.getElementById('loginWrap').style.display='none';
+  const jw=document.getElementById('joinWrap'); if(jw) jw.style.display='flex';
+  const jls=document.getElementById('joinLoginSection'); if(jls) jls.style.display='block';
+  const jwz=document.getElementById('joinWizard'); if(jwz) jwz.style.display='none';
+  ['joinChoice','joinLoginForm','joinKontoErst','joinNameGebForm','joinLnrForm'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  const wh=document.getElementById('joinFindeWeicheHead'); if(wh) wh.textContent='Angemeldet \u2713 \u2013 Konto ist da, nur die Zuordnung fehlt noch';
+  const w=document.getElementById('joinFindeWeiche'); if(w) w.style.display='block';
+  document.getElementById('app').classList.remove('show');
+  if(!_joinKursName){ try{ db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(d=>{ if(d.exists){ const k=d.data(); _joinKursName=k.name||k.lehrgangsart||''; const i=document.getElementById('joinKursInfo'); if(i && !i.textContent.trim()) i.innerHTML='<div style="font-weight:800;font-size:.88rem">'+esc(_joinKursName)+'</div>'; } }).catch(()=>{}); }catch(e){} }
+  return true;
+}
 function _weg1Fertig(){
+  try{ localStorage.removeItem('weg1Pending'); }catch(e){}
   window.history.replaceState({},'',window.location.pathname);
   const _regKursId=_joinKursId; _joinKursId=null;
   // Kein Auto-Checkin hier: (a) der reload schoss die async-Kette ab (Write kam nie an),
