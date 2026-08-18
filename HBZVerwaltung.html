@@ -1712,10 +1712,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 358';
+const APP_VERSION = 'Build 359';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 359', d:'17.08.2026', items:['📊 Dashboard „Läuft gerade": statt einer Gesamtzahl jetzt „7/9 TN" (aktiv von zugewiesen – ohne nicht angetreten, Wiederholer, entfernt; rot bei Abweichung) und „✓ 5" (Lehrgang in AzubiPro bestätigt)']},
   {v:'Build 358', d:'14.08.2026', items:['\u2753 Hilfe erweitert: neue Abschnitte zu Kurs-\u00dcbertragung & E-Mails, TN-Entfernung, Arbeitgeber-Zug\u00e4ngen (Lite/Voll) und h\u00e4ufigen Fragen.']},
   {v:'Build 357', d:'12.08.2026', items:['\ud83c\udfe2 Arbeitgeber-Zug\u00e4nge: Lite/Voll-Schalter je Betrieb (nutzt das bestehende agModule-System). Lite = nur \u00dcBL + Anwesenheit, Voll = alle Funktionen (Zeit/Auftr\u00e4ge/Belege/Urlaub). Ein Klick in der Betriebsliste.']},
   {v:'Build 355', d:'07.08.2026', items:['\ud83c\udfaf Import gleicht jetzt zuerst \u00fcber die Lehrlingsnummer ab (eindeutig) und erst danach \u00fcber Name+Geburtsdatum. L\u00f6st die bisher \u201eunsicheren\u201c F\u00e4lle bei Namensdubletten mit gleichem Geburtsdatum. Bestehender Namensabgleich bleibt als Fallback']},
@@ -3164,17 +3165,57 @@ function updateKursTNCounts(){
   });
 }
 
-function _renderDashKursListe(elId, kurse, dotColor){
+// Dashboard "Laeuft jetzt": tatsaechliche TN-Zahlen je Kurs.
+//   zugewiesen = alle TN, die dem Kurs je zugeordnet wurden (aktiverKursId oder kursHistory)
+//   aktiv      = davon ohne "nicht angetreten" (status absent), Wiederholer, entfernt/vorgemerkt, nichtErschienen
+//   bestaetigt = Kurs in AzubiPro bestaetigt (kenntnisAm in der Kurs-Teilnehmerliste; Cache _kursBestaetigt)
+let _kursBestaetigt = {};   // kursId -> Anzahl bestaetigt (aus Subcollection, nur fuer laufende Kurse geladen)
+function _kursTNZahlen(kursId){
+  let zug=0, akt=0;
+  _globalTN.forEach(t=>{
+    if(t.archived) return;
+    const hist=(t.kursHistory||[]).find(h=>h&&h.kursId===kursId);
+    const istAktuell=t.aktiverKursId===kursId;
+    if(!istAktuell && !hist) return;
+    zug++;
+    if(!istAktuell) return;                              // nur noch in der Historie -> nicht aktiv
+    if(t.status==='absent' || t.wiederholer) return;     // Container "nicht angetreten" / "Wiederholer"
+    if(t.pendingRemoval || (t.pendingRemovalKurs&&t.pendingRemovalKurs===kursId)) return;
+    if(hist && (hist.nichtErschienen||hist.entfernt||hist.abgebrochen)) return;
+    akt++;
+  });
+  return {zug, akt};
+}
+function _ladeKursBestaetigt(kurse){
+  kurse.forEach(k=>{
+    db.collection('shared').doc('kurse').collection('list').doc(k.id).collection('teilnehmer').get().then(snap=>{
+      let n=0; snap.forEach(d=>{ const x=d.data(); if(x.kenntnisAm && x.status!=='absent' && x.status!=='removed') n++; });
+      _kursBestaetigt[k.id]=n;
+      const el=document.getElementById('dashBest_'+k.id); if(el) el.textContent='✓ '+n;
+    }).catch(()=>{});
+  });
+}
+function _renderDashKursListe(elId, kurse, dotColor, mitZahlen){
   const el=document.getElementById(elId); if(!el) return;
   if(!kurse.length){ el.innerHTML='<div class="empty" style="font-size:.72rem;color:var(--mu);padding:8px 4px">Keine Kurse.</div>'; return; }
   el.innerHTML = kurse.map(k=>{
-    const tn=_kursTNHist[k.id]||0;
     const nm=esc(k.name||k.lehrgangsart||'Kurs');
     const ausb=k.ausbilderName?' · '+esc(k.ausbilderName):'';
+    let badges;
+    if(mitZahlen){
+      const z=_kursTNZahlen(k.id);
+      const warn=z.akt<z.zug;
+      const best=(_kursBestaetigt[k.id]!=null)?('✓ '+_kursBestaetigt[k.id]):'✓ …';
+      badges='<span title="'+z.akt+' aktiv von '+z.zug+' zugewiesen (ohne nicht angetreten, Wiederholer, entfernt)" style="font-family:\'JetBrains Mono\',monospace;font-size:.68rem;font-weight:700;color:'+(warn?'#b91c1c':'#2563eb')+';background:'+(warn?'#fef2f2':'#eff6ff')+';border:1px solid '+(warn?'#fecaca':'#bfdbfe')+';padding:2px 8px;border-radius:8px;white-space:nowrap">'+z.akt+'/'+z.zug+' TN</span>'
+        +'<span id="dashBest_'+k.id+'" title="Lehrgang in AzubiPro bestätigt" style="font-family:\'JetBrains Mono\',monospace;font-size:.68rem;font-weight:700;color:#059669;background:#ecfdf5;border:1px solid #a7f3d0;padding:2px 8px;border-radius:8px;white-space:nowrap">'+best+'</span>';
+    } else {
+      const tn=_kursTNHist[k.id]||0;
+      badges='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.68rem;font-weight:700;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;padding:2px 8px;border-radius:8px;white-space:nowrap">'+tn+' TN</span>';
+    }
     return '<div onclick="showKursDetail(\''+k.id+'\')" style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--brd);cursor:pointer;border-radius:6px" onmouseover="this.style.background=\'var(--sur2)\'" onmouseout="this.style.background=\'\'">'
       +'<span style="width:9px;height:9px;border-radius:50%;background:'+dotColor+';flex-shrink:0"></span>'
       +'<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nm+'</div><div style="font-size:.68rem;color:var(--mu);font-family:\'JetBrains Mono\',monospace">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+ausb+'</div></div>'
-      +'<span style="font-family:\'JetBrains Mono\',monospace;font-size:.68rem;font-weight:700;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;padding:2px 8px;border-radius:8px;white-space:nowrap">'+tn+' TN</span>'
+      +badges
       +'<span style="color:#cbd5e1;font-weight:700">›</span>'
       +'</div>';
   }).join('');
@@ -3197,7 +3238,8 @@ function loadDashboard(){
   const _geplantKurse=_kurse.filter(k=>!k.archiviert&&!k.entwurf&&k.von&&k.von>today).sort((a,b)=>(a.von||'').localeCompare(b.von||''));
   const _sg=document.getElementById('statGeplant'); if(_sg) _sg.textContent=_geplantKurse.length;
   const _ac=document.getElementById('dashAktivCnt'); if(_ac) _ac.textContent=_aktivKurse.length+' '+(_aktivKurse.length===1?'Kurs':'Kurse');
-  _renderDashKursListe('dashAktivListe', _aktivKurse, '#22c55e');
+  _renderDashKursListe('dashAktivListe', _aktivKurse, '#22c55e', true);
+  _ladeKursBestaetigt(_aktivKurse);
   _renderDashKursListe('dashNaechstesListe', _geplantKurse.slice(0,10), '#2563eb');
 
   // Wiederholer + Abwesende aus globalTN

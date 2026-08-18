@@ -1336,6 +1336,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 </div>
 
 <!-- WIEDERHOLER GRUND MODAL -->
+<div class="ov" id="kursCheckModal">
+<div class="modal" style="max-width:520px">
+<div class="mhd"><div class="mtit">⚠ Kurs-Check: Teilnehmer ohne Einordnung</div><button class="xcls" onclick="closeKursCheck()" title="Schließen">&#10005;</button></div>
+<div class="mbdy">
+<div style="font-size:.74rem;color:#111;line-height:1.5;margin-bottom:10px">Diese Teilnehmer haben seit Kursbeginn <b>keinen einzigen Anwesenheitseintrag</b> und stecken weder in „Nicht angetreten" noch in „Wiederholer". Bitte einordnen – Betrieb und Verwaltung erfahren sonst nichts.</div>
+<div id="kursCheckList"></div>
+<div style="font-size:.62rem;color:var(--mu);margin-top:10px;line-height:1.45">Der Hinweis kommt beim Öffnen des Lehrgangs einmal pro Kurstag wieder, solange offene Fälle bestehen.</div>
+</div></div></div>
 <div class="ov" id="wdhGrundModal" onclick="if(event.target===this)cancelWdhGrund()">
 <div class="modal" style="max-width:360px">
 <div class="mhd"><div class="mtit">↩ Grund für Wiederholung</div><button class="xcls" onclick="cancelWdhGrund()" title="Schließen">&#10005;</button></div>
@@ -1956,9 +1964,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v829';
+const APP_VERSION = 'v830';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v830', d:'17.08.2026', items:['⚠ Neuer Kurs-Check: Ab dem 2. Kurstag erscheint beim Öffnen des Lehrgangs ein Fenster mit allen Teilnehmern, die noch keinen Anwesenheitseintrag haben und weder in „Nicht angetreten" noch „Wiederholer" stehen. Direkt einordnen per Knopf: Nicht angetreten (mit Frist & Mail), Wiederholer (mit Grund) oder „Doch da – nachtragen". Kommt einmal pro Kurstag wieder, solange offene Fälle bestehen']},
   {v:'v829', d:'17.08.2026', items:['📋 „Was ist neu?" wieder aktuell – Einträge v822 bis v828 nachgetragen']},
   {v:'v828', d:'17.08.2026', items:['📧 Antworten auf Mails an Azubis und Betriebe gehen jetzt an die im Profil hinterlegte Dienst-E-Mail („E-Mail (für Azubis sichtbar)"), nicht mehr an die Anmelde-Adresse']},
   {v:'v827', d:'17.08.2026', items:['🪑 Sitzplatzfeld aus „+ TN" entfernt – der Azubi trägt seinen Platz selbst in AzubiPro ein und ist damit anwesend']},
@@ -2562,6 +2571,8 @@ function selInst(katId,instId){
   // Nur die Kat des aktuellen Lehrgangs offen halten, alle anderen zuklappen
   Object.keys(S.kats).forEach(k=>{ S.kats[k].open=(k===katId); });
   persist();renderAll();
+  // Kurs-Check: ab 2. Kurstag TN ohne Einordnung anzeigen (Status-Map ist dann meist schon da)
+  setTimeout(()=>{try{maybeKursCheck();}catch(e){}}, 900);
   // Cross-Ausbilder Noten-Sync: lade Noten anderer Ausbilder fuer diesen Kurs aus Firestore
   setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 150);
   // Self-Heal: Kurs in Cloud synchronisieren (falls Umbenennung nicht durchgekommen ist)
@@ -4393,6 +4404,76 @@ function seatAlertInfo(inst,id,d){
     const key=missed.concat(lateNow?[today]:[]).join(',');
     return dism[key]?null:{kind:'wdh',key:key,count:cnt};
   }catch(e){ return null; }
+}
+// ═══ KURS-CHECK (v830): ab dem 2. Kurstag Ausbilder aktiv anstupsen ═══
+// Sitze, die seit Kursbeginn keinerlei Anwesenheitseintrag haben und weder in
+// "Nicht angetreten" (status absent) noch "Wiederholer" stehen. Popup beim
+// Oeffnen des Lehrgangs, einmal je Kurstag (Merker im Lehrgang: kursCheckSeen[date]).
+function _kursCheckOffene(inst){
+  const out=[];
+  try{
+    if(!inst||!inst.seats) return out;
+    const start=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+inst.sM+'-'+inst.sD):null;
+    if(!start) return out;
+    const end=(inst.eY&&inst.eM&&inst.eD)?(inst.eY+'-'+inst.eM+'-'+inst.eD):'9999-12-31';
+    const today=new Date().toISOString().slice(0,10);
+    if(today<=start||today>end) return out;          // ab dem 2. Kurstag, nur waehrend des Kurses
+    Object.keys(inst.seats).forEach(id=>{
+      const d=inst.seats[id]; if(!d||!d.name||d.wiederholer) return;
+      const cs=(d.poolTnId&&_tnStatusMap[d.poolTnId])||'';
+      if(cs==='wiederholer'||cs==='absent') return;
+      const att=d.attendance||[];
+      const attMap=inst.attendance||{};
+      let hasAny=att.length>0 || !!(d.qrCheckin&&d.qrCheckin.datum);
+      if(!hasAny) hasAny=Object.keys(attMap).some(ds=>ds>=start&&ds<=today&&attMap[ds]&&attMap[ds][id]);
+      if(!hasAny) out.push({sid:id, name:d.name, company:d.company||'', tnId:d.poolTnId||null});
+    });
+    out.sort((a,b)=>a.name.localeCompare(b.name,'de'));
+  }catch(e){}
+  return out;
+}
+function maybeKursCheck(){
+  const inst=curInst(); if(!inst) return;
+  const today=new Date().toISOString().slice(0,10);
+  if(inst.kursCheckSeen&&inst.kursCheckSeen[today]) return;
+  const offen=_kursCheckOffene(inst);
+  if(!offen.length) return;
+  if(!inst.kursCheckSeen) inst.kursCheckSeen={};
+  inst.kursCheckSeen={[today]:true};                   // nur heutiger Merker, alte verwerfen
+  persist();
+  renderKursCheck(offen);
+  document.getElementById('kursCheckModal').classList.add('open');
+}
+function renderKursCheck(offen){
+  const el=document.getElementById('kursCheckList'); if(!el) return;
+  if(!offen||!offen.length){ el.innerHTML='<div style="font-size:.74rem;color:#059669;font-weight:700;padding:8px 0">✓ Alle Teilnehmer eingeordnet.</div>'; return; }
+  el.innerHTML=offen.map(o=>{
+    const nm=esc(o.name)+(o.company?' <span style="color:var(--mu);font-weight:500">· '+esc(o.company)+'</span>':'');
+    const sidQ=o.sid.replace(/'/g,'');
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--brd);flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:140px;font-size:.78rem;font-weight:700;color:#111">'+nm+'</div>'
+      +'<button type="button" onclick="kursCheckAktion(\''+sidQ+'\',\'absent\')" style="padding:5px 9px;font-size:.66rem;font-weight:700;border-radius:7px;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;cursor:pointer;font-family:inherit">Nicht angetreten</button>'
+      +'<button type="button" onclick="kursCheckAktion(\''+sidQ+'\',\'wdh\')" style="padding:5px 9px;font-size:.66rem;font-weight:700;border-radius:7px;border:1px solid #fde68a;background:#fffbeb;color:#92400e;cursor:pointer;font-family:inherit">Wiederholer</button>'
+      +'<button type="button" onclick="kursCheckAktion(\''+sidQ+'\',\'da\')" style="padding:5px 9px;font-size:.66rem;font-weight:700;border-radius:7px;border:1px solid #a7f3d0;background:#ecfdf5;color:#047857;cursor:pointer;font-family:inherit">Doch da – nachtragen</button>'
+      +'</div>';
+  }).join('');
+}
+function closeKursCheck(){ document.getElementById('kursCheckModal').classList.remove('open'); }
+function kursCheckAktion(sid, was){
+  const inst=curInst(); if(!inst||!inst.seats||!inst.seats[sid]) return;
+  const d=inst.seats[sid];
+  closeKursCheck();
+  if(was==='da'){
+    // Bestehendes Sitz-Fenster oeffnen: dort Anwesenheit fuer die Tage nachtragen
+    toast('Anwesenheit fuer '+d.name+' im Teilnehmer-Fenster nachtragen','ok');
+    openModal(sid);
+    return;
+  }
+  // Wie Drag auf den jeweiligen Container - exakt derselbe Weg (Frist-Modal / Grund-Modal, Mails, Sync)
+  _seatDragId=sid; _poolDragId=null; _poolDragTnId=null; _poolDragKursId=null; _wiederholerSeatId=null;
+  const fake={preventDefault(){}};
+  if(was==='absent'){ document.getElementById('fehltBody').classList.add('fehlt-dropover'); dropToFehlt(fake); }
+  else { document.getElementById('wiederholerBody').classList.add('wiederholer-dropover'); dropToWiederholer(fake); }
 }
 function dismissSeatAlert(sid){
   const inst=curInst(); if(!inst||!inst.seats) return;
