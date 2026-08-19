@@ -315,7 +315,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
       </div>
       <div style="display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;align-items:flex-start" id="agLiveTabs">
         <button class="stab active" data-tab="heute" title="Heute" onclick="showAgLiveTab('heute')">Heute</button>
-        <button class="stab" data-tab="mitarbeiter" title="Mitarbeiter" onclick="showAgLiveTab('mitarbeiter')">Mitarbeiter</button>
+        <button class="stab" data-tab="mitarbeiter" title="Azubis" onclick="showAgLiveTab('mitarbeiter')">Azubis</button>
+        <button class="stab" data-tab="arbeitnehmer" title="Mitarbeiter" onclick="showAgLiveTab('arbeitnehmer')">Mitarbeiter</button>
         <button class="stab" data-tab="auftraege" title="Aufträge" onclick="showAgLiveTab('auftraege')">Aufträge</button>
         <button class="stab" data-tab="meldungen" title="Meldungen" onclick="showAgLiveTab('meldungen')">Meldungen</button>
       </div>
@@ -328,7 +329,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
       </div>
 
-      <!-- LIVE: Mitarbeiter -->
+      <!-- LIVE: Azubis (intern weiterhin "mitarbeiter" - IDs/Handler unveraendert) -->
       <div class="abtab" id="abtab-mitarbeiter">
         <!-- Pending-Antraege Banner (Azubis/MA mit Verknuepfungs-Antrag) -->
         <div id="pendingAntraegeBanner"></div>
@@ -340,28 +341,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div id="ehemaligeListe"></div>
           </div>
         </details>
-        <!-- Arbeitnehmer (aufklappbar) -->
-        <details class="coll-card" id="sectArbeitnehmer" style="margin-bottom:10px">
-          <summary>
-            <span style="display:flex;align-items:center;gap:8px;flex:1">
-              <span style="font-size:1.05rem">👤</span>
-              <span>Arbeitnehmer</span>
-              <span id="cntArbeitnehmer" style="font-size:.6rem;background:rgba(217,119,6,.12);color:#92400e;padding:2px 7px;border-radius:8px;font-weight:700">0</span>
-              <span id="maStatusBadges" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center"></span>
-            </span>
-          </summary>
-          <div class="coll-body">
-            <div class="abtab2 active" id="abtab-ma-arbeitnehmer">
-              <div id="agArbeitnehmerListe"><div class="empty">Lädt…</div></div>
-              <button class="big-btn" onclick="openMaAnlegenModal('arbeitnehmer')" style="margin-top:12px">
-                <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">👤+</span>
-                <span class="bb-tx"><span class="bb-t">Arbeitnehmer anlegen</span><span class="bb-s">Zugang für BetriebPro</span></span>
-                <span class="bb-arr">›</span>
-              </button>
-            </div>
-          </div>
-        </details>
-
         <!-- Azubis (aufklappbar) -->
         <details class="coll-card" id="sectAzubis" style="margin-bottom:10px">
           <summary>
@@ -418,6 +397,32 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
                 <div id="dokTrenner" style="margin:12px 0 6px;font-size:.78rem;font-weight:800;color:var(--tx)">An den Azubi geschickt</div>
                 <div id="agDokListe"><div class="empty">Lädt…</div></div>
               </div>
+            </div>
+          </div>
+        </details>
+
+      </div>
+
+      <!-- LIVE: Mitarbeiter (Arbeitnehmer) - eigener Reiter seit v208; im Lite ausgeblendet -->
+      <div class="abtab" id="abtab-arbeitnehmer">
+        <!-- Arbeitnehmer (aufklappbar) -->
+        <details class="coll-card" id="sectArbeitnehmer" style="margin-bottom:10px">
+          <summary>
+            <span style="display:flex;align-items:center;gap:8px;flex:1">
+              <span style="font-size:1.05rem">👤</span>
+              <span>Arbeitnehmer</span>
+              <span id="cntArbeitnehmer" style="font-size:.6rem;background:rgba(217,119,6,.12);color:#92400e;padding:2px 7px;border-radius:8px;font-weight:700">0</span>
+              <span id="maStatusBadges" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center"></span>
+            </span>
+          </summary>
+          <div class="coll-body">
+            <div class="abtab2 active" id="abtab-ma-arbeitnehmer">
+              <div id="agArbeitnehmerListe"><div class="empty">Lädt…</div></div>
+              <button class="big-btn" onclick="openMaAnlegenModal('arbeitnehmer')" style="margin-top:12px">
+                <span class="bb-ic" style="background:rgba(37,99,235,.1);color:var(--acc)">👤+</span>
+                <span class="bb-tx"><span class="bb-t">Arbeitnehmer anlegen</span><span class="bb-s">Zugang für BetriebPro</span></span>
+                <span class="bb-arr">›</span>
+              </button>
             </div>
           </div>
         </details>
@@ -1398,7 +1403,8 @@ function _applyAgModule(m){
   // Live: Heute (Zeiterfassung) und Aufträge
   setVis(q('#agLiveTabs [data-tab="heute"]'), zeit);
   setVis(q('#agLiveTabs [data-tab="auftraege"]'), auftraege);
-  // Mitarbeiter-Sektion - die Azubi-Sektion darunter bleibt IMMER
+  // Mitarbeiter-Reiter (Arbeitnehmer) nur mit Zeit-Modul - der Azubi-Reiter bleibt IMMER
+  setVis(q('#agLiveTabs [data-tab="arbeitnehmer"]'), zeit);
   setVis(document.getElementById('sectArbeitnehmer'), zeit);
   // Auswertung
   setVis(q('#agAusTabs [data-tab="monat"]'), zeit);
@@ -4330,7 +4336,7 @@ function showAgLiveTab(tab){
     if(btn) btn.classList.add('active');
   }
   if(tab==='heute') startAgZeitLive();
-  if(tab==='mitarbeiter'){ loadAzubis(); renderAgAzubiKontakte(); _applyAgMaType(); }
+  if(tab==='mitarbeiter'||tab==='arbeitnehmer'){ loadAzubis(); renderAgAzubiKontakte(); _applyAgMaType(); if(tab==='arbeitnehmer'){ const sa=document.getElementById('sectArbeitnehmer'); if(sa) sa.open=true; } }
   if(tab==='auftraege') loadAgAuftraege();
   if(tab==='meldungen') loadAgMeldungen();
 }
@@ -4364,7 +4370,7 @@ function _applyAgMaType(){
   // gleichzeitig sichtbar als aufklappbare details-Cards.
   // Funktion bleibt fuer Rueckwaerts-Kompatibilitaet (wird an mehreren Stellen aufgerufen).
   // Sicherheits-Halber beide abtab2 als active setzen falls etwas active-Klasse erwartet:
-  document.querySelectorAll('#abtab-mitarbeiter .abtab2').forEach(t=>t.classList.add('active'));
+  document.querySelectorAll('#abtab-mitarbeiter .abtab2, #abtab-arbeitnehmer .abtab2').forEach(t=>t.classList.add('active'));
 }
 // Klick außerhalb schließt Dropdowns
 document.addEventListener('click', e=>{
@@ -4386,8 +4392,8 @@ const _tabConfigs={
     containerId:'agLiveTabs',
     storageKey:'ag_live_tab_order',
     attr:'data-tab',
-    labels:{heute:'📡 Heute', mitarbeiter:'👥 Mitarbeiter', auftraege:'📋 Aufträge', meldungen:'📨 Meldungen'},
-    default:['heute','mitarbeiter','auftraege','meldungen']
+    labels:{heute:'📡 Heute', mitarbeiter:'🎓 Azubis', arbeitnehmer:'👥 Mitarbeiter', auftraege:'📋 Aufträge', meldungen:'📨 Meldungen'},
+    default:['heute','mitarbeiter','arbeitnehmer','auftraege','meldungen']
   },
   auswertung: {
     containerId:'agAusTabs',
@@ -4488,7 +4494,7 @@ function initAgLive(){
   fillAgAzubiSelect();
   const active=document.querySelector('#agpage-live .abtab.active');
   if(!active||active.id==='abtab-heute') startAgZeitLive();
-  else if(active.id==='abtab-mitarbeiter'){ loadAzubis(); renderAgAzubiKontakte(); }
+  else if(active.id==='abtab-mitarbeiter'||active.id==='abtab-arbeitnehmer'){ loadAzubis(); renderAgAzubiKontakte(); }
   else if(active.id==='abtab-auftraege') loadAgAuftraege();
   else if(active.id==='abtab-meldungen') loadAgMeldungen();
 }
