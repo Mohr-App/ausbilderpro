@@ -1727,10 +1727,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 360';
+const APP_VERSION = 'Build 361';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 361', d:'19.08.2026', items:['🔀 Dublette zusammenführen: Suche startet mit Vor- und Nachname (findet auch „Romina Jennifer Müller" bei „Romina Müller"), bis zu 30 Treffer, Kandidaten mit gleichem Geburtsdatum stehen oben und sind markiert']},
   {v:'Build 360', d:'19.08.2026', items:['🔀 Neu im Teilnehmer-Profil: „Dublette zusammenführen". Ein Neuzugang (z. B. mit vertipptem Geburtsdatum) behält seine ID samt Konto, Kurs, Anwesenheit und Sitzplatz; die Stammdaten (Name, Geburtsdatum, Lehrlingsnummer, Betrieb, Beruf, Adresse …) kommen aus dem Kammer-Datensatz, der danach gelöscht wird. Der nächste Import erkennt den Datensatz als vorhanden']},
   {v:'Build 359', d:'17.08.2026', items:['📊 Dashboard „Läuft gerade": statt einer Gesamtzahl jetzt „7/9 TN" (aktiv von zugewiesen – ohne nicht angetreten, Wiederholer, entfernt; rot bei Abweichung) und „✓ 5" (Lehrgang in AzubiPro bestätigt)']},
   {v:'Build 358', d:'14.08.2026', items:['\u2753 Hilfe erweitert: neue Abschnitte zu Kurs-\u00dcbertragung & E-Mails, TN-Entfernung, Arbeitgeber-Zug\u00e4ngen (Lite/Voll) und h\u00e4ufigen Fragen.']},
@@ -8492,7 +8493,7 @@ function openTnMerge(tnId){
   document.getElementById('tnMergeQuelle').innerHTML='<b>Dieser Datensatz (bleibt, behält seine ID):</b><br>'+esc(_tnKurz(t))
     +'<br><span style="color:var(--mu)">'+(t.verknuepftUid?'🔗 Konto verknüpft':'kein Konto')+(t.aktiverKursId?' · aktiver Kurs':'')+(t.dsgvoZustimmung?' · DSGVO':'')+(t.selfRegistered?' · Neuzugang (selbst registriert)':'')+'</span>';
   document.getElementById('tnMergeQuelle').style.borderColor='#a7f3d0'; document.getElementById('tnMergeQuelle').style.background='#ecfdf5';
-  document.getElementById('tnMergeSuche').value=(t.nachname||'');
+  document.getElementById('tnMergeSuche').value=((t.vorname||'')+' '+(t.nachname||'')).trim();
   document.getElementById('tnMergeZiel').style.display='none';
   document.getElementById('tnMergePlan').style.display='none';
   document.getElementById('tnMergeBtn').style.display='none';
@@ -8506,10 +8507,17 @@ function tnMergeSearch(){
   const box=document.getElementById('tnMergeTreffer');
   if(q.length<2){ box.innerHTML=''; return; }
   const words=q.split(/\s+/).filter(Boolean);
-  const hits=_globalTN.filter(t=>t.id!==_mergeQuelleId && !t.archived && words.every(w=>((t.vorname||'')+' '+(t.nachname||'')+' '+(t.firma||'')).toLowerCase().includes(w))).slice(0,15);
-  if(!hits.length){ box.innerHTML='<div style="font-size:.7rem;color:var(--mu);padding:6px">Kein Treffer.</div>'; return; }
-  box.innerHTML=hits.map(t=>'<button type="button" onclick="tnMergePick(\''+t.id+'\')" style="display:block;width:100%;text-align:left;padding:7px 9px;border:none;border-bottom:1px solid var(--brd);background:#fff;cursor:pointer;font-family:inherit;font-size:.72rem;color:#111">'
-    +esc(_tnKurz(t))+(_tnHatLeben(t)?' <span style="color:#b91c1c;font-weight:700">· hat selbst Konto/Kurs!</span>':'')+'</button>').join('');
+  const q0=_globalTN.find(x=>x.id===_mergeQuelleId)||{};
+  const hits=_globalTN.filter(t=>t.id!==_mergeQuelleId && !t.archived && words.every(w=>((t.vorname||'')+' '+(t.nachname||'')+' '+(t.firma||'')).toLowerCase().includes(w)));
+  // Kandidaten mit gleichem Geburtsdatum zuerst, dann Nachname
+  hits.sort((a,b)=>{ const ga=(q0.geburtsdatum&&a.geburtsdatum===q0.geburtsdatum)?0:1, gb=(q0.geburtsdatum&&b.geburtsdatum===q0.geburtsdatum)?0:1; return ga-gb || ((a.nachname||'')+(a.vorname||'')).localeCompare((b.nachname||'')+(b.vorname||''),'de'); });
+  const shown=hits.slice(0,30);
+  if(!hits.length){ box.innerHTML='<div style="font-size:.7rem;color:var(--mu);padding:6px">Kein Treffer – anders suchen (nur Vorname, nur Betrieb …).</div>'; return; }
+  box.innerHTML=(hits.length>shown.length?'<div style="font-size:.62rem;color:var(--mu);padding:4px 9px">'+hits.length+' Treffer – die ersten '+shown.length+'. Bitte Suche eingrenzen.</div>':'')
+    +shown.map(t=>'<button type="button" onclick="tnMergePick(\''+t.id+'\')" style="display:block;width:100%;text-align:left;padding:7px 9px;border:none;border-bottom:1px solid var(--brd);background:#fff;cursor:pointer;font-family:inherit;font-size:.72rem;color:#111">'
+    +esc(_tnKurz(t))
+    +((q0.geburtsdatum&&t.geburtsdatum===q0.geburtsdatum)?' <span style="color:#047857;font-weight:700">· gleiches Geburtsdatum</span>':'')
+    +(_tnHatLeben(t)?' <span style="color:#b91c1c;font-weight:700">· hat selbst Konto/Kurs!</span>':'')+'</button>').join('');
 }
 function tnMergePick(id){
   const a=_globalTN.find(x=>x.id===id), b=_globalTN.find(x=>x.id===_mergeQuelleId); if(!a||!b) return;
