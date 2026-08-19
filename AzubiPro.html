@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v311'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v312'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -1603,11 +1603,19 @@ function togglePwVis(id,btnId){
   else { i.type='password'; if(b) b.innerHTML='&#128065;'; }
   i.focus();
 }
+// Reset-Mail-Hinweis (v312): deutlich, mit Spam-Hinweis - die Firebase-Mail landet oft im Spam/Werbung-Ordner.
+function _resetMailHinweisHtml(email){
+  return '<div style="text-align:left;background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:10px;padding:10px 12px;color:#064e3b;font-size:.76rem;line-height:1.5;font-weight:600">'
+    +'✓ Mail zum Zurücksetzen ist unterwegs an <b>'+esc(email)+'</b>.'
+    +'<div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:8px;color:#78350f">'
+    +'📬 <b>Nicht im Posteingang?</b> Bitte unbedingt im <b>Spam- / Junk- / Werbung-Ordner</b> nachschauen – dort landet die Mail sehr oft. Absender: <b>noreply@…firebaseapp.com</b>. Kann 1–2 Minuten dauern.'
+    +'</div></div>';
+}
 function doReset(){
   const e=document.getElementById('lEmail').value.trim();
   if(!e){showErr('Bitte zuerst E-Mail eingeben');return;}
   auth.sendPasswordResetEmail(e, _acs)
-    .then(()=>{document.getElementById('lErr').style.color='var(--acc)';showErr('✓ Reset-Mail gesendet – prüfe dein Postfach');})
+    .then(()=>{ const el=document.getElementById('lErr'); el.style.color=''; el.innerHTML=_resetMailHinweisHtml(e); })
     .catch(err=>showErr(_pwErrMsg(err)));
 }
 // Passwort-Reset aus dem Beitritts-Login (eigenes E-Mail-/Fehlerfeld)
@@ -1617,7 +1625,7 @@ function doResetJoin(){
   if(!errEl) return;
   if(!e){ errEl.style.color='var(--bad)'; errEl.textContent='Bitte zuerst E-Mail eingeben'; return; }
   auth.sendPasswordResetEmail(e, _acs)
-    .then(()=>{ errEl.style.color='var(--acc)'; errEl.textContent='✓ Reset-Mail gesendet – prüfe dein Postfach'; })
+    .then(()=>{ errEl.style.color=''; errEl.innerHTML=_resetMailHinweisHtml(e); })
     .catch(err=>{ errEl.style.color='var(--bad)'; errEl.textContent=_pwErrMsg(err); });
 }
 // Klare Firebase-Auth-Fehlermeldungen (wie AusbilderPro)
