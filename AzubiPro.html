@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v310'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v311'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -2244,7 +2244,13 @@ function joinNgWeiter(){
       return;
     }
     errEl.textContent='';
-    _azubiShowFoundYou(m).then(istIch=>{ if(istIch){ var f=document.getElementById('joinNameGebForm'); if(f) f.style.display='none'; _weg1ZeigeKursBestaetigung(m); } });
+    _azubiShowFoundYou(m).then(istIch=>{
+      if(istIch){ var f=document.getElementById('joinNameGebForm'); if(f) f.style.display='none'; _weg1ZeigeKursBestaetigung(m); return; }
+      if(m.vorschlag){
+        // Namens-Vorschlag abgelehnt -> wie bisher: Kein-Treffer-Dialog (korrigieren / trotzdem)
+        _azubiShowNoMatch(vn, nn, geb).then(trotzdem=>{ if(trotzdem) _weg1ZeigeKursBestaetigung({_neu:true, vorname:vn, nachname:nn, geburtsdatum:geb}); });
+      }
+    });
   }).catch(e=>{ if(btn) btn.disabled=false; errEl.style.color='#ef4444'; errEl.textContent='Fehler bei der Suche.'; console.warn('[Weg1] NameGeb:', e); });
 }
 // Lehrlingsnummer -> suchen -> "Bist du das?" -> verknuepfen
@@ -2661,8 +2667,31 @@ function _azubiFindMatch(vn,nn,geb){
     });
     if(free.length===1) return free[0];               // genau ein freier Treffer
     if(free.length===0 && linkedMatch) return {alreadyLinked:true}; // nur schon belegte Treffer
-    return null;   // 0 Treffer oder 2+ frei (mehrdeutig) -> Behelfsbruecke
+    if(free.length===0 && !linkedMatch && snap.size>=0){
+      // Zweite Chance (v311): Geburtsdatum vertippt? Gleicher Name in der Liste mit ANDEREM
+      // Geburtsdatum -> als Vorschlag zurueckgeben (nur wenn genau EIN freier Namens-Treffer).
+      return _azubiNameVorschlag(vn,nn,geb);
+    }
+    return null;   // 2+ frei (mehrdeutig) -> Behelfsbruecke
   }).catch(e=>{ console.warn('[3a] Match-Check fehlgeschlagen:', e); return null; });
+}
+// Namens-Suche fuer den Tippfehler-Fall: Nachname exakt (wie getippt + Schreibweise mit
+// grossem Anfangsbuchstaben), Vorname per Token-Match. Liefert {vorschlag:true,...} oder null.
+function _azubiNameVorschlag(vn,nn,geb){
+  const cap=x=>x?x.charAt(0).toUpperCase()+x.slice(1).toLowerCase():x;
+  const varianten=[...new Set([nn, cap(nn), nn.toUpperCase()].filter(Boolean))];
+  return Promise.all(varianten.map(v=>db.collection('globalTN').where('nachname','==',v).get().catch(()=>null))).then(snaps=>{
+    const seen=new Set(); const hits=[];
+    snaps.forEach(sn=>{ if(!sn) return; sn.forEach(d=>{
+      if(seen.has(d.id)) return; seen.add(d.id);
+      const x=d.data();
+      if(x.verknuepftUid || x.selfRegistered===true || x.archived) return;
+      if(!_fyNameMatch(vn,nn,x.vorname,x.nachname)) return;
+      if(!x.geburtsdatum || x.geburtsdatum===geb) return;
+      hits.push({id:d.id, vorname:x.vorname||'', nachname:x.nachname||'', beruf:(x.beruf||x.berufGruppe||''), berufGruppeId:(x.berufGruppeId||''), firma:(x.firma||''), geburtsdatum:x.geburtsdatum, vorschlag:true, eingegebenGeb:geb});
+    }); });
+    return hits.length===1 ? hits[0] : null;
+  }).catch(()=>null);
 }
 function _azubiShowFoundYou(m){
   return new Promise(res=>{
@@ -2678,6 +2707,14 @@ function _azubiShowFoundYou(m){
         .catch(()=>{ bEl.textContent='—'; });
     })();
     document.getElementById('fyFirma').textContent=m.firma||'—';
+    (function(){
+      var h=document.getElementById('fyHinweis'); if(!h) return;
+      if(m.vorschlag){
+        var f=x=>x?x.split('-').reverse().join('.'):'—';
+        h.style.display='block';
+        h.innerHTML='⚠ Das Geburtsdatum weicht ab: du hast <b>'+f(m.eingegebenGeb)+'</b> eingegeben, in der Liste steht <b>'+f(m.geburtsdatum)+'</b>. Vertippt? Wenn das du bist, gilt das Datum aus der Liste.';
+      } else { h.style.display='none'; h.innerHTML=''; }
+    })();
     var c=document.getElementById('fyConfirmChk'); if(c) c.checked=false;
     var y=document.getElementById('fyYesBtn'); if(y){ y.disabled=true; y.style.opacity='.5'; }
     document.getElementById('foundYouModal').style.display='flex';
@@ -2955,6 +2992,12 @@ function submitJoinRegistration(){
         return _azubiShowFoundYou(match).then(istIch=>{
           _linkTnId = istIch ? match.id : null;
           console.log('[3a] Match:', match, '| das bin ich:', istIch, '| _linkTnId:', _linkTnId, '(3a: noch keine Verknuepfung – normale Neu-Anlage)');
+          if(!istIch && match.vorschlag){
+            return _azubiShowNoMatch(vorname, nachname, geburtsdatum).then(weiter=>{
+              if(!weiter){ const ab=new Error('zurueck-korrigieren'); ab.code='custom/zurueck-korrigieren'; throw ab; }
+              _linkTnId=null;
+            });
+          }
         });
       } else {
         // Kein Treffer -> Kontrolldialog: Name/Geburtsdatum prüfen (Tippfehler abfangen)
@@ -8430,6 +8473,7 @@ window.addEventListener('load',()=>{
         <div style="font-size:.78rem;color:#475569;margin-top:4px">Beruf: <span id="fyBeruf">—</span></div>
         <div style="font-size:.78rem;color:#475569">Betrieb: <span id="fyFirma">—</span></div>
       </div>
+      <div id="fyHinweis" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;font-size:.74rem;color:#78350f;line-height:1.45;margin-bottom:12px"></div>
       <label style="display:flex;gap:8px;align-items:flex-start;font-size:.74rem;color:#374151;margin-bottom:12px;cursor:pointer;line-height:1.4"><input type="checkbox" id="fyConfirmChk" onchange="var b=document.getElementById('fyYesBtn');b.disabled=!this.checked;b.style.opacity=this.checked?'1':'.5'" style="margin-top:2px;flex-shrink:0"><span>Ich bestätige, dass dies meine echten Daten sind und ich diese Person bin.</span></label>
       <button id="fyYesBtn" onclick="_fyAnswer(true)" disabled style="width:100%;padding:12px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:8px;opacity:.5">✓ Ja, das bin ich</button>
       <button onclick="_fyAnswer(false)" style="width:100%;padding:12px;background:#e5e7eb;color:#374151;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">Das bin ich nicht</button>

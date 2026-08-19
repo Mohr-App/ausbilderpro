@@ -1540,6 +1540,21 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 <!-- TEILNEHMER (TN sind jetzt in der Sidebar – nur Modals bleiben) -->
 
       <!-- TN PROFIL MODAL -->
+      <div class="ov" id="tnMergeModal">
+        <div class="modal" style="max-width:520px">
+          <div class="mhd"><div class="mtit">🔀 Dublette zusammenführen</div><button class="xcls" onclick="closeTnMerge()" title="Schließen">&#10005;</button></div>
+          <div class="mbdy">
+            <div id="tnMergeQuelle" style="padding:8px 10px;border:1.5px solid #fecaca;background:#fef2f2;border-radius:8px;font-size:.74rem;color:#111;margin-bottom:10px"></div>
+            <div style="font-size:.66rem;color:var(--mu);font-weight:700;margin-bottom:4px">Passenden Kammer-Datensatz suchen (liefert die Stammdaten)</div>
+            <input class="fi" id="tnMergeSuche" placeholder="Name oder Betrieb…" oninput="tnMergeSearch()" autocomplete="off" style="width:100%">
+            <div id="tnMergeTreffer" style="margin-top:6px;max-height:220px;overflow-y:auto"></div>
+            <div id="tnMergeZiel" style="display:none;margin-top:10px;padding:8px 10px;border:1.5px solid #a7f3d0;background:#ecfdf5;border-radius:8px;font-size:.74rem;color:#111"></div>
+            <div id="tnMergePlan" style="display:none;font-size:.68rem;color:#111;line-height:1.55;margin-top:10px"></div>
+            <button class="btn-sm btn-ok" id="tnMergeBtn" onclick="tnMergeAusfuehren()" style="margin-top:12px;width:100%;display:none">🔀 Jetzt zusammenführen</button>
+            <div id="tnMergeLog" style="font-size:.66rem;color:var(--mu);margin-top:8px;white-space:pre-line"></div>
+          </div>
+        </div>
+      </div>
       <div class="ov" id="tnProfileModal">
         <div class="modal" style="max-width:580px">
           <div class="mhd"><div class="mtit" id="tnModalTitle">Teilnehmer</div><button class="xcls" onclick="closeTNModal()" title="Schließen">&#10005;</button></div>
@@ -1712,10 +1727,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 359';
+const APP_VERSION = 'Build 360';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 360', d:'19.08.2026', items:['🔀 Neu im Teilnehmer-Profil: „Dublette zusammenführen". Ein Neuzugang (z. B. mit vertipptem Geburtsdatum) behält seine ID samt Konto, Kurs, Anwesenheit und Sitzplatz; die Stammdaten (Name, Geburtsdatum, Lehrlingsnummer, Betrieb, Beruf, Adresse …) kommen aus dem Kammer-Datensatz, der danach gelöscht wird. Der nächste Import erkennt den Datensatz als vorhanden']},
   {v:'Build 359', d:'17.08.2026', items:['📊 Dashboard „Läuft gerade": statt einer Gesamtzahl jetzt „7/9 TN" (aktiv von zugewiesen – ohne nicht angetreten, Wiederholer, entfernt; rot bei Abweichung) und „✓ 5" (Lehrgang in AzubiPro bestätigt)']},
   {v:'Build 358', d:'14.08.2026', items:['\u2753 Hilfe erweitert: neue Abschnitte zu Kurs-\u00dcbertragung & E-Mails, TN-Entfernung, Arbeitgeber-Zug\u00e4ngen (Lite/Voll) und h\u00e4ufigen Fragen.']},
   {v:'Build 357', d:'12.08.2026', items:['\ud83c\udfe2 Arbeitgeber-Zug\u00e4nge: Lite/Voll-Schalter je Betrieb (nutzt das bestehende agModule-System). Lite = nur \u00dcBL + Anwesenheit, Voll = alle Funktionen (Zeit/Auftr\u00e4ge/Belege/Urlaub). Ein Klick in der Betriebsliste.']},
@@ -8264,6 +8280,8 @@ function openTNProfile(tnId){
     html+='<div class="profile-field"><span class="pf-label">Verknüpfung</span><span style="color:#0d9488;font-weight:600">🔗 '+esc(frei)+'</span></div>';
     html+='<button class="btn-sm btn-bad" onclick="tnVerknuepfungReset(\''+tnId+'\')" style="margin-top:6px;font-size:.65rem;padding:5px 10px" title="Selbst-Verknuepfung zuruecksetzen (Admin)">🔓 Verknüpfung zurücksetzen</button>';
   }
+  // Dublette zusammenfuehren (Admin): diesen Datensatz in einen anderen aufgehen lassen
+  html+='<button class="btn-sm" onclick="openTnMerge(\''+tnId+'\')" style="margin-top:6px;font-size:.65rem;padding:5px 10px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412" title="Neuzugang (z.B. Tippfehler im Geburtsdatum) mit seinem Kammer-Datensatz zusammenführen: dieser Datensatz bleibt (Konto, Kurs, Anwesenheit, Sitzplatz unverändert), die Stammdaten kommen aus der Kammerliste, der leere Kammer-Datensatz wird gelöscht">🔀 Dublette zusammenführen</button>';
   if(t.verkuerzer||t.wiederholer){
     html+='<div class="profile-field"><span class="pf-label">Sonderstatus</span><span>'+
       (t.verkuerzer?'<span style="background:rgba(99,102,241,.12);color:#6366f1;padding:2px 7px;border-radius:8px;font-size:.7rem;font-weight:700">Verkuerzer</span> ':'')+
@@ -8457,6 +8475,98 @@ function tnVerknuepfungReset(tnId){
   }).catch(err=>{ toast('Fehler: '+err.message,'bad'); });
 }
 function closeTNModal(){document.getElementById('tnProfileModal').classList.remove('open');}
+
+// ═══ DUBLETTE ZUSAMMENFUEHREN (Build 360) ═══
+// Prinzip: Der VERKNUEPFTE Datensatz (mit Konto/Kurs/Anwesenheit/Sitzplatz) BLEIBT - seine ID
+// haengt ueberall dran. Der leere Kammer-Datensatz liefert nur die Stammdaten (Name, Geburtsdatum,
+// Lehrlingsnummer, Betrieb, Beruf, Adresse, Beginn/Ende ...) und wird danach geloescht.
+// Damit erkennt der naechste Kammerlisten-Import den verbliebenen Datensatz als "schon da".
+// Nichts wird umgehaengt: Kurs, Check-ins, Meldungen, Sitzplaetze in AusbilderPro bleiben unberuehrt.
+let _mergeQuelleId=null, _mergeZielId=null;
+const _KAMMER_FELDER=['vorname','nachname','geburtsdatum','lehrlingsnr','firma','beruf','berufGruppeId','ausbjahr','adresse','plz','ort','anfang','endeVorgesehen','betriebTelefon','tel','kammer','ausbildungsberuf'];
+function _tnKurz(t){ return ((t.vorname||'')+' '+(t.nachname||'')).trim()+(t.firma?' · '+t.firma:'')+(t.geburtsdatum?' · geb. '+fmtDE(t.geburtsdatum):'')+(t.lehrlingsnr?' · LNr '+t.lehrlingsnr:''); }
+function _tnHatLeben(t){ return !!(t.verknuepftUid || t.aktiverKursId || (t.kursHistory||[]).length || t.dsgvoZustimmung); }
+function openTnMerge(tnId){
+  const t=_globalTN.find(x=>x.id===tnId); if(!t) return;
+  _mergeQuelleId=tnId; _mergeZielId=null;
+  document.getElementById('tnMergeQuelle').innerHTML='<b>Dieser Datensatz (bleibt, behält seine ID):</b><br>'+esc(_tnKurz(t))
+    +'<br><span style="color:var(--mu)">'+(t.verknuepftUid?'🔗 Konto verknüpft':'kein Konto')+(t.aktiverKursId?' · aktiver Kurs':'')+(t.dsgvoZustimmung?' · DSGVO':'')+(t.selfRegistered?' · Neuzugang (selbst registriert)':'')+'</span>';
+  document.getElementById('tnMergeQuelle').style.borderColor='#a7f3d0'; document.getElementById('tnMergeQuelle').style.background='#ecfdf5';
+  document.getElementById('tnMergeSuche').value=(t.nachname||'');
+  document.getElementById('tnMergeZiel').style.display='none';
+  document.getElementById('tnMergePlan').style.display='none';
+  document.getElementById('tnMergeBtn').style.display='none';
+  document.getElementById('tnMergeLog').textContent='';
+  document.getElementById('tnMergeModal').classList.add('open');
+  tnMergeSearch();
+}
+function closeTnMerge(){ document.getElementById('tnMergeModal').classList.remove('open'); }
+function tnMergeSearch(){
+  const q=(document.getElementById('tnMergeSuche').value||'').trim().toLowerCase();
+  const box=document.getElementById('tnMergeTreffer');
+  if(q.length<2){ box.innerHTML=''; return; }
+  const words=q.split(/\s+/).filter(Boolean);
+  const hits=_globalTN.filter(t=>t.id!==_mergeQuelleId && !t.archived && words.every(w=>((t.vorname||'')+' '+(t.nachname||'')+' '+(t.firma||'')).toLowerCase().includes(w))).slice(0,15);
+  if(!hits.length){ box.innerHTML='<div style="font-size:.7rem;color:var(--mu);padding:6px">Kein Treffer.</div>'; return; }
+  box.innerHTML=hits.map(t=>'<button type="button" onclick="tnMergePick(\''+t.id+'\')" style="display:block;width:100%;text-align:left;padding:7px 9px;border:none;border-bottom:1px solid var(--brd);background:#fff;cursor:pointer;font-family:inherit;font-size:.72rem;color:#111">'
+    +esc(_tnKurz(t))+(_tnHatLeben(t)?' <span style="color:#b91c1c;font-weight:700">· hat selbst Konto/Kurs!</span>':'')+'</button>').join('');
+}
+function tnMergePick(id){
+  const a=_globalTN.find(x=>x.id===id), b=_globalTN.find(x=>x.id===_mergeQuelleId); if(!a||!b) return;
+  _mergeZielId=id;
+  document.getElementById('tnMergeTreffer').innerHTML='';
+  const z=document.getElementById('tnMergeZiel'); z.style.display='block';
+  z.style.borderColor='#fecaca'; z.style.background='#fef2f2';
+  z.innerHTML='<b>Kammer-Datensatz (liefert Stammdaten, wird danach gelöscht):</b><br>'+esc(_tnKurz(a));
+  const plan=[]; let block=false;
+  if(_tnHatLeben(a)){ plan.push('⛔ Der Kammer-Datensatz hat selbst Konto/Kurs/DSGVO – das ist keine leere Dublette. Automatisches Zusammenführen gesperrt; bitte prüfen, welcher der richtige ist.'); block=true; }
+  else {
+    plan.push('👤 Stammdaten aus der Kammerliste werden übernommen: Name, Geburtsdatum, Lehrlingsnummer, Betrieb, Beruf, Lehrjahr, Adresse, Beginn/Ende');
+    plan.push('🔗 Konto, DSGVO, Kurs, Anwesenheit, Sitzplatz bleiben unverändert (gleiche ID)');
+    plan.push('🏷 „Neuzugang"-Markierung wird entfernt – nächster Import erkennt den Datensatz als vorhanden');
+    plan.push('🗑 Der leere Kammer-Datensatz wird gelöscht');
+    if(a.geburtsdatum && b.geburtsdatum && a.geburtsdatum!==b.geburtsdatum) plan.push('📅 Geburtsdatum wird korrigiert: '+fmtDE(b.geburtsdatum)+' → '+fmtDE(a.geburtsdatum));
+  }
+  const pl=document.getElementById('tnMergePlan'); pl.style.display='block'; pl.innerHTML=plan.map(x=>'• '+esc(x)).join('<br>');
+  document.getElementById('tnMergeBtn').style.display=block?'none':'block';
+}
+async function tnMergeAusfuehren(){
+  const bId=_mergeQuelleId, aId=_mergeZielId; if(!bId||!aId||bId===aId) return;
+  const btn=document.getElementById('tnMergeBtn'); btn.disabled=true;
+  const log=document.getElementById('tnMergeLog'); const L=m=>{ log.textContent+=m+'\n'; };
+  try{
+    const FV=firebase.firestore.FieldValue;
+    const bDoc=await db.collection('globalTN').doc(bId).get(); const aDoc=await db.collection('globalTN').doc(aId).get();
+    if(!bDoc.exists||!aDoc.exists) throw new Error('Datensatz nicht gefunden');
+    const b=bDoc.data(), a=aDoc.data();
+    if(_tnHatLeben(a)) throw new Error('Kammer-Datensatz hat selbst Konto/Kurs – nicht automatisch zusammenführbar');
+    if(!confirm('Wirklich zusammenführen?\n\nBleibt:   '+_tnKurz(b)+'\nStammdaten aus: '+_tnKurz(a)+'\n\nDer Kammer-Datensatz wird danach gelöscht.')){ btn.disabled=false; return; }
+    // 1) Stammdaten der Kammerliste in den bleibenden Datensatz
+    const upd={ selfRegistered: FV.delete(), mergedFrom: FV.arrayUnion(aId) };
+    _KAMMER_FELDER.forEach(k=>{ if(a[k]!==undefined && a[k]!==null && a[k]!=='') upd[k]=a[k]; });
+    // Betriebs-Verknuepfung (firmaUid etc.) vom Kammer-Datensatz uebernehmen, falls der bleibende keine hat
+    ['firmaUid','arbeitgeberId','betriebId','_verknuepftSeit','_verknuepftVon'].forEach(k=>{ if((b[k]==null||b[k]==='') && a[k]!=null && a[k]!=='') upd[k]=a[k]; });
+    await db.collection('globalTN').doc(bId).update(upd); L('✓ Stammdaten übernommen ('+Object.keys(upd).length+' Felder)');
+    // 2) Kurs-Teilnehmerlisten des bleibenden TN: Stammdaten-Kopie nachziehen (Name/Betrieb/Beruf)
+    const kursIds=new Set(); if(b.aktiverKursId) kursIds.add(b.aktiverKursId); (b.kursHistory||[]).forEach(h=>{ if(h&&h.kursId) kursIds.add(h.kursId); });
+    for(const kId of kursIds){
+      const ref=db.collection('shared').doc('kurse').collection('list').doc(kId).collection('teilnehmer').doc(bId);
+      const d=await ref.get(); if(!d.exists) continue;
+      const u={}; ['vorname','nachname','firma','beruf','berufGruppeId'].forEach(k=>{ if(upd[k]!==undefined) u[k]=upd[k]; });
+      if(upd.ausbjahr!==undefined && !d.data().ausbjahr) u.ausbjahr=upd.ausbjahr;
+      if(Object.keys(u).length){ await ref.set(u,{merge:true}); L('✓ Kurs '+kId+': Teilnehmer-Eintrag aktualisiert'); }
+    }
+    // 3) Dokumente des Kammer-Datensatzes (falls vorhanden) mitnehmen
+    const docs=await db.collection('globalTN').doc(aId).collection('dokumente').get();
+    for(const d of docs.docs){ await db.collection('globalTN').doc(bId).collection('dokumente').doc(d.id).set(d.data()); await d.ref.delete(); }
+    if(docs.size) L('✓ '+docs.size+' Dokument(e) übernommen');
+    // 4) leeren Kammer-Datensatz loeschen
+    await db.collection('globalTN').doc(aId).delete(); L('✓ Kammer-Datensatz gelöscht');
+    toast('🔀 Zusammengeführt – '+((a.vorname||'')+' '+(a.nachname||'')).trim()+' ist jetzt ein Datensatz');
+    btn.style.display='none';
+    closeTNModal();
+  }catch(err){ L('✗ Fehler: '+err.message); toast('Fehler: '+err.message,'bad'); btn.disabled=false; }
+}
 
 // ── TN-DOKUMENTE (shared via globalTN/{tnId}/dokumente) ──
 function tnDocsUpload(tnId){ document.getElementById('tnDocsFileIn').click(); }
