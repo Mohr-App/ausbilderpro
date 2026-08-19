@@ -370,10 +370,11 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
               <div id="azp-uebl" style="display:none">
                 <div class="ag-sect"><b>🎓 ÜbL-Lehrgänge</b><small>Überbetriebliche Lehrgänge im HBZ – tippe auf einen Azubi für Anwesenheit und Noten</small></div>
                 <div class="ag-tiles ag-pills" style="margin-bottom:10px">
-                  <button class="uebl-tile active" id="ueblF-aktuell" onclick="setUeblFilter(event,'aktuell')" title="Laufende und kommende Lehrgänge"><span class="ic">🟢</span>Aktuelle ÜbL<span id="ueblCntAktuell" style="font-size:.55rem;background:rgba(22,163,74,.12);color:#16a34a;padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
-                  <button class="uebl-tile" id="ueblF-vergangen" onclick="setUeblFilter(event,'vergangen')" title="Bereits beendete Lehrgänge"><span class="ic">📦</span>Vergangene ÜbL<span id="ueblCntVergangen" style="font-size:.55rem;background:rgba(148,163,184,.15);color:#64748b;padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
+                  <button class="uebl-tile active" id="ueblF-aktuell" onclick="setUeblFilter(event,'aktuell')" title="Lehrgänge, die gerade laufen"><span class="ic">🟢</span>Läuft<span id="ueblCntAktuell" style="font-size:.55rem;background:rgba(22,163,74,.12);color:#16a34a;padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
+                  <button class="uebl-tile" id="ueblF-geplant" onclick="setUeblFilter(event,'geplant')" title="Lehrgänge, die noch beginnen"><span class="ic">📅</span>Geplant<span id="ueblCntGeplant" style="font-size:.55rem;background:rgba(217,119,6,.12);color:#b45309;padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
+                  <button class="uebl-tile" id="ueblF-vergangen" onclick="setUeblFilter(event,'vergangen')" title="Bereits beendete Lehrgänge"><span class="ic">📦</span>Vergangen<span id="ueblCntVergangen" style="font-size:.55rem;background:rgba(148,163,184,.15);color:#64748b;padding:1px 6px;border-radius:8px;font-weight:700">0</span></button>
                 </div>
-                <div id="ueblTrenner" style="margin:12px 0 6px;font-size:.78rem;font-weight:800;color:var(--tx)">Aktuelle Lehrgänge</div>
+                <div id="ueblTrenner" style="margin:12px 0 6px;font-size:.78rem;font-weight:800;color:var(--tx)">Laufende Lehrgänge</div>
                 <div id="azubiList"><div class="empty">Lädt…</div></div>
                 <div id="agHVKontaktCard" style="display:none;margin-top:14px">
                   <div class="ag-tiles">
@@ -2489,15 +2490,24 @@ function renderAzubiList(){
     if(k.von&&today<k.von) return 1;
     return 2;
   };
-  const _cA=document.getElementById('ueblCntAktuell'); if(_cA) _cA.textContent=gAkt.size;
+  // v209: "Aktuell" in Laeuft (heute im Zeitraum) und Geplant (Start in der Zukunft) trennen
+  const gLauf=new Map(), gPlan=new Map();
+  gAkt.forEach((g,key)=>{ const k=g.kurs||{}; if(k.von&&today<k.von) gPlan.set(key,g); else gLauf.set(key,g); });
+  const _cA=document.getElementById('ueblCntAktuell'); if(_cA) _cA.textContent=gLauf.size;
+  const _cP=document.getElementById('ueblCntGeplant'); if(_cP) _cP.textContent=gPlan.size;
   const _cV=document.getElementById('ueblCntVergangen'); if(_cV) _cV.textContent=gVer.size;
+  const _byVon=(x,y)=>String((x.kurs&&x.kurs.von)||'').localeCompare(String((y.kurs&&y.kurs.von)||''));
   const sichtbar = (_ueblFilter==='vergangen')
     ? Array.from(gVer.values()).sort((x,y)=>String((y.kurs&&y.kurs.bis)||'').localeCompare(String((x.kurs&&x.kurs.bis)||'')))
-    : Array.from(gAkt.values()).sort((x,y)=>_rang(x)-_rang(y)||String((x.kurs&&x.kurs.von)||'').localeCompare(String((y.kurs&&y.kurs.von)||'')));
+    : (_ueblFilter==='geplant')
+      ? Array.from(gPlan.values()).sort(_byVon)
+      : Array.from(gLauf.values()).sort(_byVon);
   if(!sichtbar.length){
     const leer=document.createElement('div');
     leer.className='empty';
-    leer.textContent = (_ueblFilter==='vergangen') ? 'Noch keine beendeten Lehrgänge.' : '🎓 Zurzeit ist keiner deiner Azubis in einem Lehrgang.<br><span style="font-size:.7rem">Sobald das HBZ einen Lehrgang zuweist, siehst du ihn hier.</span>';
+    leer.innerHTML = (_ueblFilter==='vergangen') ? '📦 Noch keine beendeten Lehrgänge.'
+      : (_ueblFilter==='geplant') ? '📅 Zurzeit ist kein Lehrgang geplant.<br><span style="font-size:.7rem">Sobald das HBZ einen Lehrgang zuweist, siehst du ihn hier.</span>'
+      : '🎓 Zurzeit ist keiner deiner Azubis in einem Lehrgang.<br><span style="font-size:.7rem">Geplante Lehrgänge findest du unter „Geplant".</span>';
     el.appendChild(leer);
   }
   sichtbar.forEach(g=>{
@@ -3841,7 +3851,7 @@ function setUeblFilter(ev,f){
   const btn=(ev&&ev.currentTarget)||document.getElementById('ueblF-'+f);
   if(btn&&btn.classList) btn.classList.add('active');
   const tr=document.getElementById('ueblTrenner');
-  if(tr) tr.textContent = (f==='vergangen') ? 'Beendete Lehrgänge' : 'Aktuelle Lehrgänge';
+  if(tr) tr.textContent = (f==='vergangen') ? 'Beendete Lehrgänge' : (f==='geplant') ? 'Geplante Lehrgänge' : 'Laufende Lehrgänge';
   renderAzubiList();
   // Anwesenheit und Noten vergangener Lehrgaenge erst bei Bedarf nachladen
   if(f==='vergangen') _ladeVergangeneKurse().then(()=>renderAzubiList());
@@ -3947,7 +3957,10 @@ function _kursKopfEl(g, today){
     titel='📚 '+(k.name||'Lehrgang');
     zeit=fmtDE(k.von)+' – '+fmtDE(k.bis);
     if(k.von&&k.bis&&k.von<=today&&today<=k.bis){ status='läuft'; farbe='#16a34a'; }
-    else if(k.von&&today<k.von){ status='kommt'; farbe='#d97706'; }
+    else if(k.von&&today<k.von){
+      const tage=Math.round((new Date(k.von+'T12:00')-new Date(today+'T12:00'))/864e5);
+      status=(tage===0?'beginnt heute':tage===1?'beginnt morgen':'beginnt in '+tage+' Tagen'); farbe='#d97706';
+    }
     else { status='beendet'; farbe='#94a3b8'; }
   }
   d.style.cssText='display:flex;align-items:center;gap:8px;margin:14px 0 8px;padding:8px 10px;background:'+farbe+'14;border-left:3px solid '+farbe+';border-radius:0 8px 8px 0';
