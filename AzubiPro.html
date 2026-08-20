@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v313'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v314'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -7209,7 +7209,7 @@ function loadCheckinHistory(){
     .collection('checkins').where('tnId','==',_tnId).get()
     .then(snap=>{
       const items=[];
-      snap.forEach(d=>{ const c=d.data(); if(c.datum) items.push({datum:c.datum, zeit:c.zeit||''}); });
+      snap.forEach(d=>{ const c=d.data(); if(c.datum) items.push({datum:c.datum, zeit:c.zeit||'', ap:!!(c.viaAusbilder||c.viaFreigabe)}); });
       if(!items.length){ card.style.display='none'; return; }
       items.sort((a,b)=>b.datum.localeCompare(a.datum));
       const today=localDate();
@@ -7223,7 +7223,8 @@ function loadCheckinHistory(){
       }
       listEl.innerHTML=items.slice(0,12).map(i=>{
         const t=i.datum.split('-'); const dm=t.length===3?(t[2]+'.'+t[1]+'.'):i.datum;
-        return '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--brd)"><span>'+dm+'</span><span style="color:var(--acc);font-weight:700">✓'+(i.zeit?' '+i.zeit:'')+'</span></div>';
+        // "AP" = vom Ausbilder eingetragen (AusbilderPro), Tooltip erklaert die Abkuerzung
+        return '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--brd)"><span>'+dm+'</span><span style="color:var(--acc);font-weight:700">✓'+(i.zeit?' '+i.zeit:'')+(i.ap?' <span title="vom Ausbilder eingetragen" style="font-size:.56rem;font-weight:800;background:rgba(37,99,235,.12);color:var(--acc);padding:1px 5px;border-radius:6px;vertical-align:1px">AP</span>':'')+'</span></div>';
       }).join('');
       card.style.display='block';
     })

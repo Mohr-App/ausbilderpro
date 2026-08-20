@@ -1964,9 +1964,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v830';
+const APP_VERSION = 'v832';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v832', d:'20.08.2026', items:['👀 Trägt der Ausbilder Anwesenheit ein, sieht der Azubi den Tag jetzt auch in seiner AzubiPro-Historie (mit Kennzeichen „AP"). Nimmt der Ausbilder die Anwesenheit zurück, verschwindet der Eintrag – echte QR-Scans des Azubis bleiben unberührt']},
   {v:'v830', d:'17.08.2026', items:['⚠ Neuer Kurs-Check: Ab dem 2. Kurstag erscheint beim Öffnen des Lehrgangs ein Fenster mit allen Teilnehmern, die noch keinen Anwesenheitseintrag haben und weder in „Nicht angetreten" noch „Wiederholer" stehen. Direkt einordnen per Knopf: Nicht angetreten (mit Frist & Mail), Wiederholer (mit Grund) oder „Doch da – nachtragen". Kommt einmal pro Kurstag wieder, solange offene Fälle bestehen']},
   {v:'v829', d:'17.08.2026', items:['📋 „Was ist neu?" wieder aktuell – Einträge v822 bis v828 nachgetragen']},
   {v:'v828', d:'17.08.2026', items:['📧 Antworten auf Mails an Azubis und Betriebe gehen jetzt an die im Profil hinterlegte Dienst-E-Mail („E-Mail (für Azubis sichtbar)"), nicht mehr an die Anmelde-Adresse']},
@@ -4788,6 +4789,7 @@ function syncMobileAttDebounced(sid){
 function syncMobileAttToFirestore(sid){
   if(!_db) return;
   const inst=curInst(); if(!inst) return;
+  _spiegleCheckins(inst, sid);
   const d=inst.seats[sid]; if(!d) return;
   const tnId=d.poolTnId;
   const kursId=d.poolKursId||inst.sharedKursId;
@@ -6750,10 +6752,47 @@ async function recoverOrphanSeats(){
 }
 
 // ─── ATTENDANCE → FIRESTORE SYNC ───
+// ═══ Checkins-Spiegel (v832) ═══
+// Der Azubi sieht seine Anwesenheit in AzubiPro ueber die checkins-Collection (sein QR-Scan
+// schreibt dort). Traegt der AUSBILDER Anwesenheit ein, entstand bisher KEIN checkins-Doc ->
+// in der Azubi-App fehlte der Tag. Diese Funktion spiegelt den Ausbilder-Stand dorthin:
+//  - anwesend an Tag X -> checkins/{tnId}_{X} anlegen (viaAusbilder:true, Zeit=jetzt nur am selben Tag)
+//  - nicht (mehr) anwesend -> Doc loeschen, aber NUR wenn viaAusbilder (echte Azubi-Scans bleiben!)
+function _spiegleCheckins(inst, sid){
+  try{
+    if(_demoMode||!_db||!inst) return;
+    const d=inst.seats[sid]; if(!d) return;
+    const tnId=d.poolTnId; const kursId=d.poolKursId||inst.sharedKursId;
+    if(!tnId||!kursId) return;
+    // Praesenz-Tage aus Detail- und Quick-Eintraegen
+    const tage=new Set();
+    (d.attendance||[]).forEach(e=>{ if(e&&e.type==='present'&&e.date) tage.add(e.date); });
+    Object.entries(inst.attendance||{}).forEach(([date,slots])=>{ if(slots&&slots[sid]==='P') tage.add(date); });
+    const ref=_db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('checkins');
+    const heute=new Date().toISOString().slice(0,10);
+    // anlegen (merge:false noetig? nein - set mit merge, viaAusbilder nur wenn neu ueber uns)
+    tage.forEach(datum=>{
+      const id=tnId+'_'+datum;
+      ref.doc(id).get().then(doc=>{
+        if(doc.exists) return;                          // Azubi-Scan oder frueherer Eintrag - nicht anfassen
+        const zeit=(datum===heute)?new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
+        ref.doc(id).set({tnId, datum, zeit, viaAusbilder:true, ts:Date.now()},{merge:true}).catch(()=>{});
+      }).catch(()=>{});
+    });
+    // entfernen: nur viaAusbilder-Docs, deren Tag nicht mehr anwesend ist
+    ref.where('tnId','==',tnId).get().then(snap=>{
+      snap.forEach(doc=>{
+        const c=doc.data();
+        if(c&&c.viaAusbilder&&c.datum&&!tage.has(c.datum)) doc.ref.delete().catch(()=>{});
+      });
+    }).catch(()=>{});
+  }catch(e){}
+}
 function syncAttendanceToFirestore(seatId){
   if(_demoMode) return;
   if(!_db) return;
   const inst=curInst(); if(!inst) return;
+  _spiegleCheckins(inst, seatId);
   const d=inst.seats[seatId]; if(!d) return;
   const tnId=d.poolTnId;
   const kursId=d.poolKursId || inst.sharedKursId;
