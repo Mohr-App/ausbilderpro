@@ -924,8 +924,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="showDiagnose();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(59,130,246,.06);border-color:rgba(59,130,246,.2);color:#1e40af" title="Diagnose-Informationen anzeigen (bei Problemen)">🔍 Diagnose</button>
         <button class="tbtn" onclick="appReset();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#991b1b" title="App-Cache und alte lokale Dateien zurücksetzen (bei Problemen)">🔄 App zurücksetzen</button>
         <button class="tbtn" id="hdrChatSweepBtn" onclick="openChatSweep();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:#6d28d9;display:none" title="Alte Chat-Nachrichten manuell entfernen (Admin/DSGVO)">🧹 Chat-Bereinigung</button>
-        <!-- ═══ TEMP v833: Einmal-Abgleich Alt-Anwesenheit -> Azubi-Apps. RUECKBAU: diesen Button + Funktion migriereCheckinsAlle() loeschen, sonst nichts. ═══ -->
-        <button class="tbtn" id="tmpCheckinMigBtn" onclick="migriereCheckinsAlle();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(217,119,6,.06);border-color:rgba(217,119,6,.25);color:#92400e" title="Einmal-Aktion: spiegelt alle bereits eingetragenen Anwesenheiten dieses Lehrgangs in die Azubi-Apps (checkins). Danach nicht mehr nötig – neue Einträge laufen automatisch.">🔁 Anwesenheit → Azubi-Apps abgleichen (einmalig)</button>
         <button class="tbtn" onclick="recoverOrphanSeats();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.2);color:#4338ca" title="TN, die direkt am Sitzplatz eingegeben wurden (statt über +TN), nachträglich in globalTN + Kurs-Liste anlegen">🔗 Verwaiste Sitze nachtragen</button>
         <button class="tbtn" onclick="showHilfeModal();closeHdrMenu()" style="width:100%;text-align:left" title="Anleitungen und Tipps">❓ Brauchst du Hilfe?</button>
         <div style="border-top:1px solid var(--brd);margin:6px 0 0"></div>
@@ -1966,9 +1964,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v833';
+const APP_VERSION = 'v834';
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v834', d:'20.08.2026', items:['🧹 Vorübergehender Abgleich-Knopf (v833) wieder entfernt – der Anwesenheits-Spiegel in die Azubi-Apps läuft seit v832 automatisch']},
   {v:'v833', d:'20.08.2026', items:['🔁 Vorübergehender Knopf im Werkzeug-Menü: „Anwesenheit → Azubi-Apps abgleichen" spiegelt einmalig alle vor dem 20.08. eingetragenen Anwesenheiten des offenen Lehrgangs in die Azubi-Apps. Wird nach der Übergangszeit wieder entfernt']},
   {v:'v832', d:'20.08.2026', items:['👀 Trägt der Ausbilder Anwesenheit ein, sieht der Azubi den Tag jetzt auch in seiner AzubiPro-Historie (mit Kennzeichen „AP"). Nimmt der Ausbilder die Anwesenheit zurück, verschwindet der Eintrag – echte QR-Scans des Azubis bleiben unberührt']},
   {v:'v830', d:'17.08.2026', items:['⚠ Neuer Kurs-Check: Ab dem 2. Kurstag erscheint beim Öffnen des Lehrgangs ein Fenster mit allen Teilnehmern, die noch keinen Anwesenheitseintrag haben und weder in „Nicht angetreten" noch „Wiederholer" stehen. Direkt einordnen per Knopf: Nicht angetreten (mit Frist & Mail), Wiederholer (mit Grund) oder „Doch da – nachtragen". Kommt einmal pro Kurstag wieder, solange offene Fälle bestehen']},
@@ -6790,19 +6789,6 @@ function _spiegleCheckins(inst, sid){
       });
     }).catch(()=>{});
   }catch(e){}
-}
-// ═══ TEMP v833 (RUECKBAU zusammen mit Button tmpCheckinMigBtn) ═══
-// Einmal-Migration: spiegelt fuer ALLE belegten Sitze des aktuellen Lehrgangs die vorhandene
-// Anwesenheit in die checkins-Collection (nutzt die normale _spiegleCheckins-Logik, Azubi-Scans
-// bleiben unberuehrt). Noetig nur fuer Anwesenheiten, die VOR v832 eingetragen wurden.
-function migriereCheckinsAlle(){
-  const inst=curInst();
-  if(!inst){ toast('Kein Lehrgang geöffnet','bad'); return; }
-  const sids=Object.keys(inst.seats||{}).filter(id=>inst.seats[id]&&inst.seats[id].name&&inst.seats[id].poolTnId);
-  if(!sids.length){ toast('Keine belegten Sitze','bad'); return; }
-  if(!confirm('Anwesenheit von '+sids.length+' Teilnehmern in die Azubi-Apps spiegeln?\n\nEinmal-Aktion für Einträge vor dem 20.08. – neue laufen automatisch.')) return;
-  sids.forEach((sid,i)=>setTimeout(()=>_spiegleCheckins(inst,sid), i*300));   // gestaffelt, schont Firestore
-  toast('🔁 Abgleich läuft für '+sids.length+' TN – dauert ~'+Math.ceil(sids.length*0.3)+' Sekunden');
 }
 function syncAttendanceToFirestore(seatId){
   if(_demoMode) return;
