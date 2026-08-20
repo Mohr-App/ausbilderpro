@@ -1540,6 +1540,12 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 <!-- TEILNEHMER (TN sind jetzt in der Sidebar – nur Modals bleiben) -->
 
       <!-- TN PROFIL MODAL -->
+      <div class="ov" id="kursBestModal">
+        <div class="modal" style="max-width:420px">
+          <div class="mhd"><div class="mtit">✓ Kenntnisnahme – <span id="bestListTitel"></span></div><button class="xcls" onclick="document.getElementById('kursBestModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
+          <div class="mbdy" id="bestListBody"></div>
+        </div>
+      </div>
       <div class="ov" id="tnMergeModal">
         <div class="modal" style="max-width:520px">
           <div class="mhd"><div class="mtit">🔀 Dublette zusammenführen</div><button class="xcls" onclick="closeTnMerge()" title="Schließen">&#10005;</button></div>
@@ -1727,10 +1733,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 361';
+const APP_VERSION = 'Build 362';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 362', d:'20.08.2026', items:['✓ Dashboard: Klick auf das grüne ✓-Badge eines laufenden Kurses zeigt namentlich, wer den Lehrgang in AzubiPro bestätigt hat und wer nicht (Badge wird gelb bei offenen Bestätigungen)']},
   {v:'Build 361', d:'19.08.2026', items:['🔀 Dublette zusammenführen: Suche startet mit Vor- und Nachname (findet auch „Romina Jennifer Müller" bei „Romina Müller"), bis zu 30 Treffer, Kandidaten mit gleichem Geburtsdatum stehen oben und sind markiert']},
   {v:'Build 360', d:'19.08.2026', items:['🔀 Neu im Teilnehmer-Profil: „Dublette zusammenführen". Ein Neuzugang (z. B. mit vertipptem Geburtsdatum) behält seine ID samt Konto, Kurs, Anwesenheit und Sitzplatz; die Stammdaten (Name, Geburtsdatum, Lehrlingsnummer, Betrieb, Beruf, Adresse …) kommen aus dem Kammer-Datensatz, der danach gelöscht wird. Der nächste Import erkennt den Datensatz als vorhanden']},
   {v:'Build 359', d:'17.08.2026', items:['📊 Dashboard „Läuft gerade": statt einer Gesamtzahl jetzt „7/9 TN" (aktiv von zugewiesen – ohne nicht angetreten, Wiederholer, entfernt; rot bei Abweichung) und „✓ 5" (Lehrgang in AzubiPro bestätigt)']},
@@ -3203,14 +3210,33 @@ function _kursTNZahlen(kursId){
   });
   return {zug, akt};
 }
+let _kursBestaetigtDetail={};   // kursId -> {ja:[Namen], nein:[Namen]}
 function _ladeKursBestaetigt(kurse){
   kurse.forEach(k=>{
     db.collection('shared').doc('kurse').collection('list').doc(k.id).collection('teilnehmer').get().then(snap=>{
-      let n=0; snap.forEach(d=>{ const x=d.data(); if(x.kenntnisAm && x.status!=='absent' && x.status!=='removed') n++; });
-      _kursBestaetigt[k.id]=n;
-      const el=document.getElementById('dashBest_'+k.id); if(el) el.textContent='✓ '+n;
+      const ja=[], nein=[];
+      snap.forEach(d=>{ const x=d.data(); if(x.status==='absent'||x.status==='removed') return;
+        const nm=((x.vorname||'')+' '+(x.nachname||'')).trim()||d.id;
+        (x.kenntnisAm?ja:nein).push(nm); });
+      ja.sort((a,b)=>a.localeCompare(b,'de')); nein.sort((a,b)=>a.localeCompare(b,'de'));
+      _kursBestaetigt[k.id]=ja.length;
+      _kursBestaetigtDetail[k.id]={ja,nein};
+      const el=document.getElementById('dashBest_'+k.id); if(el){ el.textContent='✓ '+ja.length; if(nein.length){ el.style.color='#b45309'; el.style.background='#fffbeb'; el.style.borderColor='#fde68a'; } }
     }).catch(()=>{});
   });
+}
+function showKursBestaetigt(ev,kursId,kursName){
+  if(ev){ ev.stopPropagation(); }
+  const d=_kursBestaetigtDetail[kursId];
+  if(!d){ toast('Noch nicht geladen – gleich nochmal versuchen'); return; }
+  let html='<div style="font-size:.72rem;color:var(--mu);margin-bottom:10px">Lehrgang in AzubiPro bestätigt (Kenntnisnahme durch den Azubi selbst)</div>';
+  html+='<div style="font-size:.74rem;font-weight:800;color:#047857;margin-bottom:4px">✓ Bestätigt ('+d.ja.length+')</div>';
+  html+=d.ja.length?('<div style="font-size:.76rem;line-height:1.7;margin-bottom:12px">'+d.ja.map(esc).join('<br>')+'</div>'):'<div style="font-size:.72rem;color:var(--mu);margin-bottom:12px">—</div>';
+  html+='<div style="font-size:.74rem;font-weight:800;color:#b45309;margin-bottom:4px">⚠ Noch nicht bestätigt ('+d.nein.length+')</div>';
+  html+=d.nein.length?('<div style="font-size:.76rem;line-height:1.7">'+d.nein.map(esc).join('<br>')+'</div><div style="font-size:.66rem;color:var(--mu);margin-top:8px;line-height:1.45">Mögliche Gründe: noch kein AzubiPro-Konto, App noch nicht geöffnet, oder Bestätigung abgelehnt. Ab AzubiPro v313 fragt die App beim Öffnen zwingend nach.</div>'):'<div style="font-size:.72rem;color:var(--mu)">— alle bestätigt 🎉</div>';
+  document.getElementById('bestListTitel').textContent=kursName||'Lehrgang';
+  document.getElementById('bestListBody').innerHTML=html;
+  document.getElementById('kursBestModal').classList.add('open');
 }
 function _renderDashKursListe(elId, kurse, dotColor, mitZahlen){
   const el=document.getElementById(elId); if(!el) return;
@@ -3224,7 +3250,7 @@ function _renderDashKursListe(elId, kurse, dotColor, mitZahlen){
       const warn=z.akt<z.zug;
       const best=(_kursBestaetigt[k.id]!=null)?('✓ '+_kursBestaetigt[k.id]):'✓ …';
       badges='<span title="'+z.akt+' aktiv von '+z.zug+' zugewiesen (ohne nicht angetreten, Wiederholer, entfernt)" style="font-family:\'JetBrains Mono\',monospace;font-size:.68rem;font-weight:700;color:'+(warn?'#b91c1c':'#2563eb')+';background:'+(warn?'#fef2f2':'#eff6ff')+';border:1px solid '+(warn?'#fecaca':'#bfdbfe')+';padding:2px 8px;border-radius:8px;white-space:nowrap">'+z.akt+'/'+z.zug+' TN</span>'
-        +'<span id="dashBest_'+k.id+'" title="Lehrgang in AzubiPro bestätigt" style="font-family:\'JetBrains Mono\',monospace;font-size:.68rem;font-weight:700;color:#059669;background:#ecfdf5;border:1px solid #a7f3d0;padding:2px 8px;border-radius:8px;white-space:nowrap">'+best+'</span>';
+        +'<span id="dashBest_'+k.id+'" onclick="showKursBestaetigt(event,\''+k.id+'\',\''+esc(k.name||k.lehrgangsart||'Kurs').replace(/'/g,'')+'\')" title="Lehrgang in AzubiPro bestätigt – klicken für Namensliste" style="font-family:\'JetBrains Mono\',monospace;font-size:.68rem;font-weight:700;color:#059669;background:#ecfdf5;border:1px solid #a7f3d0;padding:2px 8px;border-radius:8px;white-space:nowrap;cursor:pointer">'+best+'</span>';
     } else {
       const tn=_kursTNHist[k.id]||0;
       badges='<span style="font-family:\'JetBrains Mono\',monospace;font-size:.68rem;font-weight:700;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;padding:2px 8px;border-radius:8px;white-space:nowrap">'+tn+' TN</span>';

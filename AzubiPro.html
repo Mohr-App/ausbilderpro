@@ -1194,7 +1194,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v312'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v313'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -7300,6 +7300,13 @@ function loadKurse(){
 
     // Unbestätigte Kurse ganz oben
     const unconfirmed=_kurse.filter(k=>!k._tnDoc?.kenntnisAm && (k.von>=today || (k.von&&k.bis&&today>=k.von&&today<=k.bis)));
+    // v313: Bestaetigung ZWINGEND - unbestaetigter laufender/kommender Kurs oeffnet sofort den
+    // Bestaetigungs-Dialog (_ensureKenntnis: "Ja" setzt kenntnisAm + Mails, "Nein" laesst den
+    // roten Punkt stehen). Einmal je Sitzung, damit Ablehnen nicht in einer Schleife endet.
+    if(unconfirmed.length && !window._kenntnisZwangLief){
+      window._kenntnisZwangLief=true;
+      setTimeout(()=>{ try{ _ensureKenntnis(unconfirmed[0].id).then(ok=>{ if(ok) loadKurse(); }); }catch(e){} }, 600);
+    }
     // Roter Punkt am UEBL-Nav-Button
     const badge=document.getElementById('navUeblBadge');
     if(badge){
