@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="AusbilderPro">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="assets/fonts.css" rel="stylesheet">
+<script src="assets/qrcode.js"></script>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -1964,7 +1965,19 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v835';
+const APP_VERSION = 'v836';
+function _qrDataUrl(text,px){
+  // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
+  // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
+  try{
+    var qr=qrcode(0,'M'); qr.addData(text); qr.make();
+    var n=qr.getModuleCount();
+    var cs=Math.max(2,Math.round(px/(n+8)));   // Zellgroesse so, dass Zielpixel ~erreicht werden
+    return qr.createDataURL(cs,4);             // Rand: 4 Module (Quiet Zone)
+  }catch(e){
+    return 'https://api.qrserver.com/v1/create-qr-code/?size='+px+'x'+px+'&data='+encodeURIComponent(text);
+  }
+}
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
   {v:'v834', d:'20.08.2026', items:['🧹 Vorübergehender Abgleich-Knopf (v833) wieder entfernt – der Anwesenheits-Spiegel in die Azubi-Apps läuft seit v832 automatisch']},
@@ -9014,7 +9027,7 @@ function openQRModal(){
   const baseUrl=window.location.origin+window.location.pathname.replace('AusbilderPro.html','AzubiPro.html');
   const kursName=S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs';
   const joinUrl=baseUrl+'?join='+kursId+'&k='+encodeURIComponent(kursName);
-  const qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=250x250&data='+encodeURIComponent(joinUrl);
+  const qrImgUrl=_qrDataUrl(joinUrl,250);
   const dates=instLabel(inst);
 
   const body=document.getElementById('qrBody');
@@ -9051,7 +9064,7 @@ function printQR(){
   const baseUrl=window.location.origin+window.location.pathname.replace('AusbilderPro.html','AzubiPro.html');
   const kursName=S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs';
   const joinUrl=baseUrl+'?join='+kursId+'&k='+encodeURIComponent(kursName);
-  const qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=400x400&data='+encodeURIComponent(joinUrl);
+  const qrImgUrl=_qrDataUrl(joinUrl,400);
   const dates=instLabel(inst);
 
   const w=window.open('','_blank');
@@ -9166,7 +9179,7 @@ function _toggleQrWochenende(){
 function _renderQRAttBody(kursId){
   const body=document.getElementById('qrAttBody');
   const url=_qrAttUrl(kursId);
-  const qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=250x250&data='+encodeURIComponent(url);
+  const qrImgUrl=_qrDataUrl(url,250);
   const geo=_qrAttGeo;
   const geoOk=!!(geo&&geo.lat&&geo.lng);
   const gpsPflicht=!!_qrGpsPflicht; // Default false = ohne GPS
@@ -9316,7 +9329,7 @@ function saveQRAttGeo(){
 function printQRAtt(){
   const inst=curInst(); if(!inst||!inst.sharedKursId) return;
   const url=_qrAttUrl(inst.sharedKursId);
-  const qrImgUrl='https://api.qrserver.com/v1/create-qr-code/?size=500x500&data='+encodeURIComponent(url);
+  const qrImgUrl=_qrDataUrl(url,500);
   const kursName=S.kats[S.curKat]?S.kats[S.curKat].label:'Kurs';
   const w=window.open('','_blank');
   if(!w){toast('Popup blockiert','bad');return;}

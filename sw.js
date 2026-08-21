@@ -1,4 +1,4 @@
-const CACHE = 'ausbilderpro-v835';
+const CACHE = 'ausbilderpro-v836';
 const ASSETS = [
   './AusbilderPro.html',
   './manifest.json',

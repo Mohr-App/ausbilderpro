@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="VerwaltungPro">
 <link rel="apple-touch-icon" href="icon-vp-192.png">
 <link href="assets/fonts.css" rel="stylesheet">
+<script src="assets/qrcode.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -1733,11 +1734,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 363';
+const APP_VERSION = 'Build 364';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
-  {v:'Build 363', d:'20.08.2026', items:['✓ Dashboard: Klick auf das grüne ✓-Badge eines laufenden Kurses zeigt namentlich, wer den Lehrgang in AzubiPro bestätigt hat und wer nicht (Badge wird gelb bei offenen Bestätigungen)']},
+  {v:'Build 364', d:'20.08.2026', items:['✓ Dashboard: Klick auf das grüne ✓-Badge eines laufenden Kurses zeigt namentlich, wer den Lehrgang in AzubiPro bestätigt hat und wer nicht (Badge wird gelb bei offenen Bestätigungen)']},
   {v:'Build 361', d:'19.08.2026', items:['🔀 Dublette zusammenführen: Suche startet mit Vor- und Nachname (findet auch „Romina Jennifer Müller" bei „Romina Müller"), bis zu 30 Treffer, Kandidaten mit gleichem Geburtsdatum stehen oben und sind markiert']},
   {v:'Build 360', d:'19.08.2026', items:['🔀 Neu im Teilnehmer-Profil: „Dublette zusammenführen". Ein Neuzugang (z. B. mit vertipptem Geburtsdatum) behält seine ID samt Konto, Kurs, Anwesenheit und Sitzplatz; die Stammdaten (Name, Geburtsdatum, Lehrlingsnummer, Betrieb, Beruf, Adresse …) kommen aus dem Kammer-Datensatz, der danach gelöscht wird. Der nächste Import erkennt den Datensatz als vorhanden']},
   {v:'Build 359', d:'17.08.2026', items:['📊 Dashboard „Läuft gerade": statt einer Gesamtzahl jetzt „7/9 TN" (aktiv von zugewiesen – ohne nicht angetreten, Wiederholer, entfernt; rot bei Abweichung) und „✓ 5" (Lehrgang in AzubiPro bestätigt)']},
@@ -9254,9 +9255,22 @@ function saveNewGlobalTN(){
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
+function _qrDataUrl(text,px){
+  // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
+  // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
+  try{
+    var qr=qrcode(0,'M'); qr.addData(text); qr.make();
+    var n=qr.getModuleCount();
+    var cs=Math.max(2,Math.round(px/(n+8)));   // Zellgroesse so, dass Zielpixel ~erreicht werden
+    return qr.createDataURL(cs,4);             // Rand: 4 Module (Quiet Zone)
+  }catch(e){
+    return 'https://api.qrserver.com/v1/create-qr-code/?size='+px+'x'+px+'&data='+encodeURIComponent(text);
+  }
+}
+
 function printAccessCard(name, email, password){
   const appUrl=window.location.href.replace(/[^/]*$/,'AzubiPro.html');
-  const qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(appUrl);
+  const qrUrl=_qrDataUrl(appUrl,180);
   const w=window.open('','_blank','width=550,height=800');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AzubiPro – Zugangsdaten</title>
 <style>
