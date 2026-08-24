@@ -1734,10 +1734,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 365';
+const APP_VERSION = 'Build 366';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 366', d:'24.08.2026', items:['🔍 Suche findet Nachnamen jetzt zuverlässig: Namens-Treffer stehen vor Beruf-/Betriebs-Treffern (vorher verdrängten 600+ „Anlagenmechaniker" den Nachnamen „Anlage")']},
   {v:'Build 365', d:'24.08.2026', items:['📧 TN-Profil zeigt jetzt den E-Mail-Status selbst registrierter Azubis: ✅ bestätigt oder ⚠ unbestätigt (Verifizierungslink nie geklickt – Adresse evtl. vertippt oder tot, Mails kommen nicht an)']},
   {v:'Build 364', d:'20.08.2026', items:['✓ Dashboard: Klick auf das grüne ✓-Badge eines laufenden Kurses zeigt namentlich, wer den Lehrgang in AzubiPro bestätigt hat und wer nicht (Badge wird gelb bei offenen Bestätigungen)']},
   {v:'Build 361', d:'19.08.2026', items:['🔀 Dublette zusammenführen: Suche startet mit Vor- und Nachname (findet auch „Romina Jennifer Müller" bei „Romina Müller"), bis zu 30 Treffer, Kandidaten mit gleichem Geburtsdatum stehen oben und sind markiert']},
@@ -2279,11 +2280,19 @@ function _runSearch(){
     return;
   }
 
-  // Teilnehmer durchsuchen
+  // Teilnehmer durchsuchen - mit Ranking (Build 366): Namens-Treffer schlagen Beruf/Firma/Mail.
+  // Grund: "anlage" steckt in "Anlagenmechaniker" -> 600+ Treffer, und ohne Ranking verdraengten
+  // die alphabetisch ersten 8 einen echten Nachnamen wie "Anlage".
+  const _tnScore = t=>{
+    const vn=(t.vorname||'').toLowerCase(), nn=(t.nachname||'').toLowerCase();
+    if(nn.startsWith(q)||vn.startsWith(q)) return 0;                       // Name beginnt mit Suchbegriff
+    if(nn.includes(q)||vn.includes(q)||(vn+' '+nn).includes(q)) return 1;  // Name enthaelt ihn
+    return 2;                                                              // nur Beruf/Firma/Mail
+  };
   const tnHits = _globalTN.filter(t=>{
     const haystack = ((t.vorname||'')+' '+(t.nachname||'')+' '+(t.firma||'')+' '+(t.beruf||'')+' '+(t.email||'')).toLowerCase();
     return haystack.includes(q);
-  }).slice(0, 8);
+  }).sort((a,b)=>_tnScore(a)-_tnScore(b) || ((a.nachname||'')+(a.vorname||'')).localeCompare((b.nachname||'')+(b.vorname||''),'de')).slice(0, 8);
 
   // Kurse durchsuchen
   const kursHits = _kurse.filter(k=>{
