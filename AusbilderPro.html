@@ -1965,7 +1965,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v837';
+const APP_VERSION = 'v838';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1980,6 +1980,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v838', d:'24.08.2026', items:['⚠ „Nicht angetreten"-Dialog warnt jetzt, wenn die Frist-Mail den Azubi voraussichtlich nicht erreicht (E-Mail nie bestätigt oder kein Konto verknüpft) – dann bitte zusätzlich anrufen oder über den Betrieb gehen']},
   {v:'v834', d:'20.08.2026', items:['🧹 Vorübergehender Abgleich-Knopf (v833) wieder entfernt – der Anwesenheits-Spiegel in die Azubi-Apps läuft seit v832 automatisch']},
   {v:'v833', d:'20.08.2026', items:['🔁 Vorübergehender Knopf im Werkzeug-Menü: „Anwesenheit → Azubi-Apps abgleichen" spiegelt einmalig alle vor dem 20.08. eingetragenen Anwesenheiten des offenen Lehrgangs in die Azubi-Apps. Wird nach der Übergangszeit wieder entfernt']},
   {v:'v832', d:'20.08.2026', items:['👀 Trägt der Ausbilder Anwesenheit ein, sieht der Azubi den Tag jetzt auch in seiner AzubiPro-Historie (mit Kennzeichen „AP"). Nimmt der Ausbilder die Anwesenheit zurück, verschwindet der Eintrag – echte QR-Scans des Azubis bleiben unberührt']},
@@ -11757,6 +11758,22 @@ function _openAbsentFristModal(opts){
   // Info-Text
   const info=document.getElementById('absentFristInfo');
   info.innerHTML = '<b>'+esc(opts.tnName||'?')+'</b> wird als <b>"Nicht angetreten"</b> markiert. Bevor das endgültig wird, bekommt der Azubi noch eine Mail mit einer Meldefrist – damit er sich melden kann (z.B. Bahn-Verspätung).';
+  // v838: Warnen, wenn die Mail den Azubi voraussichtlich nicht erreicht. Wahrheit liegt im
+  // globalTN-Datensatz (verknuepftUid = Konto vorhanden; emailCheckAktiv/emailBestaetigt =
+  // Verifizierungsstatus) -> ein Read beim Oeffnen, Warnung wird nachtraeglich eingeblendet.
+  try{
+    if(_db && opts.tnId){
+      _db.collection('globalTN').doc(opts.tnId).get().then(doc=>{
+        if(!doc.exists) return;
+        const g=doc.data(); let warn='';
+        if(g.emailCheckAktiv===true && g.emailBestaetigt!==true) warn='Der Azubi hat seinen E-Mail-Bestätigungslink nie geklickt – die Adresse könnte vertippt oder tot sein.';
+        else if(!g.verknuepftUid) warn='Für diesen Azubi ist kein AzubiPro-Konto verknüpft – die Mail geht an die hinterlegte Kammer-Adresse, die veraltet sein kann.';
+        if(warn && document.getElementById('absentFristModal').classList.contains('open')){
+          info.innerHTML+='<div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:8px;color:#78350f;font-size:.72rem;line-height:1.45">⚠ '+warn+' Die Frist-Mail erreicht ihn dann evtl. nicht – bitte zusätzlich anrufen oder über den Betrieb kontaktieren.</div>';
+        }
+      }).catch(()=>{});
+    }
+  }catch(e){}
   // Reset
   document.getElementById('absentFristCustom').value='';
   document.getElementById('absentFristPreview').style.display='none';
