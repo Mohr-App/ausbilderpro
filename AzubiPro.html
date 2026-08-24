@@ -1195,7 +1195,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v316'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
+const AZUBI_VERSION='v318'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
 db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
@@ -7304,13 +7304,22 @@ function loadKurse(){
     let html='';
 
     // Unbestätigte Kurse ganz oben
-    const unconfirmed=_kurse.filter(k=>!k._tnDoc?.kenntnisAm && (k.von>=today || (k.von&&k.bis&&today>=k.von&&today<=k.bis)));
+    const unconfirmed=_kurse.filter(k=>!k._tnDoc?.kenntnisAm && !k._tnDoc?.kenntnisAbgelehntAm && (k.von>=today || (k.von&&k.bis&&today>=k.von&&today<=k.bis)));
     // v313: Bestaetigung ZWINGEND - unbestaetigter laufender/kommender Kurs oeffnet sofort den
     // Bestaetigungs-Dialog (_ensureKenntnis: "Ja" setzt kenntnisAm + Mails, "Nein" laesst den
     // roten Punkt stehen). Einmal je Sitzung, damit Ablehnen nicht in einer Schleife endet.
-    if(unconfirmed.length && !window._kenntnisZwangLief){
-      window._kenntnisZwangLief=true;
-      setTimeout(()=>{ try{ _ensureKenntnis(unconfirmed[0].id).then(ok=>{ if(ok) loadKurse(); }); }catch(e){} }, 600);
+    // v317: HART - Dialog kommt bei jedem App-Start/Kurs-Reload, solange unbestaetigt. Kein
+    // Wegklicken: "Ja" bestaetigt, "Das ist nicht mein Lehrgang" fuehrt NUR zum Neuanmelde-
+    // Screen (QR des richtigen Kurses scannen) - dort korrigiert sich der Azubi selbst,
+    // egal ob Versehen (gleicher Kurs nochmal scannen -> bestaetigen) oder falscher Kurs.
+    if(unconfirmed.length && !window._kenntnisZwangAktiv){
+      window._kenntnisZwangAktiv=true;
+      const kZwang=unconfirmed[0].id;
+      setTimeout(()=>{ try{ _ensureKenntnis(kZwang).then(ok=>{
+        window._kenntnisZwangAktiv=false;
+        if(ok){ loadKurse(); return; }
+        _kenntnisAbgelehnt(kZwang);
+      }); }catch(e){ window._kenntnisZwangAktiv=false; } }, 600);
     }
     // Roter Punkt am UEBL-Nav-Button
     const badge=document.getElementById('navUeblBadge');
@@ -7737,6 +7746,19 @@ function _courseConfirmShow(kd){
     if(m) m.style.display='flex';
   });
 }
+// v318: "Das ist nicht mein Lehrgang" -> Ablehnung in den Kurs-Eintrag schreiben
+// (kenntnisAbgelehntAm). Geraeteuebergreifend: Dialog kommt nicht wieder, Ausbilder/VP
+// sehen das Abgelehnt-Kennzeichen und koennen nachfragen (Versehen -> Azubi bestaetigt
+// spaeter selbst, dann loescht kenntnisAm-Schreiben die Ablehnung; falscher Kurs ->
+// Ausbilder nimmt ihn raus). Die App bleibt voll nutzbar.
+function _kenntnisAbgelehnt(kursId){
+  if(!_tnId||!db) return;
+  db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('teilnehmer').doc(_tnId)
+    .set({kenntnisAbgelehntAm:Date.now(), kenntnisAbgelehntVon:_email||''},{merge:true})
+    .then(()=>{ toast('Alles klar – falls es doch dein Kurs ist, findest du den Bestätigen-Knopf in deiner Kursliste'); loadKurse(); })
+    .catch(()=>{});
+}
 function _courseConfirmAnswer(ja){
   const m=document.getElementById('courseConfirmModal'); if(m) m.style.display='none';
   const r=_courseConfirmResolve; _courseConfirmResolve=null;
@@ -7756,7 +7778,7 @@ function _ensureKenntnis(kursId){
       const kd=kc.exists?kc.data():{};
       return _courseConfirmShow(kd).then(ja=>{
         if(!ja) return false;
-        return tnRef.set({kenntnisAm:Date.now(),kenntnisVon:_email},{merge:true}).then(()=>{
+        return tnRef.set({kenntnisAm:Date.now(),kenntnisVon:_email,kenntnisAbgelehntAm:firebase.firestore.FieldValue.delete(),kenntnisAbgelehntVon:firebase.firestore.FieldValue.delete()},{merge:true}).then(()=>{
           try{ _sendKursBeitrittMails(kd, kursId); }catch(e){}
           return true;
         });
@@ -7770,7 +7792,7 @@ function confirmKurs(kursId, kursName){
   if(!_tnId){toast('Fehler: TN nicht zugeordnet','bad');return;}
   const ref=db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(_tnId);
-  ref.update({kenntnisAm:Date.now(),kenntnisVon:_email})
+  ref.update({kenntnisAm:Date.now(),kenntnisVon:_email,kenntnisAbgelehntAm:firebase.firestore.FieldValue.delete(),kenntnisAbgelehntVon:firebase.firestore.FieldValue.delete()})
     .then(()=>{
       toast('✅ Bestätigt');
       loadKurse();

@@ -1965,7 +1965,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v838';
+const APP_VERSION = 'v839';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1980,6 +1980,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v839', d:'24.08.2026', items:['✗ Sitzkarten zeigen jetzt, wenn ein Azubi den Lehrgang im Start-Dialog abgelehnt hat („Kurs abgelehnt" – ansprechen: Versehen oder falscher Kurs?)','➕ „Selbst beigetreten" markiert per QR beigetretene TN, die nicht von der Verwaltung zugewiesen wurden (nur in Kursen mit VP-Zuweisung)','Kurs-Check kennzeichnet Abgelehnte']},
   {v:'v838', d:'24.08.2026', items:['⚠ „Nicht angetreten"-Dialog warnt jetzt, wenn die Frist-Mail den Azubi voraussichtlich nicht erreicht (E-Mail nie bestätigt oder kein Konto verknüpft) – dann bitte zusätzlich anrufen oder über den Betrieb gehen']},
   {v:'v834', d:'20.08.2026', items:['🧹 Vorübergehender Abgleich-Knopf (v833) wieder entfernt – der Anwesenheits-Spiegel in die Azubi-Apps läuft seit v832 automatisch']},
   {v:'v833', d:'20.08.2026', items:['🔁 Vorübergehender Knopf im Werkzeug-Menü: „Anwesenheit → Azubi-Apps abgleichen" spiegelt einmalig alle vor dem 20.08. eingetragenen Anwesenheiten des offenen Lehrgangs in die Azubi-Apps. Wird nach der Übergangszeit wieder entfernt']},
@@ -2590,6 +2591,7 @@ function selInst(katId,instId){
   persist();renderAll();
   // Kurs-Check: ab 2. Kurstag TN ohne Einordnung anzeigen (Status-Map ist dann meist schon da)
   setTimeout(()=>{try{maybeKursCheck();}catch(e){}}, 900);
+  setTimeout(()=>{try{_syncKursKenntnis(curInst());}catch(e){}}, 700);
   // Cross-Ausbilder Noten-Sync: lade Noten anderer Ausbilder fuer diesen Kurs aus Firestore
   setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 150);
   // Self-Heal: Kurs in Cloud synchronisieren (falls Umbenennung nicht durchgekommen ist)
@@ -4443,11 +4445,38 @@ function _kursCheckOffene(inst){
       const attMap=inst.attendance||{};
       let hasAny=att.length>0 || !!(d.qrCheckin&&d.qrCheckin.datum);
       if(!hasAny) hasAny=Object.keys(attMap).some(ds=>ds>=start&&ds<=today&&attMap[ds]&&attMap[ds][id]);
-      if(!hasAny) out.push({sid:id, name:d.name, company:d.company||'', tnId:d.poolTnId||null});
+      if(!hasAny) out.push({sid:id, name:d.name, company:d.company||'', tnId:d.poolTnId||null, abgelehnt:!!d.kenntnisAbgelehnt});
     });
     out.sort((a,b)=>a.name.localeCompare(b.name,'de'));
   }catch(e){}
   return out;
+}
+// v839: Kenntnis-Status aus der Kurs-Teilnehmerliste an die Sitze spiegeln.
+//   kenntnisAbgelehnt = Azubi hat im Start-Dialog "Das ist nicht mein Lehrgang" gewaehlt
+//   selbstBeigetreten = per QR beigetreten, NICHT von der Verwaltung zugewiesen - wird nur
+//     markiert, wenn der Kurs ueberhaupt VP-zugewiesene TN hat (sonst waere jeder markiert)
+function _syncKursKenntnis(inst){
+  try{
+    if(!_db||!inst||!inst.sharedKursId||!inst.seats) return;
+    _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
+      .collection('teilnehmer').get().then(snap=>{
+        const map={}; let hatVPZuweisung=false;
+        snap.forEach(doc=>{ const d=doc.data()||{};
+          map[doc.id]={abgelehnt:!!d.kenntnisAbgelehntAm && !d.kenntnisAm, self:d.selfRegistered===true};
+          if(d.selfRegistered!==true) hatVPZuweisung=true;
+        });
+        let changed=false;
+        Object.values(inst.seats).forEach(seat=>{
+          if(!seat||!seat.poolTnId) return;
+          const m=map[seat.poolTnId]||{};
+          const ab=!!m.abgelehnt;
+          const sb=!!(hatVPZuweisung && m.self);
+          if(seat.kenntnisAbgelehnt!==ab){ seat.kenntnisAbgelehnt=ab; changed=true; }
+          if(seat.selbstBeigetreten!==sb){ seat.selbstBeigetreten=sb; changed=true; }
+        });
+        if(changed){ persist(); if(typeof renderSeats==='function') renderSeats(); }
+      }).catch(()=>{});
+  }catch(e){}
 }
 function maybeKursCheck(){
   const inst=curInst(); if(!inst) return;
@@ -4465,7 +4494,7 @@ function renderKursCheck(offen){
   const el=document.getElementById('kursCheckList'); if(!el) return;
   if(!offen||!offen.length){ el.innerHTML='<div style="font-size:.74rem;color:#059669;font-weight:700;padding:8px 0">✓ Alle Teilnehmer eingeordnet.</div>'; return; }
   el.innerHTML=offen.map(o=>{
-    const nm=esc(o.name)+(o.company?' <span style="color:var(--mu);font-weight:500">· '+esc(o.company)+'</span>':'');
+    const nm=esc(o.name)+(o.company?' <span style="color:var(--mu);font-weight:500">· '+esc(o.company)+'</span>':'')+(o.abgelehnt?' <span style="color:#dc2626;font-weight:800;font-size:.62rem">✗ Kurs abgelehnt</span>':'');
     const sidQ=o.sid.replace(/'/g,'');
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--brd);flex-wrap:wrap">'
       +'<div style="flex:1;min-width:140px;font-size:.78rem;font-weight:700;color:#111">'+nm+'</div>'
@@ -5054,7 +5083,10 @@ function mkSeat(id,seats){
     if(d.emailUnbestaetigt){
       /* 📧 jetzt am Anfang der Anwesenheits-Reihe (siehe oben) */
     }
-    el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+alertX+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')+wzBadge+qaBtn;
+    el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+alertX+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')
+      +(d.kenntnisAbgelehnt?'<div title="Der Azubi hat beim Start-Dialog \u201eDas ist nicht mein Lehrgang\u201c gew\u00e4hlt \u2013 bitte ansprechen: Versehen (er best\u00e4tigt selbst nach) oder falscher Kurs (entfernen)" style="margin-top:2px;font-size:.52rem;font-weight:800;background:rgba(239,68,68,.12);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:1px 5px;display:inline-block">✗ Kurs abgelehnt</div>'
+        :(d.selbstBeigetreten?'<div title="Per QR selbst beigetreten \u2013 nicht von der Verwaltung zugewiesen. Bitte pr\u00fcfen, ob er hierher geh\u00f6rt" style="margin-top:2px;font-size:.52rem;font-weight:800;background:rgba(37,99,235,.1);color:#2563eb;border:1px solid rgba(37,99,235,.3);border-radius:6px;padding:1px 5px;display:inline-block">➕ selbst beigetreten</div>':''))
+      +wzBadge+qaBtn;
   }
   return el;
 }

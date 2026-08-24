@@ -1734,10 +1734,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 367';
+const APP_VERSION = 'Build 368';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 368', d:'24.08.2026', items:['✗ Kenntnisnahme-Fenster (Klick aufs ✓-Badge) zeigt jetzt auch, wer den Lehrgang aktiv abgelehnt hat – Badge wird rot mit ✗-Zähler']},
   {v:'Build 367', d:'24.08.2026', items:['🏷 Klarere Beschriftungen im Kursbild: „Kurs nicht bestätigt" statt „Nicht bestätigt", graues Badge „keine Anwesenheitsdaten" statt gar nichts, und im Profil „Adresse unbestätigt (Link nie geklickt)" beim E-Mail-Status']},
   {v:'Build 366', d:'24.08.2026', items:['🔍 Suche findet Nachnamen jetzt zuverlässig: Namens-Treffer stehen vor Beruf-/Betriebs-Treffern (vorher verdrängten 600+ „Anlagenmechaniker" den Nachnamen „Anlage")']},
   {v:'Build 365', d:'24.08.2026', items:['📧 TN-Profil zeigt jetzt den E-Mail-Status selbst registrierter Azubis: ✅ bestätigt oder ⚠ unbestätigt (Verifizierungslink nie geklickt – Adresse evtl. vertippt oder tot, Mails kommen nicht an)']},
@@ -3226,14 +3227,16 @@ let _kursBestaetigtDetail={};   // kursId -> {ja:[Namen], nein:[Namen]}
 function _ladeKursBestaetigt(kurse){
   kurse.forEach(k=>{
     db.collection('shared').doc('kurse').collection('list').doc(k.id).collection('teilnehmer').get().then(snap=>{
-      const ja=[], nein=[];
+      const ja=[], nein=[], abgelehnt=[];
       snap.forEach(d=>{ const x=d.data(); if(x.status==='absent'||x.status==='removed') return;
         const nm=((x.vorname||'')+' '+(x.nachname||'')).trim()||d.id;
-        (x.kenntnisAm?ja:nein).push(nm); });
-      ja.sort((a,b)=>a.localeCompare(b,'de')); nein.sort((a,b)=>a.localeCompare(b,'de'));
+        if(x.kenntnisAm) ja.push(nm);
+        else if(x.kenntnisAbgelehntAm) abgelehnt.push(nm);
+        else nein.push(nm); });
+      ja.sort((a,b)=>a.localeCompare(b,'de')); nein.sort((a,b)=>a.localeCompare(b,'de')); abgelehnt.sort((a,b)=>a.localeCompare(b,'de'));
       _kursBestaetigt[k.id]=ja.length;
-      _kursBestaetigtDetail[k.id]={ja,nein};
-      const el=document.getElementById('dashBest_'+k.id); if(el){ el.textContent='✓ '+ja.length; if(nein.length){ el.style.color='#b45309'; el.style.background='#fffbeb'; el.style.borderColor='#fde68a'; } }
+      _kursBestaetigtDetail[k.id]={ja,nein,abgelehnt};
+      const el=document.getElementById('dashBest_'+k.id); if(el){ el.textContent='✓ '+ja.length+(abgelehnt.length?' ✗'+abgelehnt.length:''); if(abgelehnt.length){ el.style.color='#b91c1c'; el.style.background='#fef2f2'; el.style.borderColor='#fecaca'; } else if(nein.length){ el.style.color='#b45309'; el.style.background='#fffbeb'; el.style.borderColor='#fde68a'; } }
     }).catch(()=>{});
   });
 }
@@ -3244,6 +3247,12 @@ function showKursBestaetigt(ev,kursId,kursName){
   let html='<div style="font-size:.72rem;color:var(--mu);margin-bottom:10px">Lehrgang in AzubiPro bestätigt (Kenntnisnahme durch den Azubi selbst)</div>';
   html+='<div style="font-size:.74rem;font-weight:800;color:#047857;margin-bottom:4px">✓ Bestätigt ('+d.ja.length+')</div>';
   html+=d.ja.length?('<div style="font-size:.76rem;line-height:1.7;margin-bottom:12px">'+d.ja.map(esc).join('<br>')+'</div>'):'<div style="font-size:.72rem;color:var(--mu);margin-bottom:12px">—</div>';
+  const _ab=d.abgelehnt||[];
+  if(_ab.length){
+    html+='<div style="font-size:.74rem;font-weight:800;color:#b91c1c;margin-bottom:4px">✗ Kurs abgelehnt ('+_ab.length+')</div>';
+    html+='<div style="font-size:.76rem;line-height:1.7;margin-bottom:4px">'+_ab.map(esc).join('<br>')+'</div>';
+    html+='<div style="font-size:.66rem;color:var(--mu);margin-bottom:12px;line-height:1.45">Hat im Start-Dialog „Das ist nicht mein Lehrgang" gewählt – bitte klären: Versehen (bestätigt selbst nach) oder falscher Kurs (aus dem Kurs nehmen).</div>';
+  }
   html+='<div style="font-size:.74rem;font-weight:800;color:#b45309;margin-bottom:4px">⚠ Noch nicht bestätigt ('+d.nein.length+')</div>';
   html+=d.nein.length?('<div style="font-size:.76rem;line-height:1.7">'+d.nein.map(esc).join('<br>')+'</div><div style="font-size:.66rem;color:var(--mu);margin-top:8px;line-height:1.45">Mögliche Gründe: noch kein AzubiPro-Konto, App noch nicht geöffnet, oder Bestätigung abgelehnt. Ab AzubiPro v313 fragt die App beim Öffnen zwingend nach.</div>'):'<div style="font-size:.72rem;color:var(--mu)">— alle bestätigt 🎉</div>';
   document.getElementById('bestListTitel').textContent=kursName||'Lehrgang';

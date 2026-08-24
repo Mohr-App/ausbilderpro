@@ -183,9 +183,11 @@ service cloud.firestore {
               ['bestaetigtAm','bestaetigtVon']
             );
           // Azubi-Kenntnisnahme des Lehrgangs (eigenes Feld, NICHT die Ausbilder-Freigabe)
+          // Kenntnisnahme ODER aktive Ablehnung ("Das ist nicht mein Lehrgang");
+          // Bestaetigen loescht die Ablehnungs-Felder wieder (FieldValue.delete zaehlt als affectedKey)
           allow update: if request.auth != null
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-              ['kenntnisAm','kenntnisVon']
+              ['kenntnisAm','kenntnisVon','kenntnisAbgelehntAm','kenntnisAbgelehntVon']
             );
           allow update: if request.auth != null
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['wunschSitzplatz']);
