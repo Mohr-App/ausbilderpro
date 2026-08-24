@@ -1734,10 +1734,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 366';
+const APP_VERSION = 'Build 367';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 367', d:'24.08.2026', items:['🏷 Klarere Beschriftungen im Kursbild: „Kurs nicht bestätigt" statt „Nicht bestätigt", graues Badge „keine Anwesenheitsdaten" statt gar nichts, und im Profil „Adresse unbestätigt (Link nie geklickt)" beim E-Mail-Status']},
   {v:'Build 366', d:'24.08.2026', items:['🔍 Suche findet Nachnamen jetzt zuverlässig: Namens-Treffer stehen vor Beruf-/Betriebs-Treffern (vorher verdrängten 600+ „Anlagenmechaniker" den Nachnamen „Anlage")']},
   {v:'Build 365', d:'24.08.2026', items:['📧 TN-Profil zeigt jetzt den E-Mail-Status selbst registrierter Azubis: ✅ bestätigt oder ⚠ unbestätigt (Verifizierungslink nie geklickt – Adresse evtl. vertippt oder tot, Mails kommen nicht an)']},
   {v:'Build 364', d:'20.08.2026', items:['✓ Dashboard: Klick auf das grüne ✓-Badge eines laufenden Kurses zeigt namentlich, wer den Lehrgang in AzubiPro bestätigt hat und wer nicht (Badge wird gelb bei offenen Bestätigungen)']},
@@ -6459,8 +6460,11 @@ function showKursDetail(kursId){
       const hasAttendance=att&&att.attTotal>0;
       const confBadge=conf
         ?'<span class="gtn-badge" style="background:rgba(34,197,94,.1);color:#22c55e">✅ '+new Date(conf.am).toLocaleDateString('de-DE')+'</span>'
-        :(hasAttendance?'':'<span class="gtn-badge" style="background:rgba(245,158,11,.1);color:#f59e0b">⚠️ Nicht bestätigt</span>');
+        :(hasAttendance?'':'<span class="gtn-badge" style="background:rgba(245,158,11,.1);color:#f59e0b" title="Der Azubi hat den Lehrgang in AzubiPro noch nicht zur Kenntnis genommen">⚠️ Kurs nicht bestätigt</span>');
       let attBadge='';
+      if(!hasAttendance && t.status!=='absent' && statusMap[t.id]!=='absent'){
+        attBadge='<span class="gtn-badge" style="background:rgba(148,163,184,.12);color:#64748b" title="Weder selbst eingestempelt noch vom Ausbilder eingetragen">– keine Anwesenheitsdaten</span>';
+      }
       if(att && att.attTotal){
         const pct=att.attPercent||0;
         const col=pct>=80?'#22c55e':pct>=60?'#f59e0b':'#ef4444';
@@ -8315,7 +8319,7 @@ function openTNProfile(tnId){
   if(t.emailCheckAktiv===true){
     html+= (t.emailBestaetigt===true)
       ? '<div class="profile-field"><span class="pf-label">E-Mail-Status</span><span style="color:#22c55e;font-weight:600">✅ Bestätigt (Verifizierungslink geklickt)</span></div>'
-      : '<div class="profile-field"><span class="pf-label">E-Mail-Status</span><span style="color:#d97706;font-weight:600" title="Der Azubi hat den Bestätigungslink nie geklickt – Adresse könnte vertippt oder tot sein. Passwort-Reset und Mails erreichen ihn dann nicht. Am besten im Kurs ansprechen.">⚠ Unbestätigt – Mails erreichen ihn evtl. nicht</span></div>';
+      : '<div class="profile-field"><span class="pf-label">E-Mail-Status</span><span style="color:#d97706;font-weight:600" title="Der Azubi hat den Bestätigungslink nie geklickt – Adresse könnte vertippt oder tot sein. Passwort-Reset und Mails erreichen ihn dann nicht. Am besten im Kurs ansprechen.">⚠ Adresse unbestätigt (Link nie geklickt) – Mails erreichen ihn evtl. nicht</span></div>';
   }
   // Schritt 3 – Selbst-Verknuepfung: Status + Admin-Reset (VP schreibt als Admin)
   if(t.verknuepftUid){
