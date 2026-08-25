@@ -1965,7 +1965,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v839';
+const APP_VERSION = 'v840';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1980,6 +1980,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v840', d:'25.08.2026', items:['🔧 Sitz-Badge „selbst beigetreten" korrigiert: markiert nur noch echte Neuzugänge (nicht aus der Kammerliste) – zugewiesene TN, die per QR bestätigt haben, nicht mehr']},
   {v:'v839', d:'24.08.2026', items:['✗ Sitzkarten zeigen jetzt, wenn ein Azubi den Lehrgang im Start-Dialog abgelehnt hat („Kurs abgelehnt" – ansprechen: Versehen oder falscher Kurs?)','➕ „Selbst beigetreten" markiert per QR beigetretene TN, die nicht von der Verwaltung zugewiesen wurden (nur in Kursen mit VP-Zuweisung)','Kurs-Check kennzeichnet Abgelehnte']},
   {v:'v838', d:'24.08.2026', items:['⚠ „Nicht angetreten"-Dialog warnt jetzt, wenn die Frist-Mail den Azubi voraussichtlich nicht erreicht (E-Mail nie bestätigt oder kein Konto verknüpft) – dann bitte zusätzlich anrufen oder über den Betrieb gehen']},
   {v:'v834', d:'20.08.2026', items:['🧹 Vorübergehender Abgleich-Knopf (v833) wieder entfernt – der Anwesenheits-Spiegel in die Azubi-Apps läuft seit v832 automatisch']},
@@ -4460,17 +4461,19 @@ function _syncKursKenntnis(inst){
     if(!_db||!inst||!inst.sharedKursId||!inst.seats) return;
     _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId)
       .collection('teilnehmer').get().then(snap=>{
-        const map={}; let hatVPZuweisung=false;
+        const map={};
         snap.forEach(doc=>{ const d=doc.data()||{};
-          map[doc.id]={abgelehnt:!!d.kenntnisAbgelehntAm && !d.kenntnisAm, self:d.selfRegistered===true};
-          if(d.selfRegistered!==true) hatVPZuweisung=true;
+          map[doc.id]={abgelehnt:!!d.kenntnisAbgelehntAm && !d.kenntnisAm};
         });
         let changed=false;
         Object.values(inst.seats).forEach(seat=>{
           if(!seat||!seat.poolTnId) return;
           const m=map[seat.poolTnId]||{};
           const ab=!!m.abgelehnt;
-          const sb=!!(hatVPZuweisung && m.self);
+          // v840: "selbst beigetreten" = STAMMDATENSATZ selfRegistered (Pool-Statusmap kennt
+          // das nicht; das Kurs-Feld taugt nicht - AzubiPro setzt es auch bei Zugewiesenen).
+          // Quelle: _tnSelfMap aus dem Pool-Snapshot (globalTN).
+          const sb=!!(window._tnSelfMap && _tnSelfMap[seat.poolTnId]);
           if(seat.kenntnisAbgelehnt!==ab){ seat.kenntnisAbgelehnt=ab; changed=true; }
           if(seat.selbstBeigetreten!==sb){ seat.selbstBeigetreten=sb; changed=true; }
         });
@@ -12674,7 +12677,8 @@ function loadPool(){
       // Wiederholer wird in der Kurs-Subcollection als eigenes Feld wiederholer:true gefuehrt (status geloescht),
       // Nicht-angetreten als status:'absent' - beides beruecksichtigen.
       _tnStatusMap={};
-      snap.forEach(doc=>{ const dd=doc.data(); if(!dd) return; if(dd.wiederholer===true){ _tnStatusMap[doc.id]='wiederholer'; } else if(dd.status){ _tnStatusMap[doc.id]=dd.status; } });
+      window._tnSelfMap={};
+      snap.forEach(doc=>{ const dd=doc.data(); if(!dd) return; if(dd.selfRegistered===true) _tnSelfMap[doc.id]=true; if(dd.wiederholer===true){ _tnStatusMap[doc.id]='wiederholer'; } else if(dd.status){ _tnStatusMap[doc.id]=dd.status; } });
       // Sitze neu zeichnen, damit Wiederholer/Nicht-angetreten sofort ausgegraut werden (Map ist jetzt aktuell)
       try{ renderSeats(); }catch(e){}
       // Duplikat-Check (manuell angelegt vs. selbst registriert)

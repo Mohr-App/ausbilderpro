@@ -1734,10 +1734,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 372';
+const APP_VERSION = 'Build 373';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 373', d:'25.08.2026', items:['🔧 „Selbst beigetreten" korrigiert: zählt jetzt nur echte Neuzugänge (Stammdatensatz nicht aus der Kammerliste) – zugewiesene TN, die per QR bestätigt haben, werden nicht mehr fälschlich markiert']},
   {v:'Build 372', d:'25.08.2026', items:['⬅ Jede Unterseite hat jetzt oben einen „Zurück zum Dashboard"-Knopf']},
   {v:'Build 371', d:'25.08.2026', items:['➕ Selbst-Beigetretene ohne Verwaltungs-Zuweisung sind jetzt direkt sichtbar: blaues Badge auf der TN-Kachel im Kursbild, ➕-Zähler am Dashboard-Badge und eigene Namensliste im Kenntnisnahme-Fenster (nur in Kursen mit VP-Zuweisung)']},
   {v:'Build 370', d:'25.08.2026', items:['🔀 Mehrere Dubletten nacheinander zusammenführen geht jetzt ohne Neuladen (Ausführen-Knopf blieb nach dem ersten Merge gesperrt)']},
@@ -3249,10 +3250,10 @@ function _ladeKursBestaetigt(kurse){
   kurse.forEach(k=>{
     db.collection('shared').doc('kurse').collection('list').doc(k.id).collection('teilnehmer').get().then(snap=>{
       const ja=[], nein=[], abgelehnt=[], selbst=[];
-      let hatVP=false; snap.forEach(d=>{ const x=d.data(); if(x.selfRegistered!==true) hatVP=true; });
       snap.forEach(d=>{ const x=d.data(); if(x.status==='absent'||x.status==='removed') return;
         const nm=((x.vorname||'')+' '+(x.nachname||'')).trim()||d.id;
-        if(hatVP && x.selfRegistered===true) selbst.push(nm);
+        const g=_globalTN.find(t=>t.id===d.id);
+        if(g && g.selfRegistered===true) selbst.push(nm);
         if(x.kenntnisAm) ja.push(nm);
         else if(x.kenntnisAbgelehntAm) abgelehnt.push(nm);
         else nein.push(nm); });
@@ -6416,10 +6417,12 @@ function showKursDetail(kursId){
     const _allCustomIds=[];
     // Sammle Labels aus allen TN-Docs - falls einer Labels hat aber andere nicht
     const _aggregatedLabels={};
-    // Build 371: Selbst-Beigetretene sichtbar machen - nur wenn der Kurs ueberhaupt
-    // VP-zugewiesene TN hat (sonst waere jeder markiert und das Badge wertlos)
-    const selfMap={}; let _hatVPZuweisung=false;
-    kursSubData.forEach(d=>{ if(d.selfRegistered===true) selfMap[d.id]=true; else _hatVPZuweisung=true; });
+    // Build 373: "Selbst beigetreten" = der STAMMDATENSATZ (globalTN) ist selfRegistered,
+    // d.h. nicht von der Verwaltung angelegt / nicht aus der Kammerliste. Das Feld im
+    // Kurs-Eintrag taugt nicht: AzubiPro setzt es dort auch bei zugewiesenen TN, die nur
+    // per QR bestaetigen (Fehlmarkierung Broll-Elster/Thuenker, 25.08.).
+    const selfMap={}; const _hatVPZuweisung=true;
+    kursSubData.forEach(d=>{ const g=_globalTN.find(x=>x.id===d.id); if(g&&g.selfRegistered===true) selfMap[d.id]=true; });
     kursSubData.forEach(d=>{
       if(d.attTotal) attMap[d.id]=d;
       if(d.bestaetigtAm) confirmMap[d.id]={am:d.bestaetigtAm,von:d.bestaetigtVon||''};
