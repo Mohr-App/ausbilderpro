@@ -1734,10 +1734,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 370';
+const APP_VERSION = 'Build 371';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 371', d:'25.08.2026', items:['➕ Selbst-Beigetretene ohne Verwaltungs-Zuweisung sind jetzt direkt sichtbar: blaues Badge auf der TN-Kachel im Kursbild, ➕-Zähler am Dashboard-Badge und eigene Namensliste im Kenntnisnahme-Fenster (nur in Kursen mit VP-Zuweisung)']},
   {v:'Build 370', d:'25.08.2026', items:['🔀 Mehrere Dubletten nacheinander zusammenführen geht jetzt ohne Neuladen (Ausführen-Knopf blieb nach dem ersten Merge gesperrt)']},
   {v:'Build 369', d:'25.08.2026', items:['🔀 „Dublette zusammenführen" öffnet sich jetzt im Vordergrund – das Profil-Fenster schließt sich dabei automatisch']},
   {v:'Build 368', d:'24.08.2026', items:['✗ Kenntnisnahme-Fenster (Klick aufs ✓-Badge) zeigt jetzt auch, wer den Lehrgang aktiv abgelehnt hat – Badge wird rot mit ✗-Zähler']},
@@ -3229,16 +3230,18 @@ let _kursBestaetigtDetail={};   // kursId -> {ja:[Namen], nein:[Namen]}
 function _ladeKursBestaetigt(kurse){
   kurse.forEach(k=>{
     db.collection('shared').doc('kurse').collection('list').doc(k.id).collection('teilnehmer').get().then(snap=>{
-      const ja=[], nein=[], abgelehnt=[];
+      const ja=[], nein=[], abgelehnt=[], selbst=[];
+      let hatVP=false; snap.forEach(d=>{ const x=d.data(); if(x.selfRegistered!==true) hatVP=true; });
       snap.forEach(d=>{ const x=d.data(); if(x.status==='absent'||x.status==='removed') return;
         const nm=((x.vorname||'')+' '+(x.nachname||'')).trim()||d.id;
+        if(hatVP && x.selfRegistered===true) selbst.push(nm);
         if(x.kenntnisAm) ja.push(nm);
         else if(x.kenntnisAbgelehntAm) abgelehnt.push(nm);
         else nein.push(nm); });
-      ja.sort((a,b)=>a.localeCompare(b,'de')); nein.sort((a,b)=>a.localeCompare(b,'de')); abgelehnt.sort((a,b)=>a.localeCompare(b,'de'));
+      ja.sort((a,b)=>a.localeCompare(b,'de')); nein.sort((a,b)=>a.localeCompare(b,'de')); abgelehnt.sort((a,b)=>a.localeCompare(b,'de')); selbst.sort((a,b)=>a.localeCompare(b,'de'));
       _kursBestaetigt[k.id]=ja.length;
-      _kursBestaetigtDetail[k.id]={ja,nein,abgelehnt};
-      const el=document.getElementById('dashBest_'+k.id); if(el){ el.textContent='✓ '+ja.length+(abgelehnt.length?' ✗'+abgelehnt.length:''); if(abgelehnt.length){ el.style.color='#b91c1c'; el.style.background='#fef2f2'; el.style.borderColor='#fecaca'; } else if(nein.length){ el.style.color='#b45309'; el.style.background='#fffbeb'; el.style.borderColor='#fde68a'; } }
+      _kursBestaetigtDetail[k.id]={ja,nein,abgelehnt,selbst};
+      const el=document.getElementById('dashBest_'+k.id); if(el){ el.textContent='✓ '+ja.length+(abgelehnt.length?' ✗'+abgelehnt.length:'')+(selbst.length?' ➕'+selbst.length:''); if(abgelehnt.length){ el.style.color='#b91c1c'; el.style.background='#fef2f2'; el.style.borderColor='#fecaca'; } else if(nein.length){ el.style.color='#b45309'; el.style.background='#fffbeb'; el.style.borderColor='#fde68a'; } }
     }).catch(()=>{});
   });
 }
@@ -3254,6 +3257,12 @@ function showKursBestaetigt(ev,kursId,kursName){
     html+='<div style="font-size:.74rem;font-weight:800;color:#b91c1c;margin-bottom:4px">✗ Kurs abgelehnt ('+_ab.length+')</div>';
     html+='<div style="font-size:.76rem;line-height:1.7;margin-bottom:4px">'+_ab.map(esc).join('<br>')+'</div>';
     html+='<div style="font-size:.66rem;color:var(--mu);margin-bottom:12px;line-height:1.45">Hat im Start-Dialog „Das ist nicht mein Lehrgang" gewählt – bitte klären: Versehen (bestätigt selbst nach) oder falscher Kurs (aus dem Kurs nehmen).</div>';
+  }
+  const _sb=d.selbst||[];
+  if(_sb.length){
+    html+='<div style="font-size:.74rem;font-weight:800;color:#2563eb;margin-bottom:4px">➕ Selbst beigetreten – nicht zugewiesen ('+_sb.length+')</div>';
+    html+='<div style="font-size:.76rem;line-height:1.7;margin-bottom:4px">'+_sb.map(esc).join('<br>')+'</div>';
+    html+='<div style="font-size:.66rem;color:var(--mu);margin-bottom:12px;line-height:1.45">Per QR beigetreten, ohne vorherige Zuweisung durch die Verwaltung – bitte prüfen (Dublette? falscher Kurs?).</div>';
   }
   html+='<div style="font-size:.74rem;font-weight:800;color:#b45309;margin-bottom:4px">⚠ Noch nicht bestätigt ('+d.nein.length+')</div>';
   html+=d.nein.length?('<div style="font-size:.76rem;line-height:1.7">'+d.nein.map(esc).join('<br>')+'</div><div style="font-size:.66rem;color:var(--mu);margin-top:8px;line-height:1.45">Mögliche Gründe: noch kein AzubiPro-Konto, App noch nicht geöffnet, oder Bestätigung abgelehnt. Ab AzubiPro v313 fragt die App beim Öffnen zwingend nach.</div>'):'<div style="font-size:.72rem;color:var(--mu)">— alle bestätigt 🎉</div>';
@@ -6389,6 +6398,10 @@ function showKursDetail(kursId){
     const _allCustomIds=[];
     // Sammle Labels aus allen TN-Docs - falls einer Labels hat aber andere nicht
     const _aggregatedLabels={};
+    // Build 371: Selbst-Beigetretene sichtbar machen - nur wenn der Kurs ueberhaupt
+    // VP-zugewiesene TN hat (sonst waere jeder markiert und das Badge wertlos)
+    const selfMap={}; let _hatVPZuweisung=false;
+    kursSubData.forEach(d=>{ if(d.selfRegistered===true) selfMap[d.id]=true; else _hatVPZuweisung=true; });
     kursSubData.forEach(d=>{
       if(d.attTotal) attMap[d.id]=d;
       if(d.bestaetigtAm) confirmMap[d.id]={am:d.bestaetigtAm,von:d.bestaetigtVon||''};
@@ -6466,6 +6479,7 @@ function showKursDetail(kursId){
       const vtag=t.verkuerzer?' <span class="gtn-badge" style="background:rgba(99,102,241,.12);color:#6366f1">Verk.</span>':'';
       const wtag=t.wiederholer?' <span class="gtn-badge" style="background:rgba(245,158,11,.12);color:#d97706">Wdh.'+(t.wdhGrund?' – '+esc(t.wdhGrund):'')+'</span>':'';
       const abstag=(t.status==='absent'||statusMap[t.id]==='absent')?' <span class="gtn-badge" style="background:rgba(239,68,68,.12);color:#ef4444">✗ Nicht angetreten</span>':'';
+      const selftag=(_hatVPZuweisung&&selfMap[t.id])?' <span class="gtn-badge" style="background:rgba(37,99,235,.12);color:#2563eb" title="Per QR selbst beigetreten – nicht von der Verwaltung zugewiesen. Bitte prüfen: gehört er in diesen Kurs? (ggf. Dublette zusammenführen oder entfernen)">➕ Selbst beigetreten</span>':'';
       const conf=confirmMap[t.id];
       const att=attMap[t.id];
       const hasAttendance=att&&att.attTotal>0;
@@ -6511,7 +6525,7 @@ function showKursDetail(kursId){
       card.innerHTML=
         avHtml+
         '<div class="gtn-info">'+
-          '<div class="gtn-name" title="'+esc(name.trim())+'">'+esc(name.trim())+vtag+wtag+abstag+'</div>'+
+          '<div class="gtn-name" title="'+esc(name.trim())+'">'+esc(name.trim())+vtag+wtag+abstag+selftag+'</div>'+
           '<div class="gtn-sub" title="'+esc((t.beruf||'kein Beruf')+(t.ausbjahr?' · '+t.ausbjahr+'. Lj':'')+(t.firma?' · '+t.firma:''))+'">'+(t.beruf||'kein Beruf')+(t.ausbjahr?' · '+t.ausbjahr+'. Lj':'')+(t.firma?' · '+esc(t.firma):'')+'</div>'+
           '<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">'+(pendingBadge||confBadge)+(pendingBadge?'':attBadge||'')+'</div>'+
           gradeBadge+
