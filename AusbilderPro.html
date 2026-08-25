@@ -1965,7 +1965,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v841';
+const APP_VERSION = 'v842';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1980,6 +1980,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v842', d:'25.08.2026', items:['🔧 Badge-Sync („selbst beigetreten"/„Kurs abgelehnt") läuft jetzt auch direkt beim App-Start – nicht mehr nur beim Lehrgang-Wechsel']},
   {v:'v841', d:'25.08.2026', items:['🔧 Nachbesserung zu v840: „selbst beigetreten"-Badge liest jetzt wirklich den Stammdatensatz – fälschlich markierte Sitze (zugewiesene TN mit QR-Bestätigung) korrigieren sich beim Öffnen des Lehrgangs']},
   {v:'v840', d:'25.08.2026', items:['🔧 Sitz-Badge „selbst beigetreten" korrigiert: markiert nur noch echte Neuzugänge (nicht aus der Kammerliste) – zugewiesene TN, die per QR bestätigt haben, nicht mehr']},
   {v:'v839', d:'24.08.2026', items:['✗ Sitzkarten zeigen jetzt, wenn ein Azubi den Lehrgang im Start-Dialog abgelehnt hat („Kurs abgelehnt" – ansprechen: Versehen oder falscher Kurs?)','➕ „Selbst beigetreten" markiert per QR beigetretene TN, die nicht von der Verwaltung zugewiesen wurden (nur in Kursen mit VP-Zuweisung)','Kurs-Check kennzeichnet Abgelehnte']},
@@ -4457,7 +4458,12 @@ function _kursCheckOffene(inst){
 //   kenntnisAbgelehnt = Azubi hat im Start-Dialog "Das ist nicht mein Lehrgang" gewaehlt
 //   selbstBeigetreten = per QR beigetreten, NICHT von der Verwaltung zugewiesen - wird nur
 //     markiert, wenn der Kurs ueberhaupt VP-zugewiesene TN hat (sonst waere jeder markiert)
+let _kkSyncLast={};   // kursId -> ts (Drossel: max. 1x/Minute je Kurs)
 function _syncKursKenntnis(inst){
+  try{
+    const kid=inst&&inst.sharedKursId;
+    if(kid){ const now=Date.now(); if(_kkSyncLast[kid] && now-_kkSyncLast[kid]<60000) return; _kkSyncLast[kid]=now; }
+  }catch(e){}
   try{
     if(!_db||!inst||!inst.sharedKursId||!inst.seats) return;
     const tnIds=[...new Set(Object.values(inst.seats).map(x=>x&&x.poolTnId).filter(Boolean))];
@@ -12570,6 +12576,9 @@ function _restoreFehltCardState(){
 document.addEventListener('DOMContentLoaded', _restoreFehltCardState);
 
 function loadPool(){
+  // v842: Kenntnis-/Selbst-beigetreten-Sync auch beim App-Start (nicht nur bei selInst) -
+  // sonst behalten Sitze nach einem Reload mit bereits offenem Lehrgang veraltete Badges.
+  setTimeout(()=>{try{_syncKursKenntnis(curInst());}catch(e){}}, 1200);
   if(_demoMode) return;
   // Alten Listener abmelden
   if(_poolUnsub){_poolUnsub();_poolUnsub=null;}
