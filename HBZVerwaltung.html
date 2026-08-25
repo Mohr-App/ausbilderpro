@@ -1734,10 +1734,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 371';
+const APP_VERSION = 'Build 372';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 372', d:'25.08.2026', items:['⬅ Jede Unterseite hat jetzt oben einen „Zurück zum Dashboard"-Knopf']},
   {v:'Build 371', d:'25.08.2026', items:['➕ Selbst-Beigetretene ohne Verwaltungs-Zuweisung sind jetzt direkt sichtbar: blaues Badge auf der TN-Kachel im Kursbild, ➕-Zähler am Dashboard-Badge und eigene Namensliste im Kenntnisnahme-Fenster (nur in Kursen mit VP-Zuweisung)']},
   {v:'Build 370', d:'25.08.2026', items:['🔀 Mehrere Dubletten nacheinander zusammenführen geht jetzt ohne Neuladen (Ausführen-Knopf blieb nach dem ersten Merge gesperrt)']},
   {v:'Build 369', d:'25.08.2026', items:['🔀 „Dublette zusammenführen" öffnet sich jetzt im Vordergrund – das Profil-Fenster schließt sich dabei automatisch']},
@@ -2416,6 +2417,23 @@ function showPage(id){
   if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
   _curPage=id; _navFromPop=false;
   closeMobileSb();
+  // Build 372: einheitlicher "Zurueck zum Dashboard"-Knopf oben auf jeder Unterseite
+  // (dynamisch injiziert - gilt automatisch auch fuer kuenftige Seiten; Kursdetail hat
+  // schon einen eigenen Zurueck-Knopf und bleibt unangetastet)
+  try{
+    if(id!=='dashboard' && id!=='kursdetail'){
+      const pg=document.getElementById('page-'+id);
+      if(pg && !pg.querySelector('.backToDash')){
+        const b=document.createElement('button');
+        b.className='btn-sm backToDash';
+        b.style.cssText='padding:6px 12px;margin-bottom:10px';
+        b.title='Zurück zum Dashboard';
+        b.textContent='← Zurück zum Dashboard';
+        b.onclick=()=>showPage('dashboard');
+        pg.insertBefore(b, pg.firstChild);
+      }
+    }
+  }catch(e){}
   // Kursdetail-Listener abmelden wenn weg navigiert
   if(id!=='kursdetail'){
     if(_kdUnsubTN){ _kdUnsubTN(); _kdUnsubTN=null; }
