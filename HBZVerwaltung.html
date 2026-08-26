@@ -1751,10 +1751,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 379';
+const APP_VERSION = 'Build 380';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 380', d:'26.08.2026', items:['📋 Listen-Import pflegt jetzt auch die Kursarten: Kursbezeichnung wird als Standard-Beschreibung an der Kursart hinterlegt (wenn dort leer); unbekannte Kursarten werden mitsamt Beschreibung neu angelegt und direkt ausgewählt']},
   {v:'Build 379', d:'26.08.2026', items:['📋 Kursplaner-Vorbefüllung: Zeitraum wird jetzt auch gesetzt, wenn Von/Bis noch auf der Heute-Vorbelegung stehen; Ausbilder-Erkennung mit Nachnamen-Fallback']},
   {v:'Build 378', d:'26.08.2026', items:['📋 Listen-Import: Namens-Fallback vergleicht jetzt den Gesamtnamen (Aufteilung Vor-/Nachname und Bindestriche egal) – findet auch „Mamadou-Saidou Diallo" vs. „Mamadou Saidou Diallo"']},
   {v:'Build 377', d:'26.08.2026', items:['🔢 Lehrlingsnummer ist jetzt im TN-Profil sichtbar','📋 Listen-Import: findet die Lehrlingsnummer keinen Treffer, wird über Name+Geburtsdatum zugeordnet (mit Hinweis) und die Nummer automatisch nachgetragen']},
@@ -10191,14 +10192,31 @@ function _kliVerarbeite(rows){
     if(bis && bEl && quasiLeer(bEl)){ bEl.value=bis; vorbefuellt.push('Ende '+fmtDE(bis)); }
     if((von&&vEl&&vEl.value===von)||(bis&&bEl&&bEl.value===bis)){ try{updateBldUrlaubFilter();bldCheckDates();}catch(e){} }
     const kursart=zelle(hidx('kursart'));
+    const bez=zelle(hidx('kursbezeichnung'));
+    // Build 380: Beschreibung der LISTE ist vorrangig - erst ins Feld, dann Kursart waehlen
+    // (bldLgartChanged fuellt nur leere Felder, ueberschreibt die Liste also nicht)
+    const beEl=document.getElementById('bldBeschreibung');
+    if(bez && beEl && !beEl.value){ beEl.value=bez; vorbefuellt.push('Beschreibung'); }
     const lgSel=document.getElementById('bldLgart');
     if(kursart && lgSel && !lgSel.value){
       const hit=_lehrgangsarten.filter(l=>(l.name||'').toLowerCase()===kursart.toLowerCase());
-      if(hit.length===1){ lgSel.value=hit[0].id; try{bldLgartChanged();}catch(e){} vorbefuellt.push('Kursart '+esc(hit[0].name)); }
+      if(hit.length===1){
+        lgSel.value=hit[0].id; try{bldLgartChanged();}catch(e){} vorbefuellt.push('Kursart '+esc(hit[0].name));
+        // Kursbezeichnung der Liste an der Kursart hinterlegen - VORRANGIG, ueberschreibt
+        // auch eine abweichende alte Beschreibung (Kammer-Bezeichnung ist massgeblich)
+        if(bez && hit[0].inhalt!==bez){
+          db.collection('shared').doc('kursSettings').collection('lehrgangsarten').doc(hit[0].id).update({inhalt:bez}).catch(()=>{});
+          vorbefuellt.push(hit[0].inhalt?'Kursart-Beschreibung aktualisiert':'Beschreibung in Kursart hinterlegt');
+          hit[0].inhalt=bez;
+        }
+      } else if(hit.length===0){
+        // unbekannte Kursart mitsamt Beschreibung neu anlegen und auswaehlen
+        db.collection('shared').doc('kursSettings').collection('lehrgangsarten').add(bez?{name:kursart,inhalt:bez}:{name:kursart}).then(ref=>{
+          setTimeout(()=>{ const sel=document.getElementById('bldLgart'); if(sel){ sel.value=ref.id; try{bldLgartChanged();}catch(e){} } },600);
+        }).catch(()=>{});
+        vorbefuellt.push('Kursart '+esc(kursart)+' neu angelegt');
+      }
     }
-    const bez=zelle(hidx('kursbezeichnung'));
-    const beEl=document.getElementById('bldBeschreibung');
-    if(bez && beEl && !beEl.value){ beEl.value=bez; vorbefuellt.push('Beschreibung'); }
     const leiter=zelle(hidx('kursleiter'));
     const aSel=document.getElementById('bldAusb');
     if(leiter && aSel && !aSel.value){
