@@ -1751,10 +1751,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 378';
+const APP_VERSION = 'Build 379';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 379', d:'26.08.2026', items:['📋 Kursplaner-Vorbefüllung: Zeitraum wird jetzt auch gesetzt, wenn Von/Bis noch auf der Heute-Vorbelegung stehen; Ausbilder-Erkennung mit Nachnamen-Fallback']},
   {v:'Build 378', d:'26.08.2026', items:['📋 Listen-Import: Namens-Fallback vergleicht jetzt den Gesamtnamen (Aufteilung Vor-/Nachname und Bindestriche egal) – findet auch „Mamadou-Saidou Diallo" vs. „Mamadou Saidou Diallo"']},
   {v:'Build 377', d:'26.08.2026', items:['🔢 Lehrlingsnummer ist jetzt im TN-Profil sichtbar','📋 Listen-Import: findet die Lehrlingsnummer keinen Treffer, wird über Name+Geburtsdatum zugeordnet (mit Hinweis) und die Nummer automatisch nachgetragen']},
   {v:'Build 376', d:'26.08.2026', items:['📋 „Liste einfügen" im Kursplaner befüllt jetzt auch den Kurs vor: Zeitraum (Kursbeginn/-ende), Kursart, Beschreibung und Ausbilder (Kursleiter) werden aus der Liste übernommen – nur in leere Felder, mit Hinweis was gesetzt wurde']},
@@ -10183,8 +10184,11 @@ function _kliVerarbeite(rows){
     const zelle=i=>i>=0?String(rows[1][i]||'').trim():'';
     const von=usISO(zelle(hidx('kursbeginn'))), bis=usISO(zelle(hidx('kursende')));
     const vEl=document.getElementById('bldVon'), bEl=document.getElementById('bldBis');
-    if(von && vEl && !vEl.value){ vEl.value=von; vorbefuellt.push('📅 Beginn '+fmtDE(von)); }
-    if(bis && bEl && !bEl.value){ bEl.value=bis; vorbefuellt.push('Ende '+fmtDE(bis)); }
+    // Build 379: der Builder belegt Von/Bis mit HEUTE vor - das gilt als "leer"
+    const heuteISO=new Date().toISOString().slice(0,10);
+    const quasiLeer=el=>!el.value || el.value===heuteISO;
+    if(von && vEl && quasiLeer(vEl)){ vEl.value=von; vorbefuellt.push('📅 Beginn '+fmtDE(von)); }
+    if(bis && bEl && quasiLeer(bEl)){ bEl.value=bis; vorbefuellt.push('Ende '+fmtDE(bis)); }
     if((von&&vEl&&vEl.value===von)||(bis&&bEl&&bEl.value===bis)){ try{updateBldUrlaubFilter();bldCheckDates();}catch(e){} }
     const kursart=zelle(hidx('kursart'));
     const lgSel=document.getElementById('bldLgart');
@@ -10199,7 +10203,13 @@ function _kliVerarbeite(rows){
     const aSel=document.getElementById('bldAusb');
     if(leiter && aSel && !aSel.value){
       const ln=leiter.toLowerCase();
-      const hits=_ausbilder.filter(a=>{ const an=(a.name||'').toLowerCase(); return an===ln || ln.split(/\s+/).every(w=>an.includes(w)); });
+      let hits=_ausbilder.filter(a=>{ const an=(a.name||'').toLowerCase(); return an===ln || ln.split(/\s+/).every(w=>an.includes(w)) || an.split(/\s+/).every(w=>ln.includes(w)); });
+      if(hits.length!==1){
+        // Build 379: Nachnamen-Fallback - letztes Wort des Kursleiters, eindeutig unter den Ausbildern
+        const nn=ln.split(/\s+/).pop();
+        const h2=_ausbilder.filter(a=>(a.name||'').toLowerCase().split(/\s+/).includes(nn));
+        if(h2.length===1) hits=h2;
+      }
       if(hits.length===1){ aSel.value=hits[0].id; try{updateBldUrlaubFilter();}catch(e){} vorbefuellt.push('👤 '+esc(hits[0].name)); }
       else if(leiter){ vorbefuellt.push('<span style="color:#d97706">Kursleiter „'+esc(leiter)+'" nicht eindeutig – bitte wählen</span>'); }
     }
