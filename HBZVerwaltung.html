@@ -891,6 +891,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div class="builder-empty" id="bldEmpty" title="👆 Tippen oder Teilnehmer aus der Sidebar hierher z" onclick="openTNPicker()" style="cursor:pointer">👆 Tippen oder Teilnehmer aus der Sidebar hierher ziehen</div>
           </div>
           <button class="bld-add-btn" title="+ Teilnehmer hinzufügen" onclick="openTNPicker()">+ Teilnehmer hinzufügen</button>
+          <button class="bld-add-btn" title="Vorsortierte Excel-Liste einfügen – Zuordnung über Lehrlingsnummer" onclick="openKursListImport('builder')" style="margin-top:6px">📋 Liste einfügen</button>
         </div>
 
         <div style="display:flex;gap:10px;margin-top:16px">
@@ -1642,6 +1643,22 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 </div>
 
 <!-- TN-PICKER MODAL -->
+<div class="ov" id="kursListImportModal">
+  <div class="modal" style="max-width:560px">
+    <div class="mhd"><div class="mtit">📋 TN-Liste einfügen</div><button class="xcls" onclick="document.getElementById('kursListImportModal').classList.remove('open')" title="Schließen">&#10005;</button></div>
+    <div class="mbdy">
+      <div style="font-size:.72rem;color:var(--mu);line-height:1.5;margin-bottom:10px">Vorsortierte Excel-Liste (z. B. Seriendruck) hier einfügen oder als Datei wählen. Zugeordnet wird über die <b>Lehrlingsnummer</b>.</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn-sm" onclick="document.getElementById('kliFile').click()" style="flex:1">📁 Datei wählen (xlsx/csv)</button>
+        <input type="file" id="kliFile" accept=".xlsx,.xls,.csv,.tsv" style="display:none" onchange="kliHandleFile(this.files[0])">
+      </div>
+      <textarea id="kliPaste" placeholder="…oder Zeilen aus Excel hier einfügen (Strg+V)" oninput="kliParsePaste()" style="width:100%;min-height:90px;border:1.5px solid var(--brd);border-radius:9px;padding:10px;font-family:'JetBrains Mono',monospace;font-size:.68rem;resize:vertical"></textarea>
+      <div id="kliStatus" style="font-size:.72rem;margin-top:10px;line-height:1.6"></div>
+      <div id="kliList" style="max-height:240px;overflow-y:auto;margin-top:6px"></div>
+      <button class="btn-sm btn-ok" id="kliBtn" onclick="kliUebernehmen()" style="width:100%;margin-top:12px;display:none">✓ Übernehmen</button>
+    </div>
+  </div>
+</div>
 <div class="tn-pick-ov" id="tnPickerModal">
   <div class="tn-pick-box">
     <div class="tn-pick-hdr">
@@ -1734,10 +1751,12 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 374';
+const APP_VERSION = 'Build 376';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 376', d:'26.08.2026', items:['📋 „Liste einfügen" im Kursplaner befüllt jetzt auch den Kurs vor: Zeitraum (Kursbeginn/-ende), Kursart, Beschreibung und Ausbilder (Kursleiter) werden aus der Liste übernommen – nur in leere Felder, mit Hinweis was gesetzt wurde']},
+  {v:'Build 375', d:'26.08.2026', items:['📋 Neue Entlastung: „Liste einfügen" im Kursdetail und im Kursplaner – vorsortierte Excel-Liste (z. B. Seriendruck) als Datei wählen oder einfügen, Zuordnung automatisch über die Lehrlingsnummer, Vorschau mit Ampel (zuweisbar / bereits im Kurs / blockiert / nicht gefunden), ein Klick übernimmt alle Grünen']},
   {v:'Build 374', d:'26.08.2026', items:['📅 TN können jetzt einem neuen Lehrgang zugewiesen werden, auch wenn sie gerade in einem laufenden stecken – blockiert wird nur bei zeitlicher Überschneidung. Grünes Badge zeigt „In K2 bis 28.08. – danach frei". Die Aktiv-Zählung des laufenden Kurses bleibt korrekt']},
   {v:'Build 373', d:'25.08.2026', items:['🔧 „Selbst beigetreten" korrigiert: zählt jetzt nur echte Neuzugänge (Stammdatensatz nicht aus der Kammerliste) – zugewiesene TN, die per QR bestätigt haben, werden nicht mehr fälschlich markiert']},
   {v:'Build 372', d:'25.08.2026', items:['⬅ Jede Unterseite hat jetzt oben einen „Zurück zum Dashboard"-Knopf']},
@@ -6503,7 +6522,7 @@ function showKursDetail(kursId){
         +(totAbsU?'<span style="color:#ef4444">❌ '+totAbsU+'× unentsch.</span>':'')
         +'</div>';
     }
-    wrap.innerHTML=confirmSummary+attSummary+'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)">TEILNEHMER ('+tns.length+')</div><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.7rem;padding:5px 12px" title="OK">+ Hinzufügen</button></div><div id="kdTNGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:7px"></div>';
+    wrap.innerHTML=confirmSummary+attSummary+'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:.7rem;font-weight:700;letter-spacing:.06em;color:var(--mu)">TEILNEHMER ('+tns.length+')</div><button class="btn-sm btn-ok" onclick="openTNPickerForKurs()" style="font-size:.7rem;padding:5px 12px" title="OK">+ Hinzufügen</button><button class="btn-sm" onclick="openKursListImport(\'kursdetail\')" style="font-size:.7rem;padding:5px 12px;margin-left:6px" title="Vorsortierte Excel-Liste einfügen – Zuordnung über Lehrlingsnummer">📋 Liste</button></div><div id="kdTNGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:7px"></div>';
     const grid=document.getElementById('kdTNGrid');
     tns.forEach(t=>{
       const name=(t.vorname||'')+' '+(t.nachname||'');
@@ -9950,7 +9969,14 @@ function bldDrop(e){
     }
   }
   const isReassignable = tn.status==='absent' || tn.wiederholer;
-  if(tn.aktiverKursId && !isReassignable){ toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist bereits in einem aktiven Kurs','bad'); return; }
+  // Build 376: aktiver Kurs blockiert nur bei zeitlicher Ueberschneidung (wie Build 374 im Picker)
+  if(tn.aktiverKursId && !isReassignable){
+    const _bv=document.getElementById('bldVon')?.value||'', _bb=document.getElementById('bldBis')?.value||'';
+    const aK=_kurse.find(k=>k.id===tn.aktiverKursId);
+    if(!aK || _kurseUeberlappen(aK.von,aK.bis,_bv,_bb)){
+      toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist im Zeitraum bereits in '+((aK&&aK.name)||'einem Kurs'),'bad'); return;
+    }
+  }
   if(tn.entwurfKursId && tn.entwurfKursId!==(_bldEditKursId||'')){ toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist bereits in einer Planung reserviert','bad'); return; }
   _bldTNIds.push(tnId);
   renderBldTNList();
@@ -10089,6 +10115,153 @@ function openTNPicker(){
   renderTNPicker();
   setTimeout(()=>document.getElementById('tnPickSearch').focus(), 100);
 }
+// ═══ Build 375: TN-Liste einfuegen (Verena) ═══════════════════════════════
+// Vorsortierte Excel-Liste (Seriendruck o.ae.) -> Zuordnung ueber Lehrlingsnummer.
+// Datei (SheetJS) ODER Copy-Paste. Vorschau mit Ampel, Uebernehmen nutzt dieselben
+// Schreibwege wie der Picker; Build-374-Regeln (Zeitueberschneidung, Urlaub) gelten.
+let _kliMode='kursdetail', _kliRows=[];
+function openKursListImport(mode){
+  if(mode==='kursdetail' && !_selectedKursId){ toast('Kein Kurs ausgewählt','bad'); return; }
+  _kliMode=mode; _kliRows=[];
+  document.getElementById('kliPaste').value='';
+  document.getElementById('kliStatus').innerHTML='';
+  document.getElementById('kliList').innerHTML='';
+  document.getElementById('kliBtn').style.display='none';
+  document.getElementById('kursListImportModal').classList.add('open');
+}
+function _kliZielZeitraum(){
+  if(_kliMode==='builder') return {von:document.getElementById('bldVon')?.value||'', bis:document.getElementById('bldBis')?.value||''};
+  const k=_kurse.find(x=>x.id===_selectedKursId)||{};
+  return {von:k.von||'', bis:k.bis||''};
+}
+function kliHandleFile(f){
+  if(!f) return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+      _kliVerarbeite(rows);
+    }catch(err){ document.getElementById('kliStatus').innerHTML='<span style="color:#ef4444">Datei nicht lesbar: '+esc(err.message)+'</span>'; }
+  };
+  rd.readAsArrayBuffer(f);
+}
+function kliParsePaste(){
+  const t=document.getElementById('kliPaste').value;
+  if(!t.trim()){ document.getElementById('kliStatus').innerHTML=''; document.getElementById('kliList').innerHTML=''; document.getElementById('kliBtn').style.display='none'; return; }
+  const rows=t.split(/\r?\n/).filter(z=>z.trim()).map(z=>z.split(/\t|;/).map(c=>c.trim()));
+  _kliVerarbeite(rows);
+}
+function _kliVerarbeite(rows){
+  if(!rows||!rows.length){ return; }
+  // Lehrlingsnummern-Spalte finden: Kopfzeile ODER Heuristik (meiste Treffer im Bestand)
+  const lnrIndex={}; _globalTN.forEach(t=>{ const n=(t.lehrlingsnr||'').toString().trim(); if(n) lnrIndex[n]=t; });
+  let colLnr=-1, startRow=0;
+  const hdr=rows[0].map(c=>String(c||'').toLowerCase());
+  const hdrHit=hdr.findIndex(h=>['lehrlingsnummer','lehrlingsnr','lehrlingnr','azubinummer','azubinr','lnr'].some(k=>h.includes(k)));
+  if(hdrHit>=0){ colLnr=hdrHit; startRow=1; }
+  else{
+    const maxC=Math.max(...rows.map(r=>r.length));
+    let best=-1, bestN=0;
+    for(let c=0;c<maxC;c++){
+      let n=0; rows.forEach(r=>{ const v=String(r[c]||'').trim(); if(v && lnrIndex[v]) n++; });
+      if(n>bestN){ bestN=n; best=c; }
+    }
+    if(bestN>0) colLnr=best;
+  }
+  if(colLnr<0){ document.getElementById('kliStatus').innerHTML='<span style="color:#ef4444">Keine Spalte mit bekannten Lehrlingsnummern gefunden.</span>'; return; }
+  // Build 376: Im Kursplaner zusaetzlich Kurs-Metadaten aus der Liste vorbefuellen
+  // (Kursart, Kursbezeichnung, Kursbeginn/-ende US-Format, Kursleiter) - nur LEERE Felder.
+  let vorbefuellt=[];
+  if(_kliMode==='builder' && startRow===1){
+    const hidx=n=>hdr.findIndex(h=>h===n.toLowerCase());
+    const usISO=v=>{ const m=String(v||'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if(!m) return ''; return m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0'); };
+    const zelle=i=>i>=0?String(rows[1][i]||'').trim():'';
+    const von=usISO(zelle(hidx('kursbeginn'))), bis=usISO(zelle(hidx('kursende')));
+    const vEl=document.getElementById('bldVon'), bEl=document.getElementById('bldBis');
+    if(von && vEl && !vEl.value){ vEl.value=von; vorbefuellt.push('📅 Beginn '+fmtDE(von)); }
+    if(bis && bEl && !bEl.value){ bEl.value=bis; vorbefuellt.push('Ende '+fmtDE(bis)); }
+    if((von&&vEl&&vEl.value===von)||(bis&&bEl&&bEl.value===bis)){ try{updateBldUrlaubFilter();bldCheckDates();}catch(e){} }
+    const kursart=zelle(hidx('kursart'));
+    const lgSel=document.getElementById('bldLgart');
+    if(kursart && lgSel && !lgSel.value){
+      const hit=_lehrgangsarten.filter(l=>(l.name||'').toLowerCase()===kursart.toLowerCase());
+      if(hit.length===1){ lgSel.value=hit[0].id; try{bldLgartChanged();}catch(e){} vorbefuellt.push('Kursart '+esc(hit[0].name)); }
+    }
+    const bez=zelle(hidx('kursbezeichnung'));
+    const beEl=document.getElementById('bldBeschreibung');
+    if(bez && beEl && !beEl.value){ beEl.value=bez; vorbefuellt.push('Beschreibung'); }
+    const leiter=zelle(hidx('kursleiter'));
+    const aSel=document.getElementById('bldAusb');
+    if(leiter && aSel && !aSel.value){
+      const ln=leiter.toLowerCase();
+      const hits=_ausbilder.filter(a=>{ const an=(a.name||'').toLowerCase(); return an===ln || ln.split(/\s+/).every(w=>an.includes(w)); });
+      if(hits.length===1){ aSel.value=hits[0].id; try{updateBldUrlaubFilter();}catch(e){} vorbefuellt.push('👤 '+esc(hits[0].name)); }
+      else if(leiter){ vorbefuellt.push('<span style="color:#d97706">Kursleiter „'+esc(leiter)+'" nicht eindeutig – bitte wählen</span>'); }
+    }
+  }
+  const ziel=_kliZielZeitraum();
+  const seen=new Set(); _kliRows=[];
+  for(let i=startRow;i<rows.length;i++){
+    const raw=String(rows[i][colLnr]||'').trim();
+    if(!raw) continue;
+    if(seen.has(raw)) continue; seen.add(raw);
+    const t=lnrIndex[raw];
+    if(!t){ _kliRows.push({lnr:raw,status:'fehlt',text:'nicht im Bestand'}); continue; }
+    const name=((t.vorname||'')+' '+(t.nachname||'')).trim();
+    // schon drin?
+    const schon=(_kliMode==='builder') ? _bldTNIds.includes(t.id) : t.aktiverKursId===_selectedKursId;
+    if(schon){ _kliRows.push({lnr:raw,tn:t,name,status:'schon',text:'bereits im Kurs'}); continue; }
+    if(t.entwurfKursId && t.entwurfKursId!==(_kliMode==='builder'?(_bldEditKursId||''):'')){ _kliRows.push({lnr:raw,tn:t,name,status:'block',text:'in anderer Planung reserviert'}); continue; }
+    // Zeitueberschneidung mit aktivem Kurs (Absent/Wdh bleiben verfuegbar)
+    if(t.aktiverKursId && t.status!=='absent' && !t.wiederholer){
+      const aK=_kurse.find(k=>k.id===t.aktiverKursId);
+      if(!aK || _kurseUeberlappen(aK.von,aK.bis,ziel.von,ziel.bis)){ _kliRows.push({lnr:raw,tn:t,name,status:'block',text:'im Zeitraum in '+((aK&&aK.name)||'anderem Kurs')}); continue; }
+    }
+    const uc=hasUrlaubConflict(t.urlaub||[],ziel.von,ziel.bis);
+    if(uc && !isOneDayConflict(uc)){ _kliRows.push({lnr:raw,tn:t,name,status:'block',text:'Urlaub '+fmtDE(uc.von)+'–'+fmtDE(uc.bis)}); continue; }
+    _kliRows.push({lnr:raw,tn:t,name,status:'ok',text:(uc?'⚠ 1 Tag Urlaub '+fmtDE(uc.von):'')});
+  }
+  const ok=_kliRows.filter(r=>r.status==='ok').length;
+  const schon=_kliRows.filter(r=>r.status==='schon').length;
+  const block=_kliRows.filter(r=>r.status==='block').length;
+  const fehlt=_kliRows.filter(r=>r.status==='fehlt').length;
+  document.getElementById('kliStatus').innerHTML=(vorbefuellt&&vorbefuellt.length?'<div style="color:#2563eb;margin-bottom:4px">Vorbefüllt: '+vorbefuellt.join(' · ')+'</div>':'')+'<b style="color:#16a34a">'+ok+' zuweisbar</b>'+(schon?' · '+schon+' bereits im Kurs':'')+(block?' · <b style="color:#d97706">'+block+' blockiert</b>':'')+(fehlt?' · <b style="color:#ef4444">'+fehlt+' nicht gefunden</b>':'');
+  const farbe={ok:'#16a34a',schon:'#64748b',block:'#d97706',fehlt:'#ef4444'};
+  const ic={ok:'✓',schon:'•',block:'🚫',fehlt:'✗'};
+  document.getElementById('kliList').innerHTML=_kliRows.map(r=>'<div style="display:flex;gap:8px;padding:4px 2px;border-bottom:1px solid var(--brd);font-size:.72rem"><span style="color:'+farbe[r.status]+';font-weight:800;width:16px">'+ic[r.status]+'</span><span style="font-family:\'JetBrains Mono\',monospace;color:var(--mu);width:52px">'+esc(r.lnr)+'</span><span style="flex:1;font-weight:600">'+esc(r.name||'–')+'</span><span style="color:'+farbe[r.status]+'">'+esc(r.text||'')+'</span></div>').join('');
+  const b=document.getElementById('kliBtn');
+  b.style.display=ok?'block':'none';
+  b.textContent='✓ '+ok+' Teilnehmer übernehmen';
+}
+function kliUebernehmen(){
+  const okRows=_kliRows.filter(r=>r.status==='ok');
+  if(!okRows.length) return;
+  if(_kliMode==='builder'){
+    okRows.forEach(r=>{ if(!_bldTNIds.includes(r.tn.id)) _bldTNIds.push(r.tn.id); });
+    renderBldTNList(); if(typeof updateBldUrlaubFilter==='function') try{updateBldUrlaubFilter();}catch(e){}
+    toast(okRows.length+' TN in die Planung übernommen ✓');
+  } else {
+    const kursId=_selectedKursId; const kurs=_kurse.find(k=>k.id===kursId);
+    okRows.forEach(r=>{
+      const tn=r.tn;
+      db.collection('globalTN').doc(tn.id).update({
+        aktiverKursId:kursId,
+        kursHistory:firebase.firestore.FieldValue.arrayUnion({kursId, kursName:kurs?.name||'', von:kurs?.von||new Date().toISOString().slice(0,10), bis:kurs?.bis||'', ausbilderName:kurs?.ausbilderName||'', lehrgangsartId:kurs?.lehrgangsartId||'', addedAt:Date.now()})
+      }).catch(()=>{});
+      db.collection('shared').doc('kurse').collection('list').doc(kursId)
+        .collection('teilnehmer').doc(tn.id).set({
+          vorname:tn.vorname||'', nachname:tn.nachname||'', firma:tn.firma||'',
+          beruf:tn.beruf||'', ausbjahr:tn.ausbjahr||'',
+          addedAt:Date.now(), globalTNId:tn.id
+        },{merge:true}).catch(()=>{});
+    });
+    toast(okRows.length+' TN zugewiesen ✓');
+    setTimeout(()=>showKursDetail(kursId), 800);
+  }
+  document.getElementById('kursListImportModal').classList.remove('open');
+}
 function openTNPickerForKurs(){
   if(!_selectedKursId){ toast('Kein Kurs ausgewählt','bad'); return; }
   _tnPickMode = 'kursdetail';
@@ -10207,7 +10380,7 @@ function pickTN(tnId){
       toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist im Zeitraum bereits in '+((aK&&aK.name)||'einem Kurs'),'bad'); return;
     }
   }
-  if(tn.aktiverKursId && !isReassignable){ toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist bereits in einem aktiven Kurs','bad'); return; }
+
   if(tn.entwurfKursId && tn.entwurfKursId!==(_bldEditKursId||'')){ toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist bereits in einer Planung reserviert','bad'); return; }
   _bldTNIds.push(tnId);
   renderBldTNList();
