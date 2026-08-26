@@ -1734,10 +1734,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 373';
+const APP_VERSION = 'Build 374';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 374', d:'26.08.2026', items:['📅 TN können jetzt einem neuen Lehrgang zugewiesen werden, auch wenn sie gerade in einem laufenden stecken – blockiert wird nur bei zeitlicher Überschneidung. Grünes Badge zeigt „In K2 bis 28.08. – danach frei". Die Aktiv-Zählung des laufenden Kurses bleibt korrekt']},
   {v:'Build 373', d:'25.08.2026', items:['🔧 „Selbst beigetreten" korrigiert: zählt jetzt nur echte Neuzugänge (Stammdatensatz nicht aus der Kammerliste) – zugewiesene TN, die per QR bestätigt haben, werden nicht mehr fälschlich markiert']},
   {v:'Build 372', d:'25.08.2026', items:['⬅ Jede Unterseite hat jetzt oben einen „Zurück zum Dashboard"-Knopf']},
   {v:'Build 371', d:'25.08.2026', items:['➕ Selbst-Beigetretene ohne Verwaltungs-Zuweisung sind jetzt direkt sichtbar: blaues Badge auf der TN-Kachel im Kursbild, ➕-Zähler am Dashboard-Badge und eigene Namensliste im Kenntnisnahme-Fenster (nur in Kursen mit VP-Zuweisung)']},
@@ -3237,7 +3238,17 @@ function _kursTNZahlen(kursId){
     const istAktuell=t.aktiverKursId===kursId;
     if(!istAktuell && !hist) return;
     zug++;
-    if(!istAktuell) return;                              // nur noch in der Historie -> nicht aktiv
+    if(!istAktuell){
+      // Build 374: TN wurde schon dem Folgekurs zugewiesen (aktiverKursId umgestellt),
+      // sitzt aber noch im GERADE LAUFENDEN Kurs -> weiter als aktiv zaehlen
+      const k=_kurse.find(x=>x.id===kursId);
+      const heute=new Date().toISOString().slice(0,10);
+      const laeuft=k&&k.von&&k.bis&&k.von<=heute&&heute<=k.bis;
+      if(!laeuft) return;
+      if(t.status==='absent'||t.wiederholer) return;
+      if(hist&&(hist.nichtErschienen||hist.entfernt||hist.abgebrochen)) return;
+      akt++; return;
+    }
     if(t.status==='absent' || t.wiederholer) return;     // Container "nicht angetreten" / "Wiederholer"
     if(t.pendingRemoval || (t.pendingRemovalKurs&&t.pendingRemovalKurs===kursId)) return;
     if(hist && (hist.nichtErschienen||hist.entfernt||hist.abgebrochen)) return;
@@ -10091,6 +10102,11 @@ function openTNPickerForKurs(){
 function closeTNPicker(){
   document.getElementById('tnPickerModal').classList.remove('open');
 }
+// Build 374: Kurs-Zeitraeume ueberschneiden sich? (leere Daten = vorsichtshalber "ja")
+function _kurseUeberlappen(vonA,bisA,vonB,bisB){
+  if(!vonA||!bisA||!vonB||!bisB) return true;
+  return vonA<=bisB && vonB<=bisA;
+}
 function renderTNPicker(){
   const list=document.getElementById('tnPickList');
   const q=(document.getElementById('tnPickSearch').value||'').trim().toLowerCase();
@@ -10123,13 +10139,19 @@ function renderTNPicker(){
     const isAbsent = t.status==='absent';
     const isWdh = !!t.wiederholer;
     const canReassign = !!t.aktiverKursId && (isAbsent || isWdh);
+    // Build 374: "in anderem Kurs" blockiert nur noch bei ZEITLICHER Ueberschneidung mit dem
+    // Ziel-Zeitraum. Laufender Kurs bis 28.08. + neuer Kurs ab 07.09. -> zulaessig.
+    const aKursT=t.aktiverKursId?_kurse.find(k=>k.id===t.aktiverKursId):null;
+    const aUeberlappt=!!aKursT && _kurseUeberlappen(aKursT.von,aKursT.bis,kursVon,kursBis);
+    const aFremdOhneKurs=!!t.aktiverKursId && !aKursT;   // Kurs unbekannt -> vorsichtshalber blocken
     if(_tnPickMode==='builder'){
       alreadyAdded=_bldTNIds.includes(t.id);
-      inOtherKurs=(!!t.aktiverKursId && !isAbsent && !isWdh) || (!!t.entwurfKursId && t.entwurfKursId!==(_bldEditKursId||''));
+      inOtherKurs=((aUeberlappt||aFremdOhneKurs) && !isAbsent && !isWdh) || (!!t.entwurfKursId && t.entwurfKursId!==(_bldEditKursId||''));
     } else {
       alreadyAdded=t.aktiverKursId===_selectedKursId;
-      inOtherKurs=(!!t.aktiverKursId && t.aktiverKursId!==_selectedKursId && !isAbsent && !isWdh) || !!t.entwurfKursId;
+      inOtherKurs=(!!t.aktiverKursId && t.aktiverKursId!==_selectedKursId && (aUeberlappt||aFremdOhneKurs) && !isAbsent && !isWdh) || !!t.entwurfKursId;
     }
+    const spaeterFrei=!!aKursT && !aUeberlappt && t.aktiverKursId!==_selectedKursId && !isAbsent && !isWdh && !t.entwurfKursId;
     const oneDay=urlaubConflict&&isOneDayConflict(urlaubConflict);
     const hardBlocked=inOtherKurs||(!!urlaubConflict&&!oneDay);
     const item=document.createElement('div');
@@ -10138,6 +10160,7 @@ function renderTNPicker(){
     if(alreadyAdded) badge='<span class="tn-pick-badge" style="background:rgba(34,197,94,.12);color:#22c55e">✓ Hinzugefügt</span>';
     else if(urlaubConflict&&!oneDay) badge='<span class="tn-pick-badge" style="background:rgba(245,158,11,.1);color:#d97706">🏖 Urlaub '+fmtDE(urlaubConflict.von)+'–'+fmtDE(urlaubConflict.bis)+' ('+urlaubConflict.overlapDays+'d)</span>';
     else if(oneDay) badge='<span class="tn-pick-badge" style="background:rgba(245,158,11,.08);color:#f59e0b;border:1px dashed rgba(245,158,11,.3)">🏖 1 Tag Urlaub '+fmtDE(urlaubConflict.von)+' – klick für Entscheidung</span>';
+    else if(spaeterFrei) badge='<span class="tn-pick-badge" style="background:rgba(34,197,94,.08);color:#16a34a;border:1px dashed rgba(34,197,94,.35)">In '+esc(aKursT.name||'Kurs')+' bis '+fmtDE(aKursT.bis)+' – danach frei</span>';
     else if(canReassign && isAbsent) badge='<span class="tn-pick-badge" style="background:rgba(239,68,68,.1);color:#ef4444">✗ Fehlt – verfügbar</span>';
     else if(canReassign && isWdh) badge='<span class="tn-pick-badge" style="background:rgba(245,158,11,.1);color:#d97706">↻ Wdh. – verfügbar</span>';
     else if(inOtherKurs){
@@ -10177,6 +10200,13 @@ function pickTN(tnId){
     }
   }
   const isReassignable = tn.status==='absent' || tn.wiederholer;
+  // Build 374: aktiver Kurs blockiert nur bei zeitlicher Ueberschneidung mit dem Ziel-Zeitraum
+  if(tn.aktiverKursId && !isReassignable){
+    const aK=_kurse.find(k=>k.id===tn.aktiverKursId);
+    if(!aK || _kurseUeberlappen(aK.von,aK.bis,von,bis)){
+      toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist im Zeitraum bereits in '+((aK&&aK.name)||'einem Kurs'),'bad'); return;
+    }
+  }
   if(tn.aktiverKursId && !isReassignable){ toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist bereits in einem aktiven Kurs','bad'); return; }
   if(tn.entwurfKursId && tn.entwurfKursId!==(_bldEditKursId||'')){ toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist bereits in einer Planung reserviert','bad'); return; }
   _bldTNIds.push(tnId);
@@ -10190,7 +10220,15 @@ function pickTNForKurs(tnId){
   if(!kursId) return;
   const tn=_globalTN.find(t=>t.id===tnId);
   if(!tn) return;
-  if(tn.aktiverKursId){ toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist bereits in einem anderen Kurs','bad'); return; }
+  // Build 374: nur bei zeitlicher Ueberschneidung blocken; sonst zuweisen (aktiverKursId
+  // wandert auf den neuen Kurs - Muster wie beim Azubi-Selbstbeitritt zum Folgekurs)
+  if(tn.aktiverKursId && tn.aktiverKursId!==kursId && tn.status!=='absent' && !tn.wiederholer){
+    const zielK=_kurse.find(k=>k.id===kursId);
+    const aK=_kurse.find(k=>k.id===tn.aktiverKursId);
+    if(!aK || !zielK || _kurseUeberlappen(aK.von,aK.bis,zielK.von,zielK.bis)){
+      toast((tn.vorname||'')+' '+(tn.nachname||'')+' ist im Zeitraum bereits in '+((aK&&aK.name)||'einem Kurs'),'bad'); return;
+    }
+  }
   // Direkt in Firestore zuweisen
   const kurs=_kurse.find(k=>k.id===kursId);
   db.collection('globalTN').doc(tnId).update({
