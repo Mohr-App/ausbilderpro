@@ -923,6 +923,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="openTrennlinienModal();closeHdrMenu()" style="width:100%;text-align:left" title="Sitzplan-Trennlinien konfigurieren">📐 Trennlinien</button>
         <button class="tbtn" onclick="openTrash();closeHdrMenu()" style="width:100%;text-align:left" title="Gelöschte Lehrgänge wiederherstellen (30 Tage)">🗑 Papierkorb</button>
         <button class="tbtn" onclick="showDiagnose();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(59,130,246,.06);border-color:rgba(59,130,246,.2);color:#1e40af" title="Diagnose-Informationen anzeigen (bei Problemen)">🔍 Diagnose</button>
+        <button class="tbtn" onclick="zeigeCloudVorgaenger();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(217,119,6,.06);border-color:rgba(217,119,6,.25);color:#92400e" title="Den beim letzten Sitzungsbeginn gesicherten Cloud-Stand ansehen und bei Datenverlust wiederherstellen">🛟 Cloud-Vorgänger wiederherstellen</button>
         <button class="tbtn" onclick="appReset();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#991b1b" title="App-Cache und alte lokale Dateien zurücksetzen (bei Problemen)">🔄 App zurücksetzen</button>
         <button class="tbtn" id="hdrChatSweepBtn" onclick="openChatSweep();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:#6d28d9;display:none" title="Alte Chat-Nachrichten manuell entfernen (Admin/DSGVO)">🧹 Chat-Bereinigung</button>
         <button class="tbtn" onclick="recoverOrphanSeats();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.2);color:#4338ca" title="TN, die direkt am Sitzplatz eingegeben wurden (statt über +TN), nachträglich in globalTN + Kurs-Liste anlegen">🔗 Verwaiste Sitze nachtragen</button>
@@ -1965,7 +1966,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v842';
+const APP_VERSION = 'v843';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1980,6 +1981,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v843', d:'26.08.2026', items:['🛟 Neuer Rettungsanker unter „Mehr": „Cloud-Vorgänger wiederherstellen" zeigt den beim Sitzungsbeginn gesicherten Stand (Lehrgänge/Sitzplätze/Anwesenheit im Vergleich) und stellt ihn auf Wunsch wieder her – der aktuelle Stand wird dabei zusätzlich gesichert, nichts geht endgültig verloren']},
   {v:'v842', d:'25.08.2026', items:['🔧 Badge-Sync („selbst beigetreten"/„Kurs abgelehnt") läuft jetzt auch direkt beim App-Start – nicht mehr nur beim Lehrgang-Wechsel']},
   {v:'v841', d:'25.08.2026', items:['🔧 Nachbesserung zu v840: „selbst beigetreten"-Badge liest jetzt wirklich den Stammdatensatz – fälschlich markierte Sitze (zugewiesene TN mit QR-Bestätigung) korrigieren sich beim Öffnen des Lehrgangs']},
   {v:'v840', d:'25.08.2026', items:['🔧 Sitz-Badge „selbst beigetreten" korrigiert: markiert nur noch echte Neuzugänge (nicht aus der Kammerliste) – zugewiesene TN, die per QR bestätigt haben, nicht mehr']},
@@ -14045,6 +14047,45 @@ function _cloudIndStand(){
 
 // Konflikt: ein anderes Geraet hat inzwischen gespeichert.
 // Es gibt hier keine gute Option - nur eine bewusste Entscheidung.
+// ═══ v843: Rettungsanker - state_prev ansehen und wiederherstellen ═══
+// state_prev = der Cloud-Stand, den die App beim ERSTEN Speichern einer Sitzung vorfand.
+// Nach einem versehentlichen Ueberschreiben (Konflikt-Dialog falsch beantwortet, zwei
+// Rechner parallel) liegt dort oft der letzte gute Stand. Wiederherstellen sichert den
+// aktuellen Cloud-Stand zuvor nach state_beforeRestore - nichts geht endgueltig verloren.
+function _standZusammenfassung(rawJson){
+  try{
+    const st=JSON.parse(rawJson);
+    let kurse=0, seats=0, att=0;
+    Object.values(st.kats||{}).forEach(k=>Object.values(k.instances||{}).forEach(ins=>{
+      kurse++;
+      Object.values(ins.seats||{}).forEach(sd=>{ if(sd&&sd.name){ seats++; att+=(sd.attendance||[]).length; } });
+      Object.values(ins.attendance||{}).forEach(day=>{ att+=Object.keys(day||{}).length; });
+    }));
+    return kurse+' Lehrgänge · '+seats+' belegte Sitzplätze · '+att+' Anwesenheits-Einträge';
+  }catch(e){ return 'nicht lesbar'; }
+}
+function zeigeCloudVorgaenger(){
+  if(!_db||!_fbUid){ toast('Nicht angemeldet','bad'); return; }
+  const pRef=_db.collection('users').doc(_fbUid).collection('data').doc('state_prev');
+  const ref=_db.collection('users').doc(_fbUid).collection('data').doc('state');
+  Promise.all([pRef.get(), ref.get()]).then(([pd,cd])=>{
+    if(!pd.exists||!pd.data().s){ alert('Kein gesicherter Vorgänger vorhanden.'); return; }
+    const p=pd.data(), c=cd.exists?cd.data():null;
+    const f=ts=>{ try{ const d=ts&&ts.toDate?ts.toDate():null; return d?d.toLocaleString('de-DE'):'unbekannt'; }catch(e){ return 'unbekannt'; } };
+    const msg='🛟 GESICHERTER VORGÄNGER (state_prev)\n'
+      +'Gesichert am: '+f(p.gesichertAm)+'\nStand von: '+f(p.ts)+'\nInhalt: '+_standZusammenfassung(p.s)
+      +'\n\n☁ AKTUELLER CLOUD-STAND\nStand von: '+(c?f(c.ts):'-')+'\nInhalt: '+(c&&c.s?_standZusammenfassung(c.s):'-')
+      +'\n\nDen Vorgänger wiederherstellen? Der aktuelle Cloud-Stand wird vorher gesichert (state_beforeRestore) und die App lädt neu.';
+    if(!confirm(msg)) return;
+    const bRef=_db.collection('users').doc(_fbUid).collection('data').doc('state_beforeRestore');
+    const neuV=Math.max((c&&c.v)||0,_stateV)+1;
+    const sichern = c ? bRef.set({s:c.s||'',c:c.c===true,v:c.v||0,ts:c.ts||null,gesichertAm:firebase.firestore.FieldValue.serverTimestamp()}) : Promise.resolve();
+    sichern.then(()=>ref.set({s:p.s, c:false, v:neuV, ts:firebase.firestore.FieldValue.serverTimestamp()}))
+      .then(()=>{ try{ localStorage.setItem(_lsKey('ap_v1'), p.s); localStorage.removeItem(_lsKey('ap_dirty')); }catch(e){}
+        alert('✓ Wiederhergestellt – die App lädt jetzt neu.'); location.reload(); })
+      .catch(err=>alert('Fehler: '+err.message));
+  }).catch(err=>alert('Fehler: '+err.message));
+}
 function _zeigeKonflikt(cloudTs){
   if(_konfliktOffen) return;
   _konfliktOffen = true;
