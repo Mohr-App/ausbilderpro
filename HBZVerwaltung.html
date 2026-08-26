@@ -1751,10 +1751,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 377';
+const APP_VERSION = 'Build 378';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 378', d:'26.08.2026', items:['📋 Listen-Import: Namens-Fallback vergleicht jetzt den Gesamtnamen (Aufteilung Vor-/Nachname und Bindestriche egal) – findet auch „Mamadou-Saidou Diallo" vs. „Mamadou Saidou Diallo"']},
   {v:'Build 377', d:'26.08.2026', items:['🔢 Lehrlingsnummer ist jetzt im TN-Profil sichtbar','📋 Listen-Import: findet die Lehrlingsnummer keinen Treffer, wird über Name+Geburtsdatum zugeordnet (mit Hinweis) und die Nummer automatisch nachgetragen']},
   {v:'Build 376', d:'26.08.2026', items:['📋 „Liste einfügen" im Kursplaner befüllt jetzt auch den Kurs vor: Zeitraum (Kursbeginn/-ende), Kursart, Beschreibung und Ausbilder (Kursleiter) werden aus der Liste übernommen – nur in leere Felder, mit Hinweis was gesetzt wurde']},
   {v:'Build 375', d:'26.08.2026', items:['📋 Neue Entlastung: „Liste einfügen" im Kursdetail und im Kursplaner – vorsortierte Excel-Liste (z. B. Seriendruck) als Datei wählen oder einfügen, Zuordnung automatisch über die Lehrlingsnummer, Vorschau mit Ampel (zuweisbar / bereits im Kurs / blockiert / nicht gefunden), ein Klick übernimmt alle Grünen']},
@@ -10220,10 +10221,14 @@ function _kliVerarbeite(rows){
         const gm=String(rows[i][iG]||'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
         const giso=gm?gm[3]+'-'+gm[1].padStart(2,'0')+'-'+gm[2].padStart(2,'0'):'';
         if(nn&&giso){
-          const norm=x=>x.replace(/[-\s]+/g,' ').trim();
+          // Build 378: Gesamtname als WORTMENGE vergleichen - Kammer teilt Namen teils anders
+          // auf als der Bestand (Liste: Name "Diallo"/Vorname "Mamadou-Saidou" vs. Bestand:
+          // Nachname "Saidou Diallo"/Vorname "Mamadou"). Reihenfolge/Aufteilung egal.
+          const worte=x=>new Set(String(x||'').toLowerCase().replace(/[-\s]+/g,' ').trim().split(' ').filter(Boolean));
+          const wListe=worte(vn+' '+nn);
+          const gleich=(a,b)=>a.size===b.size && [...a].every(w=>b.has(w));
           const hits=_globalTN.filter(x=>!x.archived && x.geburtsdatum===giso
-            && norm((x.nachname||'').toLowerCase())===norm(nn)
-            && (!vn || norm((x.vorname||'').toLowerCase())===norm(vn) || norm((x.vorname||'').toLowerCase()).startsWith(norm(vn).split(' ')[0])));
+            && gleich(worte((x.vorname||'')+' '+(x.nachname||'')), wListe));
           if(hits.length===1){ t=hits[0]; viaName=true; }
         }
       }
