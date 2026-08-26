@@ -920,6 +920,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap" class="kd-actions">
           <button class="btn-sm btn-ok" onclick="openEditKursModal()" style="font-size:.72rem;padding:6px 10px" title="OK">Bearbeiten</button>
           <button class="btn-sm" title="PDF TN-Liste erstellen" onclick="generateTNListe()" style="font-size:.72rem;padding:6px 10px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">TN-Liste</button>
+          <button class="btn-sm" title="Anwesenheitsliste für die Abrechnung – Häkchen aus AusbilderPro, Noten 1:1, Fehltage von Hand ergänzbar" onclick="generateAnwListe()" style="font-size:.72rem;padding:6px 10px;background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.25);color:#059669">Anwesenheitsliste</button>
           <button class="btn-sm" title="🏢 Betriebsliste" onclick="generateBetriebsliste()" style="font-size:.72rem;padding:6px 10px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">🏢 Betriebsliste</button>
           <button class="btn-sm" title="Alle Bescheinigungen als PDF" onclick="generateAlleBescheinigungen()" style="font-size:.72rem;padding:6px 10px;background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.25);color:#6366f1">📄 Bescheinigungen</button>
           <button class="btn-sm" title="Kurs heute als ausgefallen markieren" onclick="kursAusfallVerwaltung()" style="font-size:.72rem;padding:6px 10px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#ef4444">Ausfall</button>
@@ -1754,10 +1755,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 382';
+const APP_VERSION = 'Build 383';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 383', d:'26.08.2026', items:['🖨 Neu im Kursdetail: „Anwesenheitsliste" für die Abrechnung – Häkchen je Kurstag automatisch aus den Check-ins (nicht änderbar), Noten 1:1 aus AusbilderPro (F/M/FP/FT), gelbe Felder (Fehltage, Bemerkung, Innung) vor dem Druck ausfüllbar. Querformat, druckfertig']},
   {v:'Build 382', d:'26.08.2026', items:['🎨 Kursplaner-Knöpfe ausbalanciert: „Als Planung speichern" bleibt groß, „Übertragen" und „Abbrechen" kompakt daneben']},
   {v:'Build 381', d:'26.08.2026', items:['✕ Kursplaner hat jetzt einen Abbrechen-Knopf: Eingaben werden (nach Rückfrage) verworfen, nichts wird gespeichert, zurück zum Dashboard']},
   {v:'Build 380', d:'26.08.2026', items:['📋 Listen-Import pflegt jetzt auch die Kursarten: Kursbezeichnung wird als Standard-Beschreibung an der Kursart hinterlegt (wenn dort leer); unbekannte Kursarten werden mitsamt Beschreibung neu angelegt und direkt ausgewählt']},
@@ -7065,6 +7067,97 @@ function generateTNListe(){
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
+// ═══ Build 383: Anwesenheitsliste (Kammer-Abrechnung) ═══
+// 1:1-Nachbau des Kammer-Blatts (Masse aus dem Original-PDF vermessen): Kopf ohne Rahmen,
+// 12 Datum-Kaestchen (Tageszahl nur an Kurstagen), Zeugnisnote F/M/FP/FT, Fusszeile.
+// Haekchen aus den Checkins (fest), Noten 1:1 aus AusbilderPro, gelbe Felder editierbar.
+function generateAnwListe(){
+  if(!_selectedKursId){toast('Kein Kurs gewählt','bad');return;}
+  const kurs=_kurse.find(k=>k.id===_selectedKursId);
+  if(!kurs||!kurs.von||!kurs.bis){toast('Kurs unvollständig','bad');return;}
+  const kursId=_selectedKursId;
+  Promise.all([
+    db.collection('globalTN').where('aktiverKursId','==',kursId).get(),
+    db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').get(),
+    db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('checkins').get()
+  ]).then(([gs,ts,cs])=>{
+    const tns=[]; gs.forEach(d=>tns.push({id:d.id,...d.data()}));
+    tns.sort((a,b)=>((a.nachname||'')+(a.vorname||'')).localeCompare((b.nachname||'')+(b.vorname||''),'de'));
+    if(!tns.length){toast('Keine TN im Kurs','bad');return;}
+    const sub={}; ts.forEach(d=>sub[d.id]=d.data());
+    const anw=new Set(); cs.forEach(d=>{ const c=d.data(); if(c&&c.tnId&&c.datum) anw.add(c.tnId+'_'+c.datum); });
+    const tage=[];
+    for(let d=new Date(kurs.von+'T12:00'); d<=new Date(kurs.bis+'T12:00'); d.setDate(d.getDate()+1)){
+      const wd=d.getDay(); if(wd===0||wd===6) continue;
+      tage.push(d.toISOString().slice(0,10));
+    }
+    const SP=12;   // wie im Original: 12 Datum-Kaestchen
+    const kursLabels=(kurs.customGrades)||{};
+    const ftCid=Object.entries(kursLabels).find(([cid,l])=>String(l||'').toLowerCase().includes('theorie'));
+    const lj={}; tns.forEach(t=>{ if(t.ausbjahr) lj[t.ausbjahr]=(lj[t.ausbjahr]||0)+1; });
+    const ausbjahr=Object.entries(lj).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const kuerzel=(n=>{ const m=[]; for(const t of String(n||'').split(/\s+/)){ if(/^[A-ZÄÖÜ0-9\/\-\.]+$/.test(t)) m.push(t); else break; } return m.join(' ')||n; })(kurs.lehrgangsart||kurs.name||'');
+    const heute=new Date().toLocaleDateString('de-DE');
+    const ED=' contenteditable="true" class="ed"';
+    const rows=tns.map((t,i)=>{
+      const d=sub[t.id]||{};
+      const ft=ftCid?((d.noten_extra||{})[ftCid[0]]||''):'';
+      let tds='';
+      for(let c=0;c<SP;c++){
+        const dt=tage[c];
+        if(dt && anw.has(t.id+'_'+dt)) tds+='<td class="c dz">✓</td>';
+        else tds+='<td class="c dz"><span'+ED+'>&nbsp;</span></td>';
+      }
+      return '<tr>'
+        +'<td class="c lfd">'+(i+1)+'</td>'
+        +'<td class="tn">'+esc((t.nachname||'')+', '+(t.vorname||''))+(t.ort?', '+esc(t.ort):'')+'</td>'
+        +'<td class="bt">'+esc(t.firma||'')+(t.betriebOrt?', '+esc(t.betriebOrt):'')+'</td>'
+        +tds
+        +[d.noten_fuehrung,d.noten_mitarbeit,d.noten_praxis,ft].map(n=>'<td class="c nz">'+(n?esc(String(n)):'<span'+ED+'>&nbsp;</span>')+'</td>').join('')
+        +'<td class="bm"><span'+ED+' style="display:block;min-height:5mm">&nbsp;</span></td>'
+        +'</tr>';
+    }).join('');
+    let tagKopf='';
+    for(let c=0;c<SP;c++){ const dt=tage[c]; tagKopf+='<td class="c dz dk">'+(dt?dt.slice(8,10)+'.':'&nbsp;')+'</td>'; }
+    const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Anwesenheitsliste '+esc(kuerzel)+'</title><style>'
+      +'@page{size:A4 landscape;margin:10mm 11mm 12mm 11mm}'
+      +'*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#000;margin:0}'
+      +'.tit{display:flex;justify-content:space-between;align-items:flex-start;margin:0 0 4mm}'
+      +'.tit h1{font-size:14pt;margin:0;font-weight:700}.tit .dat{font-size:9.5pt;font-weight:700}'
+      +'.kopf{display:grid;grid-template-columns:88mm 148mm 1fr;font-size:9.5pt;line-height:1.5;margin-bottom:3mm}'
+      +'.kopf b{font-weight:700}'
+      +'table{width:100%;border-collapse:collapse;table-layout:fixed}'
+      +'th,td{border:0.5pt solid #000;padding:0.8mm 1.2mm;vertical-align:middle;font-weight:400;text-align:left;font-size:9.5pt;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
+      +'th{background:#fff}'
+      +'.lfd{width:7mm}.tn{width:58mm}.bt{width:72mm}.dz{width:5.8mm}.nz{width:5.8mm}.bm{width:34mm;white-space:normal}'
+      +'td.c{text-align:center}.dk{font-size:7pt;color:#000;height:4.5mm}'
+      +'tbody td{height:8mm}'
+      +'.grp{text-align:left}'
+      +'.ed{background:#fffbe6;display:inline-block;min-width:3mm;min-height:3.5mm}'
+      +'.fuss{position:fixed;bottom:4mm;right:11mm;left:11mm;border-top:0.5pt solid #000;text-align:right;font-size:8.5pt;font-weight:700;padding-top:1mm}'
+      +'.np{position:fixed;top:4mm;right:4mm}'
+      +'@media print{.np{display:none}.ed{background:#fff!important}}'
+      +'</style></head><body>'
+      +'<button class="np" onclick="window.print()" style="padding:8px 16px;font-size:11pt;cursor:pointer">🖨 Drucken</button>'
+      +'<div class="tit"><h1>Anwesenheitsliste</h1><div class="dat">'+heute+'</div></div>'
+      +'<div class="kopf">'
+      +'<div>Lehrgang: <b>'+esc(kuerzel)+'</b><br>&nbsp;&nbsp;&nbsp;&nbsp;vom: <b>'+fmtDE(kurs.von)+'</b> &nbsp; bis: <b>'+fmtDE(kurs.bis)+'</b></div>'
+      +'<div>Innung: <b><span'+ED+' style="min-width:60mm">&nbsp;</span></b><br>Leiter: <b>'+esc(kurs.ausbilderName||'')+'</b></div>'
+      +'<div>Ausbildungsjahr: <b>'+esc(String(ausbjahr))+'</b></div>'
+      +'</div>'
+      +'<table><thead>'
+      +'<tr><th class="lfd" rowspan="1" style="border-bottom:none">Lfd.</th><th class="tn" rowspan="2" style="vertical-align:top">Teilnehmer</th><th class="bt" rowspan="2" style="vertical-align:top">Ausbildungsbetrieb</th>'
+      +'<th class="grp" colspan="'+SP+'" style="border-bottom:none">Datum</th><th class="grp" colspan="4" style="border-bottom:none">Zeugnisnote</th><th class="bm" rowspan="2" style="vertical-align:top">Bemerkung</th></tr>'
+      +'<tr><th class="lfd" style="border-top:none">Nr.</th>'+tagKopf.replace(/td class="c dz dk"/g,'th class="c dz dk" style="font-weight:400"').replace(/<\/td>/g,'</th>')
+      +'<th class="c nz">F</th><th class="c nz">M</th><th class="c nz">FP</th><th class="c nz">FT</th></tr>'
+      +'</thead><tbody>'+rows+'</tbody></table>'
+      +'<div class="fuss">Seite 1 von 1</div>'
+      +'</body></html>';
+    const w=window.open('','_blank');
+    if(!w){toast('Popup blockiert – bitte erlauben','bad');return;}
+    w.document.write(html); w.document.close();
+  }).catch(err=>toast('Fehler: '+err.message,'bad'));
+}
 function openTNListeWindow(kurs, tns){
   const von=kurs.von; const bis=kurs.bis;
   if(!von||!bis){toast('Kurs hat kein Start/Enddatum','bad');return;}
