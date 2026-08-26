@@ -1751,10 +1751,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 376';
+const APP_VERSION = 'Build 377';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 377', d:'26.08.2026', items:['🔢 Lehrlingsnummer ist jetzt im TN-Profil sichtbar','📋 Listen-Import: findet die Lehrlingsnummer keinen Treffer, wird über Name+Geburtsdatum zugeordnet (mit Hinweis) und die Nummer automatisch nachgetragen']},
   {v:'Build 376', d:'26.08.2026', items:['📋 „Liste einfügen" im Kursplaner befüllt jetzt auch den Kurs vor: Zeitraum (Kursbeginn/-ende), Kursart, Beschreibung und Ausbilder (Kursleiter) werden aus der Liste übernommen – nur in leere Felder, mit Hinweis was gesetzt wurde']},
   {v:'Build 375', d:'26.08.2026', items:['📋 Neue Entlastung: „Liste einfügen" im Kursdetail und im Kursplaner – vorsortierte Excel-Liste (z. B. Seriendruck) als Datei wählen oder einfügen, Zuordnung automatisch über die Lehrlingsnummer, Vorschau mit Ampel (zuweisbar / bereits im Kurs / blockiert / nicht gefunden), ein Klick übernimmt alle Grünen']},
   {v:'Build 374', d:'26.08.2026', items:['📅 TN können jetzt einem neuen Lehrgang zugewiesen werden, auch wenn sie gerade in einem laufenden stecken – blockiert wird nur bei zeitlicher Überschneidung. Grünes Badge zeigt „In K2 bis 28.08. – danach frei". Die Aktiv-Zählung des laufenden Kurses bleibt korrekt']},
@@ -8375,6 +8376,7 @@ function openTNProfile(tnId){
     '<div class="profile-field"><span class="pf-label">Betrieb</span><span>'+(t.firma||'–')+'</span></div>'+
     '<div class="profile-field"><span class="pf-label">Verknüpft mit</span><span id="tnFirmaLink">'+(t.firmaUid?'wird geladen…':'<span style="color:var(--mu)">nicht verknüpft</span>')+'</span></div>'+
     '<div class="profile-field"><span class="pf-label">Geburtsdatum</span><span>'+(t.geburtsdatum?fmtDE(t.geburtsdatum):'–')+'</span></div>'+
+    '<div class="profile-field"><span class="pf-label">Lehrlingsnummer</span><span style="font-family:\'JetBrains Mono\',monospace">'+(t.lehrlingsnr?esc(String(t.lehrlingsnr)):'–')+'</span></div>'+
     '<div class="profile-field"><span class="pf-label">E-Mail</span><span>'+(t.email||'–')+'</span></div>'+
     '<div class="profile-field"><span class="pf-label">Telefon</span><span>'+(t.tel||'–')+'</span></div>'+
     ((t.adresse||t.plz||t.ort)?'<div class="profile-field"><span class="pf-label">Adresse</span><span>'+esc((t.adresse||'')+(t.plz||t.ort?', ':'')+(t.plz||'')+' '+(t.ort||'')).trim()+'</span></div>':'')+
@@ -10207,8 +10209,30 @@ function _kliVerarbeite(rows){
     const raw=String(rows[i][colLnr]||'').trim();
     if(!raw) continue;
     if(seen.has(raw)) continue; seen.add(raw);
-    const t=lnrIndex[raw];
-    if(!t){ _kliRows.push({lnr:raw,status:'fehlt',text:'nicht im Bestand'}); continue; }
+    let t=lnrIndex[raw]; let viaName=false;
+    if(!t){
+      // Build 377: Fallback ueber Name+Geburtsdatum (Liste: 'Name','Vorname','Geburtsdatum' US-Format)
+      const hidx2=n=>hdr.findIndex(h=>h===n.toLowerCase());
+      const iN=hidx2('name'), iV=hidx2('vorname'), iG=hidx2('geburtsdatum');
+      if(startRow===1 && iN>=0 && iG>=0){
+        const nn=String(rows[i][iN]||'').trim().toLowerCase();
+        const vn=iV>=0?String(rows[i][iV]||'').trim().toLowerCase():'';
+        const gm=String(rows[i][iG]||'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        const giso=gm?gm[3]+'-'+gm[1].padStart(2,'0')+'-'+gm[2].padStart(2,'0'):'';
+        if(nn&&giso){
+          const norm=x=>x.replace(/[-\s]+/g,' ').trim();
+          const hits=_globalTN.filter(x=>!x.archived && x.geburtsdatum===giso
+            && norm((x.nachname||'').toLowerCase())===norm(nn)
+            && (!vn || norm((x.vorname||'').toLowerCase())===norm(vn) || norm((x.vorname||'').toLowerCase()).startsWith(norm(vn).split(' ')[0])));
+          if(hits.length===1){ t=hits[0]; viaName=true; }
+        }
+      }
+    }
+    if(!t){ _kliRows.push({lnr:raw,status:'fehlt',text:'nicht im Bestand (auch nicht über Name+Geburtsdatum)'}); continue; }
+    if(viaName && !t.lehrlingsnr){
+      // Lehrlingsnummer aus der Liste nachtragen, damit es beim naechsten Mal direkt klappt
+      db.collection('globalTN').doc(t.id).update({lehrlingsnr:raw}).catch(()=>{});
+    }
     const name=((t.vorname||'')+' '+(t.nachname||'')).trim();
     // schon drin?
     const schon=(_kliMode==='builder') ? _bldTNIds.includes(t.id) : t.aktiverKursId===_selectedKursId;
@@ -10221,7 +10245,7 @@ function _kliVerarbeite(rows){
     }
     const uc=hasUrlaubConflict(t.urlaub||[],ziel.von,ziel.bis);
     if(uc && !isOneDayConflict(uc)){ _kliRows.push({lnr:raw,tn:t,name,status:'block',text:'Urlaub '+fmtDE(uc.von)+'–'+fmtDE(uc.bis)}); continue; }
-    _kliRows.push({lnr:raw,tn:t,name,status:'ok',text:(uc?'⚠ 1 Tag Urlaub '+fmtDE(uc.von):'')});
+    _kliRows.push({lnr:raw,tn:t,name,status:'ok',text:[viaName?'über Name+Geburtsdatum':'',uc?'⚠ 1 Tag Urlaub '+fmtDE(uc.von):''].filter(Boolean).join(' · ')});
   }
   const ok=_kliRows.filter(r=>r.status==='ok').length;
   const schon=_kliRows.filter(r=>r.status==='schon').length;
