@@ -901,6 +901,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <button class="btn" title="📤 Übertragen zu AusbilderPro" onclick="bldUebertragen()" style="flex:1;font-size:.88rem;padding:14px">
             📤 Übertragen zu AusbilderPro
           </button>
+                  <button class="btn" title="Abbrechen – alle Eingaben verwerfen" onclick="bldAbbrechen()" style="font-size:.88rem;padding:14px 18px;background:#fff;border:1.5px solid #fecaca;box-shadow:none;color:#b91c1c;flex:0 0 auto">
+            ✕ Abbrechen
+          </button>
         </div>
       </div>
 
@@ -1751,10 +1754,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 380';
+const APP_VERSION = 'Build 381';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 381', d:'26.08.2026', items:['✕ Kursplaner hat jetzt einen Abbrechen-Knopf: Eingaben werden (nach Rückfrage) verworfen, nichts wird gespeichert, zurück zum Dashboard']},
   {v:'Build 380', d:'26.08.2026', items:['📋 Listen-Import pflegt jetzt auch die Kursarten: Kursbezeichnung wird als Standard-Beschreibung an der Kursart hinterlegt (wenn dort leer); unbekannte Kursarten werden mitsamt Beschreibung neu angelegt und direkt ausgewählt']},
   {v:'Build 379', d:'26.08.2026', items:['📋 Kursplaner-Vorbefüllung: Zeitraum wird jetzt auch gesetzt, wenn Von/Bis noch auf der Heute-Vorbelegung stehen; Ausbilder-Erkennung mit Nachnamen-Fallback']},
   {v:'Build 378', d:'26.08.2026', items:['📋 Listen-Import: Namens-Fallback vergleicht jetzt den Gesamtnamen (Aufteilung Vor-/Nachname und Bindestriche egal) – findet auch „Mamadou-Saidou Diallo" vs. „Mamadou Saidou Diallo"']},
@@ -10664,6 +10668,21 @@ function bldSaveEntwurf(){
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
+// Build 381: Lehrgang-Erstellen sauber abbrechen - Eingaben verwerfen, zurueck zum Dashboard.
+// Bei bearbeiteter Planung bleibt der gespeicherte Entwurf unveraendert (nichts wird geschrieben).
+function bldAbbrechen(){
+  const hatEingaben=_bldTNIds.length || document.getElementById('bldAusb')?.value || document.getElementById('bldLgart')?.value || document.getElementById('bldBeschreibung')?.value?.trim();
+  if(hatEingaben && !confirm('Eingaben verwerfen? Der Lehrgang wird nicht gespeichert.')) return;
+  _bldTNIds=[]; _bldEditKursId=null;
+  ['bldAusb','bldLgart','bldBeschreibung'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  const heute=new Date().toISOString().slice(0,10);
+  const v=document.getElementById('bldVon'), b=document.getElementById('bldBis');
+  if(v) v.value=heute; if(b) b.value=heute;
+  document.querySelectorAll('#bldBSTage input[type=checkbox]').forEach(c=>{ c.checked=false; c.parentElement.classList.remove('checked'); });
+  try{ renderBldTNList(); }catch(e){}
+  toast('Abgebrochen – nichts gespeichert');
+  showPage('dashboard');
+}
 function openEntwurf(kursId){
   const k=_kurse.find(x=>x.id===kursId);
   if(!k) return;
