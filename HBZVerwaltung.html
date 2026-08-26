@@ -1755,10 +1755,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 384';
+const APP_VERSION = 'Build 385';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 385', d:'26.08.2026', items:['🖨 Anwesenheitsliste: Ausbildungsjahr ist jetzt ein Ausfüllfeld; die Innung merkt sich das Blatt je Kursart – einmal eintippen, alle künftigen Listen dieses Gewerks füllen sie automatisch']},
   {v:'Build 384', d:'26.08.2026', items:['🖨 Anwesenheitsliste nachgebessert: FP/FT-Noten werden jetzt auch aus Extra-Notenspalten (per Label „…praxis"/„…theorie") gelesen; Spaltenköpfe „Lfd."/„FP"/„FT" nicht mehr abgeschnitten']},
   {v:'Build 383', d:'26.08.2026', items:['🖨 Neu im Kursdetail: „Anwesenheitsliste" für die Abrechnung – Häkchen je Kurstag automatisch aus den Check-ins (nicht änderbar), Noten 1:1 aus AusbilderPro (F/M/FP/FT), gelbe Felder (Fehltage, Bemerkung, Innung) vor dem Druck ausfüllbar. Querformat, druckfertig']},
   {v:'Build 382', d:'26.08.2026', items:['🎨 Kursplaner-Knöpfe ausbalanciert: „Als Planung speichern" bleibt groß, „Übertragen" und „Abbrechen" kompakt daneben']},
@@ -7072,6 +7073,15 @@ function generateTNListe(){
 // 1:1-Nachbau des Kammer-Blatts (Masse aus dem Original-PDF vermessen): Kopf ohne Rahmen,
 // 12 Datum-Kaestchen (Tageszahl nur an Kurstagen), Zeugnisnote F/M/FP/FT, Fusszeile.
 // Haekchen aus den Checkins (fest), Noten 1:1 aus AusbilderPro, gelbe Felder editierbar.
+// Vom Anwesenheitslisten-Popup aufgerufen: Innung dauerhaft an der Kursart merken
+function vpSpeichereInnung(lgartId, text){
+  if(!lgartId) return;
+  const lg=_lehrgangsarten.find(l=>l.id===lgartId);
+  if(!lg || (lg.innung||'')===text) return;
+  db.collection('shared').doc('kursSettings').collection('lehrgangsarten').doc(lgartId).update({innung:text}).then(()=>{
+    lg.innung=text; toast('Innung für '+(lg.name||'Kursart')+' gespeichert – künftige Listen füllen sie automatisch');
+  }).catch(()=>{});
+}
 function generateAnwListe(){
   if(!_selectedKursId){toast('Kein Kurs gewählt','bad');return;}
   const kurs=_kurse.find(k=>k.id===_selectedKursId);
@@ -7104,8 +7114,9 @@ function generateAnwListe(){
       }
       return '';
     };
-    const lj={}; tns.forEach(t=>{ if(t.ausbjahr) lj[t.ausbjahr]=(lj[t.ausbjahr]||0)+1; });
-    const ausbjahr=Object.entries(lj).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    // Build 385: Innung haengt am Gewerk - an der Kursart gespeichert, einmal eintippen genuegt
+    const lgart=_lehrgangsarten.find(l=>l.id===kurs.lehrgangsartId);
+    const innungVor=(lgart&&lgart.innung)||'';
     const kuerzel=(n=>{ const m=[]; for(const t of String(n||'').split(/\s+/)){ if(/^[A-ZÄÖÜ0-9\/\-\.]+$/.test(t)) m.push(t); else break; } return m.join(' ')||n; })(kurs.lehrgangsart||kurs.name||'');
     const heute=new Date().toLocaleDateString('de-DE');
     const ED=' contenteditable="true" class="ed"';
@@ -7152,11 +7163,12 @@ function generateAnwListe(){
       +'@media print{.np{display:none}.ed{background:#fff!important}}'
       +'</style></head><body>'
       +'<button class="np" onclick="window.print()" style="padding:8px 16px;font-size:11pt;cursor:pointer">🖨 Drucken</button>'
+      +'<script>document.addEventListener("blur",function(e){if(e.target&&e.target.id==="innungFeld"){try{window.opener&&window.opener.vpSpeichereInnung&&window.opener.vpSpeichereInnung('+JSON.stringify(kurs.lehrgangsartId||'')+',e.target.textContent.trim());}catch(x){}}},true);<\/script>'
       +'<div class="tit"><h1>Anwesenheitsliste</h1><div class="dat">'+heute+'</div></div>'
       +'<div class="kopf">'
       +'<div>Lehrgang: <b>'+esc(kuerzel)+'</b><br>&nbsp;&nbsp;&nbsp;&nbsp;vom: <b>'+fmtDE(kurs.von)+'</b> &nbsp; bis: <b>'+fmtDE(kurs.bis)+'</b></div>'
-      +'<div>Innung: <b><span'+ED+' style="min-width:60mm">&nbsp;</span></b><br>Leiter: <b>'+esc(kurs.ausbilderName||'')+'</b></div>'
-      +'<div>Ausbildungsjahr: <b>'+esc(String(ausbjahr))+'</b></div>'
+      +'<div>Innung: <b><span id="innungFeld"'+ED+' title="Einmal eintippen genügt: Die Innung wird für diese Kursart gespeichert und bei allen künftigen Anwesenheitslisten dieses Gewerks automatisch eingetragen" style="min-width:60mm">'+(innungVor?esc(innungVor):'&nbsp;')+'</span></b><br>Leiter: <b>'+esc(kurs.ausbilderName||'')+'</b></div>'
+      +'<div>Ausbildungsjahr: <b><span'+ED+' title="Bitte von Hand eintragen" style="min-width:10mm">&nbsp;</span></b></div>'
       +'</div>'
       +'<table><thead>'
       +'<tr><th class="lfd" rowspan="1" style="border-bottom:none">Lfd.</th><th class="tn" rowspan="2" style="vertical-align:top">Teilnehmer</th><th class="bt" rowspan="2" style="vertical-align:top">Ausbildungsbetrieb</th>'
