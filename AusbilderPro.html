@@ -1967,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v851';
+const APP_VERSION = 'v852';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1982,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v852', d:'27.08.2026', items:['🔧 Live-Sync greift jetzt wirklich: Der Empfänger arbeitete auf einem veralteten Kurs-Objekt (wurde beim Cloud-Laden ersetzt) – er holt sich den Kurs nun bei jedem Ereignis frisch']},
   {v:'v851', d:'27.08.2026', items:['🔧 Live-Sync: Schreibfehler behoben (Tages-Einträge wurden beim Übertragen versehentlich geleert); Fehler beim Live-Empfang/Übernehmen erscheinen jetzt als rote Meldung statt still zu verschwinden']},
   {v:'v850', d:'27.08.2026', items:['🔧 Live-Sync: kein Konflikt-Neuladen und keine „Ungespeicherte Änderungen"-Meldung mehr, wenn zwei eigene Fenster parallel arbeiten – im Live-Betrieb wird die Koffer-Version still fortgeschrieben (Kursdaten sind ohnehin live gesichert)']},
   {v:'v849', d:'27.08.2026', items:['🔧 Live-Sync-Schalter: Konto-Erkennung korrigiert (falsche Variable) – jetzt sichtbar für Admin- und Testkonto']},
@@ -14227,21 +14228,28 @@ function _liveStart(inst){
         _live.shadow.sitz=JSON.stringify(sitz);
         _live.shadow.anw=anw;
         _live.ready=true;
-        _liveListen(inst);
+        _liveListen();
         toast('⚡ Kurs für Live-Sync vorbereitet');
       }).catch(err=>{ toast('Live-Sync: '+err.message,'bad'); _liveStop(); });
     } else {
       // Kurs laeuft schon live -> Cloud-Zettel fuehren, lokalen Stand angleichen
-      _liveApplyDocs(inst, docs, true);
+      const frisch=curInst();
+      _liveApplyDocs((frisch&&frisch.sharedKursId===inst.sharedKursId)?frisch:inst, docs, true);
       _live.ready=true;
-      _liveListen(inst);
+      _liveListen();
     }
   }).catch(err=>{ toast('Live-Sync: '+err.message,'bad'); _liveStop(); });
 }
-function _liveListen(inst){
-  const ref=_liveKursRef(inst);
+function _liveListen(){
+  // v852: KEINE inst-Referenz im Closure halten - das Cloud-Laden ersetzt das komplette
+  // S-Objekt kurz nach dem Start, die alte Referenz waere verwaist (Toast ohne Wirkung).
+  // Stattdessen bei jedem Ereignis frisch via curInst() holen und Kurs-ID abgleichen.
+  const kid=_live.kursId;
+  const ref=_db.collection('shared').doc('kurse').collection('list').doc(kid).collection('live');
   _live.unsub=ref.onSnapshot(snap=>{
     if(!_live.ready) return;
+    const inst=curInst();
+    if(!inst||inst.sharedKursId!==kid) return;
     const docs={}; snap.forEach(d=>docs[d.id]=d.data());
     _liveApplyDocs(inst, docs, false);
   }, err=>{ toast('⚡ Live-Empfang gestört: '+err.message,'bad'); console.warn('live listen',err); });
