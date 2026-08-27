@@ -1966,7 +1966,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v844';
+const APP_VERSION = 'v845';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1981,6 +1981,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v845', d:'27.08.2026', items:['🔧 Nachbesserung zum Auto-Nachzug: Häkchen erscheinen jetzt auch auf den Sitzkarten (beide Speicherorte werden gepflegt); halb nachgetragene Tage aus v844 werden automatisch repariert']},
   {v:'v844', d:'27.08.2026', items:['📥 Anwesenheit füllt sich jetzt automatisch nach: Beim Öffnen eines Lehrgangs werden fehlende Häkchen vergangener Kurstage aus den Azubi-Check-ins ergänzt (vorhandene Einträge, auch Fehlzeit/Krank, bleiben unberührt). Behebt verlorene Tage, wenn die App während der Scans zu war']},
   {v:'v843', d:'26.08.2026', items:['🛟 Neuer Rettungsanker unter „Mehr": „Cloud-Vorgänger wiederherstellen" zeigt den beim Sitzungsbeginn gesicherten Stand (Lehrgänge/Sitzplätze/Anwesenheit im Vergleich) und stellt ihn auf Wunsch wieder her – der aktuelle Stand wird dabei zusätzlich gesichert, nichts geht endgültig verloren']},
   {v:'v842', d:'25.08.2026', items:['🔧 Badge-Sync („selbst beigetreten"/„Kurs abgelehnt") läuft jetzt auch direkt beim App-Start – nicht mehr nur beim Lehrgang-Wechsel']},
@@ -14087,28 +14088,40 @@ function _autoNachtragCheckins(inst){
           if(iVon&&c.datum<iVon) return; if(iBis&&c.datum>iBis) return;
           (je[c.tnId]=je[c.tnId]||new Set()).add(c.datum);
         });
-        const fehl=[]; const tageSet=new Set();
+        // v845: BEIDE Speicher pflegen - Tagesraster (inst.attendance) UND Karten-Dots
+        // (seat.attendance), genau wie der Handklick. Zusaetzlich Ruecklauf: Raster hat 'P',
+        // aber Dot fehlt (halber Nachtrag aus v844) -> Dot ergaenzen.
+        const fehl=[]; const tageSet=new Set(); let geaendert=false;
         Object.entries(inst.seats||{}).forEach(([sid,d])=>{
           if(!d||!d.poolTnId||!d.name) return;
           const tage=je[d.poolTnId]; if(!tage) return;
           tage.forEach(datum=>{
             const quick=(inst.attendance&&inst.attendance[datum])?inst.attendance[datum][sid]:undefined;
+            const dot=(d.attendance||[]).some(e=>e&&e.date===datum);
+            if(quick==='P' && !dot){
+              if(!d.attendance) d.attendance=[];
+              d.attendance.push({type:'present',date:datum});
+              geaendert=true; tageSet.add(datum);
+              return;
+            }
             if(quick) return;
-            if((d.attendance||[]).some(e=>e&&e.date===datum)) return;
-            fehl.push({sid,datum}); tageSet.add(datum);
+            if(dot) return;
+            fehl.push({sid,datum,seat:d}); tageSet.add(datum);
           });
         });
-        if(!fehl.length) return;
+        if(!fehl.length && !geaendert) return;
         if(!inst.attendance) inst.attendance={};
         fehl.forEach(f=>{
           if(!inst.attendance[f.datum]) inst.attendance[f.datum]={};
           inst.attendance[f.datum][f.sid]='P';
+          if(!f.seat.attendance) f.seat.attendance=[];
+          if(!f.seat.attendance.some(e=>e&&e.date===f.datum)) f.seat.attendance.push({type:'present',date:f.datum});
         });
         persist();
         try{ renderSeats(); renderQuickAttCount(); }catch(e){}
         [...new Set(fehl.map(f=>f.sid))].forEach(sid=>{ try{ syncAttendanceToFirestore(sid); }catch(e){} });
         const tage=[...tageSet].sort().map(d=>d.slice(8,10)+'.'+d.slice(5,7)+'.').join(', ');
-        toast('📥 '+fehl.length+' Anwesenheits-Einträge aus Azubi-Scans nachgetragen ('+tage+')');
+        toast('📥 Anwesenheit aus Azubi-Scans ergänzt ('+tage+')');
       }).catch(()=>{});
   }catch(e){}
 }
