@@ -1967,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v852';
+const APP_VERSION = 'v853';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1982,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v853', d:'27.08.2026', items:['🔧 Live-Sync: eingehende Anwesenheit erscheint jetzt auch auf den Sitzkarten (beide Speicherorte werden gepflegt – gleiche Lektion wie v845)']},
   {v:'v852', d:'27.08.2026', items:['🔧 Live-Sync greift jetzt wirklich: Der Empfänger arbeitete auf einem veralteten Kurs-Objekt (wurde beim Cloud-Laden ersetzt) – er holt sich den Kurs nun bei jedem Ereignis frisch']},
   {v:'v851', d:'27.08.2026', items:['🔧 Live-Sync: Schreibfehler behoben (Tages-Einträge wurden beim Übertragen versehentlich geleert); Fehler beim Live-Empfang/Übernehmen erscheinen jetzt als rote Meldung statt still zu verschwinden']},
   {v:'v850', d:'27.08.2026', items:['🔧 Live-Sync: kein Konflikt-Neuladen und keine „Ungespeicherte Änderungen"-Meldung mehr, wenn zwei eigene Fenster parallel arbeiten – im Live-Betrieb wird die Koffer-Version still fortgeschrieben (Kursdaten sind ohnehin live gesichert)']},
@@ -14298,14 +14299,22 @@ function _liveApplyDocs(inst, docs, initial){
       const sidVon={}; Object.entries(inst.seats||{}).forEach(([sid,x])=>{ if(x&&x.poolTnId) sidVon[x.poolTnId]=sid; });
       if(!inst.attendance) inst.attendance={};
       if(!inst.attendance[datum]) inst.attendance[datum]={};
+      // v853: BEIDE Speicher pflegen - Tagesraster UND Karten-Dots (seat.attendance),
+      // sonst aendert sich das Raster, aber die Sitzkarten zeigen nichts (siehe v845).
+      const _dotSet=(sid,code)=>{
+        const d=(inst.seats||{})[sid]; if(!d) return;
+        if(!d.attendance) d.attendance=[];
+        d.attendance=d.attendance.filter(e=>!(e&&e.date===datum));
+        if(code==='P') d.attendance.push({date:datum,type:'present',note:'per Live-Sync',lateMins:0,earlyMins:0});
+      };
       Object.entries(eintraege).forEach(([tnId,code])=>{
         const sid=sidVon[tnId]; if(!sid) return;
-        if(inst.attendance[datum][sid]!==code){ inst.attendance[datum][sid]=code; changed=true; }
+        if(inst.attendance[datum][sid]!==code){ inst.attendance[datum][sid]=code; _dotSet(sid,code); changed=true; }
       });
       Object.keys(alt).forEach(tnId=>{
         if(eintraege[tnId]) return;
         const sid=sidVon[tnId]; if(!sid) return;
-        if(inst.attendance[datum][sid]){ delete inst.attendance[datum][sid]; changed=true; }
+        if(inst.attendance[datum][sid]){ delete inst.attendance[datum][sid]; _dotSet(sid,null); changed=true; }
       });
       _live.shadow.anw[datum]=Object.assign({},eintraege);
     });
