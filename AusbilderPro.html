@@ -1967,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v847';
+const APP_VERSION = 'v848';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1982,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v848', d:'27.08.2026', items:['🔧 Live-Sync-Schalter erscheint jetzt zuverlässig im Mehr-Menü (Prüfung beim Menü-Öffnen; gmail/googlemail-Schreibweise egal)']},
   {v:'v847', d:'27.08.2026', items:['⚡ Live-Sync (Beta, nur Admin/Testkonto, je Gerät zuschaltbar): Sitzplan und Anwesenheit laufen als Live-Dokumente über den Kurs – mehrere PCs gleichzeitig, Änderungen erscheinen überall in Sekunden. Doppelte Buchführung: der klassische Speicherweg läuft parallel weiter, Schalter jederzeit umlegbar. Im Live-Betrieb entfällt der Konflikt-Dialog (neuester Stand gewinnt automatisch)']},
   {v:'v846', d:'27.08.2026', items:['🔧 Nachgetragene Anwesenheit trägt jetzt den Original-Zeitstempel des Azubi-Scans (inkl. Verspätungsminuten und QR-Kennung, markiert als „nachgetragen")']},
   {v:'v845', d:'27.08.2026', items:['🔧 Nachbesserung zum Auto-Nachzug: Häkchen erscheinen jetzt auch auf den Sitzkarten (beide Speicherorte werden gepflegt); halb nachgetragene Tage aus v844 werden automatisch repariert']},
@@ -13847,6 +13848,7 @@ function goAsAusbilder(){
 }
 
 function toggleHdrMenu(){
+  try{ if(typeof liveSyncMenuUpdate==='function') liveSyncMenuUpdate(); }catch(e){}
   const m=document.getElementById('hdrMenu');
   const open=m.style.display==='flex';
   m.style.display=open?'none':'flex';
@@ -14144,7 +14146,7 @@ function _autoNachtragCheckins(inst){
 //   live/anw_<datum>         {eintraege:{tnId:code}, ts}
 // Schreiben: Diff gegen Schatten in persist() (debounced) - trifft ALLE Klickwege zentral.
 // Lesen: onSnapshot auf die live-Collection des offenen Kurses; Echo-Schutz via Schatten.
-const _LIVE_ADMINS=['s.mohr@ish.de','stefan.mohr78+ausbilder@googlemail.com'];
+const _LIVE_ADMINS=['s.mohr@ish.de','stefan.mohr78+ausbilder@googlemail.com','stefan.mohr78+ausbilder@gmail.com'];
 let _live={kursId:null, unsub:null, shadow:{sitz:'', anw:{}}, ready:false, applying:false, timer:null};
 function _liveSyncAn(){ try{ return localStorage.getItem(_lsKey('ap_livesync'))==='1' && !_demoMode && !!_db; }catch(e){ return false; } }
 function liveSyncMenuUpdate(){
