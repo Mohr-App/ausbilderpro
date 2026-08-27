@@ -1967,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v856';
+const APP_VERSION = 'v858';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1982,8 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v858', d:'27.08.2026', items:['⚡ Globaler Not-Aus: Der Live-Sync-Schalter (nur Admin) wirkt jetzt zentral auf ALLE Ausbilder – Ausschalten stellt alle offenen Apps binnen Sekunden auf den klassischen Betrieb um, ohne Datenverlust']},
+  {v:'v857', d:'27.08.2026', items:['⚡ Live-Sync ist jetzt STANDARD für alle Ausbilder: Sitzplan und Anwesenheit laufen live über den Kurs – mehrere PCs gleichzeitig, ohne dass jemand etwas umstellen muss. Jeder Kurs wird beim ersten Öffnen automatisch vorbereitet. (Admin behält ein Not-Aus je Gerät)']},
   {v:'v856', d:'27.08.2026', items:['⚡ Live-Sync überträgt jetzt auch die Anwesenheits-Details: Zu-spät-/Früher-Minuten, Krank/Berufsschule und Notizen wandern live mit – auch das nachträgliche Ändern oder Entfernen']},
   {v:'v855', d:'27.08.2026', items:['⚡ Live-Sync zeigt jetzt seinen echten Zustand: Schalter-Text „AN · ✓ verbunden" bzw. Warnung mit Grund; Toast beim Verbinden; Warnung, wenn der offene Kurs nicht mit VerwaltungPro verknüpft ist']},
   {v:'v854', d:'27.08.2026', items:['🔧 Live-Sync: zwei Wurzeln behoben – Dauer-„aktualisiert"-Meldung durch Scheindiff (Feldreihenfolge) beseitigt, und manuell belegte Sitze ohne Pool-Verknüpfung werden jetzt mitsynchronisiert']},
@@ -12601,6 +12603,7 @@ function loadPool(){
   setTimeout(()=>{try{_autoNachtragCheckins(curInst());}catch(e){}}, 1500);
   setTimeout(()=>{try{_liveStart(curInst());}catch(e){}}, 1600);
   setTimeout(()=>{try{liveSyncMenuUpdate();}catch(e){}}, 800);
+  setTimeout(()=>{try{_liveGlobalWatch();}catch(e){}}, 500);
   if(_demoMode) return;
   // Alten Listener abmelden
   if(_poolUnsub){_poolUnsub();_poolUnsub=null;}
@@ -14163,22 +14166,37 @@ function _autoNachtragCheckins(inst){
 // Lesen: onSnapshot auf die live-Collection des offenen Kurses; Echo-Schutz via Schatten.
 const _LIVE_ADMINS=['s.mohr@ish.de','stefan.mohr78+ausbilder@googlemail.com','stefan.mohr78+ausbilder@gmail.com'];
 let _live={kursId:null, unsub:null, shadow:{sitz:'', anw:{}}, ready:false, applying:false, timer:null, status:'aus'};
-function _liveSyncAn(){ try{ return localStorage.getItem(_lsKey('ap_livesync'))==='1' && !_demoMode && !!_db; }catch(e){ return false; } }
+// v858: Live-Sync ist STANDARD fuer alle; das Not-Aus ist GLOBAL (Cloud-Flag
+// shared/appConfig.liveSync) und wirkt binnen Sekunden auf alle offenen Apps.
+function _liveSyncAn(){ return window._liveGlobalAn!==false && !_demoMode && !!_db; }
+let _liveGlobalUnsub=null;
+function _liveGlobalWatch(){
+  if(_liveGlobalUnsub||!_db) return;
+  _liveGlobalUnsub=_db.collection('shared').doc('appConfig').onSnapshot(d=>{
+    const vorher=window._liveGlobalAn;
+    window._liveGlobalAn=!(d.exists && d.data().liveSync===false);
+    if(vorher===window._liveGlobalAn) return;
+    liveSyncMenuUpdate();
+    if(!window._liveGlobalAn){ _liveStop(); _live.status='⛔ global deaktiviert'; toast('⚡ Live-Sync wurde zentral deaktiviert – App läuft klassisch weiter'); }
+    else { toast('⚡ Live-Sync wurde zentral aktiviert'); _liveStart(curInst()); }
+  }, ()=>{ window._liveGlobalAn=true; });
+}
 function liveSyncMenuUpdate(){
   const b=document.getElementById('liveSyncBtn'); if(!b) return;
   const darf=_LIVE_ADMINS.includes(((_auth&&_auth.currentUser&&_auth.currentUser.email)||'').toLowerCase());
   b.style.display=darf?'':'none';
-  b.textContent='⚡ Live-Sync (Beta): '+(_liveSyncAn()?('AN · '+(_live.status||'startet…')):'AUS');
+  b.textContent='⚡ Live-Sync GLOBAL '+(_liveSyncAn()?('AN · '+(_live.status||'startet…')):'⛔ AUS für alle')+' – klicken zum Umschalten';
   if(_liveSyncAn()){ b.style.background='rgba(5,150,105,.1)'; b.style.color='#065f46'; }
 }
 function liveSyncToggle(){
-  try{
-    const neu=_liveSyncAn()?'0':'1';
-    localStorage.setItem(_lsKey('ap_livesync'), neu);
-    liveSyncMenuUpdate();
-    if(neu==='1'){ toast('⚡ Live-Sync AN (nur dieses Gerät)'); _liveStart(curInst()); }
-    else { toast('Live-Sync AUS – App läuft klassisch weiter'); _liveStop(); }
-  }catch(e){}
+  // GLOBALER Schalter (nur Admin/Testkonto sichtbar): schreibt das Cloud-Flag,
+  // alle offenen Apps reagieren live darauf.
+  if(!_db) return;
+  const neu=!_liveSyncAn();
+  if(!neu && !confirm('⚡ Live-Sync für ALLE Ausbilder ausschalten?\n\nAlle Apps wechseln sofort in den klassischen Betrieb (keine Daten gehen verloren – doppelte Buchführung).')) return;
+  _db.collection('shared').doc('appConfig').set({liveSync:neu, geaendertAm:Date.now(), von:(_auth&&_auth.currentUser&&_auth.currentUser.email)||''},{merge:true})
+    .then(()=>{ /* Rueckmeldung kommt ueber den Watcher */ })
+    .catch(err=>toast('Not-Aus fehlgeschlagen: '+err.message,'bad'));
 }
 function _liveStop(){
   if(_live.unsub){ try{_live.unsub();}catch(e){} }
@@ -14261,7 +14279,7 @@ function _liveStart(inst){
       _live.ready=true;
       _live.status='✓ verbunden';
       _liveListen();
-      toast('⚡ Live-Sync verbunden');
+      if(!window._liveToastGezeigt){ window._liveToastGezeigt=true; toast('⚡ Live-Sync verbunden'); }
     }
   }).catch(err=>{ toast('Live-Sync: '+err.message,'bad'); _liveStop(); });
 }
