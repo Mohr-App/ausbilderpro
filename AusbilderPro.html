@@ -1967,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v853';
+const APP_VERSION = 'v854';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1982,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v854', d:'27.08.2026', items:['🔧 Live-Sync: zwei Wurzeln behoben – Dauer-„aktualisiert"-Meldung durch Scheindiff (Feldreihenfolge) beseitigt, und manuell belegte Sitze ohne Pool-Verknüpfung werden jetzt mitsynchronisiert']},
   {v:'v853', d:'27.08.2026', items:['🔧 Live-Sync: eingehende Anwesenheit erscheint jetzt auch auf den Sitzkarten (beide Speicherorte werden gepflegt – gleiche Lektion wie v845)']},
   {v:'v852', d:'27.08.2026', items:['🔧 Live-Sync greift jetzt wirklich: Der Empfänger arbeitete auf einem veralteten Kurs-Objekt (wurde beim Cloud-Laden ersetzt) – er holt sich den Kurs nun bei jedem Ereignis frisch']},
   {v:'v851', d:'27.08.2026', items:['🔧 Live-Sync: Schreibfehler behoben (Tages-Einträge wurden beim Übertragen versehentlich geleert); Fehler beim Live-Empfang/Übernehmen erscheinen jetzt als rote Meldung statt still zu verschwinden']},
@@ -14184,6 +14185,13 @@ function _liveStop(){
 function _liveKursRef(inst){
   return _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).collection('live');
 }
+// v854: kanonisches JSON (sortierte Schluessel) - Firestore liefert Felder in anderer
+// Reihenfolge zurueck, ein naiver Stringify-Vergleich meldete Dauer-Scheindiffs
+function _canon(x){
+  if(Array.isArray(x)) return '['+x.map(_canon).join(',')+']';
+  if(x&&typeof x==='object') return '{'+Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+_canon(x[k])).join(',')+'}';
+  return JSON.stringify(x===undefined?null:x);
+}
 function _liveSitzSnapshot(inst){
   // kompakter Sitzplan-Zettel aus dem lokalen Zustand
   const belegung={};
@@ -14201,8 +14209,10 @@ function _liveAnwSnapshot(inst){
   Object.entries(inst.attendance||{}).forEach(([datum,slots])=>{
     Object.entries(slots||{}).forEach(([sid,code])=>{
       const d=(inst.seats||{})[sid];
-      if(!d||!d.poolTnId||!code) return;
-      (out[datum]=out[datum]||{})[d.poolTnId]=code;
+      if(!d||!d.name||!code) return;
+      // v854: auch manuell belegte Sitze ohne Pool-TN syncen (Schluessel sid_<nr>)
+      const key=d.poolTnId||('sid_'+sid);
+      (out[datum]=out[datum]||{})[key]=code;
     });
   });
   return out;
@@ -14226,7 +14236,7 @@ function _liveStart(inst){
         batch.set(ref.doc('anw_'+datum), {eintraege, ts:Date.now()});
       });
       batch.commit().then(()=>{
-        _live.shadow.sitz=JSON.stringify(sitz);
+        _live.shadow.sitz=_canon(sitz);
         _live.shadow.anw=anw;
         _live.ready=true;
         _liveListen();
@@ -14263,7 +14273,7 @@ function _liveApplyDocs(inst, docs, initial){
     // 1) Sitzplan
     const sp=docs.sitzplan;
     if(sp && sp.belegung){
-      const neuJson=JSON.stringify({rows:sp.rows||[],belegung:sp.belegung||{}});
+      const neuJson=_canon({rows:sp.rows||[],belegung:sp.belegung||{}});
       if(neuJson!==_live.shadow.sitz){
         // tnId->sid Ziel und lokal
         const zielSid={}; Object.entries(sp.belegung).forEach(([sid,b])=>{ if(b&&b.tnId) zielSid[b.tnId]=sid; });
@@ -14297,6 +14307,7 @@ function _liveApplyDocs(inst, docs, initial){
       const eintraege=d.eintraege||{};
       const alt=_live.shadow.anw[datum]||{};
       const sidVon={}; Object.entries(inst.seats||{}).forEach(([sid,x])=>{ if(x&&x.poolTnId) sidVon[x.poolTnId]=sid; });
+      const _sidAus=key=>{ if(key&&key.startsWith('sid_')){ const sid=key.slice(4); return (inst.seats||{})[sid]?sid:null; } return sidVon[key]||null; };
       if(!inst.attendance) inst.attendance={};
       if(!inst.attendance[datum]) inst.attendance[datum]={};
       // v853: BEIDE Speicher pflegen - Tagesraster UND Karten-Dots (seat.attendance),
@@ -14308,12 +14319,12 @@ function _liveApplyDocs(inst, docs, initial){
         if(code==='P') d.attendance.push({date:datum,type:'present',note:'per Live-Sync',lateMins:0,earlyMins:0});
       };
       Object.entries(eintraege).forEach(([tnId,code])=>{
-        const sid=sidVon[tnId]; if(!sid) return;
+        const sid=_sidAus(tnId); if(!sid) return;
         if(inst.attendance[datum][sid]!==code){ inst.attendance[datum][sid]=code; _dotSet(sid,code); changed=true; }
       });
       Object.keys(alt).forEach(tnId=>{
         if(eintraege[tnId]) return;
-        const sid=sidVon[tnId]; if(!sid) return;
+        const sid=_sidAus(tnId); if(!sid) return;
         if(inst.attendance[datum][sid]){ delete inst.attendance[datum][sid]; _dotSet(sid,null); changed=true; }
       });
       _live.shadow.anw[datum]=Object.assign({},eintraege);
@@ -14339,7 +14350,7 @@ function _liveDiffPush(){
     const ref=_liveKursRef(inst);
     // Sitzplan als Ganzes vergleichen (klein, robust)
     const sitz=_liveSitzSnapshot(inst);
-    const sitzJson=JSON.stringify(sitz);
+    const sitzJson=_canon(sitz);
     if(sitzJson!==_live.shadow.sitz){
       ref.doc('sitzplan').set(Object.assign({ts:Date.now()},sitz)).then(()=>{ _live.shadow.sitz=sitzJson; }).catch(()=>{});
     }
