@@ -1424,6 +1424,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <div style="font-size:.58rem;color:var(--mu);margin-top:4px">Beim ersten Mal festlegen. Danach gemerkt — Feld dann leer lassen.</div>
   </div>
   <div id="apSigPinErr" style="font-size:.65rem;color:#dc2626;margin-top:4px;display:none"></div>
+  <div style="font-size:.6rem;color:var(--mu);margin-top:6px;line-height:1.5">PIN vergessen? Die <b>Verwaltung</b> kann Unterschrift &amp; PIN zurücksetzen – Unterschrift und Stempel müssen danach <b>neu eingegeben</b> werden.</div>
   <button class="bsave" onclick="saveAusbilderSigStempel()" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#7c3aed,#9333ea)" title="Verschluesselt speichern">💾 Speichern</button>
 </div>
 </div>
@@ -1967,7 +1968,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v858';
+const APP_VERSION = 'v859';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1983,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v859', d:'27.08.2026', items:['🔑 PIN vergessen: Die Verwaltung kann Unterschrift & PIN zurücksetzen (Knopf in VerwaltungPro) – die App führt den Reset beim nächsten Start aus; Unterschrift und Stempel müssen danach neu eingegeben werden. Hinweis dazu unter Mein Profil']},
   {v:'v858', d:'27.08.2026', items:['⚡ Globaler Not-Aus: Der Live-Sync-Schalter (nur Admin) wirkt jetzt zentral auf ALLE Ausbilder – Ausschalten stellt alle offenen Apps binnen Sekunden auf den klassischen Betrieb um, ohne Datenverlust']},
   {v:'v857', d:'27.08.2026', items:['⚡ Live-Sync ist jetzt STANDARD für alle Ausbilder: Sitzplan und Anwesenheit laufen live über den Kurs – mehrere PCs gleichzeitig, ohne dass jemand etwas umstellen muss. Jeder Kurs wird beim ersten Öffnen automatisch vorbereitet. (Admin behält ein Not-Aus je Gerät)']},
   {v:'v856', d:'27.08.2026', items:['⚡ Live-Sync überträgt jetzt auch die Anwesenheits-Details: Zu-spät-/Früher-Minuten, Krank/Berufsschule und Notizen wandern live mit – auch das nachträgliche Ändern oder Entfernen']},
@@ -7748,6 +7750,31 @@ async function apSigEnterEdit(){
   _apSigEditMode=true;
   _updateSigStempelUI();
 }
+// v859: PIN vergessen - ehrlicher Weg: Die Unterschrift ist mit der PIN AES-verschluesselt,
+// ohne PIN gibt es keine Wiederherstellung. Zuruecksetzen loescht Unterschrift + Stempel
+// (lokal und Cloud), danach neu zeichnen mit neuer PIN.
+function _pruefeSigReset(){
+  // v859: Reset nur durch die Verwaltung - VP setzt ein Flag am Ausbilder-Eintrag,
+  // die App fuehrt es beim naechsten Start einmalig aus (Ausfuehrungs-Merker lokal).
+  try{
+    if(!_db||!_auth||!_auth.currentUser) return;
+    const mail=(_auth.currentUser.email||'').toLowerCase();
+    _db.collection('shared').doc('kursSettings').collection('ausbilder')
+      .where('email','==',mail).get().then(snap=>{
+        snap.forEach(doc=>{
+          const d=doc.data()||{};
+          if(!d.sigResetAngefordert) return;
+          const done=parseInt(localStorage.getItem(_lsKey('ap_sigResetDone'))||'0');
+          if(d.sigResetAngefordert<=done) return;
+          _setSigStempelStore({});
+          _apSigDataUrl=''; _apStempelDataUrl=''; _apSigPinSession=''; _apSigVec=null; _apSigEditMode=false;
+          localStorage.setItem(_lsKey('ap_sigResetDone'), String(d.sigResetAngefordert));
+          try{ if(typeof _renderSigStempelStatus==='function') _renderSigStempelStatus(); }catch(e){}
+          alert('🔑 Die Verwaltung hat deine Unterschrift und PIN zurückgesetzt.\n\nBitte unter „Mehr → Mein Profil" Unterschrift und Stempel NEU eingeben und eine neue PIN vergeben.');
+        });
+      }).catch(()=>{});
+  }catch(e){}
+}
 function _getSigStempelStore(){try{return JSON.parse(localStorage.getItem(_lsKey('sigStempel'))||'{}');}catch(e){return{};}}
 function _setSigStempelStoreLocalOnly(obj){localStorage.setItem(_lsKey('sigStempel'),JSON.stringify(obj));}
 function _setSigStempelStore(obj){
@@ -12604,6 +12631,7 @@ function loadPool(){
   setTimeout(()=>{try{_liveStart(curInst());}catch(e){}}, 1600);
   setTimeout(()=>{try{liveSyncMenuUpdate();}catch(e){}}, 800);
   setTimeout(()=>{try{_liveGlobalWatch();}catch(e){}}, 500);
+  setTimeout(()=>{try{_pruefeSigReset();}catch(e){}}, 2500);
   if(_demoMode) return;
   // Alten Listener abmelden
   if(_poolUnsub){_poolUnsub();_poolUnsub=null;}

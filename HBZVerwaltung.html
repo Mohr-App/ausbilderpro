@@ -1755,10 +1755,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 386';
+const APP_VERSION = 'Build 387';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 387', d:'27.08.2026', items:['🔑 Einstellungen → Ausbilder: „PIN-Reset" setzt Unterschrift, Stempel und PIN eines Ausbilders zurück (mit deutlichem Hinweis: alles muss neu eingegeben werden) – ausgeführt wird der Reset beim nächsten Start seiner App']},
   {v:'Build 386', d:'27.08.2026', items:['🔧 Kursdetail zeigt jetzt auch TN, die dem Kurs als Folgekurs zugewiesen sind (Zuweisung über die Historie) – vorher stand am Kurs „10 TN", das Grid blieb aber leer']},
   {v:'Build 385', d:'26.08.2026', items:['🖨 Anwesenheitsliste: Ausbildungsjahr ist jetzt ein Ausfüllfeld; die Innung merkt sich das Blatt je Kursart – einmal eintippen, alle künftigen Listen dieses Gewerks füllen sie automatisch']},
   {v:'Build 384', d:'26.08.2026', items:['🖨 Anwesenheitsliste nachgebessert: FP/FT-Noten werden jetzt auch aus Extra-Notenspalten (per Label „…praxis"/„…theorie") gelesen; Spaltenköpfe „Lfd."/„FP"/„FT" nicht mehr abgeschnitten']},
@@ -4301,6 +4302,18 @@ function renderKursList(){
 // ════════════════════════════════════════════════
 
 // ── Ausbilder ─────────────────────────────────
+// Build 387: Unterschrift/PIN-Reset fuer einen Ausbilder anfordern. Die Unterschrift ist
+// mit der PIN verschluesselt - ein Reset LOESCHT sie (keine Wiederherstellung moeglich);
+// AusbilderPro fuehrt das Flag beim naechsten Start aus, der Ausbilder gibt alles neu ein.
+function vpSigReset(ausbId){
+  const a=_ausbilder.find(x=>x.id===ausbId); if(!a) return;
+  if(!a.email){ toast('Für '+(a.name||'?')+' ist keine Login-E-Mail hinterlegt','bad'); return; }
+  if(!confirm('🔑 Unterschrift & PIN von '+(a.name||'?')+' zurücksetzen?\n\nWICHTIG: Die gespeicherte Unterschrift und der Stempel werden gelöscht und können NICHT wiederhergestellt werden.\nDer Ausbilder muss Unterschrift und Stempel NEU eingeben und eine neue PIN vergeben.\n\nDer Reset wird beim nächsten Öffnen seiner App ausgeführt.')) return;
+  db.collection('shared').doc('kursSettings').collection('ausbilder').doc(ausbId)
+    .update({sigResetAngefordert:Date.now(), sigResetVon:_email||'admin'})
+    .then(()=>toast('🔑 Reset für '+(a.name||'?')+' vorgemerkt – wird beim nächsten App-Start ausgeführt'))
+    .catch(err=>toast('Fehler: '+err.message,'bad'));
+}
 function renderAusbListSettings(){
   const scCnt=document.getElementById('scCntAusb');if(scCnt)scCnt.textContent=_ausbilder.length;
   const el = document.getElementById('ausbListSettings');
@@ -4315,6 +4328,7 @@ function renderAusbListSettings(){
       +'<div class="settings-row-sub">'+(a.berufLabel||'')+(a.email?' · '+esc(a.email):'')+(a.tel?' · '+esc(a.tel):'')+'</div></div>'
       +'<div class="settings-row-actions">'
       +'<button class="s-act-btn" title="Bearbeiten" onclick="openEditAusbSettings(\'' + a.id + '\')">Bearbeiten</button>'
+      +'<button class="s-act-btn" title="Unterschrift, Stempel und PIN dieses Ausbilders zurücksetzen – er muss alles neu eingeben" style="color:#b45309;border-color:rgba(217,119,6,.35)" onclick="vpSigReset(\'' + a.id + '\')">🔑 PIN-Reset</button>'
       +'</div>';
     el.appendChild(row);
   });
