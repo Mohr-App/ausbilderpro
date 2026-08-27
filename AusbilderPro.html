@@ -1966,7 +1966,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v845';
+const APP_VERSION = 'v846';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1981,6 +1981,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v846', d:'27.08.2026', items:['🔧 Nachgetragene Anwesenheit trägt jetzt den Original-Zeitstempel des Azubi-Scans (inkl. Verspätungsminuten und QR-Kennung, markiert als „nachgetragen")']},
   {v:'v845', d:'27.08.2026', items:['🔧 Nachbesserung zum Auto-Nachzug: Häkchen erscheinen jetzt auch auf den Sitzkarten (beide Speicherorte werden gepflegt); halb nachgetragene Tage aus v844 werden automatisch repariert']},
   {v:'v844', d:'27.08.2026', items:['📥 Anwesenheit füllt sich jetzt automatisch nach: Beim Öffnen eines Lehrgangs werden fehlende Häkchen vergangener Kurstage aus den Azubi-Check-ins ergänzt (vorhandene Einträge, auch Fehlzeit/Krank, bleiben unberührt). Behebt verlorene Tage, wenn die App während der Scans zu war']},
   {v:'v843', d:'26.08.2026', items:['🛟 Neuer Rettungsanker unter „Mehr": „Cloud-Vorgänger wiederherstellen" zeigt den beim Sitzungsbeginn gesicherten Stand (Lehrgänge/Sitzplätze/Anwesenheit im Vergleich) und stellt ihn auf Wunsch wieder her – der aktuelle Stand wird dabei zusätzlich gesichert, nichts geht endgültig verloren']},
@@ -14083,10 +14084,10 @@ function _autoNachtragCheckins(inst){
     const iVon=(inst.von||inst.startDatum||''), iBis=(inst.bis||inst.endDatum||'');
     _db.collection('shared').doc('kurse').collection('list').doc(kid)
       .collection('checkins').get().then(snap=>{
-        const je={};
+        const je={};   // tnId -> {datum: zeit}
         snap.forEach(doc=>{ const c=doc.data(); if(!c||!c.tnId||!c.datum) return;
           if(iVon&&c.datum<iVon) return; if(iBis&&c.datum>iBis) return;
-          (je[c.tnId]=je[c.tnId]||new Set()).add(c.datum);
+          (je[c.tnId]=je[c.tnId]||{})[c.datum]=c.zeit||'';
         });
         // v845: BEIDE Speicher pflegen - Tagesraster (inst.attendance) UND Karten-Dots
         // (seat.attendance), genau wie der Handklick. Zusaetzlich Ruecklauf: Raster hat 'P',
@@ -14095,18 +14096,21 @@ function _autoNachtragCheckins(inst){
         Object.entries(inst.seats||{}).forEach(([sid,d])=>{
           if(!d||!d.poolTnId||!d.name) return;
           const tage=je[d.poolTnId]; if(!tage) return;
-          tage.forEach(datum=>{
+          Object.entries(tage).forEach(([datum,zeit])=>{
             const quick=(inst.attendance&&inst.attendance[datum])?inst.attendance[datum][sid]:undefined;
             const dot=(d.attendance||[]).some(e=>e&&e.date===datum);
+            // v846: gleiches Eintragsformat wie der Live-QR-Listener - mit Scan-Uhrzeit,
+            // Verspaetungsminuten und qr-Kennung, damit der Zeitstempel ueberall sichtbar ist
+            const eintrag=()=>({date:datum,type:'present',note:'per QR-Check-in'+(zeit?' '+zeit:'')+' (nachgetragen)',lateMins:(zeit?_qrLateMins(zeit):0),earlyMins:0,qr:true});
             if(quick==='P' && !dot){
               if(!d.attendance) d.attendance=[];
-              d.attendance.push({type:'present',date:datum});
+              d.attendance.push(eintrag());
               geaendert=true; tageSet.add(datum);
               return;
             }
             if(quick) return;
             if(dot) return;
-            fehl.push({sid,datum,seat:d}); tageSet.add(datum);
+            fehl.push({sid,datum,seat:d,eintrag}); tageSet.add(datum);
           });
         });
         if(!fehl.length && !geaendert) return;
@@ -14115,7 +14119,7 @@ function _autoNachtragCheckins(inst){
           if(!inst.attendance[f.datum]) inst.attendance[f.datum]={};
           inst.attendance[f.datum][f.sid]='P';
           if(!f.seat.attendance) f.seat.attendance=[];
-          if(!f.seat.attendance.some(e=>e&&e.date===f.datum)) f.seat.attendance.push({type:'present',date:f.datum});
+          if(!f.seat.attendance.some(e=>e&&e.date===f.datum)) f.seat.attendance.push(f.eintrag());
         });
         persist();
         try{ renderSeats(); renderQuickAttCount(); }catch(e){}
