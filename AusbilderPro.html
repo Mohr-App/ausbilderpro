@@ -1967,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v848';
+const APP_VERSION = 'v849';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1982,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v849', d:'27.08.2026', items:['🔧 Live-Sync-Schalter: Konto-Erkennung korrigiert (falsche Variable) – jetzt sichtbar für Admin- und Testkonto']},
   {v:'v848', d:'27.08.2026', items:['🔧 Live-Sync-Schalter erscheint jetzt zuverlässig im Mehr-Menü (Prüfung beim Menü-Öffnen; gmail/googlemail-Schreibweise egal)']},
   {v:'v847', d:'27.08.2026', items:['⚡ Live-Sync (Beta, nur Admin/Testkonto, je Gerät zuschaltbar): Sitzplan und Anwesenheit laufen als Live-Dokumente über den Kurs – mehrere PCs gleichzeitig, Änderungen erscheinen überall in Sekunden. Doppelte Buchführung: der klassische Speicherweg läuft parallel weiter, Schalter jederzeit umlegbar. Im Live-Betrieb entfällt der Konflikt-Dialog (neuester Stand gewinnt automatisch)']},
   {v:'v846', d:'27.08.2026', items:['🔧 Nachgetragene Anwesenheit trägt jetzt den Original-Zeitstempel des Azubi-Scans (inkl. Verspätungsminuten und QR-Kennung, markiert als „nachgetragen")']},
@@ -14151,7 +14152,7 @@ let _live={kursId:null, unsub:null, shadow:{sitz:'', anw:{}}, ready:false, apply
 function _liveSyncAn(){ try{ return localStorage.getItem(_lsKey('ap_livesync'))==='1' && !_demoMode && !!_db; }catch(e){ return false; } }
 function liveSyncMenuUpdate(){
   const b=document.getElementById('liveSyncBtn'); if(!b) return;
-  const darf=_LIVE_ADMINS.includes((_email||'').toLowerCase());
+  const darf=_LIVE_ADMINS.includes(((_auth&&_auth.currentUser&&_auth.currentUser.email)||'').toLowerCase());
   b.style.display=darf?'':'none';
   b.textContent='⚡ Live-Sync (Beta): '+(_liveSyncAn()?'AN':'AUS');
   if(_liveSyncAn()){ b.style.background='rgba(5,150,105,.1)'; b.style.color='#065f46'; }
