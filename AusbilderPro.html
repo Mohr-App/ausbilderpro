@@ -924,6 +924,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="openTrash();closeHdrMenu()" style="width:100%;text-align:left" title="Gelöschte Lehrgänge wiederherstellen (30 Tage)">🗑 Papierkorb</button>
         <button class="tbtn" onclick="showDiagnose();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(59,130,246,.06);border-color:rgba(59,130,246,.2);color:#1e40af" title="Diagnose-Informationen anzeigen (bei Problemen)">🔍 Diagnose</button>
         <button class="tbtn" onclick="zeigeCloudVorgaenger();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(217,119,6,.06);border-color:rgba(217,119,6,.25);color:#92400e" title="Den beim letzten Sitzungsbeginn gesicherten Cloud-Stand ansehen und bei Datenverlust wiederherstellen">🛟 Cloud-Vorgänger wiederherstellen</button>
+        <button class="tbtn" id="liveSyncBtn" onclick="liveSyncToggle();closeHdrMenu()" style="width:100%;text-align:left;display:none;background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.25);color:#1e40af" title="BETA: Sitzplan und Anwesenheit laufen live über den Kurs – mehrere PCs gleichzeitig möglich. Nur auf diesem Gerät, jederzeit umschaltbar (doppelte Buchführung).">⚡ Live-Sync (Beta): AUS</button>
         <button class="tbtn" onclick="appReset();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#991b1b" title="App-Cache und alte lokale Dateien zurücksetzen (bei Problemen)">🔄 App zurücksetzen</button>
         <button class="tbtn" id="hdrChatSweepBtn" onclick="openChatSweep();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:#6d28d9;display:none" title="Alte Chat-Nachrichten manuell entfernen (Admin/DSGVO)">🧹 Chat-Bereinigung</button>
         <button class="tbtn" onclick="recoverOrphanSeats();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.2);color:#4338ca" title="TN, die direkt am Sitzplatz eingegeben wurden (statt über +TN), nachträglich in globalTN + Kurs-Liste anlegen">🔗 Verwaiste Sitze nachtragen</button>
@@ -1966,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v846';
+const APP_VERSION = 'v847';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1981,6 +1982,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v847', d:'27.08.2026', items:['⚡ Live-Sync (Beta, nur Admin/Testkonto, je Gerät zuschaltbar): Sitzplan und Anwesenheit laufen als Live-Dokumente über den Kurs – mehrere PCs gleichzeitig, Änderungen erscheinen überall in Sekunden. Doppelte Buchführung: der klassische Speicherweg läuft parallel weiter, Schalter jederzeit umlegbar. Im Live-Betrieb entfällt der Konflikt-Dialog (neuester Stand gewinnt automatisch)']},
   {v:'v846', d:'27.08.2026', items:['🔧 Nachgetragene Anwesenheit trägt jetzt den Original-Zeitstempel des Azubi-Scans (inkl. Verspätungsminuten und QR-Kennung, markiert als „nachgetragen")']},
   {v:'v845', d:'27.08.2026', items:['🔧 Nachbesserung zum Auto-Nachzug: Häkchen erscheinen jetzt auch auf den Sitzkarten (beide Speicherorte werden gepflegt); halb nachgetragene Tage aus v844 werden automatisch repariert']},
   {v:'v844', d:'27.08.2026', items:['📥 Anwesenheit füllt sich jetzt automatisch nach: Beim Öffnen eines Lehrgangs werden fehlende Häkchen vergangener Kurstage aus den Azubi-Check-ins ergänzt (vorhandene Einträge, auch Fehlzeit/Krank, bleiben unberührt). Behebt verlorene Tage, wenn die App während der Scans zu war']},
@@ -2284,6 +2286,7 @@ function persist(){
   // Anmeldung und Ladeende griff der Schutz also nicht, und ein persist() haette den
   // alten localStorage-Stand in die Cloud geschrieben.
   if(!_fbUid || _dataOwner !== _fbUid) return;
+  try{ if(typeof _liveDiffDebounced==='function') _liveDiffDebounced(); }catch(e){}
   localStorage.setItem(_lsKey('ap_v1'), JSON.stringify(S));
   // Merker: es gibt Aenderungen, die noch NICHT in der Cloud sind.
   // Synchron und unfehlbar - im Gegensatz zu jedem Netzwerkaufruf. Ueberlebt
@@ -2601,6 +2604,7 @@ function selInst(katId,instId){
   setTimeout(()=>{try{maybeKursCheck();}catch(e){}}, 900);
   setTimeout(()=>{try{_syncKursKenntnis(curInst());}catch(e){}}, 700);
   setTimeout(()=>{try{_autoNachtragCheckins(curInst());}catch(e){}}, 1000);
+  setTimeout(()=>{try{_liveStart(curInst());}catch(e){}}, 1100);
   // Cross-Ausbilder Noten-Sync: lade Noten anderer Ausbilder fuer diesen Kurs aus Firestore
   setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 150);
   // Self-Heal: Kurs in Cloud synchronisieren (falls Umbenennung nicht durchgekommen ist)
@@ -12586,6 +12590,8 @@ function loadPool(){
   // sonst behalten Sitze nach einem Reload mit bereits offenem Lehrgang veraltete Badges.
   setTimeout(()=>{try{_syncKursKenntnis(curInst());}catch(e){}}, 1200);
   setTimeout(()=>{try{_autoNachtragCheckins(curInst());}catch(e){}}, 1500);
+  setTimeout(()=>{try{_liveStart(curInst());}catch(e){}}, 1600);
+  setTimeout(()=>{try{liveSyncMenuUpdate();}catch(e){}}, 800);
   if(_demoMode) return;
   // Alten Listener abmelden
   if(_poolUnsub){_poolUnsub();_poolUnsub=null;}
@@ -14129,6 +14135,199 @@ function _autoNachtragCheckins(inst){
       }).catch(()=>{});
   }catch(e){}
 }
+// ═══════════════ v847: LIVE-SYNC (Beta) ═══════════════
+// Sitzplan + Anwesenheit als Live-Dokumente AM KURS (shared/kurse/list/{id}/live/...),
+// wie Checkins/Meldungen. Schalter nur je Geraet (localStorage) und nur fuer Admin/Test-
+// Konto sichtbar. Doppelte Buchfuehrung: jeder Klick schreibt weiterhin auch den alten
+// Koffer-Stand -> Schalter AUS = App laeuft exakt wie vorher, nichts fehlt.
+//   live/sitzplan            {rows:[{label,seats[]}], belegung:{sid:{tnId,name,...}}, ts}
+//   live/anw_<datum>         {eintraege:{tnId:code}, ts}
+// Schreiben: Diff gegen Schatten in persist() (debounced) - trifft ALLE Klickwege zentral.
+// Lesen: onSnapshot auf die live-Collection des offenen Kurses; Echo-Schutz via Schatten.
+const _LIVE_ADMINS=['s.mohr@ish.de','stefan.mohr78+ausbilder@googlemail.com'];
+let _live={kursId:null, unsub:null, shadow:{sitz:'', anw:{}}, ready:false, applying:false, timer:null};
+function _liveSyncAn(){ try{ return localStorage.getItem(_lsKey('ap_livesync'))==='1' && !_demoMode && !!_db; }catch(e){ return false; } }
+function liveSyncMenuUpdate(){
+  const b=document.getElementById('liveSyncBtn'); if(!b) return;
+  const darf=_LIVE_ADMINS.includes((_email||'').toLowerCase());
+  b.style.display=darf?'':'none';
+  b.textContent='⚡ Live-Sync (Beta): '+(_liveSyncAn()?'AN':'AUS');
+  if(_liveSyncAn()){ b.style.background='rgba(5,150,105,.1)'; b.style.color='#065f46'; }
+}
+function liveSyncToggle(){
+  try{
+    const neu=_liveSyncAn()?'0':'1';
+    localStorage.setItem(_lsKey('ap_livesync'), neu);
+    liveSyncMenuUpdate();
+    if(neu==='1'){ toast('⚡ Live-Sync AN (nur dieses Gerät)'); _liveStart(curInst()); }
+    else { toast('Live-Sync AUS – App läuft klassisch weiter'); _liveStop(); }
+  }catch(e){}
+}
+function _liveStop(){
+  if(_live.unsub){ try{_live.unsub();}catch(e){} }
+  _live={kursId:null, unsub:null, shadow:{sitz:'', anw:{}}, ready:false, applying:false, timer:null};
+}
+function _liveKursRef(inst){
+  return _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).collection('live');
+}
+function _liveSitzSnapshot(inst){
+  // kompakter Sitzplan-Zettel aus dem lokalen Zustand
+  const belegung={};
+  Object.entries(inst.seats||{}).forEach(([sid,d])=>{
+    if(!d||!d.name) return;
+    belegung[sid]={tnId:d.poolTnId||null,name:d.name||'',firma:d.company||d.firma||'',
+      ausbjahr:d.ausbjahr||'',klasse:d.klasse||'',schuljahr:d.schuljahr||''};
+  });
+  const rows=(inst.rows||[]).map(r=>({label:r.label||'',seats:(r.seats||[]).slice()}));
+  return {rows,belegung};
+}
+function _liveAnwSnapshot(inst){
+  // {datum:{tnId:code}} aus dem lokalen Tagesraster (nur Sitze mit Pool-TN)
+  const out={};
+  Object.entries(inst.attendance||{}).forEach(([datum,slots])=>{
+    Object.entries(slots||{}).forEach(([sid,code])=>{
+      const d=(inst.seats||{})[sid];
+      if(!d||!d.poolTnId||!code) return;
+      (out[datum]=out[datum]||{})[d.poolTnId]=code;
+    });
+  });
+  return out;
+}
+function _liveStart(inst){
+  if(!_liveSyncAn()){ return; }
+  if(!inst||!inst.sharedKursId){ _liveStop(); return; }
+  if(_live.kursId===inst.sharedKursId && _live.unsub) return;   // laeuft schon
+  _liveStop();
+  _live.kursId=inst.sharedKursId;
+  const ref=_liveKursRef(inst);
+  ref.get().then(snap=>{
+    const docs={}; snap.forEach(d=>docs[d.id]=d.data());
+    if(!docs.sitzplan){
+      // Migration: dieser Kurs ist noch nie live gelaufen -> lokalen Stand vollstaendig hochschieben
+      const sitz=_liveSitzSnapshot(inst);
+      const anw=_liveAnwSnapshot(inst);
+      const batch=_db.batch();
+      batch.set(ref.doc('sitzplan'), Object.assign({ts:Date.now()},sitz));
+      Object.entries(anw).forEach(([datum,eintraege])=>{
+        batch.set(ref.doc('anw_'+datum), {eintraege, ts:Date.now()});
+      });
+      batch.commit().then(()=>{
+        _live.shadow.sitz=JSON.stringify(sitz);
+        _live.shadow.anw=anw;
+        _live.ready=true;
+        _liveListen(inst);
+        toast('⚡ Kurs für Live-Sync vorbereitet');
+      }).catch(err=>{ toast('Live-Sync: '+err.message,'bad'); _liveStop(); });
+    } else {
+      // Kurs laeuft schon live -> Cloud-Zettel fuehren, lokalen Stand angleichen
+      _liveApplyDocs(inst, docs, true);
+      _live.ready=true;
+      _liveListen(inst);
+    }
+  }).catch(err=>{ toast('Live-Sync: '+err.message,'bad'); _liveStop(); });
+}
+function _liveListen(inst){
+  const ref=_liveKursRef(inst);
+  _live.unsub=ref.onSnapshot(snap=>{
+    if(!_live.ready) return;
+    const docs={}; snap.forEach(d=>docs[d.id]=d.data());
+    _liveApplyDocs(inst, docs, false);
+  }, err=>{ console.warn('live listen',err); });
+}
+function _liveApplyDocs(inst, docs, initial){
+  if(_live.applying) return;
+  _live.applying=true;
+  try{
+    let changed=false;
+    // 1) Sitzplan
+    const sp=docs.sitzplan;
+    if(sp && sp.belegung){
+      const neuJson=JSON.stringify({rows:sp.rows||[],belegung:sp.belegung||{}});
+      if(neuJson!==_live.shadow.sitz){
+        // tnId->sid Ziel und lokal
+        const zielSid={}; Object.entries(sp.belegung).forEach(([sid,b])=>{ if(b&&b.tnId) zielSid[b.tnId]=sid; });
+        const lokalSid={}; Object.entries(inst.seats||{}).forEach(([sid,d])=>{ if(d&&d.poolTnId) lokalSid[d.poolTnId]=sid; });
+        if(!inst.seats) inst.seats={};
+        // entfernen/verschieben/anlegen
+        Object.entries(lokalSid).forEach(([tnId,sid])=>{
+          const ziel=zielSid[tnId];
+          if(!ziel){ delete inst.seats[sid]; changed=true; }
+          else if(ziel!==sid){ inst.seats[ziel]=inst.seats[sid]; delete inst.seats[sid]; changed=true; }
+        });
+        Object.entries(zielSid).forEach(([tnId,sid])=>{
+          if(!inst.seats[sid]){
+            const b=sp.belegung[sid]||{};
+            inst.seats[sid]={name:b.name||'',poolTnId:tnId,company:b.firma||'',ausbjahr:b.ausbjahr||'',klasse:b.klasse||'',schuljahr:b.schuljahr||'',attendance:[]};
+            changed=true;
+          }
+        });
+        // Reihen (Label + Sitzordnung)
+        if(Array.isArray(sp.rows) && sp.rows.length){
+          inst.rows=sp.rows.map(r=>({label:r.label||'',seats:(r.seats||[]).slice()}));
+          changed=true;
+        }
+        _live.shadow.sitz=neuJson;
+      }
+    }
+    // 2) Anwesenheit
+    Object.entries(docs).forEach(([id,d])=>{
+      if(!id.startsWith('anw_')||!d) return;
+      const datum=id.slice(4);
+      const eintraege=d.eintraege||{};
+      const alt=_live.shadow.anw[datum]||{};
+      const sidVon={}; Object.entries(inst.seats||{}).forEach(([sid,x])=>{ if(x&&x.poolTnId) sidVon[x.poolTnId]=sid; });
+      if(!inst.attendance) inst.attendance={};
+      if(!inst.attendance[datum]) inst.attendance[datum]={};
+      Object.entries(eintraege).forEach(([tnId,code])=>{
+        const sid=sidVon[tnId]; if(!sid) return;
+        if(inst.attendance[datum][sid]!==code){ inst.attendance[datum][sid]=code; changed=true; }
+      });
+      Object.keys(alt).forEach(tnId=>{
+        if(eintraege[tnId]) return;
+        const sid=sidVon[tnId]; if(!sid) return;
+        if(inst.attendance[datum][sid]){ delete inst.attendance[datum][sid]; changed=true; }
+      });
+      _live.shadow.anw[datum]=Object.assign({},eintraege);
+    });
+    if(changed){
+      persist();
+      try{ renderSeats(); renderQuickAttCount(); if(typeof renderMobileList==='function'&&_mobileListMode) renderMobileList(); }catch(e){}
+      if(!initial) toast('⚡ Live aktualisiert');
+    }
+  } finally { _live.applying=false; }
+}
+// Diff-Push: zentral aus persist() - trifft alle Klickwege
+function _liveDiffDebounced(){
+  if(!_liveSyncAn()||!_live.ready||_live.applying) return;
+  clearTimeout(_live.timer);
+  _live.timer=setTimeout(_liveDiffPush, 400);
+}
+function _liveDiffPush(){
+  try{
+    const inst=curInst();
+    if(!inst||inst.sharedKursId!==_live.kursId||!_live.ready) return;
+    const ref=_liveKursRef(inst);
+    // Sitzplan als Ganzes vergleichen (klein, robust)
+    const sitz=_liveSitzSnapshot(inst);
+    const sitzJson=JSON.stringify(sitz);
+    if(sitzJson!==_live.shadow.sitz){
+      ref.doc('sitzplan').set(Object.assign({ts:Date.now()},sitz)).then(()=>{ _live.shadow.sitz=sitzJson; }).catch(()=>{});
+    }
+    // Anwesenheit feldweise
+    const anw=_liveAnwSnapshot(inst);
+    const tage=new Set([...Object.keys(anw),...Object.keys(_live.shadow.anw)]);
+    tage.forEach(datum=>{
+      const neu=anw[datum]||{}, alt=_live.shadow.anw[datum]||{};
+      const upd={}; let dirty=false;
+      Object.entries(neu).forEach(([tnId,code])=>{ if(alt[tnId]!==code){ upd['eintraege.'+tnId]=code; dirty=true; } });
+      Object.keys(alt).forEach(tnId=>{ if(!neu[tnId]){ upd['eintraege.'+tnId]=firebase.firestore.FieldValue.delete(); dirty=true; } });
+      if(!dirty) return;
+      upd.ts=Date.now();
+      ref.doc('anw_'+datum).set({eintraege:{},ts:Date.now()},{merge:true}).then(()=>ref.doc('anw_'+datum).update(upd))
+        .then(()=>{ _live.shadow.anw[datum]=Object.assign({},neu); }).catch(()=>{});
+    });
+  }catch(e){}
+}
 function zeigeCloudVorgaenger(){
   if(!_db||!_fbUid){ toast('Nicht angemeldet','bad'); return; }
   const pRef=_db.collection('users').doc(_fbUid).collection('data').doc('state_prev');
@@ -14153,6 +14352,9 @@ function zeigeCloudVorgaenger(){
 }
 function _zeigeKonflikt(cloudTs){
   if(_konfliktOffen) return;
+  // v847: im Live-Sync-Betrieb entscheidet automatisch der neuere Stand - die Kursdaten
+  // (Sitzplan/Anwesenheit) liegen ohnehin live am Kurs und kommen nach dem Laden zurueck
+  if(typeof _liveSyncAn==='function' && _liveSyncAn()){ try{ _konfliktNeuLaden(); }catch(e){} return; }
   _konfliktOffen = true;
   const ci=document.getElementById('cloudInd');
   if(ci){ ci.textContent='⚠ Konflikt'; ci.style.color='#ef4444'; }

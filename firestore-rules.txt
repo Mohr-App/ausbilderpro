@@ -233,6 +233,12 @@ service cloud.firestore {
           allow update: if (isAusbilder() || isAdmin()) && deep == 'checkins';
           // Aufraeumen: Ausbilder/Verwaltung (AusbilderPro Z.6367 beim Sitzplatzwechsel)
           allow delete: if (isAusbilder() || isAdmin()) && deep == 'checkins';
+          // ─────────────────────────────────────────────────────────────
+          // v847 Live-Sync (Beta): Sitzplan + Tagesanwesenheit als Live-
+          // Dokumente am Kurs (live/sitzplan, live/anw_<datum>). Nur
+          // Ausbilder/Verwaltung - Azubis lesen und schreiben hier nicht.
+          // ─────────────────────────────────────────────────────────────
+          allow read, create, update, delete: if (isAusbilder() || isAdmin()) && deep == 'live';
         }
       }
     }
