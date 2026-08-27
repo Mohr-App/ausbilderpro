@@ -1967,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v855';
+const APP_VERSION = 'v856';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1982,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v856', d:'27.08.2026', items:['⚡ Live-Sync überträgt jetzt auch die Anwesenheits-Details: Zu-spät-/Früher-Minuten, Krank/Berufsschule und Notizen wandern live mit – auch das nachträgliche Ändern oder Entfernen']},
   {v:'v855', d:'27.08.2026', items:['⚡ Live-Sync zeigt jetzt seinen echten Zustand: Schalter-Text „AN · ✓ verbunden" bzw. Warnung mit Grund; Toast beim Verbinden; Warnung, wenn der offene Kurs nicht mit VerwaltungPro verknüpft ist']},
   {v:'v854', d:'27.08.2026', items:['🔧 Live-Sync: zwei Wurzeln behoben – Dauer-„aktualisiert"-Meldung durch Scheindiff (Feldreihenfolge) beseitigt, und manuell belegte Sitze ohne Pool-Verknüpfung werden jetzt mitsynchronisiert']},
   {v:'v853', d:'27.08.2026', items:['🔧 Live-Sync: eingehende Anwesenheit erscheint jetzt auch auf den Sitzkarten (beide Speicherorte werden gepflegt – gleiche Lektion wie v845)']},
@@ -14205,15 +14206,23 @@ function _liveSitzSnapshot(inst){
   return {rows,belegung};
 }
 function _liveAnwSnapshot(inst){
-  // {datum:{tnId:code}} aus dem lokalen Tagesraster (nur Sitze mit Pool-TN)
+  // v856: volles Objekt je TN/Tag - Rastercode UND Detail (Typ, Verspaetung, frueher, Notiz).
+  // "Zu spaet" lebt nur im Detail (type present + lateMins) und muss mitreisen.
   const out={};
+  const put=(datum,key,patch)=>{ const o=((out[datum]=out[datum]||{})[key]=(out[datum][key]||{})); Object.assign(o,patch); };
   Object.entries(inst.attendance||{}).forEach(([datum,slots])=>{
     Object.entries(slots||{}).forEach(([sid,code])=>{
       const d=(inst.seats||{})[sid];
       if(!d||!d.name||!code) return;
-      // v854: auch manuell belegte Sitze ohne Pool-TN syncen (Schluessel sid_<nr>)
-      const key=d.poolTnId||('sid_'+sid);
-      (out[datum]=out[datum]||{})[key]=code;
+      put(datum, d.poolTnId||('sid_'+sid), {c:code});
+    });
+  });
+  Object.entries(inst.seats||{}).forEach(([sid,d])=>{
+    if(!d||!d.name) return;
+    const key=d.poolTnId||('sid_'+sid);
+    (d.attendance||[]).forEach(e=>{
+      if(!e||!e.date||!e.type) return;
+      put(e.date, key, {t:e.type, lm:parseInt(e.lateMins)||0, em:parseInt(e.earlyMins)||0, n:e.note||''});
     });
   });
   return out;
@@ -14315,22 +14324,38 @@ function _liveApplyDocs(inst, docs, initial){
       const _sidAus=key=>{ if(key&&key.startsWith('sid_')){ const sid=key.slice(4); return (inst.seats||{})[sid]?sid:null; } return sidVon[key]||null; };
       if(!inst.attendance) inst.attendance={};
       if(!inst.attendance[datum]) inst.attendance[datum]={};
-      // v853: BEIDE Speicher pflegen - Tagesraster UND Karten-Dots (seat.attendance),
-      // sonst aendert sich das Raster, aber die Sitzkarten zeigen nichts (siehe v845).
-      const _dotSet=(sid,code)=>{
+      // v856: Objekt-Werte {c,t,lm,em,n} - Raster + Karten-Dot inkl. Verspaetung/Notiz.
+      // Alte String-Eintraege ('P') werden als {c:'P'} gelesen (Kompatibilitaet).
+      const _norm=v=>typeof v==='string'?{c:v}:(v||{});
+      const _apply=(sid,v)=>{
         const d=(inst.seats||{})[sid]; if(!d) return;
+        // Raster
+        if(v.c){ if(inst.attendance[datum][sid]!==v.c){ inst.attendance[datum][sid]=v.c; changed=true; } }
+        else if(inst.attendance[datum][sid]){ delete inst.attendance[datum][sid]; changed=true; }
+        // Dot (Detail)
         if(!d.attendance) d.attendance=[];
-        d.attendance=d.attendance.filter(e=>!(e&&e.date===datum));
-        if(code==='P') d.attendance.push({date:datum,type:'present',note:'per Live-Sync',lateMins:0,earlyMins:0});
+        const idx=d.attendance.findIndex(e=>e&&e.date===datum);
+        const sollTyp=v.t||(v.c==='P'?'present':null);
+        if(sollTyp){
+          const soll={date:datum,type:sollTyp,lateMins:v.lm||0,earlyMins:v.em||0,note:v.n||((idx<0)?'per Live-Sync':(d.attendance[idx].note||''))};
+          if(idx<0){ d.attendance.push(soll); changed=true; }
+          else{
+            const e=d.attendance[idx];
+            if(e.type!==soll.type||((parseInt(e.lateMins)||0)!==soll.lateMins)||((parseInt(e.earlyMins)||0)!==soll.earlyMins)||((e.note||'')!==soll.note)){
+              d.attendance[idx]=Object.assign({},e,soll); changed=true;
+            }
+          }
+        } else if(idx>=0){ d.attendance.splice(idx,1); changed=true; }
       };
-      Object.entries(eintraege).forEach(([tnId,code])=>{
-        const sid=_sidAus(tnId); if(!sid) return;
-        if(inst.attendance[datum][sid]!==code){ inst.attendance[datum][sid]=code; _dotSet(sid,code); changed=true; }
+      Object.entries(eintraege).forEach(([key,val])=>{
+        const sid=_sidAus(key); if(!sid) return;
+        const v=_norm(val);
+        if(_canon(_norm(alt[key]))!==_canon(v)) _apply(sid,v);
       });
-      Object.keys(alt).forEach(tnId=>{
-        if(eintraege[tnId]) return;
-        const sid=_sidAus(tnId); if(!sid) return;
-        if(inst.attendance[datum][sid]){ delete inst.attendance[datum][sid]; _dotSet(sid,null); changed=true; }
+      Object.keys(alt).forEach(key=>{
+        if(eintraege[key]!==undefined) return;
+        const sid=_sidAus(key); if(!sid) return;
+        _apply(sid,{});
       });
       _live.shadow.anw[datum]=Object.assign({},eintraege);
     });
@@ -14365,8 +14390,8 @@ function _liveDiffPush(){
     tage.forEach(datum=>{
       const neu=anw[datum]||{}, alt=_live.shadow.anw[datum]||{};
       const upd={}; let dirty=false;
-      Object.entries(neu).forEach(([tnId,code])=>{ if(alt[tnId]!==code){ upd['eintraege.'+tnId]=code; dirty=true; } });
-      Object.keys(alt).forEach(tnId=>{ if(!neu[tnId]){ upd['eintraege.'+tnId]=firebase.firestore.FieldValue.delete(); dirty=true; } });
+      Object.entries(neu).forEach(([key,val])=>{ if(_canon(alt[key]===undefined?null:alt[key])!==_canon(val)){ upd['eintraege.'+key]=val; dirty=true; } });
+      Object.keys(alt).forEach(key=>{ if(neu[key]===undefined){ upd['eintraege.'+key]=firebase.firestore.FieldValue.delete(); dirty=true; } });
       if(!dirty) return;
       upd.ts=Date.now();
       // v851: NICHT set({eintraege:{}}) - merge ERSETZT die Map und loeschte fremde Eintraege!
