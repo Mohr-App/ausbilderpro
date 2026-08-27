@@ -1966,7 +1966,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v843';
+const APP_VERSION = 'v844';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1981,6 +1981,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v844', d:'27.08.2026', items:['📥 Anwesenheit füllt sich jetzt automatisch nach: Beim Öffnen eines Lehrgangs werden fehlende Häkchen vergangener Kurstage aus den Azubi-Check-ins ergänzt (vorhandene Einträge, auch Fehlzeit/Krank, bleiben unberührt). Behebt verlorene Tage, wenn die App während der Scans zu war']},
   {v:'v843', d:'26.08.2026', items:['🛟 Neuer Rettungsanker unter „Mehr": „Cloud-Vorgänger wiederherstellen" zeigt den beim Sitzungsbeginn gesicherten Stand (Lehrgänge/Sitzplätze/Anwesenheit im Vergleich) und stellt ihn auf Wunsch wieder her – der aktuelle Stand wird dabei zusätzlich gesichert, nichts geht endgültig verloren']},
   {v:'v842', d:'25.08.2026', items:['🔧 Badge-Sync („selbst beigetreten"/„Kurs abgelehnt") läuft jetzt auch direkt beim App-Start – nicht mehr nur beim Lehrgang-Wechsel']},
   {v:'v841', d:'25.08.2026', items:['🔧 Nachbesserung zu v840: „selbst beigetreten"-Badge liest jetzt wirklich den Stammdatensatz – fälschlich markierte Sitze (zugewiesene TN mit QR-Bestätigung) korrigieren sich beim Öffnen des Lehrgangs']},
@@ -2597,6 +2598,7 @@ function selInst(katId,instId){
   // Kurs-Check: ab 2. Kurstag TN ohne Einordnung anzeigen (Status-Map ist dann meist schon da)
   setTimeout(()=>{try{maybeKursCheck();}catch(e){}}, 900);
   setTimeout(()=>{try{_syncKursKenntnis(curInst());}catch(e){}}, 700);
+  setTimeout(()=>{try{_autoNachtragCheckins(curInst());}catch(e){}}, 1000);
   // Cross-Ausbilder Noten-Sync: lade Noten anderer Ausbilder fuer diesen Kurs aus Firestore
   setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 150);
   // Self-Heal: Kurs in Cloud synchronisieren (falls Umbenennung nicht durchgekommen ist)
@@ -12581,6 +12583,7 @@ function loadPool(){
   // v842: Kenntnis-/Selbst-beigetreten-Sync auch beim App-Start (nicht nur bei selInst) -
   // sonst behalten Sitze nach einem Reload mit bereits offenem Lehrgang veraltete Badges.
   setTimeout(()=>{try{_syncKursKenntnis(curInst());}catch(e){}}, 1200);
+  setTimeout(()=>{try{_autoNachtragCheckins(curInst());}catch(e){}}, 1500);
   if(_demoMode) return;
   // Alten Listener abmelden
   if(_poolUnsub){_poolUnsub();_poolUnsub=null;}
@@ -14063,6 +14066,51 @@ function _standZusammenfassung(rawJson){
     }));
     return kurse+' Lehrgänge · '+seats+' belegte Sitzplätze · '+att+' Anwesenheits-Einträge';
   }catch(e){ return 'nicht lesbar'; }
+}
+// ═══ v844: Auto-Nachzug der Anwesenheit aus Azubi-Check-ins ═══
+// Der Live-Listener hoert nur auf Scans von HEUTE und nur bei offener App - war die App an
+// einem Kurstag zu, fehlten die Haekchen dauerhaft (Vorfall Theisen 26.08.). Deshalb zieht
+// die App beim Oeffnen eines Lehrgangs vergangene Kurstage automatisch aus den Check-ins
+// nach: still, NUR ergaenzend (bestehende Eintraege inkl. Fehlzeit/Krank bleiben unberuehrt),
+// gedrosselt 1x/Minute je Kurs. Toast informiert, wenn etwas nachgetragen wurde.
+let _cinLast={};
+function _autoNachtragCheckins(inst){
+  try{
+    if(!inst||!inst.sharedKursId||_demoMode||!_db) return;
+    const kid=inst.sharedKursId, now=Date.now();
+    if(_cinLast[kid] && now-_cinLast[kid]<60000) return; _cinLast[kid]=now;
+    const iVon=(inst.von||inst.startDatum||''), iBis=(inst.bis||inst.endDatum||'');
+    _db.collection('shared').doc('kurse').collection('list').doc(kid)
+      .collection('checkins').get().then(snap=>{
+        const je={};
+        snap.forEach(doc=>{ const c=doc.data(); if(!c||!c.tnId||!c.datum) return;
+          if(iVon&&c.datum<iVon) return; if(iBis&&c.datum>iBis) return;
+          (je[c.tnId]=je[c.tnId]||new Set()).add(c.datum);
+        });
+        const fehl=[]; const tageSet=new Set();
+        Object.entries(inst.seats||{}).forEach(([sid,d])=>{
+          if(!d||!d.poolTnId||!d.name) return;
+          const tage=je[d.poolTnId]; if(!tage) return;
+          tage.forEach(datum=>{
+            const quick=(inst.attendance&&inst.attendance[datum])?inst.attendance[datum][sid]:undefined;
+            if(quick) return;
+            if((d.attendance||[]).some(e=>e&&e.date===datum)) return;
+            fehl.push({sid,datum}); tageSet.add(datum);
+          });
+        });
+        if(!fehl.length) return;
+        if(!inst.attendance) inst.attendance={};
+        fehl.forEach(f=>{
+          if(!inst.attendance[f.datum]) inst.attendance[f.datum]={};
+          inst.attendance[f.datum][f.sid]='P';
+        });
+        persist();
+        try{ renderSeats(); renderQuickAttCount(); }catch(e){}
+        [...new Set(fehl.map(f=>f.sid))].forEach(sid=>{ try{ syncAttendanceToFirestore(sid); }catch(e){} });
+        const tage=[...tageSet].sort().map(d=>d.slice(8,10)+'.'+d.slice(5,7)+'.').join(', ');
+        toast('📥 '+fehl.length+' Anwesenheits-Einträge aus Azubi-Scans nachgetragen ('+tage+')');
+      }).catch(()=>{});
+  }catch(e){}
 }
 function zeigeCloudVorgaenger(){
   if(!_db||!_fbUid){ toast('Nicht angemeldet','bad'); return; }
