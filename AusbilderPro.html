@@ -1967,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v854';
+const APP_VERSION = 'v855';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1982,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v855', d:'27.08.2026', items:['⚡ Live-Sync zeigt jetzt seinen echten Zustand: Schalter-Text „AN · ✓ verbunden" bzw. Warnung mit Grund; Toast beim Verbinden; Warnung, wenn der offene Kurs nicht mit VerwaltungPro verknüpft ist']},
   {v:'v854', d:'27.08.2026', items:['🔧 Live-Sync: zwei Wurzeln behoben – Dauer-„aktualisiert"-Meldung durch Scheindiff (Feldreihenfolge) beseitigt, und manuell belegte Sitze ohne Pool-Verknüpfung werden jetzt mitsynchronisiert']},
   {v:'v853', d:'27.08.2026', items:['🔧 Live-Sync: eingehende Anwesenheit erscheint jetzt auch auf den Sitzkarten (beide Speicherorte werden gepflegt – gleiche Lektion wie v845)']},
   {v:'v852', d:'27.08.2026', items:['🔧 Live-Sync greift jetzt wirklich: Der Empfänger arbeitete auf einem veralteten Kurs-Objekt (wurde beim Cloud-Laden ersetzt) – er holt sich den Kurs nun bei jedem Ereignis frisch']},
@@ -14160,13 +14161,13 @@ function _autoNachtragCheckins(inst){
 // Schreiben: Diff gegen Schatten in persist() (debounced) - trifft ALLE Klickwege zentral.
 // Lesen: onSnapshot auf die live-Collection des offenen Kurses; Echo-Schutz via Schatten.
 const _LIVE_ADMINS=['s.mohr@ish.de','stefan.mohr78+ausbilder@googlemail.com','stefan.mohr78+ausbilder@gmail.com'];
-let _live={kursId:null, unsub:null, shadow:{sitz:'', anw:{}}, ready:false, applying:false, timer:null};
+let _live={kursId:null, unsub:null, shadow:{sitz:'', anw:{}}, ready:false, applying:false, timer:null, status:'aus'};
 function _liveSyncAn(){ try{ return localStorage.getItem(_lsKey('ap_livesync'))==='1' && !_demoMode && !!_db; }catch(e){ return false; } }
 function liveSyncMenuUpdate(){
   const b=document.getElementById('liveSyncBtn'); if(!b) return;
   const darf=_LIVE_ADMINS.includes(((_auth&&_auth.currentUser&&_auth.currentUser.email)||'').toLowerCase());
   b.style.display=darf?'':'none';
-  b.textContent='⚡ Live-Sync (Beta): '+(_liveSyncAn()?'AN':'AUS');
+  b.textContent='⚡ Live-Sync (Beta): '+(_liveSyncAn()?('AN · '+(_live.status||'startet…')):'AUS');
   if(_liveSyncAn()){ b.style.background='rgba(5,150,105,.1)'; b.style.color='#065f46'; }
 }
 function liveSyncToggle(){
@@ -14180,7 +14181,7 @@ function liveSyncToggle(){
 }
 function _liveStop(){
   if(_live.unsub){ try{_live.unsub();}catch(e){} }
-  _live={kursId:null, unsub:null, shadow:{sitz:'', anw:{}}, ready:false, applying:false, timer:null};
+  _live={kursId:null, unsub:null, shadow:{sitz:'', anw:{}}, ready:false, applying:false, timer:null, status:'aus'};
 }
 function _liveKursRef(inst){
   return _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).collection('live');
@@ -14219,7 +14220,8 @@ function _liveAnwSnapshot(inst){
 }
 function _liveStart(inst){
   if(!_liveSyncAn()){ return; }
-  if(!inst||!inst.sharedKursId){ _liveStop(); return; }
+  if(!inst){ _liveStop(); _live.status='⚠ kein Lehrgang geöffnet'; return; }
+  if(!inst.sharedKursId){ _liveStop(); _live.status='⚠ Kurs nicht mit VerwaltungPro verknüpft'; toast('⚡ Live-Sync: dieser Kurs ist nicht mit VerwaltungPro verknüpft – bitte einen abgerufenen Kurs verwenden','bad'); return; }
   if(_live.kursId===inst.sharedKursId && _live.unsub) return;   // laeuft schon
   _liveStop();
   _live.kursId=inst.sharedKursId;
@@ -14239,15 +14241,18 @@ function _liveStart(inst){
         _live.shadow.sitz=_canon(sitz);
         _live.shadow.anw=anw;
         _live.ready=true;
+        _live.status='✓ verbunden';
         _liveListen();
-        toast('⚡ Kurs für Live-Sync vorbereitet');
+        toast('⚡ Kurs für Live-Sync vorbereitet – verbunden');
       }).catch(err=>{ toast('Live-Sync: '+err.message,'bad'); _liveStop(); });
     } else {
       // Kurs laeuft schon live -> Cloud-Zettel fuehren, lokalen Stand angleichen
       const frisch=curInst();
       _liveApplyDocs((frisch&&frisch.sharedKursId===inst.sharedKursId)?frisch:inst, docs, true);
       _live.ready=true;
+      _live.status='✓ verbunden';
       _liveListen();
+      toast('⚡ Live-Sync verbunden');
     }
   }).catch(err=>{ toast('Live-Sync: '+err.message,'bad'); _liveStop(); });
 }
@@ -14263,7 +14268,7 @@ function _liveListen(){
     if(!inst||inst.sharedKursId!==kid) return;
     const docs={}; snap.forEach(d=>docs[d.id]=d.data());
     _liveApplyDocs(inst, docs, false);
-  }, err=>{ toast('⚡ Live-Empfang gestört: '+err.message,'bad'); console.warn('live listen',err); });
+  }, err=>{ _live.status='⚠ Empfang gestört'; toast('⚡ Live-Empfang gestört: '+err.message,'bad'); console.warn('live listen',err); });
 }
 function _liveApplyDocs(inst, docs, initial){
   if(_live.applying) return;
