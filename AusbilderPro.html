@@ -1967,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v850';
+const APP_VERSION = 'v851';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1982,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v851', d:'27.08.2026', items:['🔧 Live-Sync: Schreibfehler behoben (Tages-Einträge wurden beim Übertragen versehentlich geleert); Fehler beim Live-Empfang/Übernehmen erscheinen jetzt als rote Meldung statt still zu verschwinden']},
   {v:'v850', d:'27.08.2026', items:['🔧 Live-Sync: kein Konflikt-Neuladen und keine „Ungespeicherte Änderungen"-Meldung mehr, wenn zwei eigene Fenster parallel arbeiten – im Live-Betrieb wird die Koffer-Version still fortgeschrieben (Kursdaten sind ohnehin live gesichert)']},
   {v:'v849', d:'27.08.2026', items:['🔧 Live-Sync-Schalter: Konto-Erkennung korrigiert (falsche Variable) – jetzt sichtbar für Admin- und Testkonto']},
   {v:'v848', d:'27.08.2026', items:['🔧 Live-Sync-Schalter erscheint jetzt zuverlässig im Mehr-Menü (Prüfung beim Menü-Öffnen; gmail/googlemail-Schreibweise egal)']},
@@ -14243,7 +14244,7 @@ function _liveListen(inst){
     if(!_live.ready) return;
     const docs={}; snap.forEach(d=>docs[d.id]=d.data());
     _liveApplyDocs(inst, docs, false);
-  }, err=>{ console.warn('live listen',err); });
+  }, err=>{ toast('⚡ Live-Empfang gestört: '+err.message,'bad'); console.warn('live listen',err); });
 }
 function _liveApplyDocs(inst, docs, initial){
   if(_live.applying) return;
@@ -14302,9 +14303,10 @@ function _liveApplyDocs(inst, docs, initial){
     });
     if(changed){
       persist();
-      try{ renderSeats(); renderQuickAttCount(); if(typeof renderMobileList==='function'&&_mobileListMode) renderMobileList(); }catch(e){}
+      try{ renderSeats(); renderQuickAttCount(); if(typeof renderMobileList==='function'&&typeof _mobileListMode!=='undefined'&&_mobileListMode) renderMobileList(); }catch(e){}
       if(!initial) toast('⚡ Live aktualisiert');
     }
+  } catch(err){ toast('⚡ Live-Übernahme fehlgeschlagen: '+err.message,'bad'); console.warn('live apply',err);
   } finally { _live.applying=false; }
 }
 // Diff-Push: zentral aus persist() - trifft alle Klickwege
@@ -14334,8 +14336,10 @@ function _liveDiffPush(){
       Object.keys(alt).forEach(tnId=>{ if(!neu[tnId]){ upd['eintraege.'+tnId]=firebase.firestore.FieldValue.delete(); dirty=true; } });
       if(!dirty) return;
       upd.ts=Date.now();
-      ref.doc('anw_'+datum).set({eintraege:{},ts:Date.now()},{merge:true}).then(()=>ref.doc('anw_'+datum).update(upd))
-        .then(()=>{ _live.shadow.anw[datum]=Object.assign({},neu); }).catch(()=>{});
+      // v851: NICHT set({eintraege:{}}) - merge ERSETZT die Map und loeschte fremde Eintraege!
+      ref.doc('anw_'+datum).set({ts:Date.now()},{merge:true}).then(()=>ref.doc('anw_'+datum).update(upd))
+        .then(()=>{ _live.shadow.anw[datum]=Object.assign({},neu); })
+        .catch(err=>{ toast('⚡ Live-Schreiben fehlgeschlagen: '+err.message,'bad'); });
     });
   }catch(e){}
 }
