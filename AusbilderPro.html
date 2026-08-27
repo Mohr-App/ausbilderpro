@@ -1967,7 +1967,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v849';
+const APP_VERSION = 'v850';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1982,6 +1982,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v850', d:'27.08.2026', items:['🔧 Live-Sync: kein Konflikt-Neuladen und keine „Ungespeicherte Änderungen"-Meldung mehr, wenn zwei eigene Fenster parallel arbeiten – im Live-Betrieb wird die Koffer-Version still fortgeschrieben (Kursdaten sind ohnehin live gesichert)']},
   {v:'v849', d:'27.08.2026', items:['🔧 Live-Sync-Schalter: Konto-Erkennung korrigiert (falsche Variable) – jetzt sichtbar für Admin- und Testkonto']},
   {v:'v848', d:'27.08.2026', items:['🔧 Live-Sync-Schalter erscheint jetzt zuverlässig im Mehr-Menü (Prüfung beim Menü-Öffnen; gmail/googlemail-Schreibweise egal)']},
   {v:'v847', d:'27.08.2026', items:['⚡ Live-Sync (Beta, nur Admin/Testkonto, je Gerät zuschaltbar): Sitzplan und Anwesenheit laufen als Live-Dokumente über den Kurs – mehrere PCs gleichzeitig, Änderungen erscheinen überall in Sekunden. Doppelte Buchführung: der klassische Speicherweg läuft parallel weiter, Schalter jederzeit umlegbar. Im Live-Betrieb entfällt der Konflikt-Dialog (neuester Stand gewinnt automatisch)']},
@@ -14012,7 +14013,14 @@ function _fbSaveJetzt(){
       const cloudV = (doc.exists && typeof doc.data().v==='number') ? doc.data().v : 0;
       // Cloud ist neuer als das, was wir geladen haben -> ein anderes Geraet war da
       if(doc.exists && cloudV > _stateV){
-        return {konflikt:true, ts:doc.data().ts, v:cloudV};
+        // v850: Im Live-Sync-Betrieb ist der Koffer nur noch die Fallback-Kopie - die
+        // Kursdaten liegen live am Kurs und sind auf allen Geraeten gleich. Version still
+        // uebernehmen und weiterschreiben statt Konflikt (sonst Dauer-Reload bei 2 Fenstern).
+        if(typeof _liveSyncAn==='function' && _liveSyncAn()){
+          _stateV = cloudV;
+        } else {
+          return {konflikt:true, ts:doc.data().ts, v:cloudV};
+        }
       }
       // Vorgaenger einmal je Sitzung wegsichern: das ist genau der Stand, den wir
       // beim Anmelden vorgefunden haben - der Rueckweg, falls hier etwas schiefgeht.
@@ -14540,6 +14548,7 @@ function fbLoadData(){
                        gesichertAm:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
             }catch(e){}
             setTimeout(()=>{
+              if(typeof _liveSyncAn==='function' && _liveSyncAn()) return;   // v850: live = normal, kein Alarm
               alert('⚠ Ungespeicherte Änderungen gefunden\n\n'
                 +'Auf diesem Gerät gab es Änderungen, die nicht mehr in die Cloud kamen – '
                 +'gleichzeitig wurde auf einem anderen Gerät gearbeitet.\n\n'
