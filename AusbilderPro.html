@@ -1968,7 +1968,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v861';
+const APP_VERSION = 'v862';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1983,6 +1983,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v862', d:'27.08.2026', items:['🔧 Live-Sync-Bug behoben: Reihen verloren beim Übertragen ihre Kennung, dadurch trafen +/−/Reihe-löschen immer die erste Spalte statt der angeklickten']},
   {v:'v861', d:'27.08.2026', items:['🔕 Auch die „zentral aktiviert"-Meldung erscheint nicht mehr beim Neuladen – nur noch bei echter Umschaltung']},
   {v:'v860', d:'27.08.2026', items:['🔕 Kein „Live-Sync verbunden"-Toast mehr beim normalen Start – Meldungen nur noch beim aktiven Umschalten über den Admin-Schalter (Status weiterhin im Mehr-Menü sichtbar)']},
   {v:'v859', d:'27.08.2026', items:['🔑 PIN vergessen: Die Verwaltung kann Unterschrift & PIN zurücksetzen (Knopf in VerwaltungPro) – die App führt den Reset beim nächsten Start aus; Unterschrift und Stempel müssen danach neu eingegeben werden. Hinweis dazu unter Mein Profil']},
@@ -14256,7 +14257,9 @@ function _liveSitzSnapshot(inst){
     belegung[sid]={tnId:d.poolTnId||null,name:d.name||'',firma:d.company||d.firma||'',
       ausbjahr:d.ausbjahr||'',klasse:d.klasse||'',schuljahr:d.schuljahr||''};
   });
-  const rows=(inst.rows||[]).map(r=>({label:r.label||'',seats:(r.seats||[]).slice()}));
+  // v862: id MUSS mit uebertragen werden - ohne sie verlieren alle Reihen nach der ersten
+  // Live-Runde ihre Kennung, +/-/Loeschen trifft dann immer die erste Reihe im Array.
+  const rows=(inst.rows||[]).map(r=>({id:r.id||('r'+Date.now()+Math.random().toString(36).slice(2,6)),label:r.label||'',seats:(r.seats||[]).slice()}));
   return {rows,belegung};
 }
 function _liveAnwSnapshot(inst){
@@ -14362,7 +14365,10 @@ function _liveApplyDocs(inst, docs, initial){
         });
         // Reihen (Label + Sitzordnung)
         if(Array.isArray(sp.rows) && sp.rows.length){
-          inst.rows=sp.rows.map(r=>({label:r.label||'',seats:(r.seats||[]).slice()}));
+          // v862: id aus dem Cloud-Dokument uebernehmen, mit Fallback fuer alte Dokumente
+          // ohne id (vor v862 geschrieben) - sonst wiederholt sich derselbe Fehler.
+          const alteById={}; (inst.rows||[]).forEach((r,i)=>{ if(r.id) alteById[i]=r.id; });
+          inst.rows=sp.rows.map((r,i)=>({id:r.id||alteById[i]||('r'+Date.now()+i),label:r.label||'',seats:(r.seats||[]).slice()}));
           changed=true;
         }
         _live.shadow.sitz=neuJson;
