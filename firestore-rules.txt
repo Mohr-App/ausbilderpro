@@ -121,6 +121,14 @@ service cloud.firestore {
         allow update: if request.auth != null
           && resource.data.createdBy == request.auth.token.email
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ausbilderName','ausbilderEmail','ausbilderTel']);
+        // Self-Heal: der zustaendige Ausbilder darf seine eigene ausbilderUid/ownerUid
+        // nachtragen, wenn der Kurs (z.B. von VP angelegt) noch keine hat. Noetig fuer
+        // Storage-Regeln (Kurs-Dokumente-Ordner) - ohne diese Felder wird der Ausbilder
+        // dort als 'nicht zustaendig' abgelehnt, obwohl es sein Kurs ist.
+        allow update: if request.auth != null
+          && resource.data.ausbilderLoginEmail == request.auth.token.email
+          && !('ausbilderUid' in resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ausbilderUid','ownerUid']);
         allow create: if request.auth != null && docId == 'urlaubLog';
         // Ausbilder darf seinen EIGENEN Profil-Eintrag in kursSettings/ausbilder schreiben
         // (Dokument-ID = eigene Login-Mail oder loginEmail-Feld = eigene Mail, kein Fremdzugriff)

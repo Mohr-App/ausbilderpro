@@ -1968,7 +1968,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v862';
+const APP_VERSION = 'v863';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1983,6 +1983,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v863', d:'27.08.2026', items:['🔧 Kurs-Dokumente: Fehler beim Hochladen (fehlende Berechtigung, Speicherproblem) werden jetzt sichtbar angezeigt statt lautlos zu verschwinden']},
   {v:'v862', d:'27.08.2026', items:['🔧 Live-Sync-Bug behoben: Reihen verloren beim Übertragen ihre Kennung, dadurch trafen +/−/Reihe-löschen immer die erste Spalte statt der angeklickten']},
   {v:'v861', d:'27.08.2026', items:['🔕 Auch die „zentral aktiviert"-Meldung erscheint nicht mehr beim Neuladen – nur noch bei echter Umschaltung']},
   {v:'v860', d:'27.08.2026', items:['🔕 Kein „Live-Sync verbunden"-Toast mehr beim normalen Start – Meldungen nur noch beim aktiven Umschalten über den Admin-Schalter (Status weiterhin im Mehr-Menü sichtbar)']},
@@ -13534,7 +13535,8 @@ function docsUpload(type, scope){
 
 function docsHandleUpload(e, scope){ if(lockGuard())return;
   const file = e.target.files[0];
-  if(!file || !_fbUid) return;
+  if(!file) return;
+  if(!_fbUid){ alert('⚠ Nicht angemeldet – Datei kann nicht hochgeladen werden. Bitte Seite neu laden.'); return; }
   e.target.value = '';
   const maxMB = 20;
   if(file.size > maxMB * 1024 * 1024){ alert('Datei zu groß (max '+maxMB+' MB)'); return; }
@@ -13582,23 +13584,24 @@ function docsHandleUpload(e, scope){ if(lockGuard())return;
           uploadedBy: _auth.currentUser?.email||'', uploadedByUid: _fbUid
         };
         if(isTnShared) meta.vonRolle = 'ausbilder';
+        const _fail=err=>{ prog.textContent='❌ Eintrag konnte nicht gespeichert werden: '+(err.code||err.message); };
         if(isShared){
           _db.collection('shared').doc('kurse').collection('list').doc(kursId)
             .collection('dokumente').add(meta)
-            .then(() => { prog.remove(); docsLoadList(scope); });
+            .then(() => { prog.remove(); docsLoadList(scope); }).catch(_fail);
         } else if(isTnShared){
           _db.collection('globalTN').doc(tnId).collection('dokumente').add(meta)
-            .then(() => { prog.remove(); docsLoadList(scope); });
+            .then(() => { prog.remove(); docsLoadList(scope); }).catch(_fail);
         } else if(scope==='course'){
           _db.collection('users').doc(_fbUid).collection('courseDocs')
             .doc(S.curKat+'_'+S.curInst).collection('files').add(meta)
-            .then(() => { prog.remove(); docsLoadList(scope); });
+            .then(() => { prog.remove(); docsLoadList(scope); }).catch(_fail);
         } else {
           _db.collection('users').doc(_fbUid).collection('seatDocs')
             .doc(S.curKat+'_'+S.curInst+'_'+curSeat).collection('files').add(meta)
-            .then(() => { prog.remove(); docsLoadList(scope); });
+            .then(() => { prog.remove(); docsLoadList(scope); }).catch(_fail);
         }
-      });
+      }).catch(err=>{ prog.textContent='❌ Download-URL fehlgeschlagen: '+(err.code||err.message); });
     }
   );
 }
