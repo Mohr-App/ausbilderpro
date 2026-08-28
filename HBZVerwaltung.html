@@ -1755,10 +1755,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 388';
+const APP_VERSION = 'Build 389';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 389', d:'27.08.2026', items:['🔧 Ursache für gescheiterte Kurs-Dokument-Uploads gefunden: Der Admin-Zugang (Whitelist) trug die Rolle nie in die Nutzerakte ein, die Storage-Regeln konnten Admin daher nicht erkennen. Wird jetzt beim Login automatisch nachgetragen']},
   {v:'Build 388', d:'27.08.2026', items:['🔧 Kurs-Dokumente: Fehlercode wird jetzt in der Meldung angezeigt, wenn der Upload fehlschlägt (zur Diagnose von Berechtigungsproblemen)']},
   {v:'Build 387', d:'27.08.2026', items:['🔑 Einstellungen → Ausbilder: „PIN-Reset" setzt Unterschrift, Stempel und PIN eines Ausbilders zurück (mit deutlichem Hinweis: alles muss neu eingegeben werden) – ausgeführt wird der Reset beim nächsten Start seiner App']},
   {v:'Build 386', d:'27.08.2026', items:['🔧 Kursdetail zeigt jetzt auch TN, die dem Kurs als Folgekurs zugewiesen sind (Zuweisung über die Historie) – vorher stand am Kurs „10 TN", das Grid blieb aber leer']},
@@ -2133,8 +2134,12 @@ auth.onAuthStateChanged(u => {
         grantAccess(u, role);
         return;
       }
-      // Stefan-Bypass: Wenn E-Mail in Whitelist, Admin-Zugang auch ohne role-Feld
+      // Stefan-Bypass: Wenn E-Mail in Whitelist, Admin-Zugang auch ohne role-Feld.
+      // Build 388: role:'admin' zusaetzlich dauerhaft in Firestore eintragen - sonst
+      // sieht diese App zwar "ADMIN", aber die Storage-Regeln (Kurs-Dokumente) pruefen
+      // exakt dieses Feld und lehnen Uploads/Downloads ab, weil es dort nie ankam.
       if(stefanWhitelist.includes(emailLow)){
+        db.collection('users').doc(_uid).set({email:u.email, role:'admin'},{merge:true}).catch(()=>{});
         grantAccess(u, 'admin');
         return;
       }
