@@ -1,4 +1,4 @@
-const CACHE = 'verwaltungpro-v389';
+const CACHE = 'verwaltungpro-v390';
 const ASSETS = [
   './HBZVerwaltung.html',
   './manifest-vp.json',

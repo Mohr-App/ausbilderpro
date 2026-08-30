@@ -1968,7 +1968,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v863';
+const APP_VERSION = 'v864';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1983,6 +1983,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v864', d:'27.08.2026', items:['🔧 Vorsichtsmaßnahme zum selben Muster wie VP Build 390 – Datei wird jetzt garantiert vor dem Zurücksetzen des Dateifelds gesichert']},
   {v:'v863', d:'27.08.2026', items:['🔧 Kurs-Dokumente: Fehler beim Hochladen (fehlende Berechtigung, Speicherproblem) werden jetzt sichtbar angezeigt statt lautlos zu verschwinden']},
   {v:'v862', d:'27.08.2026', items:['🔧 Live-Sync-Bug behoben: Reihen verloren beim Übertragen ihre Kennung, dadurch trafen +/−/Reihe-löschen immer die erste Spalte statt der angeklickten']},
   {v:'v861', d:'27.08.2026', items:['🔕 Auch die „zentral aktiviert"-Meldung erscheint nicht mehr beim Neuladen – nur noch bei echter Umschaltung']},
@@ -13534,6 +13535,8 @@ function docsUpload(type, scope){
 }
 
 function docsHandleUpload(e, scope){ if(lockGuard())return;
+  // WICHTIG: erst die Datei aus der (lebenden) FileList sichern, DANN e.target.value
+  // leeren - sonst reisst das Zuruecksetzen des Feldes die Referenz mit (siehe VP Build 390).
   const file = e.target.files[0];
   if(!file) return;
   if(!_fbUid){ alert('⚠ Nicht angemeldet – Datei kann nicht hochgeladen werden. Bitte Seite neu laden.'); return; }

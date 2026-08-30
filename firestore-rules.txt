@@ -60,6 +60,15 @@ service cloud.firestore {
       allow update: if request.auth != null && request.auth.uid == uid
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']);
 
+      // Fest einprogrammierte Ausnahme fuer den VerwaltungPro-Admin-Bypass (Stefan Mohr).
+      // Die E-Mail steht direkt in der Regel (nicht in editierbaren Daten) - das ist sicher,
+      // weil nur Firebase Auth selbst bestaetigt, wem dieses Token gehoert. Ohne diese
+      // Zeile kann der App-Bypass zwar "ADMIN" anzeigen, aber Storage-Regeln (Kurs-
+      // Dokumente etc.), die echte role='admin' pruefen, lehnen ihn trotzdem ab.
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.auth.token.email == 's.mohr@ish.de'
+        && request.resource.data.role == 'admin';
+
       // Loeschen des eigenen Kontos bleibt erlaubt
       allow delete: if request.auth != null && request.auth.uid == uid;
 
