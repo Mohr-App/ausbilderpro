@@ -1755,10 +1755,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 390';
+const APP_VERSION = 'Build 391';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 391', d:'27.08.2026', items:['📎 Kurs-Dokumente: nicht unterstützte Dateiformate zeigen jetzt eine klare Meldung ("Format nicht unterstützt") statt eines verwirrenden Berechtigungsfehlers']},
   {v:'Build 390', d:'27.08.2026', items:['🔧 Ursache für gescheiterte Kurs-Dokument-Uploads endlich gefunden: das Zurücksetzen des Dateifelds leerte die Dateiliste, bevor sie verarbeitet wurde – Upload lief dadurch komplett ins Leere, ohne jeden Fehler']},
   {v:'Build 389', d:'27.08.2026', items:['🔧 Ursache für gescheiterte Kurs-Dokument-Uploads gefunden: Der Admin-Zugang (Whitelist) trug die Rolle nie in die Nutzerakte ein, die Storage-Regeln konnten Admin daher nicht erkennen. Wird jetzt beim Login automatisch nachgetragen']},
   {v:'Build 388', d:'27.08.2026', items:['🔧 Kurs-Dokumente: Fehlercode wird jetzt in der Meldung angezeigt, wenn der Upload fehlschlägt (zur Diagnose von Berechtigungsproblemen)']},
@@ -6654,6 +6655,19 @@ function showKursDetail(kursId){
 // ── KURSDETAIL DOKUMENTE ──
 function kdDocsUpload(){ document.getElementById('kdDocsFileIn').click(); }
 
+// Build 391: erlaubte Dateitypen VORAB pruefen (muss zur Storage-Regel isOfficeType()
+// passen), damit ein falsches Format als klare Meldung erscheint statt als kryptisches
+// "storage/unauthorized" - Firebase unterscheidet Rechte- und Typ-Fehler leider nicht.
+const _kdOkTypes=['application/pdf','application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.text','application/vnd.oasis.opendocument.spreadsheet',
+  'application/vnd.oasis.opendocument.presentation','application/octet-stream'];
+function _kdTypErlaubt(file){
+  if((file.type||'').startsWith('text/')||(file.type||'').startsWith('image/')) return true;
+  return _kdOkTypes.includes(file.type);
+}
 function kdDocsHandleUpload(e){
   // WICHTIG: e.target.files ist eine LEBENDE Liste, die am Input-Feld haengt - erst als
   // echtes Array kopieren, DANN e.target.value leeren. Vorher geschah es umgekehrt: das
@@ -6666,7 +6680,15 @@ function kdDocsHandleUpload(e){
   const listEl=document.getElementById('kdDocsList');
 
   files.forEach(file=>{
-    if(file.size>20*1024*1024){ toast('Datei zu groß (max 20 MB): '+file.name,'bad'); return; }
+    if(file.size>20*1024*1024){
+      toast('⚠ Datei zu groß ('+(file.size/1024/1024).toFixed(1)+' MB, max. 20 MB): '+file.name,'bad');
+      return;
+    }
+    if(!_kdTypErlaubt(file)){
+      const endg=file.name.includes('.')?file.name.split('.').pop().toUpperCase():'?';
+      toast('⚠ Format nicht unterstützt (.'+endg+'): '+file.name+' – erlaubt sind PDF, Word, Excel, PowerPoint, OpenDocument, Text, Bilder','bad');
+      return;
+    }
     const path='shared/kurse/'+kursId+'/docs/'+Date.now()+'_'+file.name;
     const prog=document.createElement('div');
     prog.style.cssText='padding:8px 12px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;font-size:.72rem;color:var(--mu);margin-bottom:6px';

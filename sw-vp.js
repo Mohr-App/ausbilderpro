@@ -1,4 +1,4 @@
-const CACHE = 'verwaltungpro-v390';
+const CACHE = 'verwaltungpro-v391';
 const ASSETS = [
   './HBZVerwaltung.html',
   './manifest-vp.json',
@@ -39,8 +39,10 @@ self.addEventListener('fetch', e => {
   if (url.hostname.includes('firebaseio.com') ||
       url.hostname.includes('googleapis.com') && url.pathname.includes('/v1/') ||
       url.hostname.includes('firestore.googleapis.com') ||
+      url.hostname.includes('firebasestorage.googleapis.com') ||
       url.hostname.includes('identitytoolkit') ||
-      url.hostname.includes('securetoken')) {
+      url.hostname.includes('securetoken') ||
+      e.request.method !== 'GET') {   // Cache API kann nur GET speichern - POST/PUT (Uploads) wuerfen sonst einen Fehler
     return;
   }
   e.respondWith(

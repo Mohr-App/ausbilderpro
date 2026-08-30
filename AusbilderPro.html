@@ -1968,7 +1968,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v864';
+const APP_VERSION = 'v865';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1983,6 +1983,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v865', d:'27.08.2026', items:['📎 Dokument-Upload: nicht unterstützte Dateiformate und zu große Dateien zeigen jetzt eine klare Meldung statt eines Berechtigungsfehlers']},
   {v:'v864', d:'27.08.2026', items:['🔧 Vorsichtsmaßnahme zum selben Muster wie VP Build 390 – Datei wird jetzt garantiert vor dem Zurücksetzen des Dateifelds gesichert']},
   {v:'v863', d:'27.08.2026', items:['🔧 Kurs-Dokumente: Fehler beim Hochladen (fehlende Berechtigung, Speicherproblem) werden jetzt sichtbar angezeigt statt lautlos zu verschwinden']},
   {v:'v862', d:'27.08.2026', items:['🔧 Live-Sync-Bug behoben: Reihen verloren beim Übertragen ihre Kennung, dadurch trafen +/−/Reihe-löschen immer die erste Spalte statt der angeklickten']},
@@ -13542,7 +13543,25 @@ function docsHandleUpload(e, scope){ if(lockGuard())return;
   if(!_fbUid){ alert('⚠ Nicht angemeldet – Datei kann nicht hochgeladen werden. Bitte Seite neu laden.'); return; }
   e.target.value = '';
   const maxMB = 20;
-  if(file.size > maxMB * 1024 * 1024){ alert('Datei zu groß (max '+maxMB+' MB)'); return; }
+  if(file.size > maxMB * 1024 * 1024){
+    toast('⚠ Datei zu groß ('+(file.size/1024/1024).toFixed(1)+' MB, max. 20 MB): '+file.name,'bad');
+    return;
+  }
+  // Build v865: erlaubte Dateitypen VORAB pruefen (muss zur Storage-Regel isOfficeType()
+  // passen), damit ein falsches Format als klare Meldung erscheint statt als kryptisches
+  // "storage/unauthorized" - Firebase unterscheidet Rechte- und Typ-Fehler leider nicht.
+  const _okTypes=['application/pdf','application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.oasis.opendocument.text','application/vnd.oasis.opendocument.spreadsheet',
+    'application/vnd.oasis.opendocument.presentation','application/octet-stream'];
+  const _typOk = (file.type||'').startsWith('text/')||(file.type||'').startsWith('image/')||_okTypes.includes(file.type);
+  if(!_typOk){
+    const endg=file.name.includes('.')?file.name.split('.').pop().toUpperCase():'?';
+    toast('⚠ Format nicht unterstützt (.'+endg+'): '+file.name+' – erlaubt sind PDF, Word, Excel, PowerPoint, OpenDocument, Text, Bilder','bad');
+    return;
+  }
 
   const inst=curInst();
   const kursId = inst ? inst.sharedKursId : null;
