@@ -1755,10 +1755,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 393';
+const APP_VERSION = 'Build 394';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 394', d:'01.09.2026', items:['🔧 Drei-Orte-Problem behoben: Beim Zuweisen zu einem Folgekurs wird der Kurs-Eintrag des alten Kurses nur noch entfernt, wenn dieser bereits vorbei ist. Läuft er noch oder steht er noch bevor, bleibt der TN in beiden Kursrostern sichtbar (Fall ET2/ETE1)']},
   {v:'Build 393', d:'27.08.2026', items:['🔧 Kurshistorie: doppelte Einträge (gleicher Kurs, gleicher Zeitraum) werden jetzt an allen 6 Zuweisungswegen (Picker, Drag, Listen-Import, Übertragen) verhindert – arrayUnion prüfte bisher wegen des Zeitstempels nie auf echte Duplikate']},
   {v:'Build 392', d:'27.08.2026', items:['🔧 Abmelden lädt jetzt die Seite hart neu – verhindert, dass beim Kontowechsel auf demselben Gerät Reste des vorherigen Kontos sichtbar bleiben']},
   {v:'Build 391', d:'27.08.2026', items:['📎 Kurs-Dokumente: nicht unterstützte Dateiformate zeigen jetzt eine klare Meldung ("Format nicht unterstützt") statt eines verwirrenden Berechtigungsfehlers']},
@@ -4252,6 +4253,19 @@ function saveEditAusbilder() { saveAusbilder(); }
 // (Picker, Drag, Uebertragen, Listen-Import) ein weiteres Mal angehaengt.
 function _histSchonDrin(tn, kursId, von, bis){
   return (tn && tn.kursHistory || []).some(h => h && h.kursId===kursId && h.von===von && h.bis===bis);
+}
+// Build 394: Beim Wechsel des aktiven Kurses (Folgekurs-Zuweisung) den Kurs-Eintrag des
+// ALTEN Kurses nur entfernen, wenn dieser Kurs bereits VORBEI ist. Laeuft er noch oder
+// steht er noch bevor, bleibt der TN im Kurs-Roster sichtbar - sonst verschwindet er aus
+// einem Kurs, den er noch braucht (Fall ET2/ETE1, 27.08.2026).
+function _altenKursEintragAufraeumenWennVorbei(oldKursId, tnId, oldKursCleanupsArr){
+  if(!oldKursId) return;
+  const alterKurs=_kurse.find(k=>k.id===oldKursId);
+  const heute=new Date().toISOString().slice(0,10);
+  const istVorbei = alterKurs ? (alterKurs.bis && alterKurs.bis<heute) : true; // unbekannter Kurs: sicherheitshalber aufraeumen
+  if(!istVorbei) return;
+  const p=db.collection('shared').doc('kurse').collection('list').doc(oldKursId).collection('teilnehmer').doc(tnId).delete().catch(()=>{});
+  if(oldKursCleanupsArr) oldKursCleanupsArr.push(p);
 }
 function deleteAusbilder() { confirmDeleteAusbilder(); }
 
@@ -10957,7 +10971,7 @@ function transferEntwurf(kursId){
     if(tn.wiederholer) tnUpdate.wiederholer=firebase.firestore.FieldValue.delete();
     batch.update(tnRef,tnUpdate);
     if(tn.aktiverKursId&&tn.aktiverKursId!==kursId){
-      oldKursCleanups.push(db.collection('shared').doc('kurse').collection('list').doc(tn.aktiverKursId).collection('teilnehmer').doc(tnId).delete().catch(()=>{}));
+      _altenKursEintragAufraeumenWennVorbei(tn.aktiverKursId, tnId, oldKursCleanups);
     }
     const kursTNRef=db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').doc(tnId);
     batch.set(kursTNRef,{vorname:tn.vorname||'',nachname:tn.nachname||'',firma:tn.firma||'',beruf:tn.beruf||'',ausbjahr:tn.ausbjahr||'',addedAt:Date.now(),globalTNId:tnId});
@@ -11020,7 +11034,7 @@ async function transferAlleEntwuerfe(){
         if(tn.wiederholer) tnUpdate.wiederholer=firebase.firestore.FieldValue.delete();
         batch.update(tnRef,tnUpdate);
         if(tn.aktiverKursId&&tn.aktiverKursId!==k.id){
-          db.collection('shared').doc('kurse').collection('list').doc(tn.aktiverKursId).collection('teilnehmer').doc(tnId).delete().catch(()=>{});
+          _altenKursEintragAufraeumenWennVorbei(tn.aktiverKursId, tnId, null);
         }
         const kursTNRef=db.collection('shared').doc('kurse').collection('list').doc(k.id).collection('teilnehmer').doc(tnId);
         batch.set(kursTNRef,{vorname:tn.vorname||'',nachname:tn.nachname||'',firma:tn.firma||'',beruf:tn.beruf||'',ausbjahr:tn.ausbjahr||'',addedAt:Date.now(),globalTNId:tnId});
@@ -11135,12 +11149,10 @@ function bldUebertragen(){
         if(tn.wiederholer) tnUpdate.wiederholer = firebase.firestore.FieldValue.delete();
         batch.update(tnRef, tnUpdate);
 
-        // Alten Kurs-Eintrag löschen falls TN aus Fehlt/Wiederholer kommt
+        // Alten Kurs-Eintrag nur loeschen, wenn dieser Kurs bereits vorbei ist
+        // (Build 394 - sonst verschwindet der TN aus einem Kurs, den er noch braucht)
         if(tn.aktiverKursId && tn.aktiverKursId !== kursId){
-          oldKursCleanups.push(
-            db.collection('shared').doc('kurse').collection('list').doc(tn.aktiverKursId)
-              .collection('teilnehmer').doc(tnId).delete().catch(()=>{})
-          );
+          _altenKursEintragAufraeumenWennVorbei(tn.aktiverKursId, tnId, oldKursCleanups);
         }
 
         // In Kurs-Subcollection eintragen
