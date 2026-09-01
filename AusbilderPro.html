@@ -1968,7 +1968,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v867';
+const APP_VERSION = 'v869';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1983,6 +1983,8 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v869', d:'01.09.2026', items:['🔒 Nachbesserung: selbst beigetretene (falsch angemeldete) TN können jetzt auch per Drag & Drop nicht mehr als „Wiederholer" oder „Nicht angetreten" eingestuft werden – nur direktes Entfernen am Sitzplatz']},
+  {v:'v868', d:'01.09.2026', items:['🔒 Von der Verwaltung zugewiesene TN können nicht mehr direkt aus dem Kurs entfernt werden – nur echte Falschanmeldungen (selbst per QR beigetreten). Reguläre TN müssen als „Wiederholer" oder „Nicht angetreten" eingestuft werden']},
   {v:'v867', d:'01.09.2026', items:['🔕 Kein Update-Banner mehr – Updates laden jetzt still im Hintergrund und werden beim nächsten normalen Neuladen aktiv, genau wie in VerwaltungPro']},
   {v:'v866', d:'27.08.2026', items:['🔧 Abmelden lädt jetzt die Seite hart neu – verhindert, dass beim Kontowechsel auf demselben Gerät Reste des vorherigen Kontos (Name, Kurse, Sitzplan) sichtbar bleiben']},
   {v:'v865', d:'27.08.2026', items:['📎 Dokument-Upload: nicht unterstützte Dateiformate und zu große Dateien zeigen jetzt eine klare Meldung statt eines Berechtigungsfehlers']},
@@ -11196,6 +11198,14 @@ function clearSeat(){
   if(!curSeat||!S.curKat||!S.curInst)return;
   const inst = S.kats[S.curKat].instances[S.curInst];
   const d = inst.seats[curSeat];
+  // v868: Direktes Entfernen nur fuer echte Falschanmeldungen (selbst per QR beigetreten,
+  // nie von der Verwaltung zugewiesen). Regulaere Pool-TN muessen als Wiederholer oder
+  // Nicht angetreten eingestuft werden, damit sie nicht spurlos aus dem Kurs verschwinden.
+  if(d && d.name && d.poolTnId && !d.selbstBeigetreten){
+    closeModal();
+    _zeigeEinstufungPflicht(d.name, curSeat);
+    return;
+  }
   if(!d||!d.name){if(!confirm('Sitzplatz entfernen?'))return;}
   else{
     const attCount=(d.attendance||[]).length;
@@ -13148,6 +13158,33 @@ function _execDropToFehlt(s, fristIso){
 
 let _wdhPendingData=null;
 
+// v868: Wiederholer-Einstufung direkt aus dem Entfernen-Block starten (ohne Drag&Drop)
+// v868: Info-Overlay statt direktem Loeschen fuer regulaere (von der Verwaltung
+// zugewiesene) Pool-TN - zwingt zur Einstufung als Wiederholer oder Nicht angetreten.
+function _zeigeEinstufungPflicht(tnName, seatId){
+  const ov=document.createElement('div');
+  ov.id='einstufungOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99998;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px;max-width:380px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)">'
+    +'<div style="font-size:.95rem;font-weight:800;color:#92400e;margin-bottom:10px">⚠️ Kein direktes Entfernen möglich</div>'
+    +'<div style="font-size:.8rem;color:#334155;line-height:1.5;margin-bottom:16px"><b>'+esc(tnName)+'</b> wurde von der Verwaltung zugewiesen und muss eingestuft werden, bevor er den Kurs verlässt.</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:8px">'
+    +'<button onclick="_einstufungOvSchliessen();_wiederholerVonSeat(\''+seatId+'\')" style="flex:1;padding:10px;border:1px solid rgba(217,119,6,.4);background:rgba(217,119,6,.08);color:#92400e;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer">↩ Wiederholer</button>'
+    +'<button onclick="_einstufungOvSchliessen();curSeat=\''+seatId+'\';markSeatAsAbsent()" style="flex:1;padding:10px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#991b1b;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer">🚫 Nicht angetreten</button>'
+    +'</div>'
+    +'<button onclick="_einstufungOvSchliessen()" style="width:100%;padding:8px;border:none;background:none;color:var(--mu);font-size:.74rem;cursor:pointer">Abbrechen</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
+function _einstufungOvSchliessen(){ const ov=document.getElementById('einstufungOv'); if(ov) ov.remove(); }
+function _wiederholerVonSeat(seatId){
+  const inst=curInst(); if(!inst) return;
+  const d=inst.seats[seatId]; if(!d||!d.name) return;
+  _wdhPendingData={tnName:d.name, tnId:d.poolTnId||'', kursId:d.poolKursId||inst.sharedKursId||'', fromSeat:true, seatId, poolDragId:null, seatDragId:seatId};
+  document.getElementById('wdhGrundName').textContent='↩ '+d.name+' → Wiederholer';
+  document.getElementById('wdhGrundFreitext').value='';
+  document.getElementById('wdhGrundModal').classList.add('open');
+}
 function dropToWiederholer(e){
   e.preventDefault();
   document.getElementById('wiederholerBody').classList.remove('wiederholer-dropover');
