@@ -1985,7 +1985,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v871';
+const APP_VERSION = 'v873';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2000,6 +2000,8 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v873', d:'01.09.2026', items:['⚖️ Kompromiss nachgeschärft: Die Einstufungspflicht greift jetzt erst ab dem ZWEITEN Anwesenheitstag – der erste, durch die Sitzplatz-Erstvergabe automatisch erzeugte Tag zählt nicht, damit reine Falschanmeldungen weiterhin direkt entfernbar bleiben']},
+  {v:'v872', d:'01.09.2026', items:['🔒 Nachbesserung an allen vier Entfernen-Wegen: sobald für einen TN bereits Anwesenheit gepflegt wurde, muss er als Wiederholer/Nicht angetreten eingestuft werden – auch wenn er ursprünglich selbst beigetreten ist. Zusätzlich: der gestrige Drag&Drop-Schutz (v869) war durch einen Skriptfehler nie tatsächlich im Code gelandet und wird hiermit korrekt nachgetragen']},
     {v:'v871', d:'01.09.2026', items:['🔑 PIN selbst ändern: unter Mein Profil → Unterschrift jetzt „PIN ändern" – aktuelle PIN eingeben, neue vergeben, Unterschrift/Stempel bleiben erhalten. Gleiches Prinzip auch beim App-Passwort: „Passwort ändern" verlangt jetzt zwingend das aktuelle Passwort']},
   {v:'v870', d:'01.09.2026', items:['🔒 Nachbesserung: auch der Knopf „✕ Aus Kurs entfernen" im TN-Detail blockiert jetzt bei von der Verwaltung zugewiesenen Azubis und leitet zur Einstufung als Wiederholer/Nicht angetreten – nur echte Falschanmeldungen können direkt entfernt werden']},
   {v:'v869', d:'01.09.2026', items:['🔒 Nachbesserung: selbst beigetretene (falsch angemeldete) TN können jetzt auch per Drag & Drop nicht mehr als „Wiederholer" oder „Nicht angetreten" eingestuft werden – nur direktes Entfernen am Sitzplatz']},
@@ -9012,9 +9014,13 @@ function deleteTnKomplett(tnId){ if(lockGuard())return;
       // werden - nur echte Falschanmeldungen (selfRegistered===true). Gleiche Regel wie
       // beim Sitzplatz-Entfernen-Knopf (v868/869), hier zusaetzlich fuer diesen zweiten Weg.
       const selbstBeigetreten = tnK.selfRegistered===true || gK.selfRegistered===true;
-      if(!selbstBeigetreten){
-        let seatIdFound=null;
-        if(inst) Object.entries(inst.seats||{}).forEach(([sid,d])=>{ if(d&&d.poolTnId===tnId) seatIdFound=sid; });
+      let seatIdFound=null, hatAnwesenheit=false;
+      if(inst) Object.entries(inst.seats||{}).forEach(([sid,d])=>{
+        if(d&&d.poolTnId===tnId){ seatIdFound=sid; hatAnwesenheit=(d.attendance||[]).length>1; }
+      });
+      // v872: auch selbst beigetretene TN muessen eingestuft werden, sobald bereits
+      // Anwesenheit existiert - gleiche Regel wie an den anderen drei Stellen.
+      if(!selbstBeigetreten || hatAnwesenheit){
         if(seatIdFound){ _zeigeEinstufungPflicht(nm, seatIdFound); }
         else { toast('⚠️ '+nm+' wurde von der Verwaltung zugewiesen – bitte im Pool über „Wiederholer" oder „Nicht angetreten" einstufen statt direkt zu entfernen','bad'); }
         return Promise.resolve();
@@ -11266,7 +11272,16 @@ function clearSeat(){
   // v868: Direktes Entfernen nur fuer echte Falschanmeldungen (selbst per QR beigetreten,
   // nie von der Verwaltung zugewiesen). Regulaere Pool-TN muessen als Wiederholer oder
   // Nicht angetreten eingestuft werden, damit sie nicht spurlos aus dem Kurs verschwinden.
-  if(d && d.name && d.poolTnId && !d.selbstBeigetreten){
+  // v872: auch selbst beigetretene TN muessen eingestuft werden, sobald bereits echte
+  // Anwesenheit gepflegt wurde - sonst geht diese Historie beim direkten Loeschen
+  // spurlos verloren. Direktes Loeschen bleibt nur fuer wirklich folgenlose Falsch-
+  // anmeldungen (selbst beigetreten UND noch keine Anwesenheit) erlaubt.
+  // v873: erst ab dem ZWEITEN Anwesenheitstag greift die Sperre - der erste Tag entsteht
+  // automatisch durch die Sitzplatz-Erstvergabe und zaehlt nicht als schuetzenswerte
+  // Historie, sonst waeren echte Falschanmeldungen (die einen Sitz waehlten) nie mehr
+  // direkt entfernbar.
+  const _hatAnw1=d && (d.attendance||[]).length>1;
+  if(d && d.name && d.poolTnId && (!d.selbstBeigetreten || _hatAnw1)){
     closeModal();
     _zeigeEinstufungPflicht(d.name, curSeat);
     return;
@@ -13150,6 +13165,17 @@ function poolDropBack(e){
 function dropToFehlt(e){
   e.preventDefault();
   document.getElementById('fehltBody').classList.remove('fehlt-dropover');
+  // v872: selbst beigetretene TN OHNE Anwesenheit gehoeren nicht hierher (direktes
+  // Entfernen am Sitz stattdessen). Sobald Anwesenheit existiert, MUSS auch ein
+  // selbst beigetretener TN eingestuft werden - diese Sperre entfaellt dann.
+  if(_seatDragId){
+    const _inst0=curInst(); const _d0=_inst0&&_inst0.seats[_seatDragId];
+    if(_d0&&_d0.selbstBeigetreten&&(_d0.attendance||[]).length<=1){
+      toast('⚠️ Selbst beigetretene TN ohne mehrtägige Anwesenheit können nicht als „Nicht angetreten" eingestuft werden – bitte am Sitzplatz direkt entfernen','bad');
+      _seatDragId=null;_poolDragId=null;_poolDragTnId=null;_poolDragKursId=null;_wiederholerSeatId=null;
+      return;
+    }
+  }
   // Drag-Daten sichern bevor sie verloren gehen
   const saved={seatDragId:_seatDragId, poolDragId:_poolDragId, poolDragTnId:_poolDragTnId, poolDragKursId:_poolDragKursId, wiederholerSeatId:_wiederholerSeatId, fehltLocal:_fehltLocal};
   const tnName=_seatDragId?(curSeats()[_seatDragId]?.name||''):(_poolDragId||'');
@@ -13259,6 +13285,12 @@ function dropToWiederholer(e){
   if(_seatDragId){
     const inst=curInst(); if(!inst) return;
     const d=inst.seats[_seatDragId]; if(!d||!d.name) return;
+    // v872: gleiche Regel wie dropToFehlt - Sperre entfaellt, sobald Anwesenheit existiert
+    if(d.selbstBeigetreten&&(d.attendance||[]).length<=1){
+      toast('⚠️ Selbst beigetretene TN ohne mehrtägige Anwesenheit können nicht als „Wiederholer" eingestuft werden – bitte am Sitzplatz direkt entfernen','bad');
+      _seatDragId=null;_poolDragId=null;_poolDragTnId=null;_poolDragKursId=null;
+      return;
+    }
     tnName=d.name;
     tnId=d.poolTnId||'';
     kursId=d.poolKursId||inst.sharedKursId||'';
