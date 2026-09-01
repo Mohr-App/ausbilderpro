@@ -1968,7 +1968,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v869';
+const APP_VERSION = 'v870';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1983,6 +1983,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v870', d:'01.09.2026', items:['🔒 Nachbesserung: auch der Knopf „✕ Aus Kurs entfernen" im TN-Detail blockiert jetzt bei von der Verwaltung zugewiesenen Azubis und leitet zur Einstufung als Wiederholer/Nicht angetreten – nur echte Falschanmeldungen können direkt entfernt werden']},
   {v:'v869', d:'01.09.2026', items:['🔒 Nachbesserung: selbst beigetretene (falsch angemeldete) TN können jetzt auch per Drag & Drop nicht mehr als „Wiederholer" oder „Nicht angetreten" eingestuft werden – nur direktes Entfernen am Sitzplatz']},
   {v:'v868', d:'01.09.2026', items:['🔒 Von der Verwaltung zugewiesene TN können nicht mehr direkt aus dem Kurs entfernt werden – nur echte Falschanmeldungen (selbst per QR beigetreten). Reguläre TN müssen als „Wiederholer" oder „Nicht angetreten" eingestuft werden']},
   {v:'v867', d:'01.09.2026', items:['🔕 Kein Update-Banner mehr – Updates laden jetzt still im Hintergrund und werden beim nächsten normalen Neuladen aktiv, genau wie in VerwaltungPro']},
@@ -8955,7 +8956,20 @@ function deleteTnKomplett(tnId){ if(lockGuard())return;
       || !!(tnK.kontaktEmail && String(tnK.kontaktEmail).includes('@'))
       || !!(gK.kontaktEmail && String(gK.kontaktEmail).includes('@'))
     );
-    if(istEchterAzubi){ return _deleteTnEchterAzubi(tnId, kursId, inst, nm); }
+    if(istEchterAzubi){
+      // v870: echte, VON DER VERWALTUNG ZUGEWIESENE Azubis duerfen nicht einfach entfernt
+      // werden - nur echte Falschanmeldungen (selfRegistered===true). Gleiche Regel wie
+      // beim Sitzplatz-Entfernen-Knopf (v868/869), hier zusaetzlich fuer diesen zweiten Weg.
+      const selbstBeigetreten = tnK.selfRegistered===true || gK.selfRegistered===true;
+      if(!selbstBeigetreten){
+        let seatIdFound=null;
+        if(inst) Object.entries(inst.seats||{}).forEach(([sid,d])=>{ if(d&&d.poolTnId===tnId) seatIdFound=sid; });
+        if(seatIdFound){ _zeigeEinstufungPflicht(nm, seatIdFound); }
+        else { toast('⚠️ '+nm+' wurde von der Verwaltung zugewiesen – bitte im Pool über „Wiederholer" oder „Nicht angetreten" einstufen statt direkt zu entfernen','bad'); }
+        return Promise.resolve();
+      }
+      return _deleteTnEchterAzubi(tnId, kursId, inst, nm);
+    }
     return _deleteTnManuellKomplett(tnId, kursId, inst, nm);
   }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
