@@ -4370,7 +4370,7 @@ function mlSetAtt(sid,st,date){
   if(!inst.attendance[date]) inst.attendance[date]={};
   // Toggle: wenn gleicher Status nochmal → löschen
   if(inst.attendance[date][sid]===st) delete inst.attendance[date][sid];
-  else inst.attendance[date][sid]=st;
+  else { inst.attendance[date][sid]=st; if(st==='P') _meldungBeiAnwesendAufloesen(sid,date); }
   persist();
   renderMobileList();
   renderSeats(); // sync Sitzplan
@@ -4390,6 +4390,7 @@ function quickMarkAllPresent(){
       const d=inst.seats[sid];
       if(d&&d.name&&!inst.attendance[date][sid]){
         inst.attendance[date][sid]='P';
+        _meldungBeiAnwesendAufloesen(sid,date);
         count++;
         syncMobileAttDebounced(sid);
       }
@@ -4579,6 +4580,22 @@ function dismissSeatAlert(sid){
 // 7:30-Auto-Refresh: Sitzplan neu zeichnen, sobald die Schwelle überschritten wird (Haken wird rot / Amber-Rahmen erscheint)
 setInterval(function(){try{const inst=(typeof curInst==='function')?curInst():null;if(!inst)return;const n=new Date();const hm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');if(hm===_instBeginn(inst)&&typeof renderSeats==='function')renderSeats();}catch(e){}},60000);
 
+// v866: Wenn ein TN mit offener "Kommt später/Geht früher"-Meldung als anwesend markiert
+// wird, muss das 🕐-Badge automatisch verschwinden - kein manuelles Bestaetigen mehr noetig.
+// Die Meldung wird nicht einfach geloescht, sondern als Vermerk im Anwesenheits-Eintrag
+// des Tages gespeichert (Anwesenheitshistorie bleibt nachvollziehbar).
+function _meldungBeiAnwesendAufloesen(sid, date){
+  const inst=curInst(); if(!inst) return;
+  const d=inst.seats && inst.seats[sid];
+  if(!d || !d.offeneMeldung) return;
+  const om=d.offeneMeldung;
+  const zeit=om.ts?new Date(om.ts).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr':'';
+  const vermerk='📋 Vorab gemeldet'+(zeit?' ('+zeit+')':'')+': '+(om.label||'Meldung')+(om.text?' – „'+om.text+'"':'');
+  d.offeneMeldung=null;
+  if(!d.attendance) d.attendance=[];
+  const entry=d.attendance.find(a=>a&&a.date===date);
+  if(entry) entry.note=(entry.note?entry.note+' · ':'')+vermerk;
+}
 function seatQuickAtt(sid){
   const inst=curInst(); if(!inst) return;
   const date=new Date().toISOString().slice(0,10);
@@ -4593,6 +4610,7 @@ function seatQuickAtt(sid){
       d.attendance.push({type:'present',date:date});
     }
   }
+  _meldungBeiAnwesendAufloesen(sid, date);
   persist(); renderSeats(); renderQuickAttCount();
   if(_mobileListMode) renderMobileList();
   syncAttendanceToFirestore(sid);
@@ -12331,6 +12349,7 @@ function _applyCheckinsToSeats(showToast){
       if(!inst.attendance) inst.attendance={};
       if(!inst.attendance[c.datum]) inst.attendance[c.datum]={};
       if(!inst.attendance[c.datum][sid]) inst.attendance[c.datum][sid]='P';
+      _meldungBeiAnwesendAufloesen(sid, c.datum);
       changed=true;
       try{ syncAttendanceToFirestore(sid); }catch(e){}
       if(showToast) toast('📡 '+esc(d.name||'TN')+' per QR eingecheckt'+(lm>0?' – verspätet +'+lm+' min':' ✓'));
