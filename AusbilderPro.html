@@ -1425,6 +1425,22 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
   <div id="apSigPinErr" style="font-size:.65rem;color:#dc2626;margin-top:4px;display:none"></div>
   <div style="font-size:.6rem;color:var(--mu);margin-top:6px;line-height:1.5">PIN vergessen? Die <b>Verwaltung</b> kann Unterschrift &amp; PIN zurücksetzen – Unterschrift und Stempel müssen danach <b>neu eingegeben</b> werden.</div>
+  <button id="apPinAendernToggle" onclick="document.getElementById('apPinAendernBox').style.display='block';this.style.display='none'" style="width:100%;margin-top:6px;padding:6px;background:#fff;color:#2563eb;border:1px dashed rgba(37,99,235,.4);border-radius:6px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">🔑 PIN ändern</button>
+  <div id="apPinAendernBox" style="display:none;margin-top:8px;padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px">
+    <div class="fg" style="margin-bottom:6px">
+      <label class="fl">Aktuelle PIN</label>
+      <input class="fi" id="apPinAlt" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="••••" autocomplete="off" style="font-family:'JetBrains Mono',monospace;letter-spacing:.3em;text-align:center">
+    </div>
+    <div class="fg" style="margin-bottom:6px">
+      <label class="fl">Neue PIN</label>
+      <input class="fi" id="apPinNeu" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="••••" autocomplete="new-password" style="font-family:'JetBrains Mono',monospace;letter-spacing:.3em;text-align:center">
+    </div>
+    <div id="apPinAendernErr" style="font-size:.65rem;color:#dc2626;margin-bottom:6px;display:none"></div>
+    <div style="display:flex;gap:6px">
+      <button onclick="apPinAendern()" style="flex:1;padding:7px;background:linear-gradient(135deg,#7c3aed,#9333ea);color:#fff;border:none;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✓ PIN ändern</button>
+      <button onclick="document.getElementById('apPinAendernBox').style.display='none';document.getElementById('apPinAendernToggle').style.display='block';document.getElementById('apPinAlt').value='';document.getElementById('apPinNeu').value=''" style="padding:7px 10px;background:#fff;color:var(--mu);border:1px solid var(--brd);border-radius:6px;font-size:.72rem;cursor:pointer">Abbrechen</button>
+    </div>
+  </div>
   <button class="bsave" onclick="saveAusbilderSigStempel()" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#7c3aed,#9333ea)" title="Verschluesselt speichern">💾 Speichern</button>
 </div>
 </div>
@@ -1456,7 +1472,8 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <div style="margin-top:16px;padding-top:14px;border-top:1.5px solid var(--brd)">
 <div style="font-size:.72rem;font-weight:700;color:var(--tx);margin-bottom:8px">🔑 Passwort ändern</div>
-<div class="fg"><label class="fl">Neues Passwort</label><input class="fi" id="apPwNew" type="password" placeholder="Min. 6 Zeichen" autocomplete="new-password"></div>
+<div class="fg"><label class="fl">Aktuelles Passwort</label><input class="fi" id="apPwOld" type="password" placeholder="Aktuelles Passwort" autocomplete="current-password"></div>
+<div class="fg" style="margin-top:6px"><label class="fl">Neues Passwort</label><input class="fi" id="apPwNew" type="password" placeholder="Min. 6 Zeichen" autocomplete="new-password"></div>
 <div class="fg" style="margin-top:6px"><label class="fl">Passwort wiederholen</label><input class="fi" id="apPwNew2" type="password" placeholder="Wiederholen" autocomplete="new-password"></div>
 <div id="apPwErr" style="font-size:.68rem;margin-top:4px"></div>
 <button class="bsave" onclick="changeAusbilderPw()" style="margin-top:8px;background:linear-gradient(135deg,#475569,#64748b)" title="Passwort ändern">🔑 Passwort ändern</button>
@@ -1968,7 +1985,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v870';
+const APP_VERSION = 'v871';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1983,6 +2000,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+    {v:'v871', d:'01.09.2026', items:['🔑 PIN selbst ändern: unter Mein Profil → Unterschrift jetzt „PIN ändern" – aktuelle PIN eingeben, neue vergeben, Unterschrift/Stempel bleiben erhalten. Gleiches Prinzip auch beim App-Passwort: „Passwort ändern" verlangt jetzt zwingend das aktuelle Passwort']},
   {v:'v870', d:'01.09.2026', items:['🔒 Nachbesserung: auch der Knopf „✕ Aus Kurs entfernen" im TN-Detail blockiert jetzt bei von der Verwaltung zugewiesenen Azubis und leitet zur Einstufung als Wiederholer/Nicht angetreten – nur echte Falschanmeldungen können direkt entfernt werden']},
   {v:'v869', d:'01.09.2026', items:['🔒 Nachbesserung: selbst beigetretene (falsch angemeldete) TN können jetzt auch per Drag & Drop nicht mehr als „Wiederholer" oder „Nicht angetreten" eingestuft werden – nur direktes Entfernen am Sitzplatz']},
   {v:'v868', d:'01.09.2026', items:['🔒 Von der Verwaltung zugewiesene TN können nicht mehr direkt aus dem Kurs entfernt werden – nur echte Falschanmeldungen (selbst per QR beigetreten). Reguläre TN müssen als „Wiederholer" oder „Nicht angetreten" eingestuft werden']},
@@ -7763,6 +7781,28 @@ let _apSigDataUrl='';
 let _apStempelDataUrl='';
 let _apSigPinSession='';
 let _apSigEditMode=false;
+// v871: Ausbilder kann seine PIN selbst aendern (alte PIN entsperrt, neue PIN wird gesetzt) -
+// entschluesselt Unterschrift/Stempel mit der alten PIN und verschluesselt neu mit der neuen.
+async function apPinAendern(){
+  const altEl=document.getElementById('apPinAlt'), neuEl=document.getElementById('apPinNeu');
+  const errEl=document.getElementById('apPinAendernErr');
+  errEl.style.display='none'; errEl.textContent='';
+  const alt=(altEl.value||'').trim(), neu=(neuEl.value||'').trim();
+  if(!/^\d{4}$/.test(alt)||!/^\d{4}$/.test(neu)){errEl.textContent='Bitte je eine 4-stellige PIN eingeben.';errEl.style.display='block';return;}
+  if(alt===neu){errEl.textContent='Die neue PIN muss sich von der alten unterscheiden.';errEl.style.display='block';return;}
+  const store=_getSigStempelStore();
+  if(!store.encSig && !store.encStempel){errEl.textContent='Keine Unterschrift/Stempel hinterlegt.';errEl.style.display='block';return;}
+  try{
+    if(store.encSig) _apSigDataUrl=await _decryptString(store.encSig,alt);
+    if(store.encStempel) _apStempelDataUrl=await _decryptString(store.encStempel,alt);
+    if(store.encSigVec){ try{ _apSigVec=JSON.parse(await _decryptString(store.encSigVec,alt)); }catch(e){} }
+  }catch(e){ errEl.textContent='Aktuelle PIN ist falsch.'; errEl.style.display='block'; return; }
+  await _persistSigStempel(neu);
+  altEl.value=''; neuEl.value='';
+  document.getElementById('apPinAendernBox').style.display='none';
+  document.getElementById('apPinAendernToggle').style.display='block';
+  toast('🔑 PIN erfolgreich geändert','ok');
+}
 async function apSigEnterEdit(){
   const errEl=document.getElementById('apSigPinErr');if(errEl){errEl.style.display='none';errEl.textContent='';}
   const store=_getSigStempelStore();
@@ -8166,23 +8206,34 @@ function saveAusbilderProfil(){
     }, 300);
   }
 }
+// v871: aktuelles Passwort wird jetzt zwingend geprueft (reauthenticateWithCredential -
+// wirft auth/wrong-password bei falschem PW), bevor ein neues gesetzt werden kann. Das
+// loest gleichzeitig das alte "requires-recent-login"-Problem, da Reauth die Sitzung
+// automatisch auffrischt.
 function changeAusbilderPw(){
+  const pwOld=document.getElementById('apPwOld').value;
   const pw1=document.getElementById('apPwNew').value;
   const pw2=document.getElementById('apPwNew2').value;
   const err=document.getElementById('apPwErr');
   err.textContent='';err.style.color='var(--bad)';
-  if(!pw1||pw1.length<6){err.textContent='Mindestens 6 Zeichen';return;}
-  if(pw1!==pw2){err.textContent='Passwörter stimmen nicht überein';return;}
-  _auth.currentUser.updatePassword(pw1).then(()=>{
+  if(!pwOld){err.textContent='Bitte aktuelles Passwort eingeben';return;}
+  if(!pw1||pw1.length<6){err.textContent='Neues Passwort: mindestens 6 Zeichen';return;}
+  if(pw1!==pw2){err.textContent='Neue Passwörter stimmen nicht überein';return;}
+  if(pwOld===pw1){err.textContent='Neues Passwort muss sich vom alten unterscheiden';return;}
+  const email=_auth.currentUser.email;
+  const cred=firebase.auth.EmailAuthProvider.credential(email,pwOld);
+  _auth.currentUser.reauthenticateWithCredential(cred).then(()=>{
+    return _auth.currentUser.updatePassword(pw1);
+  }).then(()=>{
+    document.getElementById('apPwOld').value='';
     document.getElementById('apPwNew').value='';
     document.getElementById('apPwNew2').value='';
     err.style.color='var(--acc)';err.textContent='✓ Passwort geändert';
-    // Markiere in Firestore dass PW geändert wurde
     if(_db&&_fbUid) _db.collection('users').doc(_fbUid).set({pwChanged:true},{merge:true}).catch(()=>{});
-    // Banner ausblenden
     const b=document.getElementById('pwChangeBanner');if(b)b.remove();
     toast('Passwort geändert ✓');
   }).catch(e=>{
+    if(e.code==='auth/wrong-password'){ err.textContent='Aktuelles Passwort ist falsch'; return; }
     if(e.code==='auth/requires-recent-login') err.textContent='Bitte neu anmelden und erneut versuchen';
     else err.textContent=e.message;
   });
