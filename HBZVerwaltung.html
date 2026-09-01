@@ -1755,10 +1755,12 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 391';
+const APP_VERSION = 'Build 393';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 393', d:'27.08.2026', items:['🔧 Kurshistorie: doppelte Einträge (gleicher Kurs, gleicher Zeitraum) werden jetzt an allen 6 Zuweisungswegen (Picker, Drag, Listen-Import, Übertragen) verhindert – arrayUnion prüfte bisher wegen des Zeitstempels nie auf echte Duplikate']},
+  {v:'Build 392', d:'27.08.2026', items:['🔧 Abmelden lädt jetzt die Seite hart neu – verhindert, dass beim Kontowechsel auf demselben Gerät Reste des vorherigen Kontos sichtbar bleiben']},
   {v:'Build 391', d:'27.08.2026', items:['📎 Kurs-Dokumente: nicht unterstützte Dateiformate zeigen jetzt eine klare Meldung ("Format nicht unterstützt") statt eines verwirrenden Berechtigungsfehlers']},
   {v:'Build 390', d:'27.08.2026', items:['🔧 Ursache für gescheiterte Kurs-Dokument-Uploads endlich gefunden: das Zurücksetzen des Dateifelds leerte die Dateiliste, bevor sie verarbeitet wurde – Upload lief dadurch komplett ins Leere, ohne jeden Fehler']},
   {v:'Build 389', d:'27.08.2026', items:['🔧 Ursache für gescheiterte Kurs-Dokument-Uploads gefunden: Der Admin-Zugang (Whitelist) trug die Rolle nie in die Nutzerakte ein, die Storage-Regeln konnten Admin daher nicht erkennen. Wird jetzt beim Login automatisch nachgetragen']},
@@ -2287,7 +2289,10 @@ function doLogin(){
     showErr(map[err.code]||err.message);
   });
 }
-function doLogout(){ auth.signOut(); }
+// Build 392: nach Abmelden hart neu laden - verhindert Reste des vorherigen Kontos
+// (Name, Kurse) auf demselben Geraet beim naechsten Login (gleiche Ursache wie in
+// AusbilderPro v866).
+function doLogout(){ auth.signOut().then(()=>location.reload()).catch(()=>location.reload()); }
 
 // ═══ App-Launcher (nur fuer Admin/Verwaltung) ═══
 function toggleAppLauncher(ev){
@@ -4241,6 +4246,13 @@ function openEditAusbilder(id) {
 }
 function closeEditAusbModal() { closeAddAusbModal(); }
 function saveEditAusbilder() { saveAusbilder(); }
+// Build 393: Duplikate in kursHistory verhindern. arrayUnion() dedupliziert nur bei
+// EXAKT identischen Objekten - der addedAt-Zeitstempel ist aber bei jedem Aufruf neu,
+// dadurch wurde derselbe Kurs (gleiche kursId+von+bis) bei jeder erneuten Zuweisung
+// (Picker, Drag, Uebertragen, Listen-Import) ein weiteres Mal angehaengt.
+function _histSchonDrin(tn, kursId, von, bis){
+  return (tn && tn.kursHistory || []).some(h => h && h.kursId===kursId && h.von===von && h.bis===bis);
+}
 function deleteAusbilder() { confirmDeleteAusbilder(); }
 
 // Date select helpers
@@ -8378,14 +8390,13 @@ function dropTNIntoKurs(e){
   }
   const kurs=_kurse.find(k=>k.id===kursId);
   const kursName=kurs?.name||kursId;
-  const histEntry={kursId,kursName,von:kurs?.von||'',bis:kurs?.bis||'',ausbilderName:kurs?.ausbilderName||'',lehrgangsartId:kurs?.lehrgangsartId||'',addedAt:Date.now()};
+  const vonD=kurs?.von||'', bisD=kurs?.bis||'';
+  const histEntry={kursId,kursName,von:vonD,bis:bisD,ausbilderName:kurs?.ausbilderName||'',lehrgangsartId:kurs?.lehrgangsartId||'',addedAt:Date.now()};
   // Beim Hinzufügen zu neuem Kurs: alte Status-Marker nur entfernen wenn der TN
   // jetzt den GLEICHEN Lehrgang wiederholt für den der Status gesetzt wurde.
   const decision=statusClearDecision(tn, kurs);
-  const tnUpdate={
-    aktiverKursId:kursId,
-    kursHistory:firebase.firestore.FieldValue.arrayUnion(histEntry)
-  };
+  const tnUpdate={ aktiverKursId:kursId };
+  if(!_histSchonDrin(tn,kursId,vonD,bisD)) tnUpdate.kursHistory=firebase.firestore.FieldValue.arrayUnion(histEntry);
   if(decision.clearStatus) tnUpdate.status=firebase.firestore.FieldValue.delete();
   if(decision.clearWiederholer) tnUpdate.wiederholer=firebase.firestore.FieldValue.delete();
   db.collection('globalTN').doc(_dragTNId).update(tnUpdate).then(()=>db.collection('shared').doc('kurse').collection('list').doc(kursId)
@@ -10481,12 +10492,12 @@ function kliUebernehmen(){
     toast(okRows.length+' TN in die Planung übernommen ✓');
   } else {
     const kursId=_selectedKursId; const kurs=_kurse.find(k=>k.id===kursId);
+    const vonLi=kurs?.von||new Date().toISOString().slice(0,10), bisLi=kurs?.bis||'';
     okRows.forEach(r=>{
       const tn=r.tn;
-      db.collection('globalTN').doc(tn.id).update({
-        aktiverKursId:kursId,
-        kursHistory:firebase.firestore.FieldValue.arrayUnion({kursId, kursName:kurs?.name||'', von:kurs?.von||new Date().toISOString().slice(0,10), bis:kurs?.bis||'', ausbilderName:kurs?.ausbilderName||'', lehrgangsartId:kurs?.lehrgangsartId||'', addedAt:Date.now()})
-      }).catch(()=>{});
+      const upd={aktiverKursId:kursId};
+      if(!_histSchonDrin(tn,kursId,vonLi,bisLi)) upd.kursHistory=firebase.firestore.FieldValue.arrayUnion({kursId, kursName:kurs?.name||'', von:vonLi, bis:bisLi, ausbilderName:kurs?.ausbilderName||'', lehrgangsartId:kurs?.lehrgangsartId||'', addedAt:Date.now()});
+      db.collection('globalTN').doc(tn.id).update(upd).catch(()=>{});
       db.collection('shared').doc('kurse').collection('list').doc(kursId)
         .collection('teilnehmer').doc(tn.id).set({
           vorname:tn.vorname||'', nachname:tn.nachname||'', firma:tn.firma||'',
@@ -10641,10 +10652,10 @@ function pickTNForKurs(tnId){
   }
   // Direkt in Firestore zuweisen
   const kurs=_kurse.find(k=>k.id===kursId);
-  db.collection('globalTN').doc(tnId).update({
-    aktiverKursId: kursId,
-    kursHistory: firebase.firestore.FieldValue.arrayUnion({kursId, kursName:kurs?.name||'', von:kurs?.von||new Date().toISOString().slice(0,10), bis:kurs?.bis||'', ausbilderName:kurs?.ausbilderName||'', lehrgangsartId:kurs?.lehrgangsartId||'', addedAt:Date.now()})
-  });
+  const vonPk=kurs?.von||new Date().toISOString().slice(0,10), bisPk=kurs?.bis||'';
+  const updPk={aktiverKursId: kursId};
+  if(!_histSchonDrin(tn,kursId,vonPk,bisPk)) updPk.kursHistory=firebase.firestore.FieldValue.arrayUnion({kursId, kursName:kurs?.name||'', von:vonPk, bis:bisPk, ausbilderName:kurs?.ausbilderName||'', lehrgangsartId:kurs?.lehrgangsartId||'', addedAt:Date.now()});
+  db.collection('globalTN').doc(tnId).update(updPk);
   db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(tnId).set({
       vorname:tn.vorname||'', nachname:tn.nachname||'', firma:tn.firma||'',
@@ -10937,7 +10948,11 @@ function transferEntwurf(kursId){
     const histEntry={kursId,kursName:k.name,von:k.von,bis:k.bis,ausbilderName:k.ausbilderName,lehrgangsartId:k.lehrgangsartId||'',addedAt:Date.now()};
     const tnRef=db.collection('globalTN').doc(tnId);
     const markedHist=markOldHistoryAbsent(tn, tn.aktiverKursId);
-    const tnUpdate={aktiverKursId:kursId, entwurfKursId:firebase.firestore.FieldValue.delete(), kursHistory:markedHist?markedHist.concat([histEntry]):firebase.firestore.FieldValue.arrayUnion(histEntry)};
+    const basisHist=markedHist||tn.kursHistory||[];
+    const schonDrin=basisHist.some(h=>h&&h.kursId===kursId&&h.von===k.von&&h.bis===k.bis);
+    const tnUpdate={aktiverKursId:kursId, entwurfKursId:firebase.firestore.FieldValue.delete()};
+    if(schonDrin){ if(markedHist) tnUpdate.kursHistory=markedHist; }
+    else { tnUpdate.kursHistory = markedHist ? markedHist.concat([histEntry]) : firebase.firestore.FieldValue.arrayUnion(histEntry); }
     if(tn.status) tnUpdate.status=firebase.firestore.FieldValue.delete();
     if(tn.wiederholer) tnUpdate.wiederholer=firebase.firestore.FieldValue.delete();
     batch.update(tnRef,tnUpdate);
@@ -10996,7 +11011,11 @@ async function transferAlleEntwuerfe(){
         const histEntry={kursId:k.id,kursName:k.name,von:k.von,bis:k.bis,ausbilderName:k.ausbilderName,lehrgangsartId:k.lehrgangsartId||'',addedAt:Date.now()};
         const tnRef=db.collection('globalTN').doc(tnId);
         const markedHist=markOldHistoryAbsent(tn, tn.aktiverKursId);
-        const tnUpdate={aktiverKursId:k.id,entwurfKursId:firebase.firestore.FieldValue.delete(),kursHistory:markedHist?markedHist.concat([histEntry]):firebase.firestore.FieldValue.arrayUnion(histEntry)};
+        const basisHist5=markedHist||tn.kursHistory||[];
+        const schonDrin5=basisHist5.some(h=>h&&h.kursId===k.id&&h.von===k.von&&h.bis===k.bis);
+        const tnUpdate={aktiverKursId:k.id,entwurfKursId:firebase.firestore.FieldValue.delete()};
+        if(schonDrin5){ if(markedHist) tnUpdate.kursHistory=markedHist; }
+        else { tnUpdate.kursHistory = markedHist ? markedHist.concat([histEntry]) : firebase.firestore.FieldValue.arrayUnion(histEntry); }
         if(tn.status) tnUpdate.status=firebase.firestore.FieldValue.delete();
         if(tn.wiederholer) tnUpdate.wiederholer=firebase.firestore.FieldValue.delete();
         batch.update(tnRef,tnUpdate);
@@ -11096,7 +11115,10 @@ function bldUebertragen(){
       // 2. Alle TN dem Kurs zuordnen (Batch für Performance)
       const batch = db.batch();
       const oldKursCleanups = []; // Promises für alte Kurs-Subcollection-Löschungen
-      _bldTNIds.forEach(tnId=>{
+      // Build 393: Set() gegen doppelte tnId in der Planungsliste selbst (z.B. versehentlich
+      // zweimal hinzugefuegt) - sonst wuerde derselbe TN im selben neuen Kurs zweimal
+      // verarbeitet und die Historie doppelt erhalten.
+      Array.from(new Set(_bldTNIds)).forEach(tnId=>{
         const tn = _globalTN.find(t=>t.id===tnId);
         if(!tn) return;
         const histEntry = {kursId, kursName, von, bis, ausbilderName:ausbObj.name, lehrgangsartId:lgartObj.id, addedAt:Date.now()};
@@ -11104,10 +11126,11 @@ function bldUebertragen(){
         // globalTN updaten – Status/Wiederholer aufräumen
         const tnRef = db.collection('globalTN').doc(tnId);
         const markedHist=markOldHistoryAbsent(tn, tn.aktiverKursId);
-        const tnUpdate = {
-          aktiverKursId: kursId,
-          kursHistory: markedHist ? markedHist.concat([histEntry]) : firebase.firestore.FieldValue.arrayUnion(histEntry)
-        };
+        const basisHist6=markedHist||tn.kursHistory||[];
+        const schonDrin6=basisHist6.some(h=>h&&h.kursId===kursId&&h.von===von&&h.bis===bis);
+        const tnUpdate = { aktiverKursId: kursId };
+        if(schonDrin6){ if(markedHist) tnUpdate.kursHistory=markedHist; }
+        else { tnUpdate.kursHistory = markedHist ? markedHist.concat([histEntry]) : firebase.firestore.FieldValue.arrayUnion(histEntry); }
         if(tn.status) tnUpdate.status = firebase.firestore.FieldValue.delete();
         if(tn.wiederholer) tnUpdate.wiederholer = firebase.firestore.FieldValue.delete();
         batch.update(tnRef, tnUpdate);

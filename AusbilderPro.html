@@ -1968,7 +1968,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v865';
+const APP_VERSION = 'v866';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1983,6 +1983,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v866', d:'27.08.2026', items:['🔧 Abmelden lädt jetzt die Seite hart neu – verhindert, dass beim Kontowechsel auf demselben Gerät Reste des vorherigen Kontos (Name, Kurse, Sitzplan) sichtbar bleiben']},
   {v:'v865', d:'27.08.2026', items:['📎 Dokument-Upload: nicht unterstützte Dateiformate und zu große Dateien zeigen jetzt eine klare Meldung statt eines Berechtigungsfehlers']},
   {v:'v864', d:'27.08.2026', items:['🔧 Vorsichtsmaßnahme zum selben Muster wie VP Build 390 – Datei wird jetzt garantiert vor dem Zurücksetzen des Dateifelds gesichert']},
   {v:'v863', d:'27.08.2026', items:['🔧 Kurs-Dokumente: Fehler beim Hochladen (fehlende Berechtigung, Speicherproblem) werden jetzt sichtbar angezeigt statt lautlos zu verschwinden']},
@@ -13953,8 +13954,12 @@ function fbReset(){
 }
 
 function fbLogout(){
+  // v866: Nach dem Abmelden hart neu laden. signOut() allein raeumte den laufenden
+  // Zustand (Name, Kursliste, Sitzplan, Live-Sync) NICHT auf - meldete sich auf demselben
+  // Geraet direkt danach ein anderer Ausbilder an, blieben alte Reste sichtbar, bis
+  // irgendwann (unvollstaendig) neu geladen wurde. Ein voller Reload macht das unmoeglich.
   if(!confirm('Wirklich abmelden?'))return;
-  _auth.signOut();
+  _auth.signOut().then(()=>{ location.reload(); }).catch(()=>{ location.reload(); });
 }
 
 // ═══ App-Launcher (nur fuer Admin/Verwaltung) ═══
