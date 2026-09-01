@@ -1,4 +1,4 @@
-const CACHE = 'ausbilderpro-v866';
+const CACHE = 'ausbilderpro-v867';
 const ASSETS = [
   './AusbilderPro.html',
   './manifest.json',
@@ -12,14 +12,15 @@ const ASSETS = [
 ];
 
 // Install: pre-cache assets als Offline-Fallback
+// v867: skipWaiting sofort - stilles Auto-Update wie in VerwaltungPro, kein Update-Banner
+// mehr. Der neue SW uebernimmt beim naechsten normalen Neuladen/Tab-Wechsel von selbst.
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
       .then(c => c.addAll(ASSETS.map(u => new Request(u, {mode: 'no-cors'}))))
+      .then(() => self.skipWaiting())
       .catch(() => {})
   );
-  // Standardmaessig NICHT sofort skipWaiting - damit der Client das Banner sehen kann.
-  // Client kann via postMessage('SKIP_WAITING') triggern.
 });
 
 // Message-Handler: Client kann den wartenden SW aktivieren

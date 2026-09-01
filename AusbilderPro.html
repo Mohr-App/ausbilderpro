@@ -1968,7 +1968,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v866';
+const APP_VERSION = 'v867';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -1983,6 +1983,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v867', d:'01.09.2026', items:['🔕 Kein Update-Banner mehr – Updates laden jetzt still im Hintergrund und werden beim nächsten normalen Neuladen aktiv, genau wie in VerwaltungPro']},
   {v:'v866', d:'27.08.2026', items:['🔧 Abmelden lädt jetzt die Seite hart neu – verhindert, dass beim Kontowechsel auf demselben Gerät Reste des vorherigen Kontos (Name, Kurse, Sitzplan) sichtbar bleiben']},
   {v:'v865', d:'27.08.2026', items:['📎 Dokument-Upload: nicht unterstützte Dateiformate und zu große Dateien zeigen jetzt eine klare Meldung statt eines Berechtigungsfehlers']},
   {v:'v864', d:'27.08.2026', items:['🔧 Vorsichtsmaßnahme zum selben Muster wie VP Build 390 – Datei wird jetzt garantiert vor dem Zurücksetzen des Dateifelds gesichert']},
@@ -14975,105 +14976,23 @@ window._fbSaveHook = fbSave;
 
 init();
 
-// PWA Service Worker mit AUTO-UPDATE (ohne nervigen Banner)
+// v867: Stilles Auto-Update wie in VerwaltungPro - kein Banner mehr. Der neue Service
+// Worker aktiviert sich selbst (skipWaiting in sw.js) und uebernimmt beim naechsten
+// normalen Neuladen/Tab-Wechsel von selbst. Kein erzwungener Reload der laufenden Seite.
 if('serviceWorker' in navigator){
-  let _swRefreshing=false;
-  // Reload NUR, wenn der User das Update bewusst per Hinweis angewendet hat – kein Auto-Reload mehr
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(!window._userAppliedUpdate) return;
-    if(_swRefreshing) return;
-    _swRefreshing=true;
-    setTimeout(()=>location.reload(), 150);
-  });
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('./sw.js')
       .then(reg=>{
-        // Falls schon eine neue Version wartet (z.B. nach 'Später'): dezenten Hinweis zeigen
-        if(reg.waiting && navigator.serviceWorker.controller) _showUpdateBanner();
-        // Update gefunden: NICHT automatisch anwenden – nur dezenten Hinweis zeigen
-        reg.addEventListener('updatefound', ()=>{
-          const newWorker=reg.installing;
-          if(!newWorker) return;
-          newWorker.addEventListener('statechange', ()=>{
-            if(newWorker.state==='installed' && navigator.serviceWorker.controller){
-              _showUpdateBanner();
-            }
-          });
-        });
-        // Update-Checks (nur Erkennung – loesen KEINEN Reload aus)
         try{ reg.update(); }catch(e){}
         setInterval(()=>{ try{reg.update();}catch(e){} }, 10*60*1000);
       })
       .catch(e=>console.warn('SW Fehler:',e));
   });
-  // Auch bei Tab-Wechsel zurueck-Sichtbar: Update-Check
   document.addEventListener('visibilitychange', ()=>{
     if(!document.hidden && navigator.serviceWorker.controller){
       navigator.serviceWorker.getRegistration().then(reg=>{
         if(reg) try{reg.update();}catch(e){}
       });
-    }
-  });
-}
-// Automatisches Anwenden eines verfuegbaren Updates - aber NUR wenn User idle
-let _autoUpdatePending=false;
-function _autoApplyUpdate(){
-  if(_autoUpdatePending) return;
-  _autoUpdatePending=true;
-  function tryNow(){
-    // Pruefe ob User gerade tippt
-    const active=document.activeElement;
-    const isTyping=active && (active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.isContentEditable);
-    // Pruefe ob ein Modal/Dialog offen ist (verschiedene Modal-Klassen)
-    const hasModal=document.querySelector('.mod.show, .modal.show, .ov.show, [id$="Modal"][style*="display:flex"], [id$="Dialog"][style*="display:flex"]');
-    if(isTyping||hasModal){
-      // 30s warten, dann nochmal
-      setTimeout(tryNow, 30*1000);
-      return;
-    }
-    // Sicher: SKIP_WAITING sendet, dann controllerchange → reload
-    navigator.serviceWorker.getRegistration().then(reg=>{
-      if(reg && reg.waiting){
-        reg.waiting.postMessage({type:'SKIP_WAITING'});
-      }
-    }).catch(()=>{});
-  }
-  // Erste Probe direkt nach kurzer Verzoegerung (User soll sich nicht erschrecken)
-  setTimeout(tryNow, 2000);
-}
-
-function _showUpdateBanner(){
-  if(document.getElementById('updateBanner')) return; // schon da
-  // 30min-Cooldown nach manuellem Dismiss
-  try{
-    const dis=parseInt(sessionStorage.getItem('ausb_update_dismiss')||'0');
-    if(dis && Date.now()-dis < 30*60*1000) return;
-  }catch(e){}
-  const b=document.createElement('div');
-  b.id='updateBanner';
-  b.style.cssText='position:fixed;bottom:12px;right:12px;background:rgba(71,85,105,.92);color:#fff;padding:5px 8px 5px 10px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.18);z-index:99999;display:flex;align-items:center;gap:6px;font-family:Sora,sans-serif;font-weight:600;font-size:.68rem;opacity:.72;transition:opacity .2s;animation:updateBannerIn .35s ease';
-  b.onmouseenter=()=>{b.style.opacity='1';}; b.onmouseleave=()=>{b.style.opacity='.72';};
-  b.innerHTML='<span onclick="_applyUpdate()" title="Neue Version laden" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">↻ Update</span>'
-    +'<button onclick="_dismissUpdateBanner()" title="Später (30 Min nicht mehr fragen)" style="background:none;border:none;color:rgba(255,255,255,.7);padding:0 0 0 2px;cursor:pointer;font-size:.85rem;line-height:1">×</button>';
-  const st=document.createElement('style');
-  st.textContent='@keyframes updateBannerIn{from{opacity:0;transform:translateY(12px)}to{opacity:.72;transform:translateY(0)}}';
-  document.head.appendChild(st);
-  document.body.appendChild(b);
-}
-function _dismissUpdateBanner(){
-  const b=document.getElementById('updateBanner');
-  if(b) b.remove();
-  try{ sessionStorage.setItem('ausb_update_dismiss', Date.now().toString()); }catch(e){}
-}
-function _applyUpdate(){
-  window._userAppliedUpdate=true; // erlaubt den einen gewollten Reload via controllerchange
-  const b=document.getElementById('updateBanner'); if(b) b.remove();
-  navigator.serviceWorker.getRegistration().then(reg=>{
-    if(reg && reg.waiting){
-      // Sage dem wartenden SW dass er aktiv werden soll
-      reg.waiting.postMessage({type:'SKIP_WAITING'});
-    } else {
-      location.reload();
     }
   });
 }
