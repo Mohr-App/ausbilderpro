@@ -925,6 +925,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="showDiagnose();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(59,130,246,.06);border-color:rgba(59,130,246,.2);color:#1e40af" title="Diagnose-Informationen anzeigen (bei Problemen)">🔍 Diagnose</button>
         <button class="tbtn" onclick="zeigeCloudVorgaenger();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(217,119,6,.06);border-color:rgba(217,119,6,.25);color:#92400e" title="Den beim letzten Sitzungsbeginn gesicherten Cloud-Stand ansehen und bei Datenverlust wiederherstellen">🛟 Cloud-Vorgänger wiederherstellen</button>
         <button class="tbtn" id="liveSyncBtn" onclick="liveSyncToggle();closeHdrMenu()" style="width:100%;text-align:left;display:none;background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.25);color:#1e40af" title="BETA: Sitzplan und Anwesenheit laufen live über den Kurs – mehrere PCs gleichzeitig möglich. Nur auf diesem Gerät, jederzeit umschaltbar (doppelte Buchführung).">⚡ Live-Sync (Beta): AUS</button>
+        <button class="tbtn" id="notenSyncBtn" onclick="notenSyncToggle();closeHdrMenu()" style="width:100%;text-align:left;display:none;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.25);color:#6d28d9" title="BETA (nur du): Noten laufen live über den Kurs zurück in die App – Cloud-Noten werden gelesen und auf den Sitz übernommen. Doppelte Buchführung, jederzeit umschaltbar.">🎓 Noten-Sync (Beta): AUS</button>
         <button class="tbtn" onclick="appReset();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#991b1b" title="App-Cache und alte lokale Dateien zurücksetzen (bei Problemen)">🔄 App zurücksetzen</button>
         <button class="tbtn" id="hdrChatSweepBtn" onclick="openChatSweep();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:#6d28d9;display:none" title="Alte Chat-Nachrichten manuell entfernen (Admin/DSGVO)">🧹 Chat-Bereinigung</button>
         <button class="tbtn" onclick="recoverOrphanSeats();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.2);color:#4338ca" title="TN, die direkt am Sitzplatz eingegeben wurden (statt über +TN), nachträglich in globalTN + Kurs-Liste anlegen">🔗 Verwaiste Sitze nachtragen</button>
@@ -1985,7 +1986,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v876';
+const APP_VERSION = 'v877';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2000,6 +2001,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v877', d:'01.09.2026', items:['🎓 Noten-Sync (Etappe 3, Beta – nur Admin/Testkonto, je Gerät): Noten laufen jetzt live über den Kurs zurück in die App (mehrere PCs, Vertretung sieht Noten). Liest aus der bestehenden Teilnehmerliste, kein neuer Speicherort. Leere Cloud-Werte überschreiben nie gefüllte Noten. Koffer läuft als Fallback doppelt weiter']},
   {v:'v876', d:'01.09.2026', items:['🎨 Nachbesserung: unsichtbarer Platzhalter unter „Kurs anlegen" gleicht die Statuszeile unter „Jetzt prüfen" aus – Knöpfe jetzt wirklich auf gleicher Höhe']},
   {v:'v875', d:'01.09.2026', items:['🎨 Willkommensbildschirm: Knöpfe „Jetzt prüfen" und „Kurs anlegen" stehen jetzt auf gleicher Höhe, egal wie lang der Beschreibungstext darüber ist']},
   {v:'v874', d:'01.09.2026', items:['👋 Neuer Willkommensbildschirm für Erst-Login: „Auf Zuweisung warten" und „Selbst anlegen" jetzt gleichwertig nebeneinander (statt einer großen und einer versteckten Option), plus kurze Erklärung zum Sitzplan/den Platznummern']},
@@ -2652,6 +2654,7 @@ function selInst(katId,instId){
   setTimeout(()=>{try{_syncKursKenntnis(curInst());}catch(e){}}, 700);
   setTimeout(()=>{try{_autoNachtragCheckins(curInst());}catch(e){}}, 1000);
   setTimeout(()=>{try{_liveStart(curInst());}catch(e){}}, 1100);
+  setTimeout(()=>{try{_notenStart(curInst());}catch(e){}}, 1200);
   // Cross-Ausbilder Noten-Sync: lade Noten anderer Ausbilder fuer diesen Kurs aus Firestore
   setTimeout(()=>{try{syncSeatGradesFromFirestore();}catch(e){}}, 150);
   // Self-Heal: Kurs in Cloud synchronisieren (falls Umbenennung nicht durchgekommen ist)
@@ -6995,6 +6998,9 @@ function syncAttendanceToFirestore(seatId){
   }
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(tnId).set(syncData,{merge:true}).catch(err=>console.warn('Sync error:',err));
+  // v877: eigenen Noten-Schatten aktualisieren, damit dieser Schreibvorgang nicht als
+  // Fremdaenderung zurueckkommt (Echo-Schutz analog Live-Sync).
+  try{ if(typeof _notenSyncAn==='function' && _notenSyncAn() && _notenSync.kursId===kursId){ _notenSync.shadow[tnId]=_canon(_notenVonSeat(d)); } }catch(e){}
   // Bei jedem TN-Save auch die Custom-Grade-Labels ans Kurs-Doc syncen (falls noch nicht passiert)
   try{ syncCustomGradesToCloud(); }catch(e){}
 }
@@ -12756,7 +12762,9 @@ function loadPool(){
   setTimeout(()=>{try{_syncKursKenntnis(curInst());}catch(e){}}, 1200);
   setTimeout(()=>{try{_autoNachtragCheckins(curInst());}catch(e){}}, 1500);
   setTimeout(()=>{try{_liveStart(curInst());}catch(e){}}, 1600);
+  setTimeout(()=>{try{_notenStart(curInst());}catch(e){}}, 1700);
   setTimeout(()=>{try{liveSyncMenuUpdate();}catch(e){}}, 800);
+  setTimeout(()=>{try{notenSyncMenuUpdate();}catch(e){}}, 850);
   setTimeout(()=>{try{_liveGlobalWatch();}catch(e){}}, 500);
   setTimeout(()=>{try{_pruefeSigReset();}catch(e){}}, 2500);
   if(_demoMode) return;
@@ -14081,6 +14089,7 @@ function goAsAusbilder(){
 
 function toggleHdrMenu(){
   try{ if(typeof liveSyncMenuUpdate==='function') liveSyncMenuUpdate(); }catch(e){}
+  try{ if(typeof notenSyncMenuUpdate==='function') notenSyncMenuUpdate(); }catch(e){}
   const m=document.getElementById('hdrMenu');
   const open=m.style.display==='flex';
   m.style.display=open?'none':'flex';
@@ -14529,6 +14538,97 @@ function _liveListen(){
     const docs={}; snap.forEach(d=>docs[d.id]=d.data());
     _liveApplyDocs(inst, docs, false);
   }, err=>{ _live.status='⚠ Empfang gestört'; toast('⚡ Live-Empfang gestört: '+err.message,'bad'); console.warn('live listen',err); });
+}
+// ═══════════════ v877: NOTEN-SYNC (Etappe 3, Beta) ═══════════════
+// Noten liegen bereits in der teilnehmer-Subcollection (geschrieben von syncAttendance-
+// ToFirestore). Etappe 3 baut NUR den Rueckweg: ein Listener liest Noten aus GENAU dieser
+// Quelle (kein neuer Speicherort - Drei-Orte-Lehre) und uebernimmt sie auf den Sitz,
+// geschluesselt nach TN-ID. Echo-Schutz per _canon-Schatten. Schalter nur fuer Admin/Test,
+// je Geraet. Koffer laeuft doppelt weiter (Fallback). Migration: nur Koffer->Cloud beim
+// Erstlauf, NIE leere Cloud ueber volle Koffer-Noten.
+let _notenSync={kursId:null, unsub:null, shadow:{}, ready:false, applying:false};
+function _notenSyncAn(){ try{ return localStorage.getItem(_lsKey('ap_notensync'))==='1' && !_demoMode && !!_db; }catch(e){ return false; } }
+function notenSyncMenuUpdate(){
+  const b=document.getElementById('notenSyncBtn'); if(!b) return;
+  const darf=_LIVE_ADMINS.includes(((_auth&&_auth.currentUser&&_auth.currentUser.email)||'').toLowerCase());
+  b.style.display=darf?'':'none';
+  b.textContent='🎓 Noten-Sync (Beta): '+(_notenSyncAn()?'AN':'AUS');
+  if(_notenSyncAn()){ b.style.background='rgba(5,150,105,.1)'; b.style.color='#065f46'; }
+}
+function notenSyncToggle(){
+  try{
+    const neu=_notenSyncAn()?'0':'1';
+    localStorage.setItem(_lsKey('ap_notensync'), neu);
+    notenSyncMenuUpdate();
+    if(neu==='1'){ toast('🎓 Noten-Sync AN (nur dieses Gerät)'); _notenStart(curInst()); }
+    else { toast('Noten-Sync AUS – Noten laufen klassisch'); _notenStop(); }
+  }catch(e){}
+}
+function _notenStop(){ if(_notenSync.unsub){ try{_notenSync.unsub();}catch(e){} } _notenSync={kursId:null, unsub:null, shadow:{}, ready:false, applying:false}; }
+// Notenfelder eines Sitzes als kanonisch vergleichbares Objekt (nur die 3 Fix + Extra)
+function _notenVonSeat(d){
+  const ex={}; Object.entries(d.extraGrades||{}).forEach(([k,v])=>{ if(v) ex[k]=v; });
+  return {m:d.mitarbeit||'', f:d.fuehrung||'', p:d.praxis||'', e:ex};
+}
+function _notenVonDoc(x){
+  const ex={}; Object.entries(x.noten_extra||{}).forEach(([k,v])=>{ if(v) ex[k]=v; });
+  return {m:x.noten_mitarbeit||'', f:x.noten_fuehrung||'', p:x.noten_praxis||'', e:ex};
+}
+function _notenStart(inst){
+  if(!_notenSyncAn()){ return; }
+  if(!inst||!inst.sharedKursId){ _notenStop(); return; }
+  if(_notenSync.kursId===inst.sharedKursId && _notenSync.unsub) return;
+  _notenStop();
+  _notenSync.kursId=inst.sharedKursId;
+  const kid=inst.sharedKursId;
+  const ref=_db.collection('shared').doc('kurse').collection('list').doc(kid).collection('teilnehmer');
+  // Schatten aus aktuellem lokalem Stand vorbelegen (Echo-Schutz ab erstem Snapshot)
+  Object.values(inst.seats||{}).forEach(d=>{ if(d&&d.poolTnId) _notenSync.shadow[d.poolTnId]=_canon(_notenVonSeat(d)); });
+  _notenSync.ready=true;
+  _notenSync.unsub=ref.onSnapshot(snap=>{
+    if(!_notenSync.ready) return;
+    const cur=curInst();
+    if(!cur||cur.sharedKursId!==kid) return;
+    _notenApply(cur, snap);
+  }, err=>{ toast('🎓 Noten-Empfang gestört: '+err.message,'bad'); console.warn('noten listen',err); });
+}
+function _notenApply(inst, snap){
+  if(_notenSync.applying) return;
+  _notenSync.applying=true;
+  try{
+    let changed=false;
+    // sid je TN-ID
+    const sidVon={}; Object.entries(inst.seats||{}).forEach(([sid,d])=>{ if(d&&d.poolTnId) sidVon[d.poolTnId]=sid; });
+    snap.forEach(doc=>{
+      const tnId=doc.id; const sid=sidVon[tnId]; if(!sid) return;
+      const d=inst.seats[sid]; if(!d) return;
+      const cloud=_notenVonDoc(doc.data()||{});
+      const cloudCanon=_canon(cloud);
+      if(cloudCanon===(_notenSync.shadow[tnId]||_canon(_notenVonSeat(d)))) return; // nichts Neues
+      // Cloud hat andere Noten -> uebernehmen. Leere Cloud-Werte ueberschreiben NICHT
+      // gefuellte Koffer-Werte (Schutz vor Migrationsluecke Punkt 5).
+      const _uebernehmen=(cloudVal, seatVal)=> (cloudVal!==undefined && cloudVal!=='') ? cloudVal : seatVal;
+      const neuM=_uebernehmen(cloud.m,d.mitarbeit||'');
+      const neuF=_uebernehmen(cloud.f,d.fuehrung||'');
+      const neuP=_uebernehmen(cloud.p,d.praxis||'');
+      if((d.mitarbeit||'')!==neuM){ d.mitarbeit=neuM; changed=true; }
+      if((d.fuehrung||'')!==neuF){ d.fuehrung=neuF; changed=true; }
+      if((d.praxis||'')!==neuP){ d.praxis=neuP; changed=true; }
+      if(!d.extraGrades) d.extraGrades={};
+      Object.entries(cloud.e||{}).forEach(([cid,val])=>{
+        if(val && d.extraGrades[cid]!==val){ d.extraGrades[cid]=val; changed=true; }
+      });
+      _notenSync.shadow[tnId]=_canon(_notenVonSeat(d));
+    });
+    if(changed){
+      persist();
+      // Sitzplan neu zeichnen, aber das offene Detail-Panel NICHT anfassen - dort tippt
+      // der Ausbilder evtl. gerade. Er sieht die Fremdaenderung beim naechsten Oeffnen.
+      try{ renderSeats(); }catch(e){}
+      toast('🎓 Noten aktualisiert (beim Öffnen des Sitzes sichtbar)');
+    }
+  } catch(err){ toast('🎓 Noten-Übernahme fehlgeschlagen: '+err.message,'bad'); console.warn('noten apply',err);
+  } finally { _notenSync.applying=false; }
 }
 function _liveApplyDocs(inst, docs, initial){
   if(_live.applying) return;
