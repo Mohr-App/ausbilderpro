@@ -221,8 +221,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div style="font-size:.7rem;color:var(--mu);line-height:1.5">Damit nur <b>du</b> in die App kommst. Danach ordnen wir dich deinem Lehrgang zu.</div>
         </div>
         <div><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jKeEmail" autocomplete="email" placeholder="deine@email.de"></div>
-        <div style="margin-top:6px"><label class="fl">Passwort <span style="color:#ef4444">*</span></label><input class="fi" type="password" id="jKePasswort" autocomplete="new-password" placeholder="mind. 6 Zeichen"></div>
         <div style="margin-top:6px"><label class="fl">E-Mail wiederholen <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jKeEmail2" autocomplete="off" placeholder="zur Sicherheit nochmal eintippen" onpaste="return false" ondrop="return false"></div>
+        <div style="margin-top:6px"><label class="fl">Passwort <span style="color:#ef4444">*</span></label>
+          <div style="position:relative"><input class="fi" type="password" id="jKePasswort" autocomplete="new-password" placeholder="mind. 6 Zeichen" style="padding-right:40px"><button type="button" onclick="jKeTogglePw()" id="jKePwEye" title="Passwort anzeigen" aria-label="Passwort anzeigen" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--mu);padding:4px;line-height:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+        </div>
         <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:.66rem;color:var(--mu);line-height:1.4;cursor:pointer"><input type="checkbox" id="jKeDsgvo" style="margin-top:2px;flex:none"><span>Ich akzeptiere die Datenschutzerklärung und Nutzungsbedingungen.</span></label>
         <div class="err" id="jKeErr"></div>
         <button class="btn" id="jKeBtn" onclick="submitKontoErstellen()" style="margin-top:10px;background:linear-gradient(135deg,#059669,#10b981)">Konto erstellen &amp; weiter</button>
@@ -304,7 +306,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         </div>
         <div id="jLnrWhoBox" style="background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.72rem"></div>
         <div><label class="fl">E-Mail <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jLnrEmail" autocomplete="email" placeholder="deine@email.de"></div>
-        <div style="margin-top:6px"><label class="fl">Passwort <span style="color:#ef4444">*</span></label><input class="fi" type="password" id="jLnrPasswort" autocomplete="new-password" placeholder="mind. 6 Zeichen"></div>
+        <div style="margin-top:6px"><label class="fl">E-Mail wiederholen <span style="color:#ef4444">*</span></label><input class="fi" type="email" id="jLnrEmail2" autocomplete="off" placeholder="zur Sicherheit nochmal eintippen" onpaste="return false" ondrop="return false"></div>
+        <div style="margin-top:6px"><label class="fl">Passwort <span style="color:#ef4444">*</span></label>
+          <div style="position:relative"><input class="fi" type="password" id="jLnrPasswort" autocomplete="new-password" placeholder="mind. 6 Zeichen" style="padding-right:40px"><button type="button" onclick="jPwToggle('jLnrPasswort','jLnrPwEye')" id="jLnrPwEye" title="Passwort anzeigen" aria-label="Passwort anzeigen" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--mu);padding:4px;line-height:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+        </div>
         <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:.66rem;color:var(--mu);line-height:1.4;cursor:pointer"><input type="checkbox" id="jLnrDsgvo" style="margin-top:2px;flex:none"><span>Ich akzeptiere die Datenschutzerkl&auml;rung und Nutzungsbedingungen.</span></label>
         <div class="err" id="jLnrLoginErr"></div>
         <button class="btn" id="jLnrSubmitBtn" onclick="submitLnrRegistration()" style="margin-top:10px;background:linear-gradient(135deg,#059669,#10b981)">Registrieren</button>
@@ -2172,15 +2177,30 @@ function joinKontoErstBack(){
   var k=document.getElementById('joinKontoErst'); if(k) k.style.display='none';
   var c=document.getElementById('joinChoice'); if(c) c.style.display='block';
 }
+// v319: Augensymbol - Passwort sichtbar machen statt zweites Pflichtfeld. Ein Tippfehler
+// beim Passwort ist im Gegensatz zur E-Mail harmlos (Reset-Mail kommt an), daher reicht
+// die Sichtkontrolle. Generisch fuer beide Registrierungswege (Weg 1 + Weg 2/LNr).
+const _PW_EYE_OPEN='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const _PW_EYE_OFF='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+function jPwToggle(inpId, btnId){
+  const inp=document.getElementById(inpId); const btn=document.getElementById(btnId);
+  if(!inp||!btn) return;
+  const zeigen=inp.type==='password';
+  inp.type=zeigen?'text':'password';
+  btn.title=zeigen?'Passwort verbergen':'Passwort anzeigen';
+  btn.setAttribute('aria-label', btn.title);
+  btn.innerHTML=zeigen?_PW_EYE_OFF:_PW_EYE_OPEN;
+}
+function jKeTogglePw(){ jPwToggle('jKePasswort','jKePwEye'); }
 function submitKontoErstellen(){
   const errEl=document.getElementById('jKeErr'); errEl.style.color=''; errEl.textContent='';
   const email=(document.getElementById('jKeEmail').value||'').trim().toLowerCase();
   const passwort=document.getElementById('jKePasswort').value||'';
   if(!email){ errEl.textContent='Bitte E-Mail eingeben'; return; }
+  // v317: E-Mail zuerst pruefen (jetzt vor dem Passwort im Formular), danach Passwort-Laenge
+  const email2check=(document.getElementById('jKeEmail2')?.value||'').trim().toLowerCase();
+  if(email2check!==email){ errEl.textContent='Die E-Mail-Adressen stimmen nicht überein – bitte beide prüfen. Ein Tippfehler sperrt dich später aus (Passwort-Reset käme nie an)!'; return; }
   if(passwort.length<6){ errEl.textContent='Passwort muss mindestens 6 Zeichen haben'; return; }
-  // v316: Tippfehler-Schutz - E-Mail muss doppelt eingetippt werden (Einfuegen gesperrt).
-  const email2=(document.getElementById('jKeEmail2')?.value||'').trim().toLowerCase();
-  if(email2!==email){ errEl.textContent='Die E-Mail-Adressen stimmen nicht überein – bitte beide prüfen. Ein Tippfehler sperrt dich später aus (Passwort-Reset käme nie an)!'; return; }
   if(!document.getElementById('jKeDsgvo')?.checked){ errEl.textContent='Bitte Datenschutzerkl\u00e4rung und Nutzungsbedingungen akzeptieren'; return; }
   if(!_joinKursId){ errEl.textContent='Kein Kurs-Link erkannt'; return; }
   const btn=document.getElementById('jKeBtn'); if(btn) btn.disabled=true;
@@ -2827,6 +2847,9 @@ function submitLnrRegistration(){
   const email=(document.getElementById('jLnrEmail').value||'').trim().toLowerCase();
   const passwort=document.getElementById('jLnrPasswort').value||'';
   if(!email){ errEl.textContent='Bitte E-Mail eingeben'; return; }
+  // v319: Tippfehler-Schutz jetzt auch auf Weg 2 (fehlte bisher - gleiches Risiko wie Weg 1)
+  const email2=(document.getElementById('jLnrEmail2')?.value||'').trim().toLowerCase();
+  if(email2!==email){ errEl.textContent='Die E-Mail-Adressen stimmen nicht überein – bitte beide prüfen. Ein Tippfehler sperrt dich später aus (Passwort-Reset käme nie an)!'; return; }
   if(passwort.length<6){ errEl.textContent='Passwort muss mindestens 6 Zeichen haben'; return; }
   if(!document.getElementById('jLnrDsgvo')?.checked){ errEl.textContent='Bitte Datenschutzerklärung und Nutzungsbedingungen akzeptieren'; return; }
   if(!_joinKursId){ errEl.textContent='Kein Kurs-Link erkannt'; return; }
