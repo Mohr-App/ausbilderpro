@@ -1986,7 +1986,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v880';
+const APP_VERSION = 'v881';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2001,6 +2001,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v881', d:'01.09.2026', items:['🎓 Noten-Sync ist jetzt STANDARD für alle Ausbilder: Noten laufen live über den Kurs (mehrere PCs, Vertretung sieht Noten). Kein Umstellen nötig. Admin behält globalen Not-Aus (ein Klick stellt alle auf klassischen Betrieb, ohne Datenverlust)']},
   {v:'v880', d:'01.09.2026', items:['🔧 Noten-Sync: gelöschte Noten (Feld geleert / auf – gesetzt) werden jetzt auch auf dem anderen Gerät entfernt. Der Schutz "leere Cloud überschreibt nicht" gilt nur noch für nie gesynchronisierte Alt-Kurse, nicht für bewusste Löschungen']},
   {v:'v879', d:'01.09.2026', items:['⚡ Noten-Sync zeigt Änderungen jetzt SOFORT: Die Note kam längst an, wurde aber erst beim nächsten Speichertakt gezeichnet. Jetzt werden Sitzplan-Badges und – falls offen – die Notenfelder im Sitz-Detail direkt live aktualisiert (außer man tippt gerade selbst)']},
   {v:'v878', d:'01.09.2026', items:['⚡ Noten-Sync spürbar schneller: Noten werden beim Speichern jetzt sofort direkt geschrieben (vorher hinter vielen Check-in-Abfragen in der Warteschlange – daher die langen, schwankenden Verzögerungen bis 40s)']},
@@ -12782,6 +12783,7 @@ function loadPool(){
   setTimeout(()=>{try{liveSyncMenuUpdate();}catch(e){}}, 800);
   setTimeout(()=>{try{notenSyncMenuUpdate();}catch(e){}}, 850);
   setTimeout(()=>{try{_liveGlobalWatch();}catch(e){}}, 500);
+  setTimeout(()=>{try{_notenGlobalWatch();}catch(e){}}, 550);
   setTimeout(()=>{try{_pruefeSigReset();}catch(e){}}, 2500);
   if(_demoMode) return;
   // Alten Listener abmelden
@@ -14563,22 +14565,42 @@ function _liveListen(){
 // je Geraet. Koffer laeuft doppelt weiter (Fallback). Migration: nur Koffer->Cloud beim
 // Erstlauf, NIE leere Cloud ueber volle Koffer-Noten.
 let _notenSync={kursId:null, unsub:null, shadow:{}, ready:false, applying:false};
-function _notenSyncAn(){ try{ return localStorage.getItem(_lsKey('ap_notensync'))==='1' && !_demoMode && !!_db; }catch(e){ return false; } }
+// v881: Rollout - Noten-Sync ist STANDARD fuer alle, zentral abschaltbar via appConfig
+// (notenSync===false). Zusaetzlich lokaler Geraete-Not-Aus (localStorage '0').
+function _notenSyncAn(){
+  try{
+    if(window._notenGlobalAn===false) return false;         // zentraler Not-Aus
+    if(localStorage.getItem(_lsKey('ap_notensync'))==='0') return false; // lokaler Not-Aus
+    return !_demoMode && !!_db;
+  }catch(e){ return false; }
+}
+let _notenGlobalUnsub=null;
+function _notenGlobalWatch(){
+  if(_notenGlobalUnsub||!_db) return;
+  _notenGlobalUnsub=_db.collection('shared').doc('appConfig').onSnapshot(d=>{
+    const vorher=window._notenGlobalAn;
+    window._notenGlobalAn=!(d.exists && d.data().notenSync===false);
+    if(vorher===window._notenGlobalAn) return;
+    if(vorher===undefined){ notenSyncMenuUpdate(); if(!window._notenGlobalAn){ _notenStop(); } return; }
+    notenSyncMenuUpdate();
+    if(!window._notenGlobalAn){ _notenStop(); toast('🎓 Noten-Sync wurde zentral deaktiviert – Noten laufen klassisch weiter'); }
+    else { toast('🎓 Noten-Sync wurde zentral aktiviert'); _notenStart(curInst()); }
+  }, ()=>{ window._notenGlobalAn=true; });
+}
 function notenSyncMenuUpdate(){
   const b=document.getElementById('notenSyncBtn'); if(!b) return;
   const darf=_LIVE_ADMINS.includes(((_auth&&_auth.currentUser&&_auth.currentUser.email)||'').toLowerCase());
-  b.style.display=darf?'':'none';
-  b.textContent='🎓 Noten-Sync (Beta): '+(_notenSyncAn()?'AN':'AUS');
+  b.style.display=darf?'':'none';   // Schalter weiterhin nur fuer Admin - normale Nutzer haben Noten-Sync automatisch an
+  b.textContent='🎓 Noten-Sync GLOBAL '+(_notenSyncAn()?'AN':'⛔ AUS für alle')+' – klicken zum Umschalten';
   if(_notenSyncAn()){ b.style.background='rgba(5,150,105,.1)'; b.style.color='#065f46'; }
 }
 function notenSyncToggle(){
-  try{
-    const neu=_notenSyncAn()?'0':'1';
-    localStorage.setItem(_lsKey('ap_notensync'), neu);
-    notenSyncMenuUpdate();
-    if(neu==='1'){ toast('🎓 Noten-Sync AN (nur dieses Gerät)'); _notenStart(curInst()); }
-    else { toast('Noten-Sync AUS – Noten laufen klassisch'); _notenStop(); }
-  }catch(e){}
+  // GLOBALER Schalter (nur Admin): schreibt appConfig.notenSync, alle Apps reagieren live.
+  if(!_db) return;
+  const neu=!_notenSyncAn();
+  if(!neu && !confirm('🎓 Noten-Sync für ALLE Ausbilder ausschalten?\n\nAlle Apps wechseln sofort in den klassischen Betrieb (keine Daten gehen verloren – doppelte Buchführung).')) return;
+  _db.collection('shared').doc('appConfig').set({notenSync:neu, notenGeaendertAm:Date.now(), notenVon:(_auth&&_auth.currentUser&&_auth.currentUser.email)||''},{merge:true})
+    .catch(err=>toast('Not-Aus fehlgeschlagen: '+err.message,'bad'));
 }
 function _notenStop(){ if(_notenSync.unsub){ try{_notenSync.unsub();}catch(e){} } _notenSync={kursId:null, unsub:null, shadow:{}, ready:false, applying:false}; }
 // Notenfelder eines Sitzes als kanonisch vergleichbares Objekt (nur die 3 Fix + Extra)
