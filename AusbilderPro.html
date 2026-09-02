@@ -1986,7 +1986,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v877';
+const APP_VERSION = 'v878';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2001,6 +2001,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v878', d:'01.09.2026', items:['⚡ Noten-Sync spürbar schneller: Noten werden beim Speichern jetzt sofort direkt geschrieben (vorher hinter vielen Check-in-Abfragen in der Warteschlange – daher die langen, schwankenden Verzögerungen bis 40s)']},
   {v:'v877', d:'01.09.2026', items:['🎓 Noten-Sync (Etappe 3, Beta – nur Admin/Testkonto, je Gerät): Noten laufen jetzt live über den Kurs zurück in die App (mehrere PCs, Vertretung sieht Noten). Liest aus der bestehenden Teilnehmerliste, kein neuer Speicherort. Leere Cloud-Werte überschreiben nie gefüllte Noten. Koffer läuft als Fallback doppelt weiter']},
   {v:'v876', d:'01.09.2026', items:['🎨 Nachbesserung: unsichtbarer Platzhalter unter „Kurs anlegen" gleicht die Statuszeile unter „Jetzt prüfen" aus – Knöpfe jetzt wirklich auf gleicher Höhe']},
   {v:'v875', d:'01.09.2026', items:['🎨 Willkommensbildschirm: Knöpfe „Jetzt prüfen" und „Kurs anlegen" stehen jetzt auf gleicher Höhe, egal wie lang der Beschreibungstext darüber ist']},
@@ -6941,6 +6942,19 @@ function syncAttendanceToFirestore(seatId){
   if(_demoMode) return;
   if(!_db) return;
   const inst=curInst(); if(!inst) return;
+  // v878: Noten SOFORT und direkt schreiben - noch VOR _spiegleCheckins, das viele
+  // sequenzielle Firestore-Reads macht und den Noten-Push sonst um bis zu 40s verzoegert.
+  // (Messung: direkter Schreibvorgang 88ms, hinter dem Checkin-Spiegel bis 40s.)
+  try{
+    const _dn=inst.seats[seatId];
+    const _tnId=_dn&&_dn.poolTnId; const _kid=(_dn&&_dn.poolKursId)||inst.sharedKursId;
+    if(_dn&&_tnId&&_kid){
+      const _valid=new Set((inst.customGrades||[]).map(g=>g.id));
+      const _ex={}; Object.entries(_dn.extraGrades||{}).forEach(([cid,val])=>{ if(_valid.has(cid)&&val) _ex[cid]=val; });
+      _db.collection('shared').doc('kurse').collection('list').doc(_kid).collection('teilnehmer').doc(_tnId)
+        .set({noten_mitarbeit:_dn.mitarbeit||'',noten_fuehrung:_dn.fuehrung||'',noten_praxis:_dn.praxis||'',noten_extra:_ex,notenLastSync:Date.now()},{merge:true}).catch(()=>{});
+    }
+  }catch(e){}
   _spiegleCheckins(inst, seatId);
   const d=inst.seats[seatId]; if(!d) return;
   const tnId=d.poolTnId;
