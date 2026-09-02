@@ -1986,7 +1986,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v879';
+const APP_VERSION = 'v880';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2001,6 +2001,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v880', d:'01.09.2026', items:['🔧 Noten-Sync: gelöschte Noten (Feld geleert / auf – gesetzt) werden jetzt auch auf dem anderen Gerät entfernt. Der Schutz "leere Cloud überschreibt nicht" gilt nur noch für nie gesynchronisierte Alt-Kurse, nicht für bewusste Löschungen']},
   {v:'v879', d:'01.09.2026', items:['⚡ Noten-Sync zeigt Änderungen jetzt SOFORT: Die Note kam längst an, wurde aber erst beim nächsten Speichertakt gezeichnet. Jetzt werden Sitzplan-Badges und – falls offen – die Notenfelder im Sitz-Detail direkt live aktualisiert (außer man tippt gerade selbst)']},
   {v:'v878', d:'01.09.2026', items:['⚡ Noten-Sync spürbar schneller: Noten werden beim Speichern jetzt sofort direkt geschrieben (vorher hinter vielen Check-in-Abfragen in der Warteschlange – daher die langen, schwankenden Verzögerungen bis 40s)']},
   {v:'v877', d:'01.09.2026', items:['🎓 Noten-Sync (Etappe 3, Beta – nur Admin/Testkonto, je Gerät): Noten laufen jetzt live über den Kurs zurück in die App (mehrere PCs, Vertretung sieht Noten). Liest aus der bestehenden Teilnehmerliste, kein neuer Speicherort. Leere Cloud-Werte überschreiben nie gefüllte Noten. Koffer läuft als Fallback doppelt weiter']},
@@ -14587,7 +14588,10 @@ function _notenVonSeat(d){
 }
 function _notenVonDoc(x){
   const ex={}; Object.entries(x.noten_extra||{}).forEach(([k,v])=>{ if(v) ex[k]=v; });
-  return {m:x.noten_mitarbeit||'', f:x.noten_fuehrung||'', p:x.noten_praxis||'', e:ex};
+  // _synced: true, wenn dieser Kurs schon einmal bewusst Noten gespeichert hat
+  // (notenLastSync existiert). Dann ist ein leeres Feld eine echte Loeschung, kein
+  // "nie gepflegt". Ohne den Marker bleibt der Schutz (alte Kurse, Migrationsluecke).
+  return {m:x.noten_mitarbeit||'', f:x.noten_fuehrung||'', p:x.noten_praxis||'', e:ex, _synced:!!x.notenLastSync};
 }
 function _notenStart(inst){
   if(!_notenSyncAn()){ return; }
@@ -14618,11 +14622,13 @@ function _notenApply(inst, snap){
       const tnId=doc.id; const sid=sidVon[tnId]; if(!sid) return;
       const d=inst.seats[sid]; if(!d) return;
       const cloud=_notenVonDoc(doc.data()||{});
-      const cloudCanon=_canon(cloud);
+      const _synced=cloud._synced; const _c={m:cloud.m,f:cloud.f,p:cloud.p,e:cloud.e};
+      const cloudCanon=_canon(_c);
       if(cloudCanon===(_notenSync.shadow[tnId]||_canon(_notenVonSeat(d)))) return; // nichts Neues
-      // Cloud hat andere Noten -> uebernehmen. Leere Cloud-Werte ueberschreiben NICHT
-      // gefuellte Koffer-Werte (Schutz vor Migrationsluecke Punkt 5).
-      const _uebernehmen=(cloudVal, seatVal)=> (cloudVal!==undefined && cloudVal!=='') ? cloudVal : seatVal;
+      // v880: Wurde der Kurs schon bewusst gespeichert (_synced), sind leere Cloud-Werte
+      // echte Loeschungen und werden uebernommen. Nur bei NIE gesynctem Kurs (alte Daten)
+      // bleibt der Schutz "leer ueberschreibt nicht" (Migrationsluecke Punkt 5).
+      const _uebernehmen=(cloudVal, seatVal)=> (_synced || (cloudVal!==undefined && cloudVal!=='')) ? cloudVal : seatVal;
       const neuM=_uebernehmen(cloud.m,d.mitarbeit||'');
       const neuF=_uebernehmen(cloud.f,d.fuehrung||'');
       const neuP=_uebernehmen(cloud.p,d.praxis||'');
@@ -14630,9 +14636,16 @@ function _notenApply(inst, snap){
       if((d.fuehrung||'')!==neuF){ d.fuehrung=neuF; changed=true; }
       if((d.praxis||'')!==neuP){ d.praxis=neuP; changed=true; }
       if(!d.extraGrades) d.extraGrades={};
+      // Extra-Noten: bei _synced auch entfernte (in Cloud fehlende) lokal loeschen
+      const cloudExtraIds=new Set(Object.keys(cloud.e||{}));
       Object.entries(cloud.e||{}).forEach(([cid,val])=>{
         if(val && d.extraGrades[cid]!==val){ d.extraGrades[cid]=val; changed=true; }
       });
+      if(_synced){
+        Object.keys(d.extraGrades||{}).forEach(cid=>{
+          if(!cloudExtraIds.has(cid) && d.extraGrades[cid]){ d.extraGrades[cid]=''; changed=true; }
+        });
+      }
       _notenSync.shadow[tnId]=_canon(_notenVonSeat(d));
     });
     if(changed){
