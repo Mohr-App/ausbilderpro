@@ -1904,7 +1904,15 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <option value="absent_e">📋 Abwesend – Entschuldigt</option>
             <option value="absent_u">❌ Abwesend – Unentschuldigt</option>
             <option value="berufsschule">🏫 Berufsschule</option>
+            <option value="early">🚶 Früher gegangen</option>
           </select>
+          <div id="earlySub" style="display:none;margin:4px 0 8px;padding:10px;background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.3);border-radius:8px">
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+              <div class="fg" style="margin:0;flex:1;min-width:120px"><label class="fl">Gegangen um</label><input class="fi" type="time" id="earlyZeit" oninput="_earlyBerechne()" style="font-family:JetBrains Mono,monospace;font-weight:700"></div>
+              <div id="earlyInfo" style="font-size:.72rem;color:#92400e;font-weight:700;padding-bottom:9px">–</div>
+            </div>
+            <div style="font-size:.62rem;color:var(--mu);margin-top:6px">Minuten werden automatisch gegen das Kursende berechnet (oben im Kopf einstellbar). Grund unten bei „Bemerkung" eintragen.</div>
+          </div>
           <div class="present-sub" id="presentSub">
             <div class="present-sub-row">
               <div class="sub-field">
@@ -1990,7 +1998,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v886';
+const APP_VERSION = 'v887';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2005,6 +2013,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v887', d:'03.09.2026', items:['🚶 Neuer Status „Früher gegangen" im Anwesenheits-Block: Uhrzeit eintragen statt Minuten rechnen – wird automatisch gegen das neue Kursende berechnet (Kurskopf: „07:30 – 15:30 Uhr", je Lehrgang einstellbar). Grund in der Bemerkung, Notiz vermerkt „gegangen HH:MM"']},
   {v:'v886', d:'03.09.2026', items:['🏢 Bestandsausbilder ohne Stempel: Beim nächsten regulären PIN-Einsatz (Bescheinigung erstellen oder Profil bearbeiten) wird der Firmenstempel des Standorts automatisch nachgezogen – einmalig, nur wenn keiner vorhanden ist']},
   {v:'v885', d:'03.09.2026', items:['🎨 Pause-Knopf jetzt weiß mit blauem „P" statt ☕-Symbol']},
   {v:'v884', d:'03.09.2026', items:['🎨 ☕-Pause-Knopf sitzt jetzt oben rechts, direkt links neben der Tischnummer (statt mittig am Kartenrand)']},
@@ -4046,7 +4055,7 @@ function renderMain(){
     : '<button class="hdr-lock-btn" onclick="event.stopPropagation();kursAbschliessen()" title="Kurs abschließen – danach schreibgeschützt">🔒 Kurs abschließen</button>';
   el.innerHTML=
     (_lock?'<div style="margin:8px 0;padding:10px 14px;background:rgba(5,150,105,.10);border:1.5px solid rgba(5,150,105,.4);border-radius:10px;font-size:.74rem;font-weight:700;color:#047857;line-height:1.5">✓ Kurs abgeschlossen — schreibgeschützt, keine Änderungen möglich.</div>':'')+
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span><span style="font-size:.62rem;color:#64748b;margin-left:10px">🕢 <input type="time" value="'+_instBeginn(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateBeginn(this.value)" onclick="event.stopPropagation()" title="Kursbeginn – ab dieser Zeit greifen die Erinnerungen (roter Haken / Fehltag-Rahmen). Gilt auch als Standard für neue Lehrgänge"> Beginn</span>'+'</div><label title="Bescheinigung: jede Note in einer eigenen Zeile statt paarweise nebeneinander" style="font-size:.62rem;color:#64748b;margin-left:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none">📄 <input type="checkbox" '+(inst.beschNotenUntereinander===true?'checked':'')+' onclick="event.stopPropagation();toggleBeschNotenLayout(this.checked)" style="width:12px;height:12px;cursor:pointer;accent-color:#2563eb">Noten untereinander</label><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button>'+_lockBtn+'</div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span><span style="font-size:.62rem;color:#64748b;margin-left:10px">🕢 <input type="time" value="'+_instBeginn(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateBeginn(this.value)" onclick="event.stopPropagation()" title="Kursbeginn – ab dieser Zeit greifen die Erinnerungen (roter Haken / Fehltag-Rahmen). Gilt auch als Standard für neue Lehrgänge"> – <input type="time" value="'+_instEnde(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateEnde(this.value)" onclick="event.stopPropagation()" title="Kursende – Basis für „Früher gegangen": Uhrzeit eintragen, Minuten werden gegen dieses Ende berechnet. Gilt auch als Standard für neue Lehrgänge"> Uhr</span>'+'</div><label title="Bescheinigung: jede Note in einer eigenen Zeile statt paarweise nebeneinander" style="font-size:.62rem;color:#64748b;margin-left:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none">📄 <input type="checkbox" '+(inst.beschNotenUntereinander===true?'checked':'')+' onclick="event.stopPropagation();toggleBeschNotenLayout(this.checked)" style="width:12px;height:12px;cursor:pointer;accent-color:#2563eb">Noten untereinander</label><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button>'+_lockBtn+'</div></div>'
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="kursact-close" onclick="toggleKursActions()" title="Schließen" aria-label="Schließen">✕</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="markAlleAnwesend()" title="Alle TN heute als anwesend markieren (für leere Tage)">✓ Alle anwesend</button>'
@@ -4461,6 +4470,14 @@ function toggleBeschNotenLayout(an){
   inst.beschNotenUntereinander = (an===true);
   persist();
   toast(an ? 'Noten werden untereinander gedruckt' : 'Noten werden paarweise gedruckt', 'ok');
+}
+function _instEnde(inst){ return (inst&&inst.ende)||S.endeDefault||'15:30'; }
+function _instEndeMins(inst){ const m=/^(\d{1,2}):(\d{2})$/.exec(_instEnde(inst)); return m?(+m[1])*60+(+m[2]):930; }
+function updateEnde(v){
+  const inst=curInst(); if(!inst) return;
+  if(!/^\d{2}:\d{2}$/.test(v||'')){ toast('Ungültige Zeit','bad'); return; }
+  inst.ende=v; S.endeDefault=v; persist(); renderSeats();
+  toast('Kursende '+v+' gespeichert – gilt auch für neue Lehrgänge');
 }
 function updateBeginn(v){
   const inst=curInst(); if(!inst) return;
@@ -6288,10 +6305,28 @@ function selMain(type){
   document.querySelectorAll('.att-main-btn').forEach(b=>{b.className='att-main-btn';});
   const map={present:{el:'btnP',cls:'sel-p'},absent_e:{el:'btnAE',cls:'sel-ae'},absent_u:{el:'btnAU',cls:'sel-au'},sick:{el:'btnK',cls:'sel-k'},berufsschule:{el:'btnBS',cls:'sel-bs'}};
   const m=map[type];if(m){ const _el=document.getElementById(m.el); if(_el) _el.className='att-main-btn '+m.cls; }
+  // v887: "Frueher gegangen" - Uhrzeit statt Kopfrechnen
+  const es=document.getElementById('earlySub'); const noteEl=document.getElementById('aNote');
+  if(es){ es.style.display=(type==='early')?'block':'none'; }
+  if(type==='early'){
+    const z=document.getElementById('earlyZeit');
+    if(z && !z.value){ const n=new Date(); z.value=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); }
+    if(noteEl) noteEl.placeholder='Grund (z.B. Arzttermin, Betrieb)…';
+    _earlyBerechne();
+  } else if(noteEl){ noteEl.placeholder='optional…'; }
   // show/hide present sub
   const sub=document.getElementById('presentSub');
   if(type==='present') sub.classList.add('show');
   else{ sub.classList.remove('show'); document.getElementById('chkLate').checked=false; document.getElementById('chkEarly').checked=false; document.getElementById('lateMins').disabled=true; document.getElementById('earlyMins').disabled=true; }
+}
+function _earlyMinsAus(zeit){
+  const m=/^(\d{1,2}):(\d{2})$/.exec(zeit||''); if(!m) return null;
+  return Math.max(0,_instEndeMins(curInst())-((+m[1])*60+(+m[2])));
+}
+function _earlyBerechne(){
+  const z=document.getElementById('earlyZeit'), info=document.getElementById('earlyInfo'); if(!z||!info) return;
+  const min=_earlyMinsAus(z.value);
+  info.textContent=(min===null)?'–':(min>0?('→ '+min+' min vor Kursende ('+_instEnde(curInst())+')'):'→ nicht vor Kursende ('+_instEnde(curInst())+')');
 }
 function toggleSubField(which){
   const chk=document.getElementById('chk'+which.charAt(0).toUpperCase()+which.slice(1));
@@ -6305,6 +6340,16 @@ function addAtt(){ if(lockGuard())return;
   // Wenn kein Status gewählt: Modal öffnen statt nur Alert
   if(!curAttMain){
     _openAddAttModal(date, note);
+    return;
+  }
+  if(curAttMain==='early'){
+    const z=(document.getElementById('earlyZeit')||{}).value||'';
+    const min=_earlyMinsAus(z);
+    if(min===null){ alert('Bitte Uhrzeit eingeben.'); return; }
+    if(min<=0){ alert('Die Uhrzeit liegt nicht vor dem Kursende ('+_instEnde(curInst())+').'); return; }
+    const e2={date,type:'present',note:(note?note+' · ':'')+'🚶 gegangen '+z,lateMins:0,earlyMins:min};
+    const alt=tmpAtt.find(a=>a.date===date); if(alt&&alt.type==='present'&&alt.lateMins) e2.lateMins=alt.lateMins;
+    _commitAttEntry(e2);
     return;
   }
   const entry={date,type:curAttMain,note,lateMins:0,earlyMins:0};
