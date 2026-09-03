@@ -7258,6 +7258,45 @@ function loadCheckinHistory(){
     .catch(()=>{ card.style.display='none'; });
 }
 
+// ═══ v320: Meine Meldungen - Rueckmeldung, ob der Ausbilder eine Meldung zur Kenntnis
+// genommen hat. Liest die eigenen Meldungen des Kurses live (gelesen/gelesenVon/gelesenAm
+// schreibt AusbilderPro beim Bestaetigen). Reine Anzeige, kein neuer Schreibweg.
+let _mmUnsub=null, _mmKurs=null;
+function _stopMeineMeldungen(){ if(_mmUnsub){ try{_mmUnsub();}catch(e){} } _mmUnsub=null; _mmKurs=null; }
+function _startMeineMeldungen(kursId){
+  if(!kursId||!_tnId||!db) return;
+  if(_mmKurs===kursId && _mmUnsub) return;
+  _stopMeineMeldungen();
+  _mmKurs=kursId;
+  _mmUnsub=db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('meldungen').where('tnId','==',_tnId).onSnapshot(snap=>{
+      const el=document.getElementById('meineMeldungen'); if(!el) return;
+      const rows=[]; snap.forEach(d=>rows.push({id:d.id,...d.data()}));
+      rows.sort((a,b)=>String(b.zeit||'').localeCompare(String(a.zeit||'')));
+      _renderMeineMeldungen(el, rows.slice(0,15));
+    }, err=>{ console.warn('Meine Meldungen:',err); });
+}
+function _renderMeineMeldungen(el, rows){
+  if(!rows.length){ el.innerHTML=''; return; }
+  const ICON={spaeter:'🕐',frueher:'🚶',krank:'🤒',text:'💬'};
+  const LABEL={spaeter:'Komme später',frueher:'Gehe früher',krank:'Krank',text:'Nachricht'};
+  const fmt=iso=>{ try{ const d=new Date(iso); return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } };
+  let h='<div style="font-size:.6rem;font-weight:800;letter-spacing:.06em;color:var(--mu);margin-bottom:5px">MEINE MELDUNGEN</div>';
+  rows.forEach(m=>{
+    const gelesen=!!m.gelesen;
+    const wer=m.gelesenVon?(' – '+esc(m.gelesenVon)):'';
+    const wann=m.gelesenAm?(', '+fmt(m.gelesenAm)):'';
+    const status=gelesen
+      ?'<span style="color:#059669;font-weight:700">✓ zur Kenntnis genommen'+wer+wann+'</span>'
+      :'<span style="color:#94a3b8">⏳ noch nicht gelesen</span>';
+    const txt=m.type==='text'&&m.text?(' – „'+esc(m.text)+'"'):'';
+    h+='<div style="display:flex;flex-direction:column;gap:2px;padding:7px 9px;margin-bottom:5px;background:'+(gelesen?'rgba(5,150,105,.05)':'var(--sur2)')+';border:1px solid '+(gelesen?'rgba(5,150,105,.25)':'var(--brd)')+';border-radius:8px;font-size:.68rem">'
+      +'<div><span style="font-weight:700">'+(ICON[m.type]||'📬')+' '+(LABEL[m.type]||'Meldung')+'</span>'+txt+'<span style="color:var(--mu);margin-left:6px">'+fmt(m.zeit)+'</span></div>'
+      +'<div style="font-size:.62rem">'+status+'</div>'
+      +'</div>';
+  });
+  el.innerHTML=h;
+}
 function loadKurse(){
   const el=document.getElementById('homeKurse');
   if(!_tnData) return;
@@ -7424,6 +7463,7 @@ function loadKurse(){
         +'<button title="Senden" onclick="sendMeldung(\'text\',\''+highlight.id+'\')" style="padding:6px 12px;background:#059669;color:#fff;border:none;border-radius:7px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">Senden</button>'
         +'</div>'
         +'<div id="meldungStatus" style="font-size:.6rem;color:#10b981;margin-top:4px;display:none"></div>'
+        +'<div id="meineMeldungen" data-kurs="'+highlight.id+'" style="margin-top:10px"></div>'
         +'</div>';
       html+='</div>';
     }
@@ -7468,6 +7508,8 @@ function loadKurse(){
     }
 
     el.innerHTML=html;
+    // v320: "Meine Meldungen" live nachziehen (Status: gelesen / zur Kenntnis genommen)
+    try{ const mm=document.getElementById('meineMeldungen'); if(mm) _startMeineMeldungen(mm.dataset.kurs); else _stopMeineMeldungen(); }catch(e){}
     // Frisch beigetreten (Weg-1-Marker) und noch kein Sitzplatz -> Platznummer-Popup
     // direkt oeffnen, damit der Azubi ohne Suchen einstempeln kann. Einmal je Sitzung;
     // Marker bleibt bis zur Eingabe erhalten (X schliesst nur das Popup).
