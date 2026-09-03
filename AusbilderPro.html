@@ -1998,7 +1998,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v887';
+const APP_VERSION = 'v888';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2013,6 +2013,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v888', d:'03.09.2026', items:['📄 „Noten untereinander" ist aus dem vollen Kurskopf in die Bescheinigungs-Fenster (Einzel + Sammel) gewandert – dort, wo auch Unterschrift/Stempel eingefügt werden. Umschalten baut die Bescheinigung sofort neu auf']},
   {v:'v887', d:'03.09.2026', items:['🚶 Neuer Status „Früher gegangen" im Anwesenheits-Block: Uhrzeit eintragen statt Minuten rechnen – wird automatisch gegen das neue Kursende berechnet (Kurskopf: „07:30 – 15:30 Uhr", je Lehrgang einstellbar). Grund in der Bemerkung, Notiz vermerkt „gegangen HH:MM"']},
   {v:'v886', d:'03.09.2026', items:['🏢 Bestandsausbilder ohne Stempel: Beim nächsten regulären PIN-Einsatz (Bescheinigung erstellen oder Profil bearbeiten) wird der Firmenstempel des Standorts automatisch nachgezogen – einmalig, nur wenn keiner vorhanden ist']},
   {v:'v885', d:'03.09.2026', items:['🎨 Pause-Knopf jetzt weiß mit blauem „P" statt ☕-Symbol']},
@@ -4055,7 +4056,7 @@ function renderMain(){
     : '<button class="hdr-lock-btn" onclick="event.stopPropagation();kursAbschliessen()" title="Kurs abschließen – danach schreibgeschützt">🔒 Kurs abschließen</button>';
   el.innerHTML=
     (_lock?'<div style="margin:8px 0;padding:10px 14px;background:rgba(5,150,105,.10);border:1.5px solid rgba(5,150,105,.4);border-radius:10px;font-size:.74rem;font-weight:700;color:#047857;line-height:1.5">✓ Kurs abgeschlossen — schreibgeschützt, keine Änderungen möglich.</div>':'')+
-    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span><span style="font-size:.62rem;color:#64748b;margin-left:10px">🕢 <input type="time" value="'+_instBeginn(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateBeginn(this.value)" onclick="event.stopPropagation()" title="Kursbeginn – ab dieser Zeit greifen die Erinnerungen (roter Haken / Fehltag-Rahmen). Gilt auch als Standard für neue Lehrgänge"> – <input type="time" value="'+_instEnde(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateEnde(this.value)" onclick="event.stopPropagation()" title="Kursende – Basis für „Früher gegangen": Uhrzeit eintragen, Minuten werden gegen dieses Ende berechnet. Gilt auch als Standard für neue Lehrgänge"> Uhr</span>'+'</div><label title="Bescheinigung: jede Note in einer eigenen Zeile statt paarweise nebeneinander" style="font-size:.62rem;color:#64748b;margin-left:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none">📄 <input type="checkbox" '+(inst.beschNotenUntereinander===true?'checked':'')+' onclick="event.stopPropagation();toggleBeschNotenLayout(this.checked)" style="width:12px;height:12px;cursor:pointer;accent-color:#2563eb">Noten untereinander</label><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button>'+_lockBtn+'</div></div>'
+    '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span><span style="font-size:.62rem;color:#64748b;margin-left:10px">🕢 <input type="time" value="'+_instBeginn(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateBeginn(this.value)" onclick="event.stopPropagation()" title="Kursbeginn – ab dieser Zeit greifen die Erinnerungen (roter Haken / Fehltag-Rahmen). Gilt auch als Standard für neue Lehrgänge"> – <input type="time" value="'+_instEnde(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateEnde(this.value)" onclick="event.stopPropagation()" title="Kursende – Basis für „Früher gegangen": Uhrzeit eintragen, Minuten werden gegen dieses Ende berechnet. Gilt auch als Standard für neue Lehrgänge"> Uhr</span>'+'</div><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button>'+_lockBtn+'</div></div>'
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="kursact-close" onclick="toggleKursActions()" title="Schließen" aria-label="Schließen">✕</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="markAlleAnwesend()" title="Alle TN heute als anwesend markieren (für leere Tage)">✓ Alle anwesend</button>'
@@ -7575,6 +7576,7 @@ body.fz-liste .vz-lbl-liste{display:inline;}
 <div style="text-align:center" class="no-print">
   <button class="print-btn" onclick="printAllCert()" title="Drucken">🖨 Alle drucken (${seats.length} Bescheinigungen)</button>
   <div style="margin:6px 0;font-size:12px;color:#334155"><label style="cursor:pointer;user-select:none"><input type="checkbox" onchange="toggleFehlzeitenBlank(this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen (Fehltage &amp; Verspätungen handschriftlich eintragen)</label></div>
+  <div style="margin:6px 0;font-size:12px;color:#334155"><label style="cursor:pointer;user-select:none" title="Jede Note in einer eigenen Zeile statt paarweise – gilt für diesen Lehrgang, alle Bescheinigungen werden neu aufgebaut"><input type="checkbox" ${inst && inst.beschNotenUntereinander===true ? 'checked' : ''} onchange="try{window.opener.toggleBeschNotenLayout(this.checked);window.opener.generateAlleBescheinigungenAusbilder();setTimeout(function(){window.close();},300);}catch(e){alert('Einstellung gespeichert – bitte neu öffnen.');}" style="vertical-align:middle;margin-right:5px">📄 Noten untereinander</label></div>
   <div style="margin:6px 0;font-size:12px;color:#334155">🕐 Verspätungen anzeigen als: <select onchange="setVerspModus(this.value)" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl (z. B. 2)</option><option value="sum">Anzahl + Gesamtzeit (z. B. 3 (13 Min))</option><option value="list">Je Kurstag (z. B. T1: 30min, T3: 3min)</option></select></div>
   <div style="margin:8px 0;display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:center">
     <span style="font-size:11px;color:#475569;align-self:center;margin-right:4px"><b>Standort:</b></span>
@@ -11017,7 +11019,20 @@ body.fz-liste .vz-lbl-liste{display:inline;}
 <div class="no-print" style="text-align:center;margin:2px 0 6px;font-size:12px;color:#334155">
   <label style="cursor:pointer;user-select:none;margin:0 8px"><input type="checkbox" onchange="document.body.classList.toggle('fz-blank',this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen</label>
   <span style="margin:0 8px">🕐 Verspätungen: <select onchange="document.body.classList.toggle('fz-zeit',this.value==='sum');document.body.classList.toggle('fz-liste',this.value==='list');" style="font-size:12px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px"><option value="count">Anzahl</option><option value="sum">Anzahl + Gesamtzeit</option><option value="list">Je Kurstag</option></select></span>
+  <label style="cursor:pointer;user-select:none;margin:0 8px" title="Jede Note in einer eigenen Zeile statt paarweise nebeneinander – gilt für diesen Lehrgang, Bescheinigung wird neu aufgebaut"><input type="checkbox" ${inst && inst.beschNotenUntereinander===true ? 'checked' : ''} onchange="_untToggle(this.checked)" style="vertical-align:middle;margin-right:5px">📄 Noten untereinander</label>
 </div>
+<script>
+function _untToggle(an){
+  try{
+    if(!window.opener||!window.opener.toggleBeschNotenLayout){ alert('Hauptfenster nicht erreichbar – bitte Bescheinigung aus AusbilderPro neu öffnen.'); return; }
+    window.opener.toggleBeschNotenLayout(an);
+    if(typeof window.opener.generateBescheinigungAusbilder==='function' && window.opener.curSeat){
+      window.opener.generateBescheinigungAusbilder();
+      setTimeout(function(){ window.close(); }, 300);
+    } else { alert('Einstellung gespeichert – bitte Bescheinigung neu öffnen.'); }
+  }catch(e){ alert('Einstellung gespeichert – bitte Bescheinigung neu öffnen.'); }
+}
+<\/script>
 <div id="statusArea" class="no-print">${ausgTxt?'<div class="status-msg" style="background:#dcfce7;color:#166534">'+ausgTxt+'</div>':''}</div>
 
 <div class="page">
