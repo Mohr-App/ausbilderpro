@@ -1533,6 +1533,18 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
             </div>
             <div class="fg"><label class="fl">Gebäude / Raum</label><input class="fi" id="addStandortGeb" placeholder="z.B. Gebäude B, Raum 204"></div>
             <div class="fg"><label class="fl">Hinweis (optional)</label><input class="fi" id="addStandortHinweis" placeholder="z.B. Parkplätze hinter dem Gebäude"></div>
+            <div class="fg" style="margin-top:10px;padding:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px">
+              <label class="fl">🏢 Firmenstempel dieses Standorts (Ort)</label>
+              <div style="font-size:.62rem;color:var(--mu);line-height:1.5;margin-bottom:8px">Gilt für <b>alle Gebäude</b> dieses Orts – einmal hochladen genügt. Neue Ausbilder dieses Orts bekommen ihn in AusbilderPro automatisch bei der PIN-Vergabe, wenn sie noch keinen eigenen Stempel haben. Bestehende Stempel werden nie überschrieben.</div>
+              <div style="display:flex;gap:10px;align-items:center">
+                <div id="addStandortStempelPreview" style="width:96px;height:64px;border:1px dashed var(--brd);border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:.6rem;color:var(--mu);overflow:hidden">kein Stempel</div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <button class="btn-sm" type="button" onclick="document.getElementById('addStandortStempelFile').click()" title="Stempelbild hochladen (PNG/JPG)">📤 Bild wählen</button>
+                  <button class="btn-sm" type="button" id="addStandortStempelDel" style="display:none;color:#b91c1c" onclick="stoStempelEntfernen()" title="Stempel entfernen">✕ Entfernen</button>
+                </div>
+                <input type="file" id="addStandortStempelFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="stoStempelUpload(event)">
+              </div>
+            </div>
             <div style="display:flex;gap:8px;margin-top:10px">
               <button class="btn-sm" id="addStandortDelBtn" style="flex:1;display:none;background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)" title="Löschen" onclick="confirmDeleteStandort()">&#128465; Löschen</button>
               <button class="btn-sm btn-ok" style="flex:2" onclick="saveStandort()" title="OK">&#10003; Speichern</button>
@@ -1755,10 +1767,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 394';
+const APP_VERSION = 'Build 395';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 395', d:'03.09.2026', items:['🏢 Firmenstempel je Standort: unter Einstellungen → Standorte kann pro Standort ein Stempelbild hinterlegt werden. Neue Ausbilder dieses Standorts bekommen ihn in AusbilderPro automatisch bei der PIN-Vergabe (nie überschreibend)']},
   {v:'Build 394', d:'01.09.2026', items:['🔧 Drei-Orte-Problem behoben: Beim Zuweisen zu einem Folgekurs wird der Kurs-Eintrag des alten Kurses nur noch entfernt, wenn dieser bereits vorbei ist. Läuft er noch oder steht er noch bevor, bleibt der TN in beiden Kursrostern sichtbar (Fall ET2/ETE1)']},
   {v:'Build 393', d:'27.08.2026', items:['🔧 Kurshistorie: doppelte Einträge (gleicher Kurs, gleicher Zeitraum) werden jetzt an allen 6 Zuweisungswegen (Picker, Drag, Listen-Import, Übertragen) verhindert – arrayUnion prüfte bisher wegen des Zeitstempels nie auf echte Duplikate']},
   {v:'Build 392', d:'27.08.2026', items:['🔧 Abmelden lädt jetzt die Seite hart neu – verhindert, dass beim Kontowechsel auf demselben Gerät Reste des vorherigen Kontos sichtbar bleiben']},
@@ -4838,6 +4851,7 @@ function renderStandortListSettings(){
   });
 }
 function openAddStandortModal(){
+  _stoStempelTmp=null; _stoStempelPreview('');
   document.getElementById('addStandortId').value='';
   ['addStandortName','addStandortStr','addStandortPlz','addStandortOrt','addStandortGeb','addStandortHinweis'].forEach(id=>{document.getElementById(id).value='';});
   document.getElementById('addStandortDelBtn').style.display='none';
@@ -4845,8 +4859,38 @@ function openAddStandortModal(){
   document.getElementById('addStandortModal').classList.add('open');
   setTimeout(()=>document.getElementById('addStandortName').focus(),60);
 }
+// Build 395: Firmenstempel je Standort (als verkleinertes Bild im Standort-Dokument).
+// AusbilderPro uebernimmt ihn einmalig bei der PIN-Vergabe, wenn noch kein Stempel da ist.
+let _stoStempelTmp=null;   // null = unveraendert, '' = entfernen, 'data:...' = neu
+function _stoStempelPreview(url){
+  const pv=document.getElementById('addStandortStempelPreview'); const del=document.getElementById('addStandortStempelDel');
+  if(!pv) return;
+  if(url){ pv.innerHTML='<img src="'+url+'" style="max-width:100%;max-height:100%;object-fit:contain" alt="Stempel">'; if(del) del.style.display=''; }
+  else { pv.textContent='kein Stempel'; if(del) del.style.display='none'; }
+}
+function stoStempelUpload(e){
+  const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
+  if(f.size>3*1024*1024){ toast('Bild zu groß (max. 3 MB)','bad'); return; }
+  const r=new FileReader();
+  r.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      // auf max. 600px Breite verkleinern - klein genug fuer Firestore, scharf genug fuer Druck
+      const maxW=600, sc=Math.min(1, maxW/img.width);
+      const c=document.createElement('canvas'); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      _stoStempelTmp=c.toDataURL('image/png');
+      _stoStempelPreview(_stoStempelTmp);
+      toast('Stempel geladen – mit „Speichern" übernehmen');
+    };
+    img.src=r.result;
+  };
+  r.readAsDataURL(f);
+}
+function stoStempelEntfernen(){ _stoStempelTmp=''; _stoStempelPreview(''); }
 function openEditStandort(id){
   const s=_standorte.find(x=>x.id===id);if(!s) return;
+  _stoStempelTmp=null; _stoStempelPreview(s.stempelDataUrl||'');
   document.getElementById('addStandortId').value=id;
   document.getElementById('addStandortName').value=s.name||'';
   document.getElementById('addStandortStr').value=s.strasse||'';
@@ -4858,7 +4902,7 @@ function openEditStandort(id){
   document.getElementById('addStandortModalTit').textContent='Standort bearbeiten';
   document.getElementById('addStandortModal').classList.add('open');
 }
-function closeAddStandortModal(){ document.getElementById('addStandortModal').classList.remove('open'); }
+function closeAddStandortModal(){ document.getElementById('addStandortModal').classList.remove('open'); _stoStempelTmp=null; }
 function saveStandort(){
   const id=document.getElementById('addStandortId').value;
   const name=(document.getElementById('addStandortName').value||'').trim();
@@ -4871,9 +4915,20 @@ function saveStandort(){
     gebaeude:(document.getElementById('addStandortGeb').value||'').trim(),
     hinweis:(document.getElementById('addStandortHinweis').value||'').trim()
   };
+  if(_stoStempelTmp!==null){ data.stempelDataUrl=_stoStempelTmp||firebase.firestore.FieldValue.delete(); }
   const col=db.collection('shared').doc('kursSettings').collection('standorte');
   const p=id?col.doc(id).update(data):col.add(data);
-  p.then(()=>{closeAddStandortModal();toast('Gespeichert ✓');})
+  p.then(()=>{
+    // Der Stempel gehoert zum ORT, nicht zum Gebaeude: auf alle Eintraege desselben Orts uebertragen
+    if(_stoStempelTmp!==null && data.ort){
+      const gleicherOrt=_standorte.filter(x=>x.id!==id && (x.ort||'').trim().toLowerCase()===data.ort.trim().toLowerCase());
+      if(gleicherOrt.length){
+        const b=db.batch();
+        gleicherOrt.forEach(x=>b.update(col.doc(x.id),{stempelDataUrl:_stoStempelTmp||firebase.firestore.FieldValue.delete()}));
+        b.commit().then(()=>toast('🏢 Stempel für alle '+(gleicherOrt.length+1)+' Gebäude in '+data.ort+' gesetzt')).catch(()=>{});
+      }
+    }
+    closeAddStandortModal();toast('Gespeichert ✓');})
    .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 function confirmDeleteStandort(){

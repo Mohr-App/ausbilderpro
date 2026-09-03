@@ -1416,10 +1416,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
     <button onclick="apOpenSigDraw()" style="flex:1;padding:6px;background:#fff;color:#2563eb;border:1px solid rgba(59,130,246,.4);border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✏️ Signatur zeichnen</button>
     <button id="apSigClearBtn" onclick="apClearSig()" style="display:none;padding:6px 10px;background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✕</button>
   </div>
-  <div style="display:flex;gap:6px;margin-bottom:10px">
+  <div style="display:flex;gap:6px;margin-bottom:6px">
     <button onclick="document.getElementById('apStempelInp').click()" style="flex:1;padding:6px;background:#fff;color:#2563eb;border:1px solid rgba(59,130,246,.4);border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">📤 Stempel hochladen (max 200 KB)</button>
     <button id="apStempelClearBtn" onclick="apClearStempel()" style="display:none;padding:6px 10px;background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">✕</button>
   </div>
+  <button onclick="apFirmenstempelUebernehmen()" title="Den in VerwaltungPro für deinen Standort hinterlegten Firmenstempel übernehmen (nur im Bearbeiten-Modus)" style="width:100%;padding:6px;margin-bottom:6px;background:#fff;color:#4338ca;border:1px dashed rgba(67,56,202,.4);border-radius:6px;font-size:.68rem;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif">🏢 Firmenstempel meines Standorts übernehmen</button>
+  <div style="font-size:.6rem;color:var(--mu);line-height:1.5;margin-bottom:10px">💡 Ohne eigenen Stempel wird nach Vergabe der PIN automatisch der Firmenstempel deines Standorts übernommen. Ein später selbst hochgeladener Stempel bleibt immer erhalten.</div>
   <div class="fg">
     <label class="fl">PIN (4-stellig)</label>
     <input class="fi" id="apSigPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="••••" autocomplete="new-password" style="font-family:'JetBrains Mono',monospace;letter-spacing:.3em;text-align:center">
@@ -1987,7 +1989,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v882';
+const APP_VERSION = 'v883';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2002,6 +2004,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v883', d:'03.09.2026', items:['👤 Profil wird beim Erst-Login automatisch aus VerwaltungPro vorbelegt (Name, Telefon, E-Mail – nur leere Felder). 🏢 Firmenstempel des Standorts wird bei der PIN-Vergabe einmalig übernommen, wenn noch kein eigener Stempel da ist; Knopf „Firmenstempel übernehmen" im Profil für später. Eigene Stempel werden nie überschrieben']},
   {v:'v882', d:'03.09.2026', items:['☕ Neu auf der Sitzkarte: „Zu spät aus der Pause" – ein Tipp, Minuten eingeben, werden auf die Tages-Verspätung draufgerechnet (auch wenn morgens pünktlich). Läuft automatisch in Fehlzeit-Summen, Kammerliste, Bescheinigung und Live-Sync mit; Notiz vermerkt „Pause +X min (Uhrzeit)"']},
   {v:'v881', d:'01.09.2026', items:['🎓 Noten-Sync ist jetzt STANDARD für alle Ausbilder: Noten laufen live über den Kurs (mehrere PCs, Vertretung sieht Noten). Kein Umstellen nötig. Admin behält globalen Not-Aus (ein Klick stellt alle auf klassischen Betrieb, ohne Datenverlust)']},
   {v:'v880', d:'01.09.2026', items:['🔧 Noten-Sync: gelöschte Noten (Feld geleert / auf – gesetzt) werden jetzt auch auf dem anderen Gerät entfernt. Der Schutz "leere Cloud überschreibt nicht" gilt nur noch für nie gesynchronisierte Alt-Kurse, nicht für bewusste Löschungen']},
@@ -8076,6 +8079,62 @@ function apClearStempel(){
   const store=_getSigStempelStore();delete store.encStempel;_setSigStempelStore(store);
   _updateSigStempelUI();
 }
+// ═══ v883: Profil + Firmenstempel aus VerwaltungPro ═══
+// Der Ausbilder-Eintrag in VP (shared/kursSettings/ausbilder) kennt Name, Telefon, Mail und
+// den Standard-Standort. Beim Erst-Login sind diese Felder in AusbilderPro leer - unnoetige
+// Doppelarbeit. Wir belegen NUR leere Felder vor; gepflegte Profile bleiben unangetastet.
+let _vpAusbilderDocCache=null;
+async function _vpAusbilderEintrag(){
+  if(_vpAusbilderDocCache!==null) return _vpAusbilderDocCache;
+  try{
+    const mail=((_auth&&_auth.currentUser&&_auth.currentUser.email)||'').toLowerCase();
+    if(!mail||!_db){ _vpAusbilderDocCache=false; return false; }
+    const col=_db.collection('shared').doc('kursSettings').collection('ausbilder');
+    let snap=await col.where('loginEmail','==',mail).limit(1).get();
+    if(snap.empty) snap=await col.where('email','==',mail).limit(1).get();
+    _vpAusbilderDocCache=snap.empty?false:{id:snap.docs[0].id,...snap.docs[0].data()};
+  }catch(e){ _vpAusbilderDocCache=false; }
+  return _vpAusbilderDocCache;
+}
+async function _profilAusVPvorbelegen(){
+  const p=getAusbilderProfil();
+  if(p.name && p.telefon && p.email) return;          // alles gepflegt - nichts tun
+  const a=await _vpAusbilderEintrag(); if(!a) return;
+  let geaendert=false;
+  if(!p.name && a.name){ p.name=a.name; geaendert=true; }
+  if(!p.telefon && a.tel){ p.telefon=a.tel; geaendert=true; }
+  if(!p.email && (a.email||a.loginEmail)){ p.email=a.email||a.loginEmail; geaendert=true; }
+  if(!geaendert) return;
+  localStorage.setItem(_lsKey('ausbilderProfil'),JSON.stringify(p));
+  try{ if(_db&&_fbUid) _db.collection('users').doc(_fbUid).collection('data').doc('profil').set({name:p.name||'',telefon:p.telefon||'',email:p.email||''},{merge:true}).catch(()=>{}); }catch(e){}
+  try{ loadAusbilder(); }catch(e){}
+  toast('👤 Profil aus VerwaltungPro übernommen (Name/Telefon/E-Mail)');
+}
+// Firmenstempel des Standard-Standorts (VP: Einstellungen -> Standorte -> Stempelbild)
+async function _standortStempelHolen(){
+  try{
+    const a=await _vpAusbilderEintrag();
+    if(!a||!a.standortId||!_db) return '';
+    const col=_db.collection('shared').doc('kursSettings').collection('standorte');
+    const d=await col.doc(a.standortId).get();
+    if(!d.exists) return '';
+    if(d.data().stempelDataUrl) return d.data().stempelDataUrl;
+    // Stempel gehoert zum ORT, nicht zum Gebaeude: anderen Eintrag mit gleichem Ort suchen
+    const ort=(d.data().ort||'').trim().toLowerCase(); if(!ort) return '';
+    const alle=await col.get(); let url='';
+    alle.forEach(x=>{ const y=x.data()||{}; if(!url && (y.ort||'').trim().toLowerCase()===ort && y.stempelDataUrl) url=y.stempelDataUrl; });
+    return url;
+  }catch(e){ return ''; }
+}
+// Manuell aus dem Profil: Firmenstempel (wieder) uebernehmen - nur im Bearbeiten-Modus (PIN)
+async function apFirmenstempelUebernehmen(){
+  if(!_apSigEditMode){ toast('Bitte zuerst „Bearbeiten" wählen und PIN eingeben','bad'); return; }
+  const url=await _standortStempelHolen();
+  if(!url){ toast('Für deinen Standort ist in VerwaltungPro kein Firmenstempel hinterlegt','bad'); return; }
+  _apStempelDataUrl=url;
+  try{ _updateSigStempelUI(); }catch(e){}
+  toast('🏢 Firmenstempel übernommen – mit „Speichern" bestätigen');
+}
 async function saveAusbilderSigStempel(){
   const pinEl=document.getElementById('apSigPin');
   const errEl=document.getElementById('apSigPinErr');
@@ -8083,11 +8142,22 @@ async function saveAusbilderSigStempel(){
   let pin=(pinEl.value||'').trim();
   if(!pin) pin=_apSigPinSession||'';
   if(!/^\d{4}$/.test(pin)){errEl.textContent='Bitte 4-stellige PIN eingeben.';errEl.style.display='block';return;}
+  // v883: Noch KEIN Stempel (weder gezeichnet/hochgeladen noch gespeichert)? Dann den
+  // Firmenstempel des Standard-Standorts EINMALIG uebernehmen. Danach nie wieder von
+  // selbst - ein spaeter eigener Stempel bleibt der eigene.
+  let _autoStempel=false;
+  try{
+    const _st=_getSigStempelStore();
+    if(!_apStempelDataUrl && !_st.encStempel){
+      const url=await _standortStempelHolen();
+      if(url){ _apStempelDataUrl=url; _autoStempel=true; }
+    }
+  }catch(e){}
   try {
     await _persistSigStempel(pin);
     _apSigEditMode=false;
     _updateSigStempelUI();
-    toast('✅ Stempel + Signatur verschlüsselt gespeichert','ok');
+    toast(_autoStempel?'✅ Gespeichert – 🏢 Firmenstempel deines Standorts automatisch übernommen':'✅ Stempel + Signatur verschlüsselt gespeichert','ok');
     pinEl.value='';
   } catch(e){errEl.textContent='Falsche PIN — kann gespeicherte Daten nicht entschlüsseln.';errEl.style.display='block';}
 }
@@ -15102,6 +15172,8 @@ function fbLoadData(){
         }
       }).catch(()=>{}).finally(()=>{
         loadAusbilder(); // Profilname in Header (nach evtl. Firestore-Load)
+        // v883: leere Profilfelder einmalig aus dem VP-Ausbilder-Eintrag vorbelegen
+        try{ _profilAusVPvorbelegen(); }catch(e){}
       });
       _cloudIndStand();
     })
