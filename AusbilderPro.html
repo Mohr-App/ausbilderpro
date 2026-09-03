@@ -1990,7 +1990,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v885';
+const APP_VERSION = 'v886';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2005,6 +2005,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v886', d:'03.09.2026', items:['🏢 Bestandsausbilder ohne Stempel: Beim nächsten regulären PIN-Einsatz (Bescheinigung erstellen oder Profil bearbeiten) wird der Firmenstempel des Standorts automatisch nachgezogen – einmalig, nur wenn keiner vorhanden ist']},
   {v:'v885', d:'03.09.2026', items:['🎨 Pause-Knopf jetzt weiß mit blauem „P" statt ☕-Symbol']},
   {v:'v884', d:'03.09.2026', items:['🎨 ☕-Pause-Knopf sitzt jetzt oben rechts, direkt links neben der Tischnummer (statt mittig am Kartenrand)']},
   {v:'v883', d:'03.09.2026', items:['👤 Profil wird beim Erst-Login automatisch aus VerwaltungPro vorbelegt (Name, Telefon, E-Mail – nur leere Felder). 🏢 Firmenstempel des Standorts wird bei der PIN-Vergabe einmalig übernommen, wenn noch kein eigener Stempel da ist; Knopf „Firmenstempel übernehmen" im Profil für später. Eigene Stempel werden nie überschrieben']},
@@ -7876,6 +7877,24 @@ async function apPinAendern(){
   document.getElementById('apPinAendernToggle').style.display='block';
   toast('🔑 PIN erfolgreich geändert','ok');
 }
+// v886: Bestandsausbilder mit Unterschrift/PIN, aber OHNE Stempel: beim naechsten regulaeren
+// PIN-Einsatz (Bescheinigung, Profil bearbeiten) den Firmenstempel des Standorts still
+// nachziehen. Nur wenn wirklich kein Stempel gespeichert ist - nie ueberschreibend.
+let _stempelNachzugLief=false;
+async function _stempelNachzugBeiPin(pin){
+  if(_stempelNachzugLief) return false;
+  try{
+    const store=_getSigStempelStore();
+    if(store.encStempel) { _stempelNachzugLief=true; return false; }   // hat schon einen
+    const url=await _standortStempelHolen();
+    if(!url){ _stempelNachzugLief=true; return false; }
+    _apStempelDataUrl=url;
+    await _persistSigStempel(pin);
+    _stempelNachzugLief=true;
+    toast('🏢 Firmenstempel deines Standorts automatisch übernommen');
+    return true;
+  }catch(e){ return false; }
+}
 async function apSigEnterEdit(){
   const errEl=document.getElementById('apSigPinErr');if(errEl){errEl.style.display='none';errEl.textContent='';}
   const store=_getSigStempelStore();
@@ -7888,6 +7907,7 @@ async function apSigEnterEdit(){
       if(store.encStempel) _apStempelDataUrl=await _decryptString(store.encStempel,pin);
       _apSigPinSession=pin;
     }catch(e){if(errEl){errEl.textContent='Falsche PIN.';errEl.style.display='block';}toast('Falsche PIN','bad');return;}
+    try{ await _stempelNachzugBeiPin(pin); }catch(e){}
   }
   _apSigEditMode=true;
   _updateSigStempelUI();
@@ -8177,6 +8197,8 @@ window._getDefaultSigStempel=async function(pin){
     if(store.encSig) result.sig=await _decryptString(store.encSig,pin);
     if(store.encStempel) result.stempel=await _decryptString(store.encStempel,pin);
     _apSigPinSession=pin;
+    // v886: fehlt der Stempel, jetzt (PIN bekannt) den Firmenstempel nachziehen und gleich mitliefern
+    if(!result.stempel){ try{ if(await _stempelNachzugBeiPin(pin)) result.stempel=_apStempelDataUrl; }catch(e){} }
     return result;
   } catch(e){return {error:'bad-pin',msg:'PIN falsch'};}
 };
