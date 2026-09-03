@@ -442,6 +442,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 /* attendance strip */
 .satt{display:flex;gap:3px;margin-top:3px;flex-wrap:wrap;align-items:center;}
 .sqa-btn{position:absolute;top:50%;right:4px;transform:translateY(-50%);z-index:3;cursor:pointer;font-size:.85rem;width:20px;height:20px;display:flex;align-items:center;justify-content:center;background:rgba(34,197,94,.15);border:1.5px solid rgba(34,197,94,.4);border-radius:50%;color:#22c55e;font-weight:900;transition:transform .1s;}
+.sqa-btn.sqa-pause{background:rgba(217,119,6,.12);border-color:rgba(217,119,6,.4);color:#b45309;font-size:.75rem;}
 .sqa-btn:hover{transform:translateY(-50%) scale(1.2);background:rgba(34,197,94,.25);}
 .sqa-btn.sqa-late{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.5);color:#ef4444;}
 .sqa-btn.sqa-late:hover{background:rgba(239,68,68,.25);}
@@ -1986,7 +1987,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v881';
+const APP_VERSION = 'v882';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2001,6 +2002,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v882', d:'03.09.2026', items:['☕ Neu auf der Sitzkarte: „Zu spät aus der Pause" – ein Tipp, Minuten eingeben, werden auf die Tages-Verspätung draufgerechnet (auch wenn morgens pünktlich). Läuft automatisch in Fehlzeit-Summen, Kammerliste, Bescheinigung und Live-Sync mit; Notiz vermerkt „Pause +X min (Uhrzeit)"']},
   {v:'v881', d:'01.09.2026', items:['🎓 Noten-Sync ist jetzt STANDARD für alle Ausbilder: Noten laufen live über den Kurs (mehrere PCs, Vertretung sieht Noten). Kein Umstellen nötig. Admin behält globalen Not-Aus (ein Klick stellt alle auf klassischen Betrieb, ohne Datenverlust)']},
   {v:'v880', d:'01.09.2026', items:['🔧 Noten-Sync: gelöschte Noten (Feld geleert / auf – gesetzt) werden jetzt auch auf dem anderen Gerät entfernt. Der Schutz "leere Cloud überschreibt nicht" gilt nur noch für nie gesynchronisierte Alt-Kurse, nicht für bewusste Löschungen']},
   {v:'v879', d:'01.09.2026', items:['⚡ Noten-Sync zeigt Änderungen jetzt SOFORT: Die Note kam längst an, wurde aber erst beim nächsten Speichertakt gezeichnet. Jetzt werden Sitzplan-Badges und – falls offen – die Notenfelder im Sitz-Detail direkt live aktualisiert (außer man tippt gerade selbst)']},
@@ -4637,6 +4639,33 @@ function _meldungBeiAnwesendAufloesen(sid, date){
   const entry=d.attendance.find(a=>a&&a.date===date);
   if(entry) entry.note=(entry.note?entry.note+' · ':'')+vermerk;
 }
+// v882: Zu spaet aus der Pause - Minuten werden auf die Tages-Verspaetung (lateMins)
+// ADDIERT. Kein neuer Status, keine neue Kategorie: lateMins speist bereits 🕐-Badge,
+// Fehlzeit-Summen fuer VP, Kammer-Anwesenheitsliste, Bescheinigung und den Live-Sync (lm).
+// War der TN morgens puenktlich (0), zeigt der Tag danach "zu spaet X min".
+function seatPauseVerspaetung(sid){ if(lockGuard())return;
+  const inst=curInst(); if(!inst) return;
+  const d=inst.seats[sid]; if(!d||!d.name) return;
+  const raw=prompt('☕ '+d.name+' – zu spät aus der Pause.\n\nWie viele Minuten? (werden auf die heutige Verspätung draufgerechnet)','10');
+  if(raw===null) return;
+  const min=parseInt(String(raw).replace(/[^0-9]/g,''),10);
+  if(!min||min<=0){ toast('Bitte eine Minutenzahl größer 0 eingeben','bad'); return; }
+  const date=new Date().toISOString().slice(0,10);
+  const jetzt=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  if(!d.attendance) d.attendance=[];
+  let e=d.attendance.find(a=>a&&a.date===date);
+  if(!e){ e={date,type:'present',note:'',lateMins:0,earlyMins:0}; d.attendance.push(e); }
+  if(e.type!=='present'){ toast('Heute ist kein „anwesend" eingetragen – erst Anwesenheit setzen','bad'); return; }
+  e.lateMins=(parseInt(e.lateMins)||0)+min;
+  e.note=(e.note?e.note+' · ':'')+'☕ Pause +'+min+' min ('+jetzt+')';
+  if(!inst.attendance) inst.attendance={};
+  if(!inst.attendance[date]) inst.attendance[date]={};
+  if(!inst.attendance[date][sid]) inst.attendance[date][sid]='P';
+  persist(); renderSeats(); renderQuickAttCount();
+  if(_mobileListMode) renderMobileList();
+  syncAttendanceToFirestore(sid);
+  toast('☕ '+d.name+': +'+min+' min – heute gesamt '+e.lateMins+' min zu spät');
+}
 function seatQuickAtt(sid){
   const inst=curInst(); if(!inst) return;
   const date=new Date().toISOString().slice(0,10);
@@ -5160,6 +5189,9 @@ function mkSeat(id,seats){
     const _qaN=new Date();
     const qaLate=_qaN.getDay()!==0&&_qaN.getDay()!==6&&(_qaN.getHours()*60+_qaN.getMinutes())>=_instBeginnMins(inst);
     const qaBtn=(qaSt||hasDetail||qaD>instEnd||qaD<instStart)?'':'<div class="sqa-btn'+(qaLate?' sqa-late':'')+'" onclick="event.stopPropagation();seatQuickAtt(\''+id+'\')" title="'+(qaLate?'Bis '+_instBeginn(inst)+' nicht erschienen – Klick trägt trotzdem Anwesend ein':'Anwesend markieren')+'">✓</div>';
+    // v882: ☕ Pause-Verspaetung - nur wenn heute anwesend (Gegenstueck zum ✓-Knopf)
+    const _heutePraesent=(qaSt==='P')||att.some(a=>a&&a.date===qaD&&a.type==='present');
+    const pauseBtn=(_heutePraesent&&qaD<=instEnd&&qaD>=instStart&&!isPending)?'<div class="sqa-btn sqa-pause" onclick="event.stopPropagation();seatPauseVerspaetung(\''+id+'\')" title="Zu spät aus der Pause – Minuten auf die Tages-Verspätung draufrechnen">☕</div>':'';
     // Erinnerungs-Rahmen (Tag-1-No-Show rot / ab 2. Fehltag amber)
     const seatAlert=seatAlertInfo(inst,id,d);
     let alertX='';
@@ -5191,7 +5223,7 @@ function mkSeat(id,seats){
     el.innerHTML+=(pendingIcon||urlInfo)+meldHtml+alertX+'<div class="sname-row"><span class="sname"><span class="nf">'+esc(d.name)+'</span><span class="na">'+esc(_abbrevName(d.name))+'</span></span></div>'+(d.company?'<div class="sco">'+esc(d.company)+'</div>':'')+(g?'<div class="sgr">'+g+'</div>':'')+(d.ausbjahr||d.schuljahr||d.klasse?'<div class="smeta">'+[d.ausbjahr?d.ausbjahr+'.Lj':null,d.schuljahr?'Kl.'+d.schuljahr:null,d.klasse?esc(d.klasse):null].filter(Boolean).join(' · ')+'</div>':'')
       +(d.kenntnisAbgelehnt?'<div title="Der Azubi hat beim Start-Dialog \u201eDas ist nicht mein Lehrgang\u201c gew\u00e4hlt \u2013 bitte ansprechen: Versehen (er best\u00e4tigt selbst nach) oder falscher Kurs (entfernen)" style="margin-top:2px;font-size:.52rem;font-weight:800;background:rgba(239,68,68,.12);color:#dc2626;border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:1px 5px;display:inline-block">✗ Kurs abgelehnt</div>'
         :(d.selbstBeigetreten?'<div title="Per QR selbst beigetreten \u2013 nicht von der Verwaltung zugewiesen. Bitte pr\u00fcfen, ob er hierher geh\u00f6rt" style="margin-top:2px;font-size:.52rem;font-weight:800;background:rgba(37,99,235,.1);color:#2563eb;border:1px solid rgba(37,99,235,.3);border-radius:6px;padding:1px 5px;display:inline-block">➕ selbst beigetreten</div>':''))
-      +wzBadge+qaBtn;
+      +wzBadge+qaBtn+pauseBtn;
   }
   return el;
 }
