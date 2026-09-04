@@ -1998,7 +1998,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v888';
+const APP_VERSION = 'v889';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2013,6 +2013,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v889', d:'04.09.2026', items:['🔒 E-Mail-Weitergabe: Hat ein Azubi sie in AzubiPro abgewählt, zeigt AusbilderPro keine Adresse mehr, sendet keine E-Mails an ihn (zentrale Sperre) und die Bescheinigung kann nur gedruckt/händisch ausgehändigt werden. Nicht abgewählt = alles wie bisher']},
   {v:'v888', d:'03.09.2026', items:['📄 „Noten untereinander" ist aus dem vollen Kurskopf in die Bescheinigungs-Fenster (Einzel + Sammel) gewandert – dort, wo auch Unterschrift/Stempel eingefügt werden. Umschalten baut die Bescheinigung sofort neu auf']},
   {v:'v887', d:'03.09.2026', items:['🚶 Neuer Status „Früher gegangen" im Anwesenheits-Block: Uhrzeit eintragen statt Minuten rechnen – wird automatisch gegen das neue Kursende berechnet (Kurskopf: „07:30 – 15:30 Uhr", je Lehrgang einstellbar). Grund in der Bemerkung, Notiz vermerkt „gegangen HH:MM"']},
   {v:'v886', d:'03.09.2026', items:['🏢 Bestandsausbilder ohne Stempel: Beim nächsten regulären PIN-Einsatz (Bescheinigung erstellen oder Profil bearbeiten) wird der Firmenstempel des Standorts automatisch nachgezogen – einmalig, nur wenn keiner vorhanden ist']},
@@ -5674,7 +5675,7 @@ function openModal(id){
             h+='<div style="margin-bottom:8px;padding:7px 10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);border-radius:8px;font-size:.68rem;font-weight:700;color:#b45309">✏️ Manuell angelegt (kein aktives Azubi-Konto) – bei Doppel-Eintrag diesen löschen</div>';
           }
           h+=fld('🎂','Geburtsdatum',t.geburtsdatum?fmtDE(t.geburtsdatum):'');
-          const _tnEmail=t.kontaktEmail||t.email||'';
+          const _tnEmail=(t.emailFreigabe===false)?'':(t.kontaktEmail||t.email||'');
           const _mailBtn=_tnEmail?'<a href="mailto:'+esc(_tnEmail)+'" title="E-Mail schreiben an '+esc(_tnEmail)+'" aria-label="E-Mail schreiben" onclick="event.stopPropagation()" style="flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;background:#2563eb;color:#fff;text-decoration:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg></a>':'';
           h+=fld('📧','E-Mail',_tnEmail,_mailBtn);
           h+=fld('📱','Telefon',t.kontaktTelefon||t.tel||'');
@@ -8992,7 +8993,8 @@ function openTnDetail(tnId){
     html+=field('Beruf',berufDisplay(t),'🔧');
     html+=field('Lehrjahr',t.ausbjahr?t.ausbjahr+'. Jahr':'','📅');
     html+=field('Geburtsdatum',t.geburtsdatum?fmtDE(t.geburtsdatum):'','🎂');
-    html+=field('E-Mail',t.kontaktEmail||t.email,'📧');
+    if(t.emailFreigabe===false) html+=field('E-Mail','🔒 vom Azubi nicht freigegeben – keine E-Mails, Bescheinigung drucken (Verwaltung kann per Mail versenden)','📧');
+    else html+=field('E-Mail',t.kontaktEmail||t.email,'📧');
     html+=field('Telefon',t.kontaktTelefon||t.tel,'📱');
     html+=field('Sitzplatz-Wunsch',t.wunschSitzplatz?'Platz '+t.wunschSitzplatz:'','🪑');
     // Registrierungsinfo
@@ -11015,6 +11017,7 @@ body.fz-liste .vz-lbl-liste{display:inline;}
   <button class="btn-print" onclick="printCert()" title="Drucken">🖨 Drucken</button>
   <button class="btn-default" id="btnInsertDefault" title="Hinterlegte Unterschrift und Stempel einfügen" onclick="insertDefaultSigStempel()">📝 Unterschrift & Stempel</button>
   <button class="btn-send" id="btnSend" title="Bescheinigung als PDF per E-Mail an den Azubi senden" onclick="sendBescheinigung()">📧 Per E-Mail senden</button>
+  <script>try{ if(window.opener && window.opener._emailGesperrt && window.opener._emailGesperrt.has(String(window._tnEmail||'').toLowerCase())){ const b=document.getElementById('btnSend'); if(b){ b.disabled=true; b.style.opacity='.45'; b.title='Der Azubi hat die E-Mail-Weitergabe abgewählt – Bescheinigung bitte drucken und händisch aushändigen'; b.textContent='🔒 E-Mail abgewählt – bitte drucken'; } } }catch(e){}<\/script>
 </div>
 <div class="no-print" style="text-align:center;margin:2px 0 6px;font-size:12px;color:#334155">
   <label style="cursor:pointer;user-select:none;margin:0 8px"><input type="checkbox" onchange="document.body.classList.toggle('fz-blank',this.checked)" style="vertical-align:middle;margin-right:5px">✍ Fehlzeiten leer lassen</label>
@@ -14126,6 +14129,37 @@ try{
   firebase.initializeApp(_fbCfg);
   _auth=firebase.auth();
   _db=firebase.firestore();
+  // ═══ v889: E-Mail-Weitergabe (Widerspruch des Azubis) ═══
+  // Azubis, die in AzubiPro die E-Mail-Weitergabe ABGEWAEHLT haben (emailFreigabe===false),
+  // duerfen weder angezeigt noch angemailt werden. Zentrale Sperre statt elf Einzelstellen:
+  // alle _db.collection('mail').add(...) laufen durch diesen Filter. Arbeitgeber-Mails
+  // sind nicht betroffen (andere Adressen).
+  try{
+    window._emailGesperrt=new Set();
+    _db.collection('globalTN').where('emailFreigabe','==',false).onSnapshot(snap=>{
+      const neu=new Set();
+      snap.forEach(d=>{ const x=d.data()||{}; [x.email,x.kontaktEmail].forEach(e=>{ if(e) neu.add(String(e).toLowerCase()); }); });
+      window._emailGesperrt=neu;
+    }, ()=>{});
+    const _origColl=_db.collection.bind(_db);
+    _db.collection=function(name){
+      const c=_origColl(name);
+      if(name==='mail'){
+        const _origAdd=c.add.bind(c);
+        c.add=function(doc){
+          try{
+            const tos=[].concat(doc&&doc.to||[]).map(x=>String(x).toLowerCase());
+            if(tos.some(t=>window._emailGesperrt.has(t))){
+              toast('🔒 E-Mail nicht gesendet – Azubi hat die E-Mail-Weitergabe abgewählt (Infos nur in der App, Bescheinigung händisch)','bad');
+              return Promise.reject(Object.assign(new Error('E-Mail-Weitergabe vom Azubi abgewählt'),{code:'email-nicht-freigegeben'}));
+            }
+          }catch(e){}
+          return _origAdd(doc);
+        };
+      }
+      return c;
+    };
+  }catch(e){}
   window._db=_db; // für Bescheinigung-Popup
   _db.enablePersistence({synchronizeTabs:true}).catch(e=>console.warn('Offline-Cache:',e.code));
   _st=firebase.storage();

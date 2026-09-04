@@ -1767,10 +1767,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 395';
+const APP_VERSION = 'Build 396';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 396', d:'04.09.2026', items:['🔒 E-Mail-Weitergabe (Rollen-Trennung): Die Verwaltung sieht und nutzt Azubi-Adressen weiterhin (Abwicklung der Ausbildung, Kammerdaten). Hat ein Azubi die Weitergabe an den Ausbilder abgewählt, zeigt VP dazu nur den Hinweis „🔒 nicht für Ausbilder"']},
   {v:'Build 395', d:'03.09.2026', items:['🏢 Firmenstempel je Standort: unter Einstellungen → Standorte kann pro Standort ein Stempelbild hinterlegt werden. Neue Ausbilder dieses Standorts bekommen ihn in AusbilderPro automatisch bei der PIN-Vergabe (nie überschreibend)']},
   {v:'Build 394', d:'01.09.2026', items:['🔧 Drei-Orte-Problem behoben: Beim Zuweisen zu einem Folgekurs wird der Kurs-Eintrag des alten Kurses nur noch entfernt, wenn dieser bereits vorbei ist. Läuft er noch oder steht er noch bevor, bleibt der TN in beiden Kursrostern sichtbar (Fall ET2/ETE1)']},
   {v:'Build 393', d:'27.08.2026', items:['🔧 Kurshistorie: doppelte Einträge (gleicher Kurs, gleicher Zeitraum) werden jetzt an allen 6 Zuweisungswegen (Picker, Drag, Listen-Import, Übertragen) verhindert – arrayUnion prüfte bisher wegen des Zeitstempels nie auf echte Duplikate']},
@@ -7179,7 +7180,7 @@ ${tns.map((t,i)=>{
     +'<td>'+esc(t.betriebTelefon||'–')+'</td>'
     +'<td>'+esc(t.beruf||'–')+'</td>'
     +'<td style="text-align:center">'+(t.ausbjahr||'–')+'</td>'
-    +'<td>'+esc(t.email||'–')+'</td>'
+    +'<td>'+esc(t.email||'–')+(t.emailFreigabe===false?' <span title="Weitergabe an Ausbilder abgewählt">🔒</span>':'')+'</td>'
     +'<td>'+esc(t.tel||'–')+'</td>'
     +'</tr>';
 }).join('')}
@@ -8640,7 +8641,7 @@ function openTNProfile(tnId){
     '<div class="profile-field"><span class="pf-label">Verknüpft mit</span><span id="tnFirmaLink">'+(t.firmaUid?'wird geladen…':'<span style="color:var(--mu)">nicht verknüpft</span>')+'</span></div>'+
     '<div class="profile-field"><span class="pf-label">Geburtsdatum</span><span>'+(t.geburtsdatum?fmtDE(t.geburtsdatum):'–')+'</span></div>'+
     '<div class="profile-field"><span class="pf-label">Lehrlingsnummer</span><span style="font-family:\'JetBrains Mono\',monospace">'+(t.lehrlingsnr?esc(String(t.lehrlingsnr)):'–')+'</span></div>'+
-    '<div class="profile-field"><span class="pf-label">E-Mail</span><span>'+(t.email||'–')+'</span></div>'+
+    '<div class="profile-field"><span class="pf-label">E-Mail</span><span>'+(t.email||'–')+(t.emailFreigabe===false?' <span title="Der Azubi hat die Weitergabe an den Ausbilder abgewählt – AusbilderPro zeigt die Adresse nicht und sendet keine E-Mails. Die Verwaltung darf sie weiterhin nutzen." style="font-size:.62rem;color:#b45309;background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.3);border-radius:5px;padding:1px 5px;margin-left:6px">🔒 nicht für Ausbilder</span>':'')+'</span></div>'+
     '<div class="profile-field"><span class="pf-label">Telefon</span><span>'+(t.tel||'–')+'</span></div>'+
     ((t.adresse||t.plz||t.ort)?'<div class="profile-field"><span class="pf-label">Adresse</span><span>'+esc((t.adresse||'')+(t.plz||t.ort?', ':'')+(t.plz||'')+' '+(t.ort||'')).trim()+'</span></div>':'')+
     '<div class="profile-field"><span class="pf-label">Lehrjahr</span><span>'+(t.ausbjahr?t.ausbjahr+'. Jahr':'–')+'</span></div>'+

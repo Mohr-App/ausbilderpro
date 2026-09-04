@@ -357,6 +357,11 @@ service cloud.firestore {
         && resource.data.verknuepftUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email','kontaktEmail','emailBestaetigt'])
         && request.resource.data.email == request.auth.token.email;
+      // v321 (AzubiPro): E-Mail-Weitergabe (Widerspruchsrecht) - der Azubi darf an seinem
+      // eigenen Datensatz nur diese zwei Felder umschalten. Nicht gesetzt = freigegeben.
+      allow update: if request.auth != null
+        && resource.data.verknuepftUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['emailFreigabe','emailFreigabeAm']);
       // Schritt 3 - Selbst-Verknuepfung (Claim) eines UNBEANSPRUCHTEN Bestand-TN:
       // nur auf eigene UID, nur mit eigener Login-Mail, nur diese Felder, nur wenn noch frei.
       // ausbjahr: der Azubi gibt sein Lehrjahr bei der Anmeldung an und korrigiert damit den Import-Schaetzwert.
