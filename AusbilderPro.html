@@ -2004,7 +2004,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v891';
+const APP_VERSION = 'v892';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2019,6 +2019,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v892', d:'06.09.2026', items:['🎨 Aktionen-Menü ohne Symbole (auch in den Untermenüs), „Anwesenheitsliste" ohne Klammerzusatz']},
   {v:'v891', d:'06.09.2026', items:['🧹 Aktionen aufgeräumt: „📄 Dokumente" bündelt Bescheinigungen, Anwesenheitsliste, Betriebsliste und TN-Liste; „📱 QR" bündelt QR-Code und QR-Anwesenheits-Einstellungen; der Dateiaustausch mit der Verwaltung heißt jetzt „📤 Transfer (Verwaltung)"']},
   {v:'v890', d:'06.09.2026', items:['🖨 Neu unter Aktionen: „Anwesenheitsliste" (Kammer-Layout wie in VP) – Häkchen aus dem Sitzplan, Noten F/M/FP/FT aus dem Sitz, Ort/Betrieb aus dem Pool, Innung je Kursart gelernt, gelbe Felder ausfüllbar, druckfertig']},
   {v:'v888', d:'03.09.2026', items:['📄 „Noten untereinander" ist aus dem vollen Kurskopf in die Bescheinigungs-Fenster (Einzel + Sammel) gewandert – dort, wo auch Unterschrift/Stempel eingefügt werden. Umschalten baut die Bescheinigung sofort neu auf']},
@@ -4067,27 +4068,27 @@ function renderMain(){
     '<div class="main-hdr"><div class="main-title"><div class="main-kat">'+esc(S.kats[S.curKat].label)+'</div><div class="main-dates-row"><div class="main-dates">'+esc(instLabel(inst))+(inst.berufsschultage&&inst.berufsschultage.length?' <span style="font-size:.65rem;color:#7c3aed;font-weight:700;margin-left:8px">🎓 '+inst.berufsschultage.join(', ')+'</span>':'')+'<span style="font-size:.62rem;color:#64748b;margin-left:10px">📅 <input type="number" min="1" max="30" value="'+(inst.kurstage||5)+'" style="width:36px;text-align:center;border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px;font-family:JetBrains Mono,monospace" onchange="updateKurstage(this.value)" onclick="event.stopPropagation()"> Kurstage</span><span style="font-size:.62rem;color:#64748b;margin-left:10px">🕢 <input type="time" value="'+_instBeginn(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateBeginn(this.value)" onclick="event.stopPropagation()" title="Kursbeginn – ab dieser Zeit greifen die Erinnerungen (roter Haken / Fehltag-Rahmen). Gilt auch als Standard für neue Lehrgänge"> – <input type="time" value="'+_instEnde(inst)+'" style="border:1.5px solid #e2e8f0;border-radius:5px;font-size:.62rem;font-weight:700;padding:2px 4px;font-family:JetBrains Mono,monospace;color:#334155" onchange="updateEnde(this.value)" onclick="event.stopPropagation()" title="Kursende – Basis für „Früher gegangen": Uhrzeit eintragen, Minuten werden gegen dieses Ende berechnet. Gilt auch als Standard für neue Lehrgänge"> Uhr</span>'+'</div><button class="hdr-menu-btn" title="Aktionen anzeigen/ausblenden" onclick="event.stopPropagation();toggleKursActions()" id="kursActBtn">☰ Aktionen</button>'+_lockBtn+'</div></div>'
     +'<div class="hdr-actions" id="kursActions">'
     +'<button class="kursact-close" onclick="toggleKursActions()" title="Schließen" aria-label="Schließen">✕</button>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="markAlleAnwesend()" title="Alle TN heute als anwesend markieren (für leere Tage)">✓ Alle anwesend</button>'
-    +'<button class="tbtn main-docs-btn ka-g" onclick="markBerufsschultag()" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="openCourseDocsModal()" title="Dateien mit der Verwaltung austauschen – Kurs-Unterlagen hoch- und herunterladen (nicht für Teilnehmer sichtbar)">📤 Transfer (Verwaltung)</button>'
-    +'<div class="ka-grp" id="kaGrpDok"><button class="tbtn main-docs-btn ka-b" onclick="event.stopPropagation();kaGrpToggle(\'kaGrpDok\')" title="Druckbare Unterlagen zum Lehrgang">📄 Dokumente</button><div class="ka-dd">'
-      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateAlleBescheinigungenAusbilder()" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen (alle TN)</button>'
-      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateAnwListeAP()" title="Kammer-Anwesenheitsliste für die Abrechnung – Häkchen aus dem Sitzplan, Noten 1:1, gelbe Felder ausfüllbar">🖨 Anwesenheitsliste (Kammer)</button>'
-      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateBetriebslisteAusbilder()" title="PDF-Liste der Ausbildungsbetriebe mit Telefonnummern">🏢 Betriebsliste</button>'
-      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateTNListeAusbilder()" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">📋 TN-Liste</button>'
+    +'<button class="tbtn main-docs-btn ka-b" onclick="markAlleAnwesend()" title="Alle TN heute als anwesend markieren (für leere Tage)">Alle anwesend</button>'
+    +'<button class="tbtn main-docs-btn ka-g" onclick="markBerufsschultag()" title="Alle TN an diesem Tag als Berufsschule markieren">Berufsschultag</button>'
+    +'<button class="tbtn main-docs-btn ka-b" onclick="openCourseDocsModal()" title="Dateien mit der Verwaltung austauschen – Kurs-Unterlagen hoch- und herunterladen (nicht für Teilnehmer sichtbar)">Transfer (Verwaltung)</button>'
+    +'<div class="ka-grp" id="kaGrpDok"><button class="tbtn main-docs-btn ka-b" onclick="event.stopPropagation();kaGrpToggle(\'kaGrpDok\')" title="Druckbare Unterlagen zum Lehrgang">Dokumente</button><div class="ka-dd">'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateAlleBescheinigungenAusbilder()" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">Bescheinigungen (alle TN)</button>'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateAnwListeAP()" title="Kammer-Anwesenheitsliste für die Abrechnung – Häkchen aus dem Sitzplan, Noten 1:1, gelbe Felder ausfüllbar">Anwesenheitsliste</button>'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateBetriebslisteAusbilder()" title="PDF-Liste der Ausbildungsbetriebe mit Telefonnummern">Betriebsliste</button>'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateTNListeAusbilder()" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">TN-Liste</button>'
       +'</div></div>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="openEmailBestaetigung()" title="Übersicht: welche Azubis ihre E-Mail-Adresse bestätigt haben">📧 E-Mail-Bestätigung</button>'
-    +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g btn-grad" onclick="openManualTNModal()" title="Teilnehmer aus der Kammerliste zum Kurs zuordnen">👤+ TN</button><div class="ka-grp" id="kaGrpQR"><button class="tbtn main-docs-btn ka-g btn-grad" onclick="event.stopPropagation();kaGrpToggle(\'kaGrpQR\')" title="QR-Code und Einstellungen zur QR-Anwesenheit">📱 QR</button><div class="ka-dd">'
-      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt und täglichen Check-in anzeigen">📱 QR-Code anzeigen</button>'
-      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();openQRAttModal()" title="QR-Anwesenheit einstellen: Kurs-Standort, GPS-Pflicht, Wochenende/Feiertage">📡 QR-Anwesenheit einstellen</button>'
-      +'</div></div>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
-    +'<button class="tbtn main-docs-btn ka-g" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Diesen Lehrgang in einen anderen Kurs verschieben">↔ Lehrgang verschieben</button>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="showAktionsVerlauf()" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">📋 Aktions-Verlauf</button>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="refreshTNStammdaten()" title="Beruf/Fachrichtung aller platzierten TN aus den Stammdaten (KH-Liste) auffrischen">🔄 TN-Daten auffrischen</button>'
+    +'<button class="tbtn main-docs-btn ka-b" onclick="openEmailBestaetigung()" title="Übersicht: welche Azubis ihre E-Mail-Adresse bestätigt haben">E-Mail-Bestätigung</button>'
+    +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g btn-grad" onclick="openManualTNModal()" title="Teilnehmer aus der Kammerliste zum Kurs zuordnen">TN hinzufügen</button><div class="ka-grp" id="kaGrpQR"><button class="tbtn main-docs-btn ka-g btn-grad" onclick="event.stopPropagation();kaGrpToggle(\'kaGrpQR\')" title="QR-Code und Einstellungen zur QR-Anwesenheit">QR</button><div class="ka-dd">'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt und täglichen Check-in anzeigen">QR-Code anzeigen</button>'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();openQRAttModal()" title="QR-Anwesenheit einstellen: Kurs-Standort, GPS-Pflicht, Wochenende/Feiertage">QR-Anwesenheit einstellen</button>'
+      +'</div></div>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">QR + Pool aktivieren</button>')
+    +'<button class="tbtn main-docs-btn ka-g" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Diesen Lehrgang in einen anderen Kurs verschieben">Lehrgang verschieben</button>'
+    +'<button class="tbtn main-docs-btn ka-b" onclick="showAktionsVerlauf()" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">Aktions-Verlauf</button>'
+    +'<button class="tbtn main-docs-btn ka-b" onclick="refreshTNStammdaten()" title="Beruf/Fachrichtung aller platzierten TN aus den Stammdaten (KH-Liste) auffrischen">TN-Daten auffrischen</button>'
     +'<div class="ka-divider"></div>'
-    +'<button class="tbtn main-docs-btn ka-warn" onclick="ausbilderKommtSpaeter()" title="Alle Azubis im Kurs benachrichtigen">🕐 Unterricht beginnt später</button>'
-    +'<button class="tbtn main-docs-btn ka-orange" onclick="kursAusfall()" title="Kurs für heute als ausgefallen markieren">⚠️ Ausfall</button>'
-    +'<button class="tbtn main-docs-btn ka-del" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Lehrgang löschen (30 Tage im Papierkorb)">🗑 Löschen</button>'
+    +'<button class="tbtn main-docs-btn ka-warn" onclick="ausbilderKommtSpaeter()" title="Alle Azubis im Kurs benachrichtigen">Unterricht beginnt später</button>'
+    +'<button class="tbtn main-docs-btn ka-orange" onclick="kursAusfall()" title="Kurs für heute als ausgefallen markieren">Ausfall</button>'
+    +'<button class="tbtn main-docs-btn ka-del" onclick="delInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Lehrgang löschen (30 Tage im Papierkorb)">Löschen</button>'
     +'</div>'
     +'</div>'
     +'<div id="mobileListView" class="mob-list-view" style="display:none"></div>'
