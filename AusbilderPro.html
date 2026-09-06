@@ -256,6 +256,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 /* Aktionen-Menue: blau/gruen abwechselnd statt bunt — Warn-Aktionen am Ende eskalierend gelb→orange→rot */
 .hdr-actions .ka-b{background:#fff!important;border:1.5px solid #e2e8f0!important;color:#0f172a!important;font-weight:800!important;box-shadow:0 3px 10px rgba(15,23,42,.12);}
 .hdr-actions .ka-g{background:#fff!important;border:1.5px solid #e2e8f0!important;color:#0f172a!important;font-weight:800!important;box-shadow:0 3px 10px rgba(15,23,42,.12);}
+/* v891: Aktionen-Gruppen (Dokumente, QR) als aufklappbare Untermenues */
+.ka-grp{position:relative;display:inline-block}
+.ka-grp .ka-dd{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:200px;background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.16);padding:6px;flex-direction:column;gap:4px}
+.ka-grp.open .ka-dd{display:flex}
+.ka-grp .ka-dd button{text-align:left;width:100%;justify-content:flex-start;box-shadow:none!important}
+.ka-grp>button::after{content:' ▾';font-size:.7em;opacity:.7}
 .hdr-actions .ka-warn{background:rgba(234,179,8,.22)!important;border:1.5px solid rgba(234,179,8,.65)!important;color:#854d0e!important;font-weight:800!important;}
 .hdr-actions .ka-orange{background:rgba(249,115,22,.22)!important;border:1.5px solid rgba(249,115,22,.65)!important;color:#9a3412!important;font-weight:800!important;}
 .hdr-actions .ka-del{background:rgba(239,68,68,.2)!important;border:1.5px solid rgba(239,68,68,.6)!important;color:#b91c1c!important;font-weight:800!important;}
@@ -1998,7 +2004,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v890';
+const APP_VERSION = 'v891';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2013,6 +2019,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v891', d:'06.09.2026', items:['🧹 Aktionen aufgeräumt: „📄 Dokumente" bündelt Bescheinigungen, Anwesenheitsliste, Betriebsliste und TN-Liste; „📱 QR" bündelt QR-Code und QR-Anwesenheits-Einstellungen; der Dateiaustausch mit der Verwaltung heißt jetzt „📤 Transfer (Verwaltung)"']},
   {v:'v890', d:'06.09.2026', items:['🖨 Neu unter Aktionen: „Anwesenheitsliste" (Kammer-Layout wie in VP) – Häkchen aus dem Sitzplan, Noten F/M/FP/FT aus dem Sitz, Ort/Betrieb aus dem Pool, Innung je Kursart gelernt, gelbe Felder ausfüllbar, druckfertig']},
   {v:'v888', d:'03.09.2026', items:['📄 „Noten untereinander" ist aus dem vollen Kurskopf in die Bescheinigungs-Fenster (Einzel + Sammel) gewandert – dort, wo auch Unterschrift/Stempel eingefügt werden. Umschalten baut die Bescheinigung sofort neu auf']},
   {v:'v887', d:'03.09.2026', items:['🚶 Neuer Status „Früher gegangen" im Anwesenheits-Block: Uhrzeit eintragen statt Minuten rechnen – wird automatisch gegen das neue Kursende berechnet (Kurskopf: „07:30 – 15:30 Uhr", je Lehrgang einstellbar). Grund in der Bemerkung, Notiz vermerkt „gegangen HH:MM"']},
@@ -4062,13 +4069,18 @@ function renderMain(){
     +'<button class="kursact-close" onclick="toggleKursActions()" title="Schließen" aria-label="Schließen">✕</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="markAlleAnwesend()" title="Alle TN heute als anwesend markieren (für leere Tage)">✓ Alle anwesend</button>'
     +'<button class="tbtn main-docs-btn ka-g" onclick="markBerufsschultag()" title="Alle TN an diesem Tag als Berufsschule markieren">🎓 Berufsschultag</button>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="openCourseDocsModal()" title="Kurs-Dokumente – Austausch mit der Verwaltung (nicht für Teilnehmer sichtbar)">📁 Dokumente (Verwaltung)</button>'
-    +'<button class="tbtn main-docs-btn ka-g" onclick="generateTNListeAusbilder()" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">📋 TN-Liste</button>'
+    +'<button class="tbtn main-docs-btn ka-b" onclick="openCourseDocsModal()" title="Dateien mit der Verwaltung austauschen – Kurs-Unterlagen hoch- und herunterladen (nicht für Teilnehmer sichtbar)">📤 Transfer (Verwaltung)</button>'
+    +'<div class="ka-grp" id="kaGrpDok"><button class="tbtn main-docs-btn ka-b" onclick="event.stopPropagation();kaGrpToggle(\'kaGrpDok\')" title="Druckbare Unterlagen zum Lehrgang">📄 Dokumente</button><div class="ka-dd">'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateAlleBescheinigungenAusbilder()" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen (alle TN)</button>'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateAnwListeAP()" title="Kammer-Anwesenheitsliste für die Abrechnung – Häkchen aus dem Sitzplan, Noten 1:1, gelbe Felder ausfüllbar">🖨 Anwesenheitsliste (Kammer)</button>'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateBetriebslisteAusbilder()" title="PDF-Liste der Ausbildungsbetriebe mit Telefonnummern">🏢 Betriebsliste</button>'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();generateTNListeAusbilder()" title="PDF-Liste aller Teilnehmer mit Noten und Anwesenheit">📋 TN-Liste</button>'
+      +'</div></div>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="openEmailBestaetigung()" title="Übersicht: welche Azubis ihre E-Mail-Adresse bestätigt haben">📧 E-Mail-Bestätigung</button>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="generateBetriebslisteAusbilder()" title="PDF-Liste der Ausbildungsbetriebe mit Telefonnummern">🏢 Betriebsliste</button>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="generateAlleBescheinigungenAusbilder()" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen</button>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="generateAnwListeAP()" title="Kammer-Anwesenheitsliste für die Abrechnung – Häkchen aus dem Sitzplan, Noten 1:1, gelbe Felder ausfüllbar" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#059669">🖨 Anwesenheitsliste</button>'
-    +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g btn-grad" onclick="openManualTNModal()" title="Teilnehmer aus der Kammerliste zum Kurs zuordnen">👤+ TN</button><button class="tbtn main-docs-btn ka-b" onclick="openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button><button class="tbtn main-docs-btn ka-g btn-grad" onclick="openQRAttModal()" title="QR-Anwesenheit: Azubis checken per Scan + GPS-Standortprüfung selbst ein">📡 QR-Anwesenheit</button>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
+    +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g btn-grad" onclick="openManualTNModal()" title="Teilnehmer aus der Kammerliste zum Kurs zuordnen">👤+ TN</button><div class="ka-grp" id="kaGrpQR"><button class="tbtn main-docs-btn ka-g btn-grad" onclick="event.stopPropagation();kaGrpToggle(\'kaGrpQR\')" title="QR-Code und Einstellungen zur QR-Anwesenheit">📱 QR</button><div class="ka-dd">'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt und täglichen Check-in anzeigen">📱 QR-Code anzeigen</button>'
+      +'<button class="tbtn main-docs-btn ka-b" onclick="kaGrpClose();openQRAttModal()" title="QR-Anwesenheit einstellen: Kurs-Standort, GPS-Pflicht, Wochenende/Feiertage">📡 QR-Anwesenheit einstellen</button>'
+      +'</div></div>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
     +'<button class="tbtn main-docs-btn ka-g" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Diesen Lehrgang in einen anderen Kurs verschieben">↔ Lehrgang verschieben</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="showAktionsVerlauf()" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">📋 Aktions-Verlauf</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="refreshTNStammdaten()" title="Beruf/Fachrichtung aller platzierten TN aus den Stammdaten (KH-Liste) auffrischen">🔄 TN-Daten auffrischen</button>'
@@ -4743,6 +4755,10 @@ function showMeldungen(kursId){
     }).catch(err=>toast('Fehler: '+err.message,'bad'));
 }
 
+// v891: Untermenues im Aktionen-Bereich
+function kaGrpToggle(id){ document.querySelectorAll('.ka-grp.open').forEach(g=>{ if(g.id!==id) g.classList.remove('open'); }); const g=document.getElementById(id); if(g) g.classList.toggle('open'); }
+function kaGrpClose(){ document.querySelectorAll('.ka-grp.open').forEach(g=>g.classList.remove('open')); }
+document.addEventListener('click', e=>{ if(!e.target.closest('.ka-grp')) kaGrpClose(); });
 function toggleKursActions(){
   event.stopPropagation();
   const el=document.getElementById('kursActions');
