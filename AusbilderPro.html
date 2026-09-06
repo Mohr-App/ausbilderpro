@@ -1998,7 +1998,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v888';
+const APP_VERSION = 'v890';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2013,6 +2013,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v890', d:'06.09.2026', items:['🖨 Neu unter Aktionen: „Anwesenheitsliste" (Kammer-Layout wie in VP) – Häkchen aus dem Sitzplan, Noten F/M/FP/FT aus dem Sitz, Ort/Betrieb aus dem Pool, Innung je Kursart gelernt, gelbe Felder ausfüllbar, druckfertig']},
   {v:'v888', d:'03.09.2026', items:['📄 „Noten untereinander" ist aus dem vollen Kurskopf in die Bescheinigungs-Fenster (Einzel + Sammel) gewandert – dort, wo auch Unterschrift/Stempel eingefügt werden. Umschalten baut die Bescheinigung sofort neu auf']},
   {v:'v887', d:'03.09.2026', items:['🚶 Neuer Status „Früher gegangen" im Anwesenheits-Block: Uhrzeit eintragen statt Minuten rechnen – wird automatisch gegen das neue Kursende berechnet (Kurskopf: „07:30 – 15:30 Uhr", je Lehrgang einstellbar). Grund in der Bemerkung, Notiz vermerkt „gegangen HH:MM"']},
   {v:'v886', d:'03.09.2026', items:['🏢 Bestandsausbilder ohne Stempel: Beim nächsten regulären PIN-Einsatz (Bescheinigung erstellen oder Profil bearbeiten) wird der Firmenstempel des Standorts automatisch nachgezogen – einmalig, nur wenn keiner vorhanden ist']},
@@ -4066,6 +4067,7 @@ function renderMain(){
     +'<button class="tbtn main-docs-btn ka-b" onclick="openEmailBestaetigung()" title="Übersicht: welche Azubis ihre E-Mail-Adresse bestätigt haben">📧 E-Mail-Bestätigung</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="generateBetriebslisteAusbilder()" title="PDF-Liste der Ausbildungsbetriebe mit Telefonnummern">🏢 Betriebsliste</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="generateAlleBescheinigungenAusbilder()" title="PDF-Bescheinigungen für alle TN auf einmal erstellen">📄 Bescheinigungen</button>'
+    +'<button class="tbtn main-docs-btn ka-b" onclick="generateAnwListeAP()" title="Kammer-Anwesenheitsliste für die Abrechnung – Häkchen aus dem Sitzplan, Noten 1:1, gelbe Felder ausfüllbar" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#059669">🖨 Anwesenheitsliste</button>'
     +(inst.sharedKursId?'<button class="tbtn main-docs-btn ka-g btn-grad" onclick="openManualTNModal()" title="Teilnehmer aus der Kammerliste zum Kurs zuordnen">👤+ TN</button><button class="tbtn main-docs-btn ka-b" onclick="openQRModal()" title="QR-Code für Azubis zum Kurs-Beitritt anzeigen">📱 QR-Code</button><button class="tbtn main-docs-btn ka-g btn-grad" onclick="openQRAttModal()" title="QR-Anwesenheit: Azubis checken per Scan + GPS-Standortprüfung selbst ein">📡 QR-Anwesenheit</button>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">🔗 QR + Pool aktivieren</button>')
     +'<button class="tbtn main-docs-btn ka-g" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Diesen Lehrgang in einen anderen Kurs verschieben">↔ Lehrgang verschieben</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="showAktionsVerlauf()" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">📋 Aktions-Verlauf</button>'
@@ -7267,6 +7269,86 @@ function safeConfirm(title, body, checkLabel, btnLabel, callback){
 }
 
 // ─── ALLE BESCHEINIGUNGEN (Massendruck – Ausbilder) ───
+// ═══ v890: Kammer-Anwesenheitsliste (Port aus VP Build 383-385) ═══
+// Datenquellen hier: Haekchen aus Tagesraster + Sitz-Eintraegen (inkl. Handklicks),
+// Noten aus dem Sitz (F=Fuehrung, M=Mitarbeit, FP=Praxis, FT=Extra-Spalte "Theorie"),
+// Ort/Betrieb aus dem Pool-Datensatz (globalTN), Innung aus der Kursart (lernt mit).
+function apSpeichereInnung(lgartId, text){
+  if(!lgartId||!_db) return;
+  _db.collection('shared').doc('kursSettings').collection('lehrgangsarten').doc(lgartId).set({innung:text},{merge:true})
+    .then(()=>toast('Innung gespeichert – künftige Listen dieser Kursart füllen sie automatisch')).catch(()=>{});
+}
+async function generateAnwListeAP(){
+  const inst=curInst(); if(!inst){ toast('Kein Lehrgang geöffnet','bad'); return; }
+  if(!inst.sY||!inst.sM||!inst.sD){ toast('Lehrgang hat kein Startdatum','bad'); return; }
+  const von=inst.sY+'-'+String(inst.sM).padStart(2,'0')+'-'+String(inst.sD).padStart(2,'0');
+  const bis=(inst.eY||inst.sY)+'-'+String(inst.eM||inst.sM).padStart(2,'0')+'-'+String(inst.eD||inst.sD).padStart(2,'0');
+  // Sitze in Reihenfolge der Reihen, nur belegte
+  const sids=[]; getRows(inst).forEach(r=>r.seats.forEach(sid=>{ const d=inst.seats[sid]; if(d&&d.name) sids.push(sid); }));
+  if(!sids.length){ toast('Keine Teilnehmer im Sitzplan','bad'); return; }
+  // Pool-Daten (Ort/Firma/Nachname) nachladen, wo verknuepft
+  const pool={};
+  if(_db){
+    await Promise.all(sids.map(async sid=>{ const d=inst.seats[sid]; if(!d.poolTnId) return;
+      try{ const g=await _db.collection('globalTN').doc(d.poolTnId).get(); if(g.exists) pool[sid]=g.data()||{}; }catch(e){} }));
+  }
+  // Kursart / Innung / Kuerzel
+  let innungVor='', lgartId='', kuerzel=(S.kats[S.curKat]&&S.kats[S.curKat].label)||'';
+  let leiter=(getAusbilderProfil().name||'').trim();
+  if(_db && inst.sharedKursId){
+    try{
+      const k=await _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).get();
+      if(k.exists){ const kd=k.data()||{}; lgartId=kd.lehrgangsartId||''; if(kd.ausbilderName) leiter=kd.ausbilderName;
+        const full=kd.lehrgangsart||kd.name||kuerzel; const m=[]; for(const t of String(full).split(/\s+/)){ if(/^[A-ZÄÖÜ0-9\/\-\.]+$/.test(t)) m.push(t); else break; } kuerzel=m.join(' ')||kuerzel;
+        if(lgartId){ const lg=await _db.collection('shared').doc('kursSettings').collection('lehrgangsarten').doc(lgartId).get(); if(lg.exists&&lg.data().innung) innungVor=lg.data().innung; }
+      }
+    }catch(e){}
+  }
+  // Kurstage Mo-Fr
+  const tage=[];
+  for(let d=new Date(von+'T12:00'); d<=new Date(bis+'T12:00'); d.setDate(d.getDate()+1)){ const wd=d.getDay(); if(wd===0||wd===6) continue; tage.push(d.toISOString().slice(0,10)); }
+  const SP=12;
+  // Extra-Spalte "Theorie"
+  const ftCid=((inst.customGrades||[]).find(g=>String(g.label||g.name||'').toLowerCase().includes('theorie'))||{}).id||null;
+  const anwesend=(sid,datum)=>{ const d=inst.seats[sid];
+    if(inst.attendance&&inst.attendance[datum]&&inst.attendance[datum][sid]==='P') return true;
+    return (d.attendance||[]).some(e=>e&&e.date===datum&&e.type==='present'); };
+  const heute=new Date().toLocaleDateString('de-DE');
+  const ED=' contenteditable="true" class="ed"';
+  const rows=sids.map((sid,i)=>{
+    const d=inst.seats[sid]; const g=pool[sid]||{};
+    const nach=g.nachname||'', vor=g.vorname||'';
+    const nameCell=(nach||vor)?esc(nach+', '+vor):esc(d.name||'');
+    const ort=g.ort?', '+esc(g.ort):'';
+    const firma=esc(g.firma||d.company||d.firma||'');
+    const ft=ftCid?((d.extraGrades||{})[ftCid]||''):'';
+    let tds=''; for(let c=0;c<SP;c++){ const dt=tage[c]; tds+= (dt&&anwesend(sid,dt))?'<td class="c dz">✓</td>':'<td class="c dz"><span'+ED+'>&nbsp;</span></td>'; }
+    return '<tr><td class="c lfd">'+(i+1)+'</td><td class="tn">'+nameCell+ort+'</td><td class="bt">'+firma+'</td>'+tds
+      +[d.fuehrung,d.mitarbeit,d.praxis,ft].map(n=>'<td class="c nz">'+(n?esc(String(n)):'<span'+ED+'>&nbsp;</span>')+'</td>').join('')
+      +'<td class="bm"><span'+ED+' style="display:block;min-height:5mm">&nbsp;</span></td></tr>';
+  }).join('');
+  let tagKopf=''; for(let c=0;c<SP;c++){ const dt=tage[c]; tagKopf+='<th class="c dz dk" style="font-weight:400">'+(dt?dt.slice(8,10)+'.':'&nbsp;')+'</th>'; }
+  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Anwesenheitsliste '+esc(kuerzel)+'</title><style>'
+    +'@page{size:A4 landscape;margin:10mm 11mm 12mm 11mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#000;margin:0}'
+    +'.tit{display:flex;justify-content:space-between;align-items:flex-start;margin:0 0 4mm}.tit h1{font-size:14pt;margin:0;font-weight:700}.tit .dat{font-size:9.5pt;font-weight:700}'
+    +'.kopf{display:grid;grid-template-columns:88mm 148mm 1fr;font-size:9.5pt;line-height:1.5;margin-bottom:3mm}.kopf b{font-weight:700}'
+    +'table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:0.5pt solid #000;padding:0.8mm 1.2mm;vertical-align:middle;font-weight:400;text-align:left;font-size:9.5pt;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}th{background:#fff;overflow:visible;text-overflow:clip}'
+    +'.lfd{width:9mm}.tn{width:55mm}.bt{width:67mm}.dz{width:5.8mm}.nz{width:7mm}.bm{width:34mm;white-space:normal}td.c{text-align:center}.dk{font-size:7pt;color:#000;height:4.5mm}tbody td{height:8mm}.grp{text-align:left}'
+    +'.ed{background:#fffbe6;display:inline-block;min-width:3mm;min-height:3.5mm}.fuss{position:fixed;bottom:4mm;right:11mm;left:11mm;border-top:0.5pt solid #000;text-align:right;font-size:8.5pt;font-weight:700;padding-top:1mm}.np{position:fixed;top:4mm;right:4mm}'
+    +'@media print{.np{display:none}.ed{background:#fff!important}}</style></head><body>'
+    +'<button class="np" onclick="window.print()" style="padding:8px 16px;font-size:11pt;cursor:pointer">🖨 Drucken</button>'
+    +'<script>document.addEventListener("blur",function(e){if(e.target&&e.target.id==="innungFeld"){try{window.opener&&window.opener.apSpeichereInnung&&window.opener.apSpeichereInnung('+JSON.stringify(lgartId)+',e.target.textContent.trim());}catch(x){}}},true);<\/script>'
+    +'<div class="tit"><h1>Anwesenheitsliste</h1><div class="dat">'+heute+'</div></div>'
+    +'<div class="kopf"><div>Lehrgang: <b>'+esc(kuerzel)+'</b><br>&nbsp;&nbsp;&nbsp;&nbsp;vom: <b>'+fmtDE(von)+'</b> &nbsp; bis: <b>'+fmtDE(bis)+'</b></div>'
+    +'<div>Innung: <b><span id="innungFeld"'+ED+' title="Einmal eintippen genügt: wird für diese Kursart gespeichert" style="min-width:60mm">'+(innungVor?esc(innungVor):'&nbsp;')+'</span></b><br>Leiter: <b>'+esc(leiter)+'</b></div>'
+    +'<div>Ausbildungsjahr: <b><span'+ED+' title="Bitte von Hand eintragen" style="min-width:10mm">&nbsp;</span></b></div></div>'
+    +'<table><thead><tr><th class="lfd" style="border-bottom:none">Lfd.</th><th class="tn" rowspan="2" style="vertical-align:top">Teilnehmer</th><th class="bt" rowspan="2" style="vertical-align:top">Ausbildungsbetrieb</th>'
+    +'<th class="grp" colspan="'+SP+'" style="border-bottom:none">Datum</th><th class="grp" colspan="4" style="border-bottom:none">Zeugnisnote</th><th class="bm" rowspan="2" style="vertical-align:top">Bemerkung</th></tr>'
+    +'<tr><th class="lfd" style="border-top:none">Nr.</th>'+tagKopf+'<th class="c nz">F</th><th class="c nz">M</th><th class="c nz">FP</th><th class="c nz">FT</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table><div class="fuss">Seite 1 von 1</div></body></html>';
+  const w=window.open('','_blank'); if(!w){ toast('Popup blockiert – bitte erlauben','bad'); return; }
+  w.document.write(html); w.document.close();
+}
 function generateAlleBescheinigungenAusbilder(){
   const inst=curInst();if(!inst)return;
   const kursId=inst.sharedKursId;
