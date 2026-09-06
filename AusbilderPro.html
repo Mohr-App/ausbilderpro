@@ -2006,7 +2006,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v894';
+const APP_VERSION = 'v895';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2021,6 +2021,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v895', d:'06.09.2026', items:['🔄 Beruf/Fachrichtung werden jetzt automatisch aus den Stammdaten auf die Sitzplätze übernommen (wie Name und Firma) – der Knopf „TN-Daten auffrischen" entfällt']},
   {v:'v894', d:'06.09.2026', items:['🎨 Aufgeklappte Gruppen im Aktionen-Menü (Dokumente, QR) sind blau hervorgehoben, solange das Untermenü offen ist']},
   {v:'v893', d:'06.09.2026', items:['🎨 QR-Gruppenknopf im Aktionen-Menü jetzt weiß wie die anderen (kein farbiger Verlauf mehr)']},
   {v:'v892', d:'06.09.2026', items:['🎨 Aktionen-Menü ohne Symbole (auch in den Untermenüs), „Anwesenheitsliste" ohne Klammerzusatz']},
@@ -4088,7 +4089,6 @@ function renderMain(){
       +'</div></div>':'<button class="tbtn main-docs-btn ka-g" onclick="activateFirestore()" style="border-style:dashed;grid-column:span 2" title="Kurs in der Cloud anlegen – dann können Azubis per QR-Code beitreten">QR + Pool aktivieren</button>')
     +'<button class="tbtn main-docs-btn ka-g" onclick="moveInst(\''+S.curKat+'\',\''+S.curInst+'\',event)" title="Diesen Lehrgang in einen anderen Kurs verschieben">Lehrgang verschieben</button>'
     +'<button class="tbtn main-docs-btn ka-b" onclick="showAktionsVerlauf()" title="Letzte Ausfall-/Verspätungs-Meldungen anzeigen">Aktions-Verlauf</button>'
-    +'<button class="tbtn main-docs-btn ka-b" onclick="refreshTNStammdaten()" title="Beruf/Fachrichtung aller platzierten TN aus den Stammdaten (KH-Liste) auffrischen">TN-Daten auffrischen</button>'
     +'<div class="ka-divider"></div>'
     +'<button class="tbtn main-docs-btn ka-warn" onclick="ausbilderKommtSpaeter()" title="Alle Azubis im Kurs benachrichtigen">Unterricht beginnt später</button>'
     +'<button class="tbtn main-docs-btn ka-orange" onclick="kursAusfall()" title="Kurs für heute als ausgefallen markieren">Ausfall</button>'
@@ -5984,6 +5984,11 @@ function syncSeatNamesFromFirestore(){
           if(tn.firma!==undefined && seat.company!==tn.firma){
             seat.company=tn.firma||'';
             changed=true;
+          }
+          // v895: Beruf/Fachrichtung synchronisieren (ersetzt den Knopf "TN-Daten auffrischen")
+          if(tn.beruf!==undefined){
+            const b=String(tn.beruf||'').trim();
+            if(b && (seat.profession||'')!==b){ seat.profession=b; changed=true; }
           }
           // E-Mail-unbestaetigt-Marker: nur fuer neu registrierte (emailCheckAktiv) + noch nicht bestaetigt
           const unbest=!!(tn.emailCheckAktiv===true && tn.emailBestaetigt!==true);
