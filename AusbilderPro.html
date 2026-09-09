@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v913';
+const APP_VERSION = 'v914';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v914', d:'09.09.2026', items:['🐛 URSACHE GEFUNDEN: Die heutigen QR-Check-ins wurden in jeden geöffneten Lehrgang eingetragen – auch in einen bereits beendeten Vorkurs mit denselben Teilnehmern. Deshalb ließ sich immer genau der heutige Tag dort nicht löschen. Jetzt werden Check-ins nur noch auf Lehrgänge angewendet, die heute tatsächlich laufen']},
   {v:'v913', d:'09.09.2026', items:['🐛 Letzte Lücke im Kreislauf geschlossen: Anwesenheitstage außerhalb des Lehrgangszeitraums werden nicht mehr als Live-Zettel hochgeschickt – bisher schrieb ein Fremdtag sich so in einen beendeten Kurs und kam bei jedem Öffnen zurück']},
   {v:'v912', d:'08.09.2026', items:['🐛 Kreislauf durchbrochen: Anwesenheitstage außerhalb des Lehrgangszeitraums werden nicht mehr als Check-ins in die Cloud zurückgeschrieben und Live-Zettel fremder Tage nicht mehr angewendet – gelöschte Häkchen bleiben jetzt endgültig gelöscht']},
   {v:'v911', d:'08.09.2026', items:['🐛 Wichtiger Fix: Der automatische Nachzug aus Check-ins prüfte den Kurszeitraum mit falschen Feldnamen und trug deshalb auch Check-ins von außerhalb des Lehrgangs nach – gelöschte Anwesenheits-Häkchen kamen beim nächsten Öffnen des Kurses immer wieder zurück']},
@@ -12922,6 +12923,14 @@ function _applyCheckinsToSeats(showToast){
   if(window._applyingCheckins) return; // Rekursions-Guard (renderSeats ruft uns ggf. erneut)
   if(!_todayCheckinMap || !Object.keys(_todayCheckinMap).length) return;
   const inst=curInst(); if(!inst) return;
+  // v914: NUR anwenden, wenn der geoeffnete Lehrgang HEUTE laeuft. Ohne diese Pruefung
+  // trug die Funktion die heutigen QR-Check-ins in JEDEN geoeffneten Kurs ein - auch in
+  // einen bereits beendeten Vorkurs mit denselben Teilnehmern. Das war die Ursache dafuer,
+  // dass sich immer genau der HEUTIGE Tag nicht aus dem alten Kurs loeschen liess.
+  const _heuteISO=new Date().toISOString().slice(0,10);
+  const _cVon=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+String(inst.sM).padStart(2,'0')+'-'+String(inst.sD).padStart(2,'0')):'';
+  const _cBis=(inst.eY&&inst.eM&&inst.eD)?(inst.eY+'-'+String(inst.eM).padStart(2,'0')+'-'+String(inst.eD).padStart(2,'0')):'';
+  if((_cVon&&_heuteISO<_cVon)||(_cBis&&_heuteISO>_cBis)) return;
   const seats=curSeats(); if(!seats) return;
   window._applyingCheckins=true;
   let changed=false;
