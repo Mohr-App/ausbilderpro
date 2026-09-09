@@ -2010,7 +2010,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v912';
+const APP_VERSION = 'v913';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2025,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v913', d:'09.09.2026', items:['🐛 Letzte Lücke im Kreislauf geschlossen: Anwesenheitstage außerhalb des Lehrgangszeitraums werden nicht mehr als Live-Zettel hochgeschickt – bisher schrieb ein Fremdtag sich so in einen beendeten Kurs und kam bei jedem Öffnen zurück']},
   {v:'v912', d:'08.09.2026', items:['🐛 Kreislauf durchbrochen: Anwesenheitstage außerhalb des Lehrgangszeitraums werden nicht mehr als Check-ins in die Cloud zurückgeschrieben und Live-Zettel fremder Tage nicht mehr angewendet – gelöschte Häkchen bleiben jetzt endgültig gelöscht']},
   {v:'v911', d:'08.09.2026', items:['🐛 Wichtiger Fix: Der automatische Nachzug aus Check-ins prüfte den Kurszeitraum mit falschen Feldnamen und trug deshalb auch Check-ins von außerhalb des Lehrgangs nach – gelöschte Anwesenheits-Häkchen kamen beim nächsten Öffnen des Kurses immer wieder zurück']},
   {v:'v910', d:'08.09.2026', items:['🔒 „Alle anwesend" trägt nichts mehr ein, wenn das heutige Datum außerhalb des Lehrgangszeitraums liegt – so entstand am Folgetag ein zusätzlicher Anwesenheitstag im bereits beendeten Kurs, der sich über die Check-ins immer wieder zurückholte']},
@@ -15015,7 +15016,13 @@ function _liveAnwSnapshot(inst){
   // v856: volles Objekt je TN/Tag - Rastercode UND Detail (Typ, Verspaetung, frueher, Notiz).
   // "Zu spaet" lebt nur im Detail (type present + lateMins) und muss mitreisen.
   const out={};
-  const put=(datum,key,patch)=>{ const o=((out[datum]=out[datum]||{})[key]=(out[datum][key]||{})); Object.assign(o,patch); };
+  // v913: Tage AUSSERHALB des Lehrgangszeitraums gar nicht erst hochschicken. Ohne diese
+  // Sperre wurde ein versehentlich lokal vorhandener Fremdtag als Live-Zettel in den
+  // (bereits beendeten) Kurs geschrieben und von dort bei jedem Oeffnen wieder eingelesen.
+  const _lVon=(inst.sY&&inst.sM&&inst.sD)?(inst.sY+'-'+String(inst.sM).padStart(2,'0')+'-'+String(inst.sD).padStart(2,'0')):'';
+  const _lBis=(inst.eY&&inst.eM&&inst.eD)?(inst.eY+'-'+String(inst.eM).padStart(2,'0')+'-'+String(inst.eD).padStart(2,'0')):'';
+  const _imKurs=dt=>!((_lVon&&dt<_lVon)||(_lBis&&dt>_lBis));
+  const put=(datum,key,patch)=>{ if(!_imKurs(datum)) return; const o=((out[datum]=out[datum]||{})[key]=(out[datum][key]||{})); Object.assign(o,patch); };
   Object.entries(inst.attendance||{}).forEach(([datum,slots])=>{
     Object.entries(slots||{}).forEach(([sid,code])=>{
       const d=(inst.seats||{})[sid];
