@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v917';
+const APP_VERSION = 'v918';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v918', d:'10.09.2026', items:['🎨 „Vergangene Lehrgänge" deutlicher erkennbar: fetter, hinterlegt und mit Pfeil nach unten, der sich beim Aufklappen dreht']},
   {v:'v917', d:'10.09.2026', items:['🗂 Übersichtlichere Kursliste: Abgeschlossene Lehrgänge liegen jetzt in einem aufklappbaren Bereich „X vergangene Lehrgänge" – sichtbar bleiben nur der laufende und kommende. Beim Neuladen immer zugeklappt']},
   {v:'v916', d:'09.09.2026', items:['🔄 Neuer Admin-Knopf im Mehr-Menü: „Alle Apps neu laden lassen" – löst bei allen offenen AusbilderPro-Apps einen Neustart aus (mit Hinweis und 2,5 Sekunden Vorlauf), damit nach einem Fix niemand mit einer alten Fassung weiterarbeitet']},
   {v:'v915', d:'09.09.2026', items:['🛡 Live-Sync robuster: Einträge mit ungültigen Schlüsseln (Punkte/Schrägstriche) werden nicht mehr geschrieben – ein einziger solcher Eintrag legte bisher den gesamten Live-Sync eines Kurses lahm. 🔄 Zusätzlich: Admin kann bei Bedarf einen Neustart aller offenen Apps auslösen']},
@@ -2688,15 +2689,17 @@ function renderSidebar(){
     let _altBox=null;
     if(_vergangene.length){
       const tog=document.createElement('div');
-      tog.style.cssText='font-size:.6rem;font-weight:700;color:#64748b;padding:7px 12px;cursor:pointer;letter-spacing:.04em;display:flex;align-items:center;gap:5px;border-top:1px solid #e2e8f0;margin-top:4px;user-select:none';
-      tog.innerHTML='<span class="altpfeil">▸</span> '+_vergangene.length+' vergangene Lehrgänge';
+      tog.style.cssText='font-size:.68rem;font-weight:800;color:#475569;padding:9px 12px;cursor:pointer;letter-spacing:.03em;display:flex;align-items:center;gap:6px;border-top:1px solid #e2e8f0;margin-top:4px;user-select:none;background:rgba(148,163,184,.10);border-radius:6px;transition:background .12s';
+      tog.onmouseenter=()=>{ tog.style.background='rgba(148,163,184,.20)'; };
+      tog.onmouseleave=()=>{ tog.style.background='rgba(148,163,184,.10)'; };
+      tog.innerHTML='<span class="altpfeil" style="font-size:.8rem;transition:transform .15s;display:inline-block">▼</span> '+_vergangene.length+' vergangene Lehrgänge';
       tog.title='Abgeschlossene Lehrgänge ein-/ausblenden';
       _altBox=document.createElement('div');
       _altBox.style.display='none';
       tog.onclick=e=>{ e.stopPropagation();
         const auf=_altBox.style.display!=='none';
         _altBox.style.display=auf?'none':'';
-        tog.querySelector('.altpfeil').textContent=auf?'▸':'▾';
+        const pf=tog.querySelector('.altpfeil'); pf.style.transform=auf?'':'rotate(180deg)';
       };
       ch.appendChild(tog); ch.appendChild(_altBox);
     }
