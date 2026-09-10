@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v918';
+const APP_VERSION = 'v920';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,8 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v920', d:'10.09.2026', items:['🐛 Noten ließen sich nicht löschen: Der Schreibvorgang enthielt ein Feld, das die Sicherheitsregeln nicht erlaubten – dadurch wurde er komplett abgelehnt und die alte Note kam aus der Cloud zurück. Regel ergänzt; außerdem wird ein solcher Fehler jetzt sichtbar gemeldet statt verschluckt']},
+  {v:'v919', d:'10.09.2026', items:['↩️ „Sitzplatz leeren" geht wieder für Teilnehmer ohne jede Datenspur (keine Anwesenheit, keine Noten, keine Notiz) – sie wandern einfach zurück in den Pool. Die Pflicht zur Einstufung als Wiederholer/Nicht angetreten greift erst, wenn tatsächlich Daten am TN hängen']},
   {v:'v918', d:'10.09.2026', items:['🎨 „Vergangene Lehrgänge" deutlicher erkennbar: fetter, hinterlegt und mit Pfeil nach unten, der sich beim Aufklappen dreht']},
   {v:'v917', d:'10.09.2026', items:['🗂 Übersichtlichere Kursliste: Abgeschlossene Lehrgänge liegen jetzt in einem aufklappbaren Bereich „X vergangene Lehrgänge" – sichtbar bleiben nur der laufende und kommende. Beim Neuladen immer zugeklappt']},
   {v:'v916', d:'09.09.2026', items:['🔄 Neuer Admin-Knopf im Mehr-Menü: „Alle Apps neu laden lassen" – löst bei allen offenen AusbilderPro-Apps einen Neustart aus (mit Hinweis und 2,5 Sekunden Vorlauf), damit nach einem Fix niemand mit einer alten Fassung weiterarbeitet']},
@@ -7224,7 +7226,8 @@ function syncAttendanceToFirestore(seatId){
       const _valid=new Set((inst.customGrades||[]).map(g=>g.id));
       const _ex={}; Object.entries(_dn.extraGrades||{}).forEach(([cid,val])=>{ if(_valid.has(cid)&&val) _ex[cid]=val; });
       _db.collection('shared').doc('kurse').collection('list').doc(_kid).collection('teilnehmer').doc(_tnId)
-        .set({noten_mitarbeit:_dn.mitarbeit||'',noten_fuehrung:_dn.fuehrung||'',noten_praxis:_dn.praxis||'',noten_extra:_ex,notenLastSync:Date.now()},{merge:true}).catch(()=>{});
+        .set({noten_mitarbeit:_dn.mitarbeit||'',noten_fuehrung:_dn.fuehrung||'',noten_praxis:_dn.praxis||'',noten_extra:_ex,notenLastSync:Date.now()},{merge:true})
+        .catch(err=>{ console.error('Noten-Schreibfehler:',err); toast('⚠️ Noten konnten nicht gespeichert werden: '+err.message,'bad'); });
     }
   }catch(e){}
   _spiegleCheckins(inst, seatId);
@@ -11798,7 +11801,12 @@ function clearSeat(){
   // Historie, sonst waeren echte Falschanmeldungen (die einen Sitz waehlten) nie mehr
   // direkt entfernbar.
   const _hatAnw1=d && (d.attendance||[]).length>1;
-  if(d && d.name && d.poolTnId && (!d.selbstBeigetreten || _hatAnw1)){
+  // v919: Ein TN OHNE jede Datenspur darf zurueck in den Pool - dafuer ist "Sitzplatz leeren"
+  // da (Sitz = Position, TN = Datenbesitzer). Die Einstufungspflicht greift erst, wenn es
+  // etwas zu verlieren gibt: Anwesenheit, Noten, Notiz oder Bemerkung.
+  const _hatNoten=d && ((d.mitarbeit||'')||(d.fuehrung||'')||(d.praxis||'')||Object.values(d.extraGrades||{}).some(v=>v));
+  const _hatSpur=d && (((d.attendance||[]).length>0)||_hatNoten||(d.note||'').trim()||(d.bemerkung||'').trim());
+  if(d && d.name && d.poolTnId && _hatSpur && (!d.selbstBeigetreten || _hatAnw1)){
     closeModal();
     _zeigeEinstufungPflicht(d.name, curSeat);
     return;
