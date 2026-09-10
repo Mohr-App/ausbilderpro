@@ -1195,13 +1195,36 @@ const _fbCfg={
   messagingSenderId:"937082794250",
   appId:"1:937082794250:web:eb99bc41d8f39908df8af3"
 };
+// v322: Manche Browser (privater Modus, blockierte Cookies, strenge iOS-Einstellungen)
+// verweigern den lokalen Speicher komplett - jeder Zugriff wirft dann SecurityError
+// ("The operation is insecure") und die App bricht an unerwarteten Stellen ab. Deshalb
+// einmal pruefen und im Notfall auf einen Speicher im Arbeitsspeicher umschalten: die App
+// laeuft dann normal weiter, merkt sich Einstellungen nur nicht ueber das Schliessen hinaus.
+(function(){
+  let ok=true;
+  try{ const t='__lstest'; localStorage.setItem(t,'1'); localStorage.removeItem(t); }catch(e){ ok=false; }
+  if(ok) return;
+  console.warn('[Speicher] Browser verweigert lokalen Speicher – Ersatzspeicher aktiv');
+  const mem={};
+  const shim={
+    getItem:k=>(Object.prototype.hasOwnProperty.call(mem,k)?mem[k]:null),
+    setItem:(k,v)=>{ mem[k]=String(v); },
+    removeItem:k=>{ delete mem[k]; },
+    key:i=>{ const ks=Object.keys(mem); return i<ks.length?ks[i]:null; },
+    clear:()=>{ Object.keys(mem).forEach(k=>delete mem[k]); },
+    get length(){ return Object.keys(mem).length; }
+  };
+  try{ Object.defineProperty(window,'localStorage',{configurable:true,get:()=>shim}); }catch(e){}
+})();
 firebase.initializeApp(_fbCfg);
 const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
 const AZUBI_VERSION='v318'; // bei jedem SW-Bump mitziehen (sw-azubi.js azubipro-vNNN)
-db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code));
+// v322: enablePersistence kann in Browsern ohne Speicherzugriff auch SYNCHRON werfen
+try{ db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code||e.message)); }
+catch(e){ console.warn('Offline-Cache nicht verfügbar:', e&&e.message); }
 // Selbstheilung gegen bekannten Firestore-SDK-Bug "INTERNAL ASSERTION FAILED" (iPhone/Safari):
 // erkennt genau diese Meldung und lädt die eingefrorene Sitzung einmal neu (max. 1x/60s, Loop-Schutz).
 (function(){
@@ -8536,7 +8559,8 @@ function isStandalone(){
   return window.matchMedia('(display-mode:standalone)').matches||navigator.standalone;
 }
 
-function showInstallBanner(){
+function showInstallBanner(){ try{ _showInstallBannerIntern(); }catch(e){ console.warn('Install-Banner übersprungen:', e&&e.message); } }
+function _showInstallBannerIntern(){
   if(isStandalone()) return;
   if(document.getElementById('installBanner')) return;
   const visits=parseInt(localStorage.getItem('azubi_install_visits')||'0')+1;
