@@ -940,6 +940,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
         <button class="tbtn" onclick="zeigeCloudVorgaenger();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(217,119,6,.06);border-color:rgba(217,119,6,.25);color:#92400e" title="Den beim letzten Sitzungsbeginn gesicherten Cloud-Stand ansehen und bei Datenverlust wiederherstellen">🛟 Cloud-Vorgänger wiederherstellen</button>
         <button class="tbtn" id="liveSyncBtn" onclick="liveSyncToggle();closeHdrMenu()" style="width:100%;text-align:left;display:none;background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.25);color:#1e40af" title="BETA: Sitzplan und Anwesenheit laufen live über den Kurs – mehrere PCs gleichzeitig möglich. Nur auf diesem Gerät, jederzeit umschaltbar (doppelte Buchführung).">⚡ Live-Sync (Beta): AUS</button>
         <button class="tbtn" id="notenSyncBtn" onclick="notenSyncToggle();closeHdrMenu()" style="width:100%;text-align:left;display:none;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.25);color:#6d28d9" title="BETA (nur du): Noten laufen live über den Kurs zurück in die App – Cloud-Noten werden gelesen und auf den Sitz übernommen. Doppelte Buchführung, jederzeit umschaltbar.">🎓 Noten-Sync (Beta): AUS</button>
+        <button class="tbtn" id="reloadAlleBtn" onclick="reloadAlleApps();closeHdrMenu()" style="width:100%;text-align:left;display:none;background:rgba(15,23,42,.05);border-color:rgba(15,23,42,.2);color:#0f172a" title="Alle offenen AusbilderPro-Apps (auch bei Kollegen) laden nach kurzem Hinweis neu – nützlich nach einem Fix, damit niemand mit einer alten Fassung weiterarbeitet.">🔄 Alle Apps neu laden lassen</button>
         <button class="tbtn" onclick="appReset();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2);color:#991b1b" title="App-Cache und alte lokale Dateien zurücksetzen (bei Problemen)">🔄 App zurücksetzen</button>
         <button class="tbtn" id="hdrChatSweepBtn" onclick="openChatSweep();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(124,58,237,.06);border-color:rgba(124,58,237,.2);color:#6d28d9;display:none" title="Alte Chat-Nachrichten manuell entfernen (Admin/DSGVO)">🧹 Chat-Bereinigung</button>
         <button class="tbtn" onclick="recoverOrphanSeats();closeHdrMenu()" style="width:100%;text-align:left;background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.2);color:#4338ca" title="TN, die direkt am Sitzplatz eingegeben wurden (statt über +TN), nachträglich in globalTN + Kurs-Liste anlegen">🔗 Verwaiste Sitze nachtragen</button>
@@ -2010,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v915';
+const APP_VERSION = 'v916';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2025,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v916', d:'09.09.2026', items:['🔄 Neuer Admin-Knopf im Mehr-Menü: „Alle Apps neu laden lassen" – löst bei allen offenen AusbilderPro-Apps einen Neustart aus (mit Hinweis und 2,5 Sekunden Vorlauf), damit nach einem Fix niemand mit einer alten Fassung weiterarbeitet']},
   {v:'v915', d:'09.09.2026', items:['🛡 Live-Sync robuster: Einträge mit ungültigen Schlüsseln (Punkte/Schrägstriche) werden nicht mehr geschrieben – ein einziger solcher Eintrag legte bisher den gesamten Live-Sync eines Kurses lahm. 🔄 Zusätzlich: Admin kann bei Bedarf einen Neustart aller offenen Apps auslösen']},
   {v:'v914', d:'09.09.2026', items:['🐛 URSACHE GEFUNDEN: Die heutigen QR-Check-ins wurden in jeden geöffneten Lehrgang eingetragen – auch in einen bereits beendeten Vorkurs mit denselben Teilnehmern. Deshalb ließ sich immer genau der heutige Tag dort nicht löschen. Jetzt werden Check-ins nur noch auf Lehrgänge angewendet, die heute tatsächlich laufen']},
   {v:'v913', d:'09.09.2026', items:['🐛 Letzte Lücke im Kreislauf geschlossen: Anwesenheitstage außerhalb des Lehrgangszeitraums werden nicht mehr als Live-Zettel hochgeschickt – bisher schrieb ein Fremdtag sich so in einen beendeten Kurs und kam bei jedem Öffnen zurück']},
@@ -13257,6 +13259,7 @@ function loadPool(){
   setTimeout(()=>{try{_notenStart(curInst());}catch(e){}}, 1700);
   setTimeout(()=>{try{liveSyncMenuUpdate();}catch(e){}}, 800);
   setTimeout(()=>{try{notenSyncMenuUpdate();}catch(e){}}, 850);
+  setTimeout(()=>{try{reloadAlleMenuUpdate();}catch(e){}}, 900);
   setTimeout(()=>{try{_liveGlobalWatch();}catch(e){}}, 500);
   setTimeout(()=>{try{_notenGlobalWatch();}catch(e){}}, 550);
   setTimeout(()=>{try{_pruefeSigReset();}catch(e){}}, 2500);
@@ -14631,6 +14634,7 @@ function goAsAusbilder(){
 function toggleHdrMenu(){
   try{ if(typeof liveSyncMenuUpdate==='function') liveSyncMenuUpdate(); }catch(e){}
   try{ if(typeof notenSyncMenuUpdate==='function') notenSyncMenuUpdate(); }catch(e){}
+  try{ if(typeof reloadAlleMenuUpdate==='function') reloadAlleMenuUpdate(); }catch(e){}
   const m=document.getElementById('hdrMenu');
   const open=m.style.display==='flex';
   m.style.display=open?'none':'flex';
@@ -15148,6 +15152,19 @@ function _notenGlobalWatch(){
     if(!window._notenGlobalAn){ _notenStop(); toast('🎓 Noten-Sync wurde zentral deaktiviert – Noten laufen klassisch weiter'); }
     else { toast('🎓 Noten-Sync wurde zentral aktiviert'); _notenStart(curInst()); }
   }, ()=>{ window._notenGlobalAn=true; });
+}
+// v916: Admin loest bei allen offenen Apps einen Neustart aus (appConfig.reloadAb).
+// Wirkt nur auf Apps ab v915 - aeltere Fassungen muessen einmalig selbst neu laden.
+function reloadAlleApps(){
+  if(!_db) return;
+  if(!confirm('🔄 Alle offenen AusbilderPro-Apps neu laden lassen?\n\nJeder Kollege sieht kurz den Hinweis „Neue Fassung verfügbar" und die App lädt nach 2,5 Sekunden neu. Nicht gespeicherte Eingaben in offenen Dialogen gehen dabei verloren.')) return;
+  _db.collection('shared').doc('appConfig').set({reloadAb:Date.now(), reloadVon:(_auth&&_auth.currentUser&&_auth.currentUser.email)||''},{merge:true})
+    .then(()=>toast('🔄 Neustart ausgelöst – alle offenen Apps laden neu'))
+    .catch(err=>toast('Fehlgeschlagen: '+err.message,'bad'));
+}
+function reloadAlleMenuUpdate(){
+  const b=document.getElementById('reloadAlleBtn'); if(!b) return;
+  b.style.display=_LIVE_ADMINS.includes(((_auth&&_auth.currentUser&&_auth.currentUser.email)||'').toLowerCase())?'':'none';
 }
 function notenSyncMenuUpdate(){
   const b=document.getElementById('notenSyncBtn'); if(!b) return;
