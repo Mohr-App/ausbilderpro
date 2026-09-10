@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v916';
+const APP_VERSION = 'v917';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v917', d:'10.09.2026', items:['🗂 Übersichtlichere Kursliste: Abgeschlossene Lehrgänge liegen jetzt in einem aufklappbaren Bereich „X vergangene Lehrgänge" – sichtbar bleiben nur der laufende und kommende. Beim Neuladen immer zugeklappt']},
   {v:'v916', d:'09.09.2026', items:['🔄 Neuer Admin-Knopf im Mehr-Menü: „Alle Apps neu laden lassen" – löst bei allen offenen AusbilderPro-Apps einen Neustart aus (mit Hinweis und 2,5 Sekunden Vorlauf), damit nach einem Fix niemand mit einer alten Fassung weiterarbeitet']},
   {v:'v915', d:'09.09.2026', items:['🛡 Live-Sync robuster: Einträge mit ungültigen Schlüsseln (Punkte/Schrägstriche) werden nicht mehr geschrieben – ein einziger solcher Eintrag legte bisher den gesamten Live-Sync eines Kurses lahm. 🔄 Zusätzlich: Admin kann bei Bedarf einen Neustart aller offenen Apps auslösen']},
   {v:'v914', d:'09.09.2026', items:['🐛 URSACHE GEFUNDEN: Die heutigen QR-Check-ins wurden in jeden geöffneten Lehrgang eingetragen – auch in einen bereits beendeten Vorkurs mit denselben Teilnehmern. Deshalb ließ sich immer genau der heutige Tag dort nicht löschen. Jetzt werden Check-ins nur noch auf Lehrgänge angewendet, die heute tatsächlich laufen']},
@@ -2679,6 +2680,26 @@ function renderSidebar(){
     });
     const today=new Date().toISOString().slice(0,10);
     let lastYear=null;
+    // v917: Vergangene Lehrgaenge in ein aufklappbares Untermenue - die Liste wird sonst
+    // mit jedem Durchgang laenger, obwohl nur der laufende und kommende interessant sind.
+    // Standard immer zugeklappt (auch wenn es NUR vergangene gibt), Zustand nicht gemerkt.
+    const _endeVon=i=>{ const y=i.sY||''; return (i.eY||y)+'-'+String(i.eM||12).padStart(2,'0')+'-'+String(i.eD||28).padStart(2,'0'); };
+    const _vergangene=instEntries.filter(([,i])=>_endeVon(i)<today);
+    let _altBox=null;
+    if(_vergangene.length){
+      const tog=document.createElement('div');
+      tog.style.cssText='font-size:.6rem;font-weight:700;color:#64748b;padding:7px 12px;cursor:pointer;letter-spacing:.04em;display:flex;align-items:center;gap:5px;border-top:1px solid #e2e8f0;margin-top:4px;user-select:none';
+      tog.innerHTML='<span class="altpfeil">▸</span> '+_vergangene.length+' vergangene Lehrgänge';
+      tog.title='Abgeschlossene Lehrgänge ein-/ausblenden';
+      _altBox=document.createElement('div');
+      _altBox.style.display='none';
+      tog.onclick=e=>{ e.stopPropagation();
+        const auf=_altBox.style.display!=='none';
+        _altBox.style.display=auf?'none':'';
+        tog.querySelector('.altpfeil').textContent=auf?'▸':'▾';
+      };
+      ch.appendChild(tog); ch.appendChild(_altBox);
+    }
     instEntries.forEach(([iid,inst])=>{
       const yr=inst.sY||'';
       const instStart=yr+'-'+String(inst.sM||1).padStart(2,'0')+'-'+String(inst.sD||1).padStart(2,'0');
@@ -2691,7 +2712,7 @@ function renderSidebar(){
         const yrDiv=document.createElement('div');
         yrDiv.style.cssText='font-size:.55rem;font-weight:700;color:#94a3b8;padding:6px 12px 2px;letter-spacing:.08em;font-family:"JetBrains Mono",monospace;border-top:1px solid rgba(148,163,184,.2);margin-top:4px';
         yrDiv.textContent='── '+yr+' ──';
-        ch.appendChild(yrDiv);
+        (_altBox||ch).appendChild(yrDiv);
       }
       lastYear=yr;
 
@@ -2702,7 +2723,7 @@ function renderSidebar(){
       if(isVergangen) ir.style.opacity='.6';
       ir.innerHTML='<div class="inst-dot"'+instDotStyle(inst,isAktiv,instStart,today)+'></div><div class="inst-info"><div class="inst-dates">'+esc(instLabel(inst))+'</div>'+(cnt?'<div class="inst-cnt">'+cnt+' Schüler</div>':'')+(isAktiv?'<div style="font-size:.5rem;color:#22c55e;font-weight:700">● AKTUELL</div>':'')+(inst.abgeschlossen?'<div style="display:inline-block;margin-top:3px;font-size:.55rem;color:#fff;background:#059669;font-weight:800;padding:2px 8px;border-radius:7px;letter-spacing:.03em;box-shadow:0 1px 3px rgba(5,150,105,.4)">✓ ABGESCHLOSSEN</div>':'')+'</div>';
       ir.addEventListener('click',()=>selInst(id,iid));
-      ch.appendChild(ir);
+      (isVergangen&&_altBox?_altBox:ch).appendChild(ir);
     });
     const addBtn=document.createElement('div');
     addBtn.className='kat-newinst'+(k.open?' show':'');
