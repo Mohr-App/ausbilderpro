@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v921';
+const APP_VERSION = 'v922';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v922', d:'10.09.2026', items:['🐛 Sofortkorrektur zu v921: Die Anwesenheitsliste ließ sich nicht mehr öffnen, weil die neue Notenspalten-Zuordnung an der falschen Stelle stand']},
   {v:'v921', d:'10.09.2026', items:['🖨 Anwesenheitsliste: Die Notenspalten F/M/FP/FT werden jetzt zuverlässig gefüllt – auch wenn eigene Notenspalten verwendet werden („Theoretische Kenntnisse", „Fachpraxis" usw.). Vorher blieben FP und FT leer, weil nur exakt „Theorie" erkannt wurde']},
   {v:'v920', d:'10.09.2026', items:['🐛 Noten ließen sich nicht löschen: Der Schreibvorgang enthielt ein Feld, das die Sicherheitsregeln nicht erlaubten – dadurch wurde er komplett abgelehnt und die alte Note kam aus der Cloud zurück. Regel ergänzt; außerdem wird ein solcher Fehler jetzt sichtbar gemeldet statt verschluckt']},
   {v:'v919', d:'10.09.2026', items:['↩️ „Sitzplatz leeren" geht wieder für Teilnehmer ohne jede Datenspur (keine Anwesenheit, keine Noten, keine Notiz) – sie wandern einfach zurück in den Pool. Die Pflicht zur Einstufung als Wiederholer/Nicht angetreten greift erst, wenn tatsächlich Daten am TN hängen']},
@@ -7469,7 +7470,7 @@ function apSpeichereInnung(lgartId, text){
 // damit Sitz- und Pool-TN in EINER alphabetischen Liste gemischt werden koennen).
 let _anwCtx=null;
 function _anwZeileSitz(i, sid, d, nameCell, ort, firma){
-  const {inst, tage, SP, ftCid, ED, anwesend}=_anwCtx;
+  const {inst, tage, SP, ftCid, ED, anwesend, _wert, _cidF, _cidM, _cidFP, _cidFT}=_anwCtx;
   let tds=''; for(let c=0;c<SP;c++){ const dt=tage[c]; tds+= (dt&&anwesend(sid,dt))?'<td class="c dz">✓</td>':'<td class="c dz"><span'+ED+'>&nbsp;</span></td>'; }
   const _noten=[_wert(d,'fuehrung',_cidF), _wert(d,'mitarbeit',_cidM), _wert(d,'praxis',_cidFP), _wert(d,'__none__',_cidFT)];
   return '<tr><td class="c lfd">'+(i+1)+'</td><td class="tn">'+nameCell+ort+'</td><td class="bt">'+firma+'</td>'+tds
@@ -7542,7 +7543,7 @@ async function generateAnwListeAP(){
     return (d.attendance||[]).some(e=>e&&e.date===datum&&e.type==='present'); };
   const heute=new Date().toLocaleDateString('de-DE');
   const ED=' contenteditable="true" class="ed"';
-  _anwCtx={inst, tage, SP, ftCid, ED, anwesend};
+  _anwCtx={inst, tage, SP, ftCid, ED, anwesend, _wert, _cidF, _cidM, _cidFP, _cidFT};
   // v908: EINE gemeinsame, durchgehend alphabetische Liste aus Sitzplan-TN und
   // zugewiesenen TN ohne Sitzplatz - so wie die Kammerliste gedruckt wird.
   const alle=[];
