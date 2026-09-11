@@ -1769,10 +1769,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 397';
+const APP_VERSION = 'Build 398';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 398', d:'11.09.2026', items:['🐛 Innungen bei Berufsgruppen wurden zwar gespeichert, beim erneuten Öffnen aber nicht angezeigt (Felder wurden beim Laden nicht übernommen). Behoben']},
   {v:'Build 397', d:'10.09.2026', items:['🏛 Innung(en) werden jetzt bei der BERUFSGRUPPE hinterlegt (Einstellungen → Berufsgruppen) – mehrere möglich, z.B. Tischler und Parkett-/Bodenleger. Sind mehrere gesetzt, wählt der Ausbilder auf der Anwesenheitsliste per Auswahlfeld aus; die Wahl wird je Kursart gemerkt']},
   {v:'Build 396', d:'10.09.2026', items:['🏛 Kursarten haben jetzt ein Innungs-Feld. Es zeigt dieselbe automatische Zuordnung wie die Anwesenheitsliste (z.B. „automatisch: 15 Innung für Elektrotechnik") – gespeichert wird nur eine bewusst getroffene Auswahl, die dann dauerhaft gilt und den Vorschlag überschreibt']},
   {v:'Build 395', d:'03.09.2026', items:['🏢 Firmenstempel je Standort: unter Einstellungen → Standorte kann pro Standort ein Stempelbild hinterlegt werden. Neue Ausbilder dieses Standorts bekommen ihn in AusbilderPro automatisch bei der PIN-Vergabe (nie überschreibend)']},
@@ -8261,7 +8262,9 @@ function buildBEREUFEFromDocs(docs){
     const keyStr = d.keyStr || d.keys || '';
     const parts = keyStr.split(',').map(s=>s.trim()).filter(Boolean);
     const rx = parts.length ? new RegExp(parts.join('|')) : new RegExp(d.name.toLowerCase());
-    BERUFE[k] = {label: d.name, emoji: d.emoji||'', name: d.name, keys: rx, keyStr, order: d.order!=null?d.order:99, berufe: d.berufe||[]};
+    // Build 398: innung/innungen mit uebernehmen - sonst sind sie zwar gespeichert, aber
+    // beim Oeffnen der Berufsgruppe nie sichtbar (Haekchen "verschwinden")
+    BERUFE[k] = {label: d.name, emoji: d.emoji||'', name: d.name, keys: rx, keyStr, order: d.order!=null?d.order:99, berufe: d.berufe||[], innung: d.innung||'', innungen: Array.isArray(d.innungen)?d.innungen:[]};
   });
 }
 
