@@ -766,6 +766,13 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div id="dashNaechstesListe"><div class="empty" style="font-size:.72rem;color:var(--mu);padding:8px 4px">Lädt…</div></div>
         </div>
 
+        <!-- Abgeschlossen - Nachbearbeitung (Build 400) -->
+        <div class="card" style="margin:0 0 16px;padding:16px 18px" id="dashNachbearbCard">
+          <div class="card-title" style="margin-bottom:4px;display:flex;align-items:center;gap:8px"><span class="card-icon slate" style="width:26px;height:26px"><svg viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>Abgeschlossen – zu bearbeiten <span style="font-size:.62rem;color:var(--mu);font-weight:600;margin-left:6px">Unterlagen, Listen, Ablage</span><span id="dashNachbearbCnt" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.68rem;font-weight:700;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:2px 8px;border-radius:8px"></span></div>
+          <div id="dashNachbearbListe"><div class="empty" style="font-size:.72rem;color:var(--mu);padding:8px 4px">Lädt…</div></div>
+          <div style="margin-top:8px;font-size:.62rem;color:var(--mu)"><label style="cursor:pointer;user-select:none"><input type="checkbox" id="dashNachbearbAlle" onchange="renderDashNachbearbeitung()" style="vertical-align:middle;margin-right:4px">auch bereits erledigte anzeigen</label></div>
+        </div>
+
         <!-- Kursfortschritt Warnung -->
         <div id="dashCurrWarning" style="display:none;margin-bottom:20px"></div>
 
@@ -1769,10 +1776,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 399';
+const APP_VERSION = 'Build 400';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 400', d:'11.09.2026', items:['✅ Neue Dashboard-Karte „Abgeschlossen – zu bearbeiten": alle beendeten Kurse, die noch nachbearbeitet werden müssen (Unterlagen, Listen, Ablage). Per Häkchen abhaken – erledigte verschwinden aus der Liste, mit Datum und Bearbeiter am Kurs vermerkt; optional einblendbar']},
   {v:'Build 399', d:'11.09.2026', items:['🏛 Anwesenheitsliste ermittelt die Innung jetzt wie AusbilderPro über den Ausbilder des Kurses (Ausbilder → Beruf → Innung); bei mehreren Innungen erscheint ein Auswahlfeld, die Wahl wird je Kursart gemerkt']},
   {v:'Build 398', d:'11.09.2026', items:['🐛 Innungen bei Berufsgruppen wurden zwar gespeichert, beim erneuten Öffnen aber nicht angezeigt (Felder wurden beim Laden nicht übernommen). Behoben']},
   {v:'Build 397', d:'10.09.2026', items:['🏛 Innung(en) werden jetzt bei der BERUFSGRUPPE hinterlegt (Einstellungen → Berufsgruppen) – mehrere möglich, z.B. Tischler und Parkett-/Bodenleger. Sind mehrere gesetzt, wählt der Ausbilder auf der Anwesenheitsliste per Auswahlfeld aus; die Wahl wird je Kursart gemerkt']},
@@ -3367,6 +3375,41 @@ function showKursBestaetigt(ev,kursId,kursName){
   document.getElementById('bestListBody').innerHTML=html;
   document.getElementById('kursBestModal').classList.add('open');
 }
+// Build 400: Abgeschlossene Kurse, die die Verwaltung noch nachbearbeiten muss (Unterlagen
+// drucken, Listen an die Kammer, Ablage). Abhaken schreibt nachbearbeitetAm/-Von an den
+// Kurs; erledigte verschwinden aus der Liste (optional einblendbar).
+function renderDashNachbearbeitung(){
+  const el=document.getElementById('dashNachbearbListe'); if(!el) return;
+  const today=new Date().toISOString().slice(0,10);
+  const alle=!!(document.getElementById('dashNachbearbAlle')||{}).checked;
+  let kurse=_kurse.filter(k=>!k.archiviert&&!k.entwurf&&k.bis&&k.bis<today);
+  kurse.sort((a,b)=>(b.bis||'').localeCompare(a.bis||''));
+  const offen=kurse.filter(k=>!k.nachbearbeitetAm);
+  const cnt=document.getElementById('dashNachbearbCnt'); if(cnt) cnt.textContent=offen.length?(offen.length+' offen'):'';
+  if(!alle) kurse=offen;
+  kurse=kurse.slice(0,25);
+  if(!kurse.length){ el.innerHTML='<div class="empty" style="font-size:.72rem;color:var(--mu);padding:8px 4px">Alles erledigt – keine offenen Nachbearbeitungen.</div>'; return; }
+  el.innerHTML=kurse.map(k=>{
+    const nm=esc(k.name||k.lehrgangsart||'Kurs');
+    const erl=!!k.nachbearbeitetAm;
+    const wann=erl?new Date(k.nachbearbeitetAm).toLocaleDateString('de-DE'):'';
+    return '<div style="display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--brd);border-radius:6px;'+(erl?'opacity:.55':'')+'">'
+      +'<input type="checkbox" '+(erl?'checked':'')+' onclick="event.stopPropagation();kursNachbearbeitet(\''+k.id+'\',this.checked)" title="'+(erl?'Als noch offen markieren':'Als bearbeitet abhaken')+'" style="width:17px;height:17px;cursor:pointer;accent-color:#059669;flex-shrink:0">'
+      +'<div onclick="showKursDetail(\''+k.id+'\')" style="flex:1;min-width:0;cursor:pointer"><div style="font-size:.82rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+(erl?'text-decoration:line-through':'')+'">'+nm+'</div>'
+      +'<div style="font-size:.68rem;color:var(--mu)">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+(k.ausbilderName?' · '+esc(k.ausbilderName):'')+(erl?' · ✓ '+wann+(k.nachbearbeitetVon?' ('+esc(k.nachbearbeitetVon.split('@')[0])+')':''):'')+'</div></div>'
+      +'<span onclick="showKursDetail(\''+k.id+'\')" style="color:#cbd5e1;font-weight:700;cursor:pointer">›</span>'
+      +'</div>';
+  }).join('');
+}
+function kursNachbearbeitet(kursId, erledigt){
+  const upd = erledigt
+    ? {nachbearbeitetAm:Date.now(), nachbearbeitetVon:(auth.currentUser&&auth.currentUser.email)||''}
+    : {nachbearbeitetAm:firebase.firestore.FieldValue.delete(), nachbearbeitetVon:firebase.firestore.FieldValue.delete()};
+  db.collection('shared').doc('kurse').collection('list').doc(kursId).update(upd)
+    .then(()=>{ const k=_kurse.find(x=>x.id===kursId); if(k){ if(erledigt){ k.nachbearbeitetAm=upd.nachbearbeitetAm; k.nachbearbeitetVon=upd.nachbearbeitetVon; } else { delete k.nachbearbeitetAm; delete k.nachbearbeitetVon; } }
+      renderDashNachbearbeitung(); toast(erledigt?'✓ Als bearbeitet markiert':'Wieder als offen markiert'); })
+    .catch(err=>{ toast('Fehler: '+err.message,'bad'); renderDashNachbearbeitung(); });
+}
 function _renderDashKursListe(elId, kurse, dotColor, mitZahlen){
   const el=document.getElementById(elId); if(!el) return;
   if(!kurse.length){ el.innerHTML='<div class="empty" style="font-size:.72rem;color:var(--mu);padding:8px 4px">Keine Kurse.</div>'; return; }
@@ -3413,6 +3456,7 @@ function loadDashboard(){
   _renderDashKursListe('dashAktivListe', _aktivKurse, '#22c55e', true);
   _ladeKursBestaetigt(_aktivKurse);
   _renderDashKursListe('dashNaechstesListe', _geplantKurse.slice(0,10), '#2563eb');
+  try{ renderDashNachbearbeitung(); }catch(e){}
 
   // Wiederholer + Abwesende aus globalTN
   const absentEl=document.getElementById('dashAbsent');
