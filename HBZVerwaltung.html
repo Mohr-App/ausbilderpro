@@ -1776,10 +1776,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 400';
+const APP_VERSION = 'Build 401';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 401', d:'11.09.2026', items:['🏛 Innung wird jetzt auch bei älteren Kursen gefunden, die den Ausbilder nur per Name oder E-Mail statt per ID kennen']},
   {v:'Build 400', d:'11.09.2026', items:['✅ Neue Dashboard-Karte „Abgeschlossen – zu bearbeiten": alle beendeten Kurse, die noch nachbearbeitet werden müssen (Unterlagen, Listen, Ablage). Per Häkchen abhaken – erledigte verschwinden aus der Liste, mit Datum und Bearbeiter am Kurs vermerkt; optional einblendbar']},
   {v:'Build 399', d:'11.09.2026', items:['🏛 Anwesenheitsliste ermittelt die Innung jetzt wie AusbilderPro über den Ausbilder des Kurses (Ausbilder → Beruf → Innung); bei mehreren Innungen erscheint ein Auswahlfeld, die Wahl wird je Kursart gemerkt']},
   {v:'Build 398', d:'11.09.2026', items:['🐛 Innungen bei Berufsgruppen wurden zwar gespeichert, beim erneuten Öffnen aber nicht angezeigt (Felder wurden beim Laden nicht übernommen). Behoben']},
@@ -7366,7 +7367,12 @@ function generateAnwListe(){
     let innungAuswahl=[];
     let innungVor=(lgart&&lgart.innung)||'';
     if(!innungVor){
-      const _ab=_ausbilder.find(a=>a.id===kurs.ausbilderId);
+      // Build 401: aeltere Kurse tragen keine ausbilderId - dann ueber E-Mail oder Namen finden
+      const _mail=String(kurs.ausbilderLoginEmail||kurs.ausbilderEmail||'').toLowerCase();
+      const _ab=_ausbilder.find(a=>a.id===kurs.ausbilderId)
+        ||(_mail&&_ausbilder.find(a=>String(a.loginEmail||a.email||'').toLowerCase()===_mail))
+        ||(kurs.ausbilderName&&_ausbilder.find(a=>String(a.name||'').trim().toLowerCase()===String(kurs.ausbilderName).trim().toLowerCase()))
+        ||null;
       const _bg=(_ab&&_ab.berufId&&BERUFE[_ab.berufId])||((lgart&&lgart.berufGruppeId&&BERUFE[lgart.berufGruppeId])||null);
       if(_bg){
         innungAuswahl=(_bg.innungen&&_bg.innungen.length)?_bg.innungen.slice():(_bg.innung?[_bg.innung]:[]);

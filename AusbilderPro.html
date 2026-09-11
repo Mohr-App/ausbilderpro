@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v928';
+const APP_VERSION = 'v929';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v929', d:'11.09.2026', items:['🏛 Innung wird jetzt auch bei älteren Kursen gefunden, die den Ausbilder nur per Name oder E-Mail statt per ID kennen']},
   {v:'v928', d:'11.09.2026', items:['🧭 Neue Ausbilder werden vor dem ersten eigenen Kurs gefragt, ob es eine Verwaltung gibt, die Lehrgänge zuteilt. Bei „Ja" folgt der Hinweis, auf die Zuteilung zu warten bzw. Lehrgänge abzurufen; bei „Nein" geht es direkt zum Anlegen (wird gemerkt)']},
   {v:'v927', d:'11.09.2026', items:['🏛 Innung wird jetzt über den AUSBILDER des Kurses ermittelt (Ausbilder → Beruf → Innung) – so wie besprochen. Die Kursart braucht dafür keine Berufsgruppe mehr']},
   {v:'v926', d:'10.09.2026', items:['🏛 Sind für eine Berufsgruppe mehrere Innungen hinterlegt (z.B. Tischler und Parkett-/Bodenleger), erscheint auf der Anwesenheitsliste ein Auswahlfeld. Die getroffene Wahl wird für die Kursart gespeichert und ist beim nächsten Mal vorausgewählt']},
@@ -7604,10 +7605,16 @@ const _innungFinden=function(){
         // v927: REGELFALL - ueber den AUSBILDER des Kurses: er gehoert zu genau einem Beruf,
         // und der Beruf hat seine Innung(en). Das ist verlaesslicher als die Kursart, die
         // oft keine Berufsgruppe traegt.
-        if(!innungVor && !innungAuswahl.length && kd.ausbilderId){
+        if(!innungVor && !innungAuswahl.length && (kd.ausbilderId||kd.ausbilderLoginEmail||kd.ausbilderEmail||kd.ausbilderName)){
           try{
-            const ab=await _db.collection('shared').doc('kursSettings').collection('ausbilder').doc(kd.ausbilderId).get();
-            const bid=ab.exists?(ab.data().berufId||''):'';
+            const col=_db.collection('shared').doc('kursSettings').collection('ausbilder');
+            let ab=null;
+            if(kd.ausbilderId){ const d0=await col.doc(kd.ausbilderId).get(); if(d0.exists) ab=d0; }
+            // v929: aeltere Kurse ohne ausbilderId -> ueber E-Mail, sonst Name
+            if(!ab){ const mail=String(kd.ausbilderLoginEmail||kd.ausbilderEmail||'').toLowerCase();
+              if(mail){ let q=await col.where('loginEmail','==',mail).limit(1).get(); if(q.empty) q=await col.where('email','==',mail).limit(1).get(); if(!q.empty) ab=q.docs[0]; } }
+            if(!ab && kd.ausbilderName){ const q=await col.where('name','==',String(kd.ausbilderName).trim()).limit(1).get(); if(!q.empty) ab=q.docs[0]; }
+            const bid=(ab&&ab.exists)?(ab.data().berufId||''):'';
             if(bid){
               const bg=await _db.collection('shared').doc('kursSettings').collection('berufe').doc(bid).get();
               if(bg.exists){ const bd=bg.data()||{};
