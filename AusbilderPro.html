@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v922';
+const APP_VERSION = 'v923';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v923', d:'10.09.2026', items:['🏛 Anwesenheitsliste füllt die Innung jetzt automatisch aus – passend zum Beruf bzw. zur Kursart (z. B. „15 Innung für Elektrotechnik" bei Elektroberufen). Eine von Hand eingetragene Innung hat weiterhin Vorrang und wird je Kursart gespeichert']},
   {v:'v922', d:'10.09.2026', items:['🐛 Sofortkorrektur zu v921: Die Anwesenheitsliste ließ sich nicht mehr öffnen, weil die neue Notenspalten-Zuordnung an der falschen Stelle stand']},
   {v:'v921', d:'10.09.2026', items:['🖨 Anwesenheitsliste: Die Notenspalten F/M/FP/FT werden jetzt zuverlässig gefüllt – auch wenn eigene Notenspalten verwendet werden („Theoretische Kenntnisse", „Fachpraxis" usw.). Vorher blieben FP und FT leer, weil nur exakt „Theorie" erkannt wurde']},
   {v:'v920', d:'10.09.2026', items:['🐛 Noten ließen sich nicht löschen: Der Schreibvorgang enthielt ein Feld, das die Sicherheitsregeln nicht erlaubten – dadurch wurde er komplett abgelehnt und die alte Note kam aus der Cloud zurück. Regel ergänzt; außerdem wird ein solcher Fehler jetzt sichtbar gemeldet statt verschluckt']},
@@ -7502,6 +7503,26 @@ async function generateAnwListeAP(){
       try{ const g=await _db.collection('globalTN').doc(t.id).get(); if(g.exists) poolCloud[t.id]=g.data()||{}; }catch(e){} }));
   }
   // Kursart / Innung / Kuerzel
+  // v923: Innungen der Kreishandwerkerschaft Bonn/Rhein-Sieg - werden anhand des Berufs
+  // bzw. der Kursart automatisch vorgeschlagen. Eine von Hand eingetragene Innung hat
+  // weiterhin Vorrang (sie wird je Kursart gespeichert und ueberschreibt den Vorschlag).
+  const _INNUNGEN=[
+    {nr:'6',  name:'Tischler-Innung',                 worte:['tischler','schreiner','holz']},
+    {nr:'8',  name:'Maler- und Lackierer-Innung',     worte:['maler','lackier']},
+    {nr:'11', name:'Innung für Metalltechnik',        worte:['metall','konstruktionsmech','feinwerk','schlosser']},
+    {nr:'13', name:'Innung Sanitär-Heizung-Klima',    worte:['anlagenmechanik','sanitär','sanitaer','heizung','klima','shk']},
+    {nr:'14', name:'Innung der Kraftfahrzeughandwerke',worte:['kraftfahrzeug','kfz','automobil']},
+    {nr:'15', name:'Innung für Elektrotechnik',       worte:['elektro','elektronik','informationselektronik']},
+    {nr:'22', name:'Bäcker - Innung',                 worte:['bäcker','baecker','backwaren','fachverkäufer','fachverkaeufer']},
+    {nr:'30', name:'Friseur-Innung',                  worte:['friseur','frisör','frisoer']},
+    {nr:'38', name:'Innung Parkett- & Bodenleger',    worte:['parkett','bodenleger','estrich']}
+  ];
+  const _innungFinden=(...texte)=>{
+    const hay=texte.filter(Boolean).join(' ').toLowerCase();
+    if(!hay) return '';
+    const t=_INNUNGEN.find(i=>i.worte.some(w=>hay.includes(w)));
+    return t?(t.nr+' '+t.name):'';
+  };
   let innungVor='', lgartId='', kuerzel=(S.kats[S.curKat]&&S.kats[S.curKat].label)||'';
   let leiter=(getAusbilderProfil().name||'').trim();
   if(_db && inst.sharedKursId){
@@ -7510,8 +7531,15 @@ async function generateAnwListeAP(){
       if(k.exists){ const kd=k.data()||{}; lgartId=kd.lehrgangsartId||''; if(kd.ausbilderName) leiter=kd.ausbilderName;
         const full=kd.lehrgangsart||kd.name||kuerzel; const m=[]; for(const t of String(full).split(/\s+/)){ if(/^[A-ZÄÖÜ0-9\/\-\.]+$/.test(t)) m.push(t); else break; } kuerzel=m.join(' ')||kuerzel;
         if(lgartId){ const lg=await _db.collection('shared').doc('kursSettings').collection('lehrgangsarten').doc(lgartId).get(); if(lg.exists&&lg.data().innung) innungVor=lg.data().innung; }
+        // v923: keine gelernte Innung? Dann aus Kursart/Beruf ableiten
+        if(!innungVor) innungVor=_innungFinden(kd.lehrgangsart, kd.name, kd.berufLabel, kd.beruf, kuerzel, (S.kats[S.curKat]&&S.kats[S.curKat].label));
       }
     }catch(e){}
+  }
+  // v923: immer noch nichts? Dann aus den Berufen der Teilnehmer ableiten
+  if(!innungVor){
+    const berufe=sids.map(sid=>(pool[sid]||{}).beruf||inst.seats[sid].profession||'').filter(Boolean);
+    innungVor=_innungFinden(kuerzel, (S.kats[S.curKat]&&S.kats[S.curKat].label), berufe.join(' '));
   }
   // Kurstage Mo-Fr
   const tage=[];
