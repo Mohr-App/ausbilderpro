@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v927';
+const APP_VERSION = 'v928';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v928', d:'11.09.2026', items:['🧭 Neue Ausbilder werden vor dem ersten eigenen Kurs gefragt, ob es eine Verwaltung gibt, die Lehrgänge zuteilt. Bei „Ja" folgt der Hinweis, auf die Zuteilung zu warten bzw. Lehrgänge abzurufen; bei „Nein" geht es direkt zum Anlegen (wird gemerkt)']},
   {v:'v927', d:'11.09.2026', items:['🏛 Innung wird jetzt über den AUSBILDER des Kurses ermittelt (Ausbilder → Beruf → Innung) – so wie besprochen. Die Kursart braucht dafür keine Berufsgruppe mehr']},
   {v:'v926', d:'10.09.2026', items:['🏛 Sind für eine Berufsgruppe mehrere Innungen hinterlegt (z.B. Tischler und Parkett-/Bodenleger), erscheint auf der Anwesenheitsliste ein Auswahlfeld. Die getroffene Wahl wird für die Kursart gespeichert und ist beim nächsten Mal vorausgewählt']},
   {v:'v925', d:'10.09.2026', items:['🏛 Innung kommt jetzt in erster Linie von der Berufsgruppe (in VerwaltungPro einmal je Gewerk hinterlegt) – das ist die verlässliche Quelle. Eine an der Kursart gesetzte Innung hat Vorrang für Sonderfälle; findet sich nichts, greift die automatische Erkennung nach Kürzel']},
@@ -3596,7 +3597,51 @@ function _syncLehrgangsartToVP(lbl, beschreibung){
   }).catch(err=>console.warn('Kurs-Lookup fehlgeschlagen:',err));
 }
 
+// v928: Bevor ein NEUER Ausbilder (noch keine Kurse) selbst einen Kurs anlegt, einmal
+// fragen, ob es eine Verwaltung gibt, die Kurse zuteilt. Sonst entstehen Doppelkurse
+// neben den von VP zugewiesenen. Die Antwort wird je Konto gemerkt.
 function openKatModal(){
+  try{
+    const nochKeineKurse=!Object.keys(S.kats||{}).length;
+    const geklaert=localStorage.getItem(_lsKey('ap_kursanlageGeklaert'));
+    if(nochKeineKurse && !geklaert){ _kursanlageRueckfrage(); return; }
+  }catch(e){}
+  _openKatModalIntern();
+}
+function _kursanlageRueckfrage(){
+  const ov=document.createElement('div');
+  ov.id='kursanlageOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99998;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)">'
+    +'<div style="font-size:1rem;font-weight:800;margin-bottom:10px">Kurz vorab</div>'
+    +'<div style="font-size:.82rem;color:#334155;line-height:1.55;margin-bottom:16px">Gibt es bei euch eine <b>Verwaltung</b> (oder eine Kollegin/einen Kollegen), die Lehrgänge zentral anlegt und den Ausbildern zuweist?<br><br>Falls ja, bitte dort nachfragen, bevor du eigene Kurse erstellst – sonst entstehen Doppelkurse, die sich später nur mühsam zusammenführen lassen.</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="_kursanlageAntwort(true)" style="flex:1;padding:11px;border:1px solid rgba(5,150,105,.4);background:rgba(5,150,105,.08);color:#065f46;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer">Ja, gibt es</button>'
+    +'<button onclick="_kursanlageAntwort(false)" style="flex:1;padding:11px;border:1px solid rgba(37,99,235,.4);background:rgba(37,99,235,.08);color:#1e40af;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer">Nein, ich lege selbst an</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+}
+function _kursanlageAntwort(jaVerwaltung){
+  const ov=document.getElementById('kursanlageOv'); if(ov) ov.remove();
+  if(jaVerwaltung){
+    // Nicht dauerhaft merken - beim naechsten Versuch erneut fragen, bis die Kurse zugeteilt sind
+    const ov2=document.createElement('div');
+    ov2.id='kursanlageOv';
+    ov2.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99998;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov2.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)">'
+      +'<div style="font-size:1rem;font-weight:800;margin-bottom:10px">Dann bist du hier richtig</div>'
+      +'<div style="font-size:.82rem;color:#334155;line-height:1.55;margin-bottom:16px">Deine Verwaltung weist dir die Lehrgänge zu. Sobald etwas für dich da ist, erscheint es hier automatisch – du musst nichts anlegen. Mit <b>„Lehrgänge abrufen"</b> kannst du jederzeit nachsehen, ob schon etwas zugeteilt wurde.</div>'
+      +'<div style="display:flex;gap:8px">'
+      +'<button onclick="document.getElementById(\'kursanlageOv\').remove();openLehrgangAbrufen()" style="flex:1;padding:11px;border:none;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer">📥 Lehrgänge abrufen</button>'
+      +'<button onclick="document.getElementById(\'kursanlageOv\').remove()" style="padding:11px 14px;border:1px solid var(--brd);background:#fff;color:var(--mu);border-radius:8px;font-size:.8rem;cursor:pointer">Später</button>'
+      +'</div></div>';
+    document.body.appendChild(ov2);
+    return;
+  }
+  try{ localStorage.setItem(_lsKey('ap_kursanlageGeklaert'),'1'); }catch(e){}
+  _openKatModalIntern();
+}
+function _openKatModalIntern(){
   document.getElementById('katInp').value='';
   const _bk=document.getElementById('katBeschrInp'); if(_bk)_bk.value='';
   window._katInhaltByName={};
