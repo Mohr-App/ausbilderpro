@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v925';
+const APP_VERSION = 'v926';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v926', d:'10.09.2026', items:['🏛 Sind für eine Berufsgruppe mehrere Innungen hinterlegt (z.B. Tischler und Parkett-/Bodenleger), erscheint auf der Anwesenheitsliste ein Auswahlfeld. Die getroffene Wahl wird für die Kursart gespeichert und ist beim nächsten Mal vorausgewählt']},
   {v:'v925', d:'10.09.2026', items:['🏛 Innung kommt jetzt in erster Linie von der Berufsgruppe (in VerwaltungPro einmal je Gewerk hinterlegt) – das ist die verlässliche Quelle. Eine an der Kursart gesetzte Innung hat Vorrang für Sonderfälle; findet sich nichts, greift die automatische Erkennung nach Kürzel']},
   {v:'v924', d:'10.09.2026', items:['🏛 Innungs-Zuordnung erkennt jetzt auch Kurskürzel (ET, ETE, IH, BAE, VBA, GML, MB, K2/K3, FRI) und den Inhaltstext – nicht mehr nur die Berufsgruppe. Damit wird die Innung auch bei Kursarten ohne hinterlegten Beruf gefunden']},
   {v:'v923', d:'10.09.2026', items:['🏛 Anwesenheitsliste füllt die Innung jetzt automatisch aus – passend zum Beruf bzw. zur Kursart (z. B. „15 Innung für Elektrotechnik" bei Elektroberufen). Eine von Hand eingetragene Innung hat weiterhin Vorrang und wird je Kursart gespeichert']},
@@ -7533,6 +7534,7 @@ const _innungFinden=function(){
   }
   return '';
 };
+  let innungAuswahl=[];   // v926: mehrere moegliche Innungen der Berufsgruppe
   let innungVor='', lgartId='', kuerzel=(S.kats[S.curKat]&&S.kats[S.curKat].label)||'';
   let leiter=(getAusbilderProfil().name||'').trim();
   if(_db && inst.sharedKursId){
@@ -7546,14 +7548,20 @@ const _innungFinden=function(){
             if(lgd.innung) innungVor=lgd.innung;                  // 1. Kursart (Sonderfall)
             if(!innungVor && lgd.berufGruppeId){                   // 2. Berufsgruppe (Regelfall)
               try{ const bg=await _db.collection('shared').doc('kursSettings').collection('berufe').doc(lgd.berufGruppeId).get();
-                if(bg.exists && bg.data().innung) innungVor=bg.data().innung; }catch(e){}
+                if(bg.exists){ const bd=bg.data()||{};
+                  innungAuswahl=(bd.innungen&&bd.innungen.length)?bd.innungen.slice():(bd.innung?[bd.innung]:[]);
+                  if(innungAuswahl.length===1) innungVor=innungAuswahl[0];
+                } }catch(e){}
             }
           }
         }
         // 2b. Berufsgruppe direkt am Kurs (falls dort hinterlegt)
-        if(!innungVor && kd.berufGruppeId){
+        if(!innungVor && !innungAuswahl.length && kd.berufGruppeId){
           try{ const bg=await _db.collection('shared').doc('kursSettings').collection('berufe').doc(kd.berufGruppeId).get();
-            if(bg.exists && bg.data().innung) innungVor=bg.data().innung; }catch(e){}
+            if(bg.exists){ const bd=bg.data()||{};
+              innungAuswahl=(bd.innungen&&bd.innungen.length)?bd.innungen.slice():(bd.innung?[bd.innung]:[]);
+              if(innungAuswahl.length===1) innungVor=innungAuswahl[0];
+            } }catch(e){}
         }
         // v923: keine gelernte Innung? Dann aus Kursart/Beruf ableiten
         if(!innungVor) innungVor=_innungFinden(kuerzel||kd.name, kd.lehrgangsart, kd.berufLabel, kd.beruf, kd.berufGruppeId, kd.inhalt, (S.kats[S.curKat]&&S.kats[S.curKat].label));
@@ -7628,10 +7636,18 @@ const _innungFinden=function(){
     +'.ed{background:#fffbe6;display:inline-block;min-width:3mm;min-height:3.5mm}.fuss{position:fixed;bottom:4mm;right:11mm;left:11mm;border-top:0.5pt solid #000;text-align:right;font-size:8.5pt;font-weight:700;padding-top:1mm}.np{position:fixed;top:4mm;right:4mm}'
     +'@media print{.np{display:none}.ed{background:#fff!important}}</style></head><body>'
     +'<button class="np" onclick="window.print()" style="padding:8px 16px;font-size:11pt;cursor:pointer">🖨 Drucken</button>'
-    +'<script>document.addEventListener("blur",function(e){if(e.target&&e.target.id==="innungFeld"){try{window.opener&&window.opener.apSpeichereInnung&&window.opener.apSpeichereInnung('+JSON.stringify(lgartId)+',e.target.textContent.trim());}catch(x){}}},true);<\/script>'
+    +'<script>document.addEventListener("blur",function(e){if(e.target&&e.target.id==="innungFeld"){try{window.opener&&window.opener.apSpeichereInnung&&window.opener.apSpeichereInnung('+JSON.stringify(lgartId)+',e.target.textContent.trim());}catch(x){}}},true);'
+      +'document.addEventListener("change",function(e){if(e.target&&e.target.id==="innungSelect"){try{window.opener&&window.opener.apSpeichereInnung&&window.opener.apSpeichereInnung('+JSON.stringify(lgartId)+',e.target.value);}catch(x){}}});<\/script>'
     +'<div class="tit"><h1>Anwesenheitsliste</h1><div class="dat">'+heute+'</div></div>'
     +'<div class="kopf"><div>Lehrgang: <b>'+esc(kuerzel)+'</b><br>&nbsp;&nbsp;&nbsp;&nbsp;vom: <b>'+fmtDE(von)+'</b> &nbsp; bis: <b>'+fmtDE(bis)+'</b></div>'
-    +'<div>Innung: <b><span id="innungFeld"'+ED+' title="Einmal eintippen genügt: wird für diese Kursart gespeichert" style="min-width:60mm">'+(innungVor?esc(innungVor):'&nbsp;')+'</span></b><br>Leiter: <b>'+esc(leiter)+'</b></div>'
+    +'<div>Innung: <b>'
+      +((innungAuswahl.length>1)
+        ? '<select id="innungSelect" style="font:inherit;font-weight:700;border:1px solid #cbd5e1;border-radius:3px;padding:0 2px;background:#fffbe6">'
+          +'<option value="">– bitte wählen –</option>'
+          +innungAuswahl.map(v=>'<option value="'+esc(v)+'"'+(v===innungVor?' selected':'')+'>'+esc(v)+'</option>').join('')
+          +'</select>'
+        : '<span id="innungFeld"'+ED+' title="Einmal eintippen genügt: wird für diese Kursart gespeichert" style="min-width:60mm">'+(innungVor?esc(innungVor):'&nbsp;')+'</span>')
+      +'</b><br>Leiter: <b>'+esc(leiter)+'</b></div>'
     +'<div>Ausbildungsjahr: <b><span'+ED+' title="Bitte von Hand eintragen" style="min-width:10mm">&nbsp;</span></b></div></div>'
     +'<table><thead><tr><th class="lfd" style="border-bottom:none">Lfd.</th><th class="tn" rowspan="2" style="vertical-align:top">Teilnehmer</th><th class="bt" rowspan="2" style="vertical-align:top">Ausbildungsbetrieb</th>'
     +'<th class="grp" colspan="'+SP+'" style="border-bottom:none">Datum</th><th class="grp" colspan="4" style="border-bottom:none">Zeugnisnote</th><th class="bm" rowspan="2" style="vertical-align:top">Bemerkung</th></tr>'
