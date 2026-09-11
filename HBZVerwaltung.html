@@ -1776,10 +1776,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 401';
+const APP_VERSION = 'Build 402';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 402', d:'11.09.2026', items:['✅ Nachbearbeitung sichtbar: Im Kursdetail steht bei beendeten Kursen „✓ bearbeitet [Datum · Wer]" bzw. „⏳ Bearbeitung offen"; in der Kursliste unter dem Ausbilder erscheint bei bearbeiteten Kursen ein grünes Häkchen']},
   {v:'Build 401', d:'11.09.2026', items:['🏛 Innung wird jetzt auch bei älteren Kursen gefunden, die den Ausbilder nur per Name oder E-Mail statt per ID kennen']},
   {v:'Build 400', d:'11.09.2026', items:['✅ Neue Dashboard-Karte „Abgeschlossen – zu bearbeiten": alle beendeten Kurse, die noch nachbearbeitet werden müssen (Unterlagen, Listen, Ablage). Per Häkchen abhaken – erledigte verschwinden aus der Liste, mit Datum und Bearbeiter am Kurs vermerkt; optional einblendbar']},
   {v:'Build 399', d:'11.09.2026', items:['🏛 Anwesenheitsliste ermittelt die Innung jetzt wie AusbilderPro über den Ausbilder des Kurses (Ausbilder → Beruf → Innung); bei mehreren Innungen erscheint ein Auswahlfeld, die Wahl wird je Kursart gemerkt']},
@@ -3643,7 +3644,7 @@ function loadDashboard(){
       <div class="kurs-dot" style="background:${statusDot[st]}"></div>
       <div class="kurs-info">
         <div class="kurs-name">${esc(k.name||'?')}</div>
-        <div class="kurs-meta">${fmtDE(k.von)} – ${fmtDE(k.bis)}${k.ausbilderName?' · '+esc(k.ausbilderName):''} <span style="color:${statusDot[st]};font-weight:700">${statusLabel[st]}</span></div>
+        <div class="kurs-meta">${fmtDE(k.von)} – ${fmtDE(k.bis)}${k.ausbilderName?' · '+esc(k.ausbilderName):''} <span style="color:${statusDot[st]};font-weight:700">${statusLabel[st]}</span>${k.nachbearbeitetAm?' <span title="Nachbearbeitet am '+new Date(k.nachbearbeitetAm).toLocaleDateString('de-DE')+(k.nachbearbeitetVon?' von '+esc(String(k.nachbearbeitetVon).split('@')[0]):'')+'" style="color:#059669;font-weight:800">✓</span>':''}</div>
       </div>
       <div class="kurs-cnt">${cnt} TN</div>
     </div>`;
@@ -6638,7 +6639,11 @@ function showKursDetail(kursId){
     '<span style="color:'+kdStColor+'">'+kdSt+'</span>'+
     ' &middot; '+fmtDE(k.von)+' – '+fmtDE(k.bis)+
     (k.ausbilderName?' &middot; '+esc(k.ausbilderName):'')+
-    (k.ausbilderEmail?' ('+esc(k.ausbilderEmail)+')':'');
+    (k.ausbilderEmail?' ('+esc(k.ausbilderEmail)+')':'')+
+    // Build 402: Nachbearbeitung durch die Verwaltung sichtbar machen
+    (k.nachbearbeitetAm
+      ? ' &middot; <span title="Nachbearbeitung abgeschlossen (Unterlagen, Listen, Ablage)" style="color:#065f46;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.3);border-radius:6px;padding:1px 7px;font-weight:700">✓ bearbeitet '+new Date(k.nachbearbeitetAm).toLocaleDateString('de-DE')+(k.nachbearbeitetVon?' · '+esc(String(k.nachbearbeitetVon).split('@')[0]):'')+'</span>'
+      : ((k.bis&&today>k.bis&&!k.archiviert&&!k.entwurf)?' &middot; <span title="Noch nicht nachbearbeitet – siehe Dashboard" style="color:#92400e;background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.3);border-radius:6px;padding:1px 7px;font-weight:700">⏳ Bearbeitung offen</span>':''));
   const kdBeschrEl=document.getElementById('kdBeschreibung');
   if(kdBeschrEl){
     let descHtml=k.beschreibung?'<div style="font-size:.75rem;padding:8px 12px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.12);border-radius:8px;margin-top:8px;line-height:1.5;color:var(--tx)">'+esc(k.beschreibung)+'</div>':'';
