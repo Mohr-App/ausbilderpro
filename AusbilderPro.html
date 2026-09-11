@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v926';
+const APP_VERSION = 'v927';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v927', d:'11.09.2026', items:['🏛 Innung wird jetzt über den AUSBILDER des Kurses ermittelt (Ausbilder → Beruf → Innung) – so wie besprochen. Die Kursart braucht dafür keine Berufsgruppe mehr']},
   {v:'v926', d:'10.09.2026', items:['🏛 Sind für eine Berufsgruppe mehrere Innungen hinterlegt (z.B. Tischler und Parkett-/Bodenleger), erscheint auf der Anwesenheitsliste ein Auswahlfeld. Die getroffene Wahl wird für die Kursart gespeichert und ist beim nächsten Mal vorausgewählt']},
   {v:'v925', d:'10.09.2026', items:['🏛 Innung kommt jetzt in erster Linie von der Berufsgruppe (in VerwaltungPro einmal je Gewerk hinterlegt) – das ist die verlässliche Quelle. Eine an der Kursart gesetzte Innung hat Vorrang für Sonderfälle; findet sich nichts, greift die automatische Erkennung nach Kürzel']},
   {v:'v924', d:'10.09.2026', items:['🏛 Innungs-Zuordnung erkennt jetzt auch Kurskürzel (ET, ETE, IH, BAE, VBA, GML, MB, K2/K3, FRI) und den Inhaltstext – nicht mehr nur die Berufsgruppe. Damit wird die Innung auch bei Kursarten ohne hinterlegten Beruf gefunden']},
@@ -7554,6 +7555,22 @@ const _innungFinden=function(){
                 } }catch(e){}
             }
           }
+        }
+        // v927: REGELFALL - ueber den AUSBILDER des Kurses: er gehoert zu genau einem Beruf,
+        // und der Beruf hat seine Innung(en). Das ist verlaesslicher als die Kursart, die
+        // oft keine Berufsgruppe traegt.
+        if(!innungVor && !innungAuswahl.length && kd.ausbilderId){
+          try{
+            const ab=await _db.collection('shared').doc('kursSettings').collection('ausbilder').doc(kd.ausbilderId).get();
+            const bid=ab.exists?(ab.data().berufId||''):'';
+            if(bid){
+              const bg=await _db.collection('shared').doc('kursSettings').collection('berufe').doc(bid).get();
+              if(bg.exists){ const bd=bg.data()||{};
+                innungAuswahl=(bd.innungen&&bd.innungen.length)?bd.innungen.slice():(bd.innung?[bd.innung]:[]);
+                if(innungAuswahl.length===1) innungVor=innungAuswahl[0];
+              }
+            }
+          }catch(e){}
         }
         // 2b. Berufsgruppe direkt am Kurs (falls dort hinterlegt)
         if(!innungVor && !innungAuswahl.length && kd.berufGruppeId){
