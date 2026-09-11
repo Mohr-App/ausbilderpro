@@ -1769,10 +1769,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 398';
+const APP_VERSION = 'Build 399';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 399', d:'11.09.2026', items:['🏛 Anwesenheitsliste ermittelt die Innung jetzt wie AusbilderPro über den Ausbilder des Kurses (Ausbilder → Beruf → Innung); bei mehreren Innungen erscheint ein Auswahlfeld, die Wahl wird je Kursart gemerkt']},
   {v:'Build 398', d:'11.09.2026', items:['🐛 Innungen bei Berufsgruppen wurden zwar gespeichert, beim erneuten Öffnen aber nicht angezeigt (Felder wurden beim Laden nicht übernommen). Behoben']},
   {v:'Build 397', d:'10.09.2026', items:['🏛 Innung(en) werden jetzt bei der BERUFSGRUPPE hinterlegt (Einstellungen → Berufsgruppen) – mehrere möglich, z.B. Tischler und Parkett-/Bodenleger. Sind mehrere gesetzt, wählt der Ausbilder auf der Anwesenheitsliste per Auswahlfeld aus; die Wahl wird je Kursart gemerkt']},
   {v:'Build 396', d:'10.09.2026', items:['🏛 Kursarten haben jetzt ein Innungs-Feld. Es zeigt dieselbe automatische Zuordnung wie die Anwesenheitsliste (z.B. „automatisch: 15 Innung für Elektrotechnik") – gespeichert wird nur eine bewusst getroffene Auswahl, die dann dauerhaft gilt und den Vorschlag überschreibt']},
@@ -7316,7 +7317,18 @@ function generateAnwListe(){
     };
     // Build 385: Innung haengt am Gewerk - an der Kursart gespeichert, einmal eintippen genuegt
     const lgart=_lehrgangsarten.find(l=>l.id===kurs.lehrgangsartId);
-    const innungVor=(lgart&&lgart.innung)||'';
+    // Build 399: Rangfolge wie in AusbilderPro - 1. Kursart (Sonderfall), 2. Ausbilder ->
+    // Beruf -> Innung (Regelfall), 3. Berufsgruppe der Kursart. Mehrere -> Auswahlfeld.
+    let innungAuswahl=[];
+    let innungVor=(lgart&&lgart.innung)||'';
+    if(!innungVor){
+      const _ab=_ausbilder.find(a=>a.id===kurs.ausbilderId);
+      const _bg=(_ab&&_ab.berufId&&BERUFE[_ab.berufId])||((lgart&&lgart.berufGruppeId&&BERUFE[lgart.berufGruppeId])||null);
+      if(_bg){
+        innungAuswahl=(_bg.innungen&&_bg.innungen.length)?_bg.innungen.slice():(_bg.innung?[_bg.innung]:[]);
+        if(innungAuswahl.length===1) innungVor=innungAuswahl[0];
+      }
+    }
     const kuerzel=(n=>{ const m=[]; for(const t of String(n||'').split(/\s+/)){ if(/^[A-ZÄÖÜ0-9\/\-\.]+$/.test(t)) m.push(t); else break; } return m.join(' ')||n; })(kurs.lehrgangsart||kurs.name||'');
     const heute=new Date().toLocaleDateString('de-DE');
     const ED=' contenteditable="true" class="ed"';
@@ -7363,11 +7375,16 @@ function generateAnwListe(){
       +'@media print{.np{display:none}.ed{background:#fff!important}}'
       +'</style></head><body>'
       +'<button class="np" onclick="window.print()" style="padding:8px 16px;font-size:11pt;cursor:pointer">🖨 Drucken</button>'
-      +'<script>document.addEventListener("blur",function(e){if(e.target&&e.target.id==="innungFeld"){try{window.opener&&window.opener.vpSpeichereInnung&&window.opener.vpSpeichereInnung('+JSON.stringify(kurs.lehrgangsartId||'')+',e.target.textContent.trim());}catch(x){}}},true);<\/script>'
+      +'<script>document.addEventListener("blur",function(e){if(e.target&&e.target.id==="innungFeld"){try{window.opener&&window.opener.vpSpeichereInnung&&window.opener.vpSpeichereInnung('+JSON.stringify(kurs.lehrgangsartId||'')+',e.target.textContent.trim());}catch(x){}}},true);document.addEventListener("change",function(e){if(e.target&&e.target.id==="innungSelect"){try{window.opener&&window.opener.vpSpeichereInnung&&window.opener.vpSpeichereInnung('+JSON.stringify(kurs.lehrgangsartId||'')+',e.target.value);}catch(x){}}});<\/script>'
       +'<div class="tit"><h1>Anwesenheitsliste</h1><div class="dat">'+heute+'</div></div>'
       +'<div class="kopf">'
       +'<div>Lehrgang: <b>'+esc(kuerzel)+'</b><br>&nbsp;&nbsp;&nbsp;&nbsp;vom: <b>'+fmtDE(kurs.von)+'</b> &nbsp; bis: <b>'+fmtDE(kurs.bis)+'</b></div>'
-      +'<div>Innung: <b><span id="innungFeld"'+ED+' title="Einmal eintippen genügt: Die Innung wird für diese Kursart gespeichert und bei allen künftigen Anwesenheitslisten dieses Gewerks automatisch eingetragen" style="min-width:60mm">'+(innungVor?esc(innungVor):'&nbsp;')+'</span></b><br>Leiter: <b>'+esc(kurs.ausbilderName||'')+'</b></div>'
+      +'<div>Innung: <b>'
+      +((innungAuswahl.length>1)
+        ? '<select id="innungSelect" style="font:inherit;font-weight:700;border:1px solid #cbd5e1;border-radius:3px;padding:0 2px;background:#fffbe6"><option value="">– bitte wählen –</option>'
+          +innungAuswahl.map(v=>'<option value="'+esc(v)+'"'+(v===innungVor?' selected':'')+'>'+esc(v)+'</option>').join('')+'</select>'
+        : '<span id="innungFeld"'+ED+' title="Einmal eintippen genügt: Die Innung wird für diese Kursart gespeichert und bei allen künftigen Anwesenheitslisten dieser Kursart automatisch eingetragen." style="min-width:60mm">'+(innungVor?esc(innungVor):'&nbsp;')+'</span>')
+      +'</b><br>Leiter: <b>'+esc(kurs.ausbilderName||'')+'</b></div>'
       +'<div>Ausbildungsjahr: <b><span'+ED+' title="Bitte von Hand eintragen" style="min-width:10mm">&nbsp;</span></b></div>'
       +'</div>'
       +'<table><thead>'
