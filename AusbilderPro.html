@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v923';
+const APP_VERSION = 'v925';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,8 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v925', d:'10.09.2026', items:['🏛 Innung kommt jetzt in erster Linie von der Berufsgruppe (in VerwaltungPro einmal je Gewerk hinterlegt) – das ist die verlässliche Quelle. Eine an der Kursart gesetzte Innung hat Vorrang für Sonderfälle; findet sich nichts, greift die automatische Erkennung nach Kürzel']},
+  {v:'v924', d:'10.09.2026', items:['🏛 Innungs-Zuordnung erkennt jetzt auch Kurskürzel (ET, ETE, IH, BAE, VBA, GML, MB, K2/K3, FRI) und den Inhaltstext – nicht mehr nur die Berufsgruppe. Damit wird die Innung auch bei Kursarten ohne hinterlegten Beruf gefunden']},
   {v:'v923', d:'10.09.2026', items:['🏛 Anwesenheitsliste füllt die Innung jetzt automatisch aus – passend zum Beruf bzw. zur Kursart (z. B. „15 Innung für Elektrotechnik" bei Elektroberufen). Eine von Hand eingetragene Innung hat weiterhin Vorrang und wird je Kursart gespeichert']},
   {v:'v922', d:'10.09.2026', items:['🐛 Sofortkorrektur zu v921: Die Anwesenheitsliste ließ sich nicht mehr öffnen, weil die neue Notenspalten-Zuordnung an der falschen Stelle stand']},
   {v:'v921', d:'10.09.2026', items:['🖨 Anwesenheitsliste: Die Notenspalten F/M/FP/FT werden jetzt zuverlässig gefüllt – auch wenn eigene Notenspalten verwendet werden („Theoretische Kenntnisse", „Fachpraxis" usw.). Vorher blieben FP und FT leer, weil nur exakt „Theorie" erkannt wurde']},
@@ -7507,22 +7509,30 @@ async function generateAnwListeAP(){
   // bzw. der Kursart automatisch vorgeschlagen. Eine von Hand eingetragene Innung hat
   // weiterhin Vorrang (sie wird je Kursart gespeichert und ueberschreibt den Vorschlag).
   const _INNUNGEN=[
-    {nr:'6',  name:'Tischler-Innung',                 worte:['tischler','schreiner','holz']},
-    {nr:'8',  name:'Maler- und Lackierer-Innung',     worte:['maler','lackier']},
-    {nr:'11', name:'Innung für Metalltechnik',        worte:['metall','konstruktionsmech','feinwerk','schlosser']},
-    {nr:'13', name:'Innung Sanitär-Heizung-Klima',    worte:['anlagenmechanik','sanitär','sanitaer','heizung','klima','shk']},
-    {nr:'14', name:'Innung der Kraftfahrzeughandwerke',worte:['kraftfahrzeug','kfz','automobil']},
-    {nr:'15', name:'Innung für Elektrotechnik',       worte:['elektro','elektronik','informationselektronik']},
-    {nr:'22', name:'Bäcker - Innung',                 worte:['bäcker','baecker','backwaren','fachverkäufer','fachverkaeufer']},
-    {nr:'30', name:'Friseur-Innung',                  worte:['friseur','frisör','frisoer']},
-    {nr:'38', name:'Innung Parkett- & Bodenleger',    worte:['parkett','bodenleger','estrich']}
+  {nr:'6',  name:'Tischler-Innung',                  worte:['tischler','schreiner','holz'], kuerzel:[/^TI/i,/^SCHR/i]},
+  {nr:'8',  name:'Maler- und Lackierer-Innung',      worte:['maler','lackier'], kuerzel:[/^GML/i,/^MB\s*\d/i,/^ML/i]},
+  {nr:'11', name:'Innung für Metalltechnik',         worte:['metall','konstruktionsmech','feinwerk','schlosser'], kuerzel:[/^MT/i,/^KM/i]},
+  {nr:'13', name:'Innung Sanitär-Heizung-Klima',     worte:['sanit','anlagenmechanik','heizung','klima','shk','versorgungstechnik'], kuerzel:[/^G?-?IH\s*\d/i,/^SHK/i]},
+  {nr:'14', name:'Innung der Kraftfahrzeughandwerke',worte:['kraftfahrzeug','kfz','automobil','fahrwerk','motormanagement','diagnosetechnik'], kuerzel:[/^K\s*\d/i]},
+  {nr:'15', name:'Innung für Elektrotechnik',        worte:['elektro','elektronik','informationselektronik'], kuerzel:[/^ETE?\s*\d/i,/^ET\b/i]},
+  {nr:'22', name:'Bäcker - Innung',                  worte:['b_cker','bäcker','baecker','backwaren','konditor','fachverk','verkauf','ernährung','ernaehrung'], kuerzel:[/^G?-?V?BAE?\s*\d/i,/^G?-?VBA/i]},
+  {nr:'30', name:'Friseur-Innung',                   worte:['friseur','frisör','frisoer'], kuerzel:[/^FRI/i]},
+  {nr:'38', name:'Innung Parkett- & Bodenleger',     worte:['parkett','bodenleger','estrich'], kuerzel:[/^PB/i,/^BL/i]}
   ];
-  const _innungFinden=(...texte)=>{
-    const hay=texte.filter(Boolean).join(' ').toLowerCase();
-    if(!hay) return '';
-    const t=_INNUNGEN.find(i=>i.worte.some(w=>hay.includes(w)));
-    return t?(t.nr+' '+t.name):'';
-  };
+const _innungFinden=function(){
+  const args=Array.prototype.slice.call(arguments).filter(Boolean).map(String);
+  const kuerzelQuelle=(args[0]||'').trim();
+  // Das Kuerzel ist das verlaessliche Merkmal (z.B. IH = Installateur/Heizungsbauer),
+  // der Inhaltstext beschreibt nur das Thema (ein SHK-Kurs kann "Elektrotechnik" heissen).
+  for(const i of _INNUNGEN){
+    if((i.kuerzel||[]).some(rx=>rx.test(kuerzelQuelle))) return i.nr+' '+i.name;
+  }
+  const hay=args.join(' ').toLowerCase();
+  for(const i of _INNUNGEN){
+    if(i.worte.some(w=>hay.includes(w))) return i.nr+' '+i.name;
+  }
+  return '';
+};
   let innungVor='', lgartId='', kuerzel=(S.kats[S.curKat]&&S.kats[S.curKat].label)||'';
   let leiter=(getAusbilderProfil().name||'').trim();
   if(_db && inst.sharedKursId){
@@ -7530,16 +7540,30 @@ async function generateAnwListeAP(){
       const k=await _db.collection('shared').doc('kurse').collection('list').doc(inst.sharedKursId).get();
       if(k.exists){ const kd=k.data()||{}; lgartId=kd.lehrgangsartId||''; if(kd.ausbilderName) leiter=kd.ausbilderName;
         const full=kd.lehrgangsart||kd.name||kuerzel; const m=[]; for(const t of String(full).split(/\s+/)){ if(/^[A-ZÄÖÜ0-9\/\-\.]+$/.test(t)) m.push(t); else break; } kuerzel=m.join(' ')||kuerzel;
-        if(lgartId){ const lg=await _db.collection('shared').doc('kursSettings').collection('lehrgangsarten').doc(lgartId).get(); if(lg.exists&&lg.data().innung) innungVor=lg.data().innung; }
+        if(lgartId){ const lg=await _db.collection('shared').doc('kursSettings').collection('lehrgangsarten').doc(lgartId).get();
+          if(lg.exists){
+            const lgd=lg.data()||{};
+            if(lgd.innung) innungVor=lgd.innung;                  // 1. Kursart (Sonderfall)
+            if(!innungVor && lgd.berufGruppeId){                   // 2. Berufsgruppe (Regelfall)
+              try{ const bg=await _db.collection('shared').doc('kursSettings').collection('berufe').doc(lgd.berufGruppeId).get();
+                if(bg.exists && bg.data().innung) innungVor=bg.data().innung; }catch(e){}
+            }
+          }
+        }
+        // 2b. Berufsgruppe direkt am Kurs (falls dort hinterlegt)
+        if(!innungVor && kd.berufGruppeId){
+          try{ const bg=await _db.collection('shared').doc('kursSettings').collection('berufe').doc(kd.berufGruppeId).get();
+            if(bg.exists && bg.data().innung) innungVor=bg.data().innung; }catch(e){}
+        }
         // v923: keine gelernte Innung? Dann aus Kursart/Beruf ableiten
-        if(!innungVor) innungVor=_innungFinden(kd.lehrgangsart, kd.name, kd.berufLabel, kd.beruf, kuerzel, (S.kats[S.curKat]&&S.kats[S.curKat].label));
+        if(!innungVor) innungVor=_innungFinden(kuerzel||kd.name, kd.lehrgangsart, kd.berufLabel, kd.beruf, kd.berufGruppeId, kd.inhalt, (S.kats[S.curKat]&&S.kats[S.curKat].label));
       }
     }catch(e){}
   }
   // v923: immer noch nichts? Dann aus den Berufen der Teilnehmer ableiten
   if(!innungVor){
     const berufe=sids.map(sid=>(pool[sid]||{}).beruf||inst.seats[sid].profession||'').filter(Boolean);
-    innungVor=_innungFinden(kuerzel, (S.kats[S.curKat]&&S.kats[S.curKat].label), berufe.join(' '));
+    innungVor=_innungFinden(kuerzel||(S.kats[S.curKat]&&S.kats[S.curKat].label), berufe.join(' '));
   }
   // Kurstage Mo-Fr
   const tage=[];

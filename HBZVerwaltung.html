@@ -1438,6 +1438,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
             <div class="fg"><label class="fl">Name <span style="color:var(--bad)">*</span></label><input class="fi" id="addBerufNameInp" placeholder="z.B. Elektroniker"></div>
             <div class="fg"><label class="fl">Emoji / Icon</label><input class="fi" id="addBerufEmojiInp" placeholder="z.B. ⚡" maxlength="4"></div>
             <div class="fg"><label class="fl">Stichwörter (kommagetrennt)</label><input class="fi" id="addBerufKeysInp" placeholder="z.B. elektro, mechatronik, elektronik"></div>
+            <div class="fg"><label class="fl">🏛 Innung <span style="font-weight:400;color:var(--mu)">– erscheint auf der Anwesenheitsliste aller Kurse dieser Gruppe</span></label><select class="fi" id="addBerufInnung" style="cursor:pointer"><option value="">– keine –</option><option value="6 Tischler-Innung">6 Tischler-Innung</option><option value="8 Maler- und Lackierer-Innung">8 Maler- und Lackierer-Innung</option><option value="11 Innung für Metalltechnik">11 Innung für Metalltechnik</option><option value="13 Innung Sanitär-Heizung-Klima">13 Innung Sanitär-Heizung-Klima</option><option value="14 Innung der Kraftfahrzeughandwerke">14 Innung der Kraftfahrzeughandwerke</option><option value="15 Innung für Elektrotechnik">15 Innung für Elektrotechnik</option><option value="22 Bäcker - Innung">22 Bäcker - Innung</option><option value="30 Friseur-Innung">30 Friseur-Innung</option><option value="38 Innung Parkett- &amp; Bodenleger">38 Innung Parkett- &amp; Bodenleger</option></select></div>
             <div class="fg"><label class="fl">Fachrichtungen / Berufe (je Zeile einer)</label><textarea class="fi" id="addBerufSubInp" rows="5" placeholder="z.B.&#10;Elektroniker – Energie- und Gebäudetechnik (EuG)&#10;Elektroniker – Betriebstechnik&#10;Mechatroniker" style="resize:vertical;min-height:80px;font-size:.78rem;line-height:1.5"></textarea></div>
             <div style="display:flex;gap:8px;margin-top:10px">
               <button class="btn-sm" id="addBerufDelBtn" style="flex:1;display:none;background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)" title="Löschen" onclick="confirmDeleteBeruf()">&#128465; Löschen</button>
@@ -1768,10 +1769,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 396';
+const APP_VERSION = 'Build 397';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 397', d:'10.09.2026', items:['🏛 Innung wird jetzt bei der BERUFSGRUPPE hinterlegt (Einstellungen → Berufsgruppen) – einmal je Gewerk gesetzt, gilt sie für alle Kurse dieser Gruppe. Die Kursart kann sie im Einzelfall überschreiben; erkennt die App nichts, greift weiterhin die automatische Zuordnung nach Kürzel']},
   {v:'Build 396', d:'10.09.2026', items:['🏛 Kursarten haben jetzt ein Innungs-Feld. Es zeigt dieselbe automatische Zuordnung wie die Anwesenheitsliste (z.B. „automatisch: 15 Innung für Elektrotechnik") – gespeichert wird nur eine bewusst getroffene Auswahl, die dann dauerhaft gilt und den Vorschlag überschreibt']},
   {v:'Build 395', d:'03.09.2026', items:['🏢 Firmenstempel je Standort: unter Einstellungen → Standorte kann pro Standort ein Stempelbild hinterlegt werden. Neue Ausbilder dieses Standorts bekommen ihn in AusbilderPro automatisch bei der PIN-Vergabe (nie überschreibend)']},
   {v:'Build 394', d:'01.09.2026', items:['🔧 Drei-Orte-Problem behoben: Beim Zuweisen zu einem Folgekurs wird der Kurs-Eintrag des alten Kurses nur noch entfernt, wenn dieser bereits vorbei ist. Läuft er noch oder steht er noch bevor, bleibt der TN in beiden Kursrostern sichtbar (Fall ET2/ETE1)']},
@@ -4729,21 +4731,29 @@ function renderLgartListSettings(){
 // ANGEZEIGT; gespeichert wird ausschliesslich eine bewusste Auswahl von Verena, die dann
 // dauerhaft gilt und die automatische Zuordnung ueberschreibt.
 const _VP_INNUNGEN=[
-  {nr:'6',  name:'Tischler-Innung',                  worte:['tischler','schreiner','holz']},
-  {nr:'8',  name:'Maler- und Lackierer-Innung',      worte:['maler','lackier']},
-  {nr:'11', name:'Innung für Metalltechnik',         worte:['metall','konstruktionsmech','feinwerk','schlosser']},
-  {nr:'13', name:'Innung Sanitär-Heizung-Klima',     worte:['anlagenmechanik','sanitär','sanitaer','heizung','klima','shk']},
-  {nr:'14', name:'Innung der Kraftfahrzeughandwerke',worte:['kraftfahrzeug','kfz','automobil']},
-  {nr:'15', name:'Innung für Elektrotechnik',        worte:['elektro','elektronik','informationselektronik']},
-  {nr:'22', name:'Bäcker - Innung',                  worte:['bäcker','baecker','backwaren','fachverkäufer','fachverkaeufer']},
-  {nr:'30', name:'Friseur-Innung',                   worte:['friseur','frisör','frisoer']},
-  {nr:'38', name:'Innung Parkett- & Bodenleger',     worte:['parkett','bodenleger','estrich']}
+  {nr:'6',  name:'Tischler-Innung',                  worte:['tischler','schreiner','holz'], kuerzel:[/^TI/i,/^SCHR/i]},
+  {nr:'8',  name:'Maler- und Lackierer-Innung',      worte:['maler','lackier'], kuerzel:[/^GML/i,/^MB\s*\d/i,/^ML/i]},
+  {nr:'11', name:'Innung für Metalltechnik',         worte:['metall','konstruktionsmech','feinwerk','schlosser'], kuerzel:[/^MT/i,/^KM/i]},
+  {nr:'13', name:'Innung Sanitär-Heizung-Klima',     worte:['sanit','anlagenmechanik','heizung','klima','shk','versorgungstechnik'], kuerzel:[/^G?-?IH\s*\d/i,/^SHK/i]},
+  {nr:'14', name:'Innung der Kraftfahrzeughandwerke',worte:['kraftfahrzeug','kfz','automobil','fahrwerk','motormanagement','diagnosetechnik'], kuerzel:[/^K\s*\d/i]},
+  {nr:'15', name:'Innung für Elektrotechnik',        worte:['elektro','elektronik','informationselektronik'], kuerzel:[/^ETE?\s*\d/i,/^ET\b/i]},
+  {nr:'22', name:'Bäcker - Innung',                  worte:['b_cker','bäcker','baecker','backwaren','konditor','fachverk','verkauf','ernährung','ernaehrung'], kuerzel:[/^G?-?V?BAE?\s*\d/i,/^G?-?VBA/i]},
+  {nr:'30', name:'Friseur-Innung',                   worte:['friseur','frisör','frisoer'], kuerzel:[/^FRI/i]},
+  {nr:'38', name:'Innung Parkett- & Bodenleger',     worte:['parkett','bodenleger','estrich'], kuerzel:[/^PB/i,/^BL/i]}
 ];
-function _vpInnungFinden(...texte){
-  const hay=texte.filter(Boolean).join(' ').toLowerCase();
-  if(!hay) return '';
-  const t=_VP_INNUNGEN.find(i=>i.worte.some(w=>hay.includes(w)));
-  return t?(t.nr+' '+t.name):'';
+function _vpInnungFinden(){
+  const args=Array.prototype.slice.call(arguments).filter(Boolean).map(String);
+  const kuerzelQuelle=(args[0]||'').trim();
+  // Das Kuerzel ist das verlaessliche Merkmal (z.B. IH = Installateur/Heizungsbauer),
+  // der Inhaltstext beschreibt nur das Thema (ein SHK-Kurs kann "Elektrotechnik" heissen).
+  for(const i of _VP_INNUNGEN){
+    if((i.kuerzel||[]).some(rx=>rx.test(kuerzelQuelle))) return i.nr+' '+i.name;
+  }
+  const hay=args.join(' ').toLowerCase();
+  for(const i of _VP_INNUNGEN){
+    if(i.worte.some(w=>hay.includes(w))) return i.nr+' '+i.name;
+  }
+  return '';
 }
 // Zeigt den automatischen Vorschlag in der ersten Auswahlzeile an
 function _vpInnungVorschlagAktualisieren(){
@@ -4751,7 +4761,12 @@ function _vpInnungVorschlagAktualisieren(){
   const berufSel=document.getElementById('addLgartBeruf');
   const berufTxt=berufSel&&berufSel.selectedIndex>0?berufSel.options[berufSel.selectedIndex].text:'';
   const name=(document.getElementById('addLgartNameInp')||{}).value||'';
-  const vor=_vpInnungFinden(berufTxt, name);
+  const inhalt=(document.getElementById('addLgartInhalt')||{}).value||'';
+  const berufId=berufSel?berufSel.value:'';
+  // Build 397: Die am BERUF hinterlegte Innung hat Vorrang - sie ist die verlaessliche
+  // Quelle (ein Ausbilder gehoert zu genau einem Gewerk). Erst danach Kuerzel/Text.
+  const ausBeruf=(berufId&&BERUFE[berufId]&&BERUFE[berufId].innung)||'';
+  const vor=ausBeruf||_vpInnungFinden(name, berufTxt, berufId, inhalt);
   sel.options[0].text = vor ? ('– automatisch: '+vor+' –') : '– automatisch nach Beruf –';
 }
 function populateLgartBerufSelect(selectedId){
@@ -5721,6 +5736,7 @@ function openAddBerufModal(){
   document.getElementById('addBerufNameInp').value = '';
   document.getElementById('addBerufEmojiInp').value = '';
   document.getElementById('addBerufKeysInp').value = '';
+  { const _i=document.getElementById('addBerufInnung'); if(_i) _i.value=''; }
   document.getElementById('addBerufSubInp').value = '';
   document.getElementById('addBerufDelBtn').style.display = 'none';
   document.getElementById('addBerufModalTit').textContent = 'Berufsgruppe hinzufügen';
@@ -5734,6 +5750,7 @@ function openEditBerufSettings(id){
   document.getElementById('addBerufNameInp').value = b.name||'';
   document.getElementById('addBerufEmojiInp').value = b.emoji||'';
   document.getElementById('addBerufKeysInp').value = b.keyStr||'';
+  { const _i=document.getElementById('addBerufInnung'); if(_i) _i.value=b.innung||''; }
   document.getElementById('addBerufSubInp').value = (b.berufe||[]).join('\n');
   document.getElementById('addBerufDelBtn').style.display = 'flex';
   document.getElementById('addBerufModalTit').textContent = 'Berufsgruppe bearbeiten';
@@ -5810,7 +5827,8 @@ function saveBeruf(){
   const col = db.collection('shared').doc('kursSettings').collection('berufe');
   const docId = id || berufKeyFromName(name);
   const order = id ? (BERUFE[id]?.order!=null?BERUFE[id].order:99) : Object.keys(BERUFE).length;
-  col.doc(docId).set({name, emoji, keyStr, order, berufe}, {merge:true})
+  const innung = (document.getElementById('addBerufInnung')||{}).value||'';
+  col.doc(docId).set({name, emoji, keyStr, order, berufe, innung}, {merge:true})
     .then(()=>{ closeAddBerufModal(); toast('Gespeichert ✓'); })
     .catch(err=>toast('Fehler: '+err.message,'bad'));
 }
