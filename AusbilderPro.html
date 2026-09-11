@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v929';
+const APP_VERSION = 'v930';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v930', d:'11.09.2026', items:['📄 Die Kursbeschreibung aus VerwaltungPro (Inhalt der Kursart) wird beim Übernehmen eines Lehrgangs jetzt mitgenommen und erscheint auf der Teilnahmebescheinigung hinter dem Kurskürzel. Bei bereits übernommenen Kursen ohne Beschreibung wird sie beim nächsten Abruf nachgezogen']},
   {v:'v929', d:'11.09.2026', items:['🏛 Innung wird jetzt auch bei älteren Kursen gefunden, die den Ausbilder nur per Name oder E-Mail statt per ID kennen']},
   {v:'v928', d:'11.09.2026', items:['🧭 Neue Ausbilder werden vor dem ersten eigenen Kurs gefragt, ob es eine Verwaltung gibt, die Lehrgänge zuteilt. Bei „Ja" folgt der Hinweis, auf die Zuteilung zu warten bzw. Lehrgänge abzurufen; bei „Nein" geht es direkt zum Anlegen (wird gemerkt)']},
   {v:'v927', d:'11.09.2026', items:['🏛 Innung wird jetzt über den AUSBILDER des Kurses ermittelt (Ausbilder → Beruf → Innung) – so wie besprochen. Die Kursart braucht dafür keine Berufsgruppe mehr']},
@@ -3505,13 +3506,17 @@ function linkHBZKurs(kursId, kursData, targetKatId){
   // Kurs finden oder erstellen
   if(!targetKatId){
     const label=kursData.lehrgangsart||kursData.name||'HBZ-Kurs';
+  // v930: hat die Kategorie schon einen Eintrag, aber noch KEINE Beschreibung -> aus VP nachziehen
+  try{ const _kv=S.kats[targetKatId]; const _bv=String(kursData.beschreibung||kursData.inhalt||'').trim();
+    if(_kv && !String(_kv.beschreibung||'').trim() && _bv){ _kv.beschreibung=_bv; } }catch(e){}
     // Prüfen ob Kurs mit gleichem Namen schon existiert
     const existing=Object.entries(S.kats).find(([,k])=>k.label.toLowerCase()===label.toLowerCase());
     if(existing){
       targetKatId=existing[0];
     } else {
       targetKatId='kat_c_'+gid();
-      S.kats[targetKatId]={label:label, predefined:false, open:true, instances:{}};
+      // v930: Beschreibung aus VP mitnehmen - sie erscheint auf der Teilnahmebescheinigung
+      S.kats[targetKatId]={label:label, beschreibung:String(kursData.beschreibung||kursData.inhalt||'').trim(), predefined:false, open:true, instances:{}};
       S.katOrder.push(targetKatId);
     }
   }
