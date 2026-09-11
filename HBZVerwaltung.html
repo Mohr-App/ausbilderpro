@@ -1772,7 +1772,7 @@ const APP_VERSION = 'Build 396';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
-  {v:'Build 396', d:'10.09.2026', items:['🏛 Kursarten haben jetzt ein Innungs-Feld (Auswahlliste der neun Innungen). Die dort gesetzte Innung erscheint dauerhaft auf der Anwesenheitsliste in AusbilderPro und hat Vorrang vor der automatischen Zuordnung nach Beruf']},
+  {v:'Build 396', d:'10.09.2026', items:['🏛 Kursarten haben jetzt ein Innungs-Feld. Es zeigt dieselbe automatische Zuordnung wie die Anwesenheitsliste (z.B. „automatisch: 15 Innung für Elektrotechnik") – gespeichert wird nur eine bewusst getroffene Auswahl, die dann dauerhaft gilt und den Vorschlag überschreibt']},
   {v:'Build 395', d:'03.09.2026', items:['🏢 Firmenstempel je Standort: unter Einstellungen → Standorte kann pro Standort ein Stempelbild hinterlegt werden. Neue Ausbilder dieses Standorts bekommen ihn in AusbilderPro automatisch bei der PIN-Vergabe (nie überschreibend)']},
   {v:'Build 394', d:'01.09.2026', items:['🔧 Drei-Orte-Problem behoben: Beim Zuweisen zu einem Folgekurs wird der Kurs-Eintrag des alten Kurses nur noch entfernt, wenn dieser bereits vorbei ist. Läuft er noch oder steht er noch bevor, bleibt der TN in beiden Kursrostern sichtbar (Fall ET2/ETE1)']},
   {v:'Build 393', d:'27.08.2026', items:['🔧 Kurshistorie: doppelte Einträge (gleicher Kurs, gleicher Zeitraum) werden jetzt an allen 6 Zuweisungswegen (Picker, Drag, Listen-Import, Übertragen) verhindert – arrayUnion prüfte bisher wegen des Zeitstempels nie auf echte Duplikate']},
@@ -4725,6 +4725,35 @@ function renderLgartListSettings(){
   });
   el.innerHTML=h;
 }
+// Build 397: Innungs-Zuordnung - identisch zu AusbilderPro. Der Vorschlag wird nur
+// ANGEZEIGT; gespeichert wird ausschliesslich eine bewusste Auswahl von Verena, die dann
+// dauerhaft gilt und die automatische Zuordnung ueberschreibt.
+const _VP_INNUNGEN=[
+  {nr:'6',  name:'Tischler-Innung',                  worte:['tischler','schreiner','holz']},
+  {nr:'8',  name:'Maler- und Lackierer-Innung',      worte:['maler','lackier']},
+  {nr:'11', name:'Innung für Metalltechnik',         worte:['metall','konstruktionsmech','feinwerk','schlosser']},
+  {nr:'13', name:'Innung Sanitär-Heizung-Klima',     worte:['anlagenmechanik','sanitär','sanitaer','heizung','klima','shk']},
+  {nr:'14', name:'Innung der Kraftfahrzeughandwerke',worte:['kraftfahrzeug','kfz','automobil']},
+  {nr:'15', name:'Innung für Elektrotechnik',        worte:['elektro','elektronik','informationselektronik']},
+  {nr:'22', name:'Bäcker - Innung',                  worte:['bäcker','baecker','backwaren','fachverkäufer','fachverkaeufer']},
+  {nr:'30', name:'Friseur-Innung',                   worte:['friseur','frisör','frisoer']},
+  {nr:'38', name:'Innung Parkett- & Bodenleger',     worte:['parkett','bodenleger','estrich']}
+];
+function _vpInnungFinden(...texte){
+  const hay=texte.filter(Boolean).join(' ').toLowerCase();
+  if(!hay) return '';
+  const t=_VP_INNUNGEN.find(i=>i.worte.some(w=>hay.includes(w)));
+  return t?(t.nr+' '+t.name):'';
+}
+// Zeigt den automatischen Vorschlag in der ersten Auswahlzeile an
+function _vpInnungVorschlagAktualisieren(){
+  const sel=document.getElementById('addLgartInnung'); if(!sel) return;
+  const berufSel=document.getElementById('addLgartBeruf');
+  const berufTxt=berufSel&&berufSel.selectedIndex>0?berufSel.options[berufSel.selectedIndex].text:'';
+  const name=(document.getElementById('addLgartNameInp')||{}).value||'';
+  const vor=_vpInnungFinden(berufTxt, name);
+  sel.options[0].text = vor ? ('– automatisch: '+vor+' –') : '– automatisch nach Beruf –';
+}
 function populateLgartBerufSelect(selectedId){
   const sel=document.getElementById('addLgartBeruf');
   if(!sel) return;
@@ -4732,6 +4761,10 @@ function populateLgartBerufSelect(selectedId){
   Object.entries(BERUFE).forEach(([id,b])=>{
     sel.innerHTML+='<option value="'+id+'"'+(id===selectedId?' selected':'')+'>'+esc((b.emoji||'')+' '+b.name)+'</option>';
   });
+  sel.onchange=()=>{ try{_vpInnungVorschlagAktualisieren();}catch(e){} };
+  const nm=document.getElementById('addLgartNameInp');
+  if(nm) nm.oninput=()=>{ try{_vpInnungVorschlagAktualisieren();}catch(e){} };
+  try{ _vpInnungVorschlagAktualisieren(); }catch(e){}
 }
 function openAddLgartModal(){
   document.getElementById('addLgartId').value = '';
@@ -4753,6 +4786,7 @@ function openEditLgartSettings(id){
   document.getElementById('addLgartNameInp').value = l.name||'';
   document.getElementById('addLgartInhalt').value = l.inhalt||'';
   { const _i=document.getElementById('addLgartInnung'); if(_i) _i.value=l.innung||''; }
+  try{ _vpInnungVorschlagAktualisieren(); }catch(e){}
   document.getElementById('addLgartWerkzeug').value = (l.werkzeug||[]).join('\n');
   document.getElementById('addLgartKleidung').value = (l.kleidung||[]).join('\n');
   document.getElementById('addLgartDelBtn').style.display = 'flex';
