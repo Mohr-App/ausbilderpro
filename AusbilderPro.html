@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v930';
+const APP_VERSION = 'v931';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v931', d:'12.09.2026', items:['⏳ Beim Start zeigt die App „Lehrgänge werden geladen…" statt kurz einen leeren Sitzplan – bis der Cloud-Stand da ist']},
   {v:'v930', d:'11.09.2026', items:['📄 Die Kursbeschreibung aus VerwaltungPro (Inhalt der Kursart) wird beim Übernehmen eines Lehrgangs jetzt mitgenommen und erscheint auf der Teilnahmebescheinigung hinter dem Kurskürzel. Bei bereits übernommenen Kursen ohne Beschreibung wird sie beim nächsten Abruf nachgezogen']},
   {v:'v929', d:'11.09.2026', items:['🏛 Innung wird jetzt auch bei älteren Kursen gefunden, die den Ausbilder nur per Name oder E-Mail statt per ID kennen']},
   {v:'v928', d:'11.09.2026', items:['🧭 Neue Ausbilder werden vor dem ersten eigenen Kurs gefragt, ob es eine Verwaltung gibt, die Lehrgänge zuteilt. Bei „Ja" folgt der Hinweis, auf die Zuteilung zu warten bzw. Lehrgänge abzurufen; bei „Nein" geht es direkt zum Anlegen (wird gemerkt)']},
@@ -4134,6 +4135,17 @@ function instDotStyle(inst, isAktiv, startStr, today){
 function renderMain(){
   const el=document.getElementById('mainArea');
   const inst=curInst();
+  // v931: Solange der Cloud-Stand noch nicht da ist (_dataOwner leer, Nutzer aber angemeldet),
+  // KEINEN leeren Sitzplan/Willkommensbildschirm zeigen - das wirkte wie "alles weg".
+  // Stattdessen ein ruhiger Ladehinweis; sobald fbLoadData fertig ist, wird normal gerendert.
+  if(!inst && _fbUid && _dataOwner!==_fbUid && !_demoMode){
+    el.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:14px;color:var(--mu)">'
+      +'<div style="width:34px;height:34px;border:3px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:apSpin .9s linear infinite"></div>'
+      +'<div style="font-size:.85rem;font-weight:700;color:#334155">Lehrgänge werden geladen…</div>'
+      +'<div style="font-size:.7rem">Dein Stand wird mit der Cloud abgeglichen</div>'
+      +'</div><style>@keyframes apSpin{to{transform:rotate(360deg)}}</style>';
+    return;
+  }
   if(!inst){
     const katName=S.curKat&&S.kats[S.curKat]?S.kats[S.curKat].label:null;
     const hasAnyInst=Object.values(S.kats).some(k=>Object.keys(k.instances||{}).length>0);
