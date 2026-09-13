@@ -1792,7 +1792,7 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 405';
+const APP_VERSION = 'Build 406';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
@@ -2472,6 +2472,34 @@ document.addEventListener('keydown', function(e){
 
 // Build 403: untere Handy-Leiste
 document.addEventListener('DOMContentLoaded',()=>{ try{ ['vpBnav','vpMore'].forEach(id=>{ const e=document.getElementById(id); if(e&&e.parentNode!==document.body) document.body.appendChild(e); }); }catch(e){} });
+// Build 406: Selbstdiagnose fuer die Handy-Ansicht - Aufruf mit ?diag=1 (kein Debugger noetig)
+if(/[?&]diag=1/.test(location.search)){
+  const _diag=()=>{
+    try{
+      const ov=document.getElementById('sbOverlay'), sb=document.querySelector('.sb'), main=document.querySelector('.main');
+      const cx=Math.floor(innerWidth/2), cy=Math.floor(innerHeight/2);
+      const top=document.elementFromPoint(cx,cy);
+      const desc=el=>el?(el.tagName.toLowerCase()+(el.id?'#'+el.id:'')+(el.className&&typeof el.className==='string'?'.'+el.className.trim().split(/\s+/).slice(0,3).join('.'):'')):'-';
+      const chain=[]; let e=top; while(e&&chain.length<5){ chain.push(desc(e)); e=e.parentElement; }
+      const pages=[...document.querySelectorAll('.page')].map(p=>p.id+':'+(getComputedStyle(p).display)).join('  ');
+      const txt=[
+        'Build: '+APP_VERSION,
+        'Viewport: '+innerWidth+'x'+innerHeight+' | touch: '+matchMedia('(pointer:coarse)').matches,
+        'Overlay sichtbar: '+(ov?getComputedStyle(ov).display!=='none':'?')+' | Sidebar offen: '+(sb?sb.classList.contains('mobile-open'):'?'),
+        'Main: '+(main?getComputedStyle(main).display+' '+main.offsetWidth+'x'+main.offsetHeight:'fehlt'),
+        'Seiten: '+pages,
+        'Mitte trifft: '+chain.join(' < '),
+        'Leiste unten: '+(document.getElementById('vpBnav')?getComputedStyle(document.getElementById('vpBnav')).display:'fehlt')
+      ].join('\n');
+      let box=document.getElementById('vpDiagBox');
+      if(!box){ box=document.createElement('pre'); box.id='vpDiagBox';
+        box.style.cssText='position:fixed;left:6px;right:6px;top:60px;z-index:99999;background:#111;color:#9f9;font:11px/1.45 monospace;padding:10px;border-radius:8px;white-space:pre-wrap;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+        box.onclick=()=>box.remove(); document.body.appendChild(box); }
+      box.textContent=txt+'\n\n(tippen zum Schließen)';
+    }catch(err){ alert('Diag-Fehler: '+err.message); }
+  };
+  window.addEventListener('load',()=>{ setTimeout(_diag,2500); setTimeout(_diag,6000); });
+}
 function vpMoreToggle(){ const m=document.getElementById('vpMore'); if(m) m.classList.toggle('show'); }
 function vpMoreClose(){ const m=document.getElementById('vpMore'); if(m) m.classList.remove('show'); }
 function vpBnavMark(page){
