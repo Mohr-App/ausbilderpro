@@ -1793,7 +1793,7 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 408';
+const APP_VERSION = 'Build 409';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
@@ -2498,14 +2498,27 @@ if(/[?&]diag=1/.test(location.search)){
           const c=getComputedStyle(el); const r=el.getBoundingClientRect();
           return sel+': op='+c.opacity+' vis='+c.visibility+' disp='+c.display+' pos='+c.position+' tf='+(c.transform==='none'?'-':c.transform.slice(0,30))+' rect='+Math.round(r.left)+','+Math.round(r.top)+' '+Math.round(r.width)+'x'+Math.round(r.height)+' color='+c.color+' bg='+c.backgroundColor; })
       ].join('\n');
+      // Build 409: Was liegt an mehreren Punkten obenauf? + Textmenge der Dashboard-Seite
+      const pts=[0.25,0.5,0.75,0.9].map(f=>{ const y=Math.floor(innerHeight*f); const el=document.elementFromPoint(cx,y); return Math.round(y)+':'+desc(el); });
+      const pd=document.getElementById('page-dashboard');
+      const extra='\nPunkte: '+pts.join(' | ')+'\nDashboard-Text: '+(pd?pd.innerText.replace(/\s+/g,' ').slice(0,80):'-')+' ('+(pd?pd.innerText.length:0)+' Zeichen)'
+        +'\nbody bg='+getComputedStyle(document.body).backgroundColor+' | html bg='+getComputedStyle(document.documentElement).backgroundColor
+        +'\nscroll: window='+window.scrollY+' main='+(main?main.scrollTop:'-')+' body='+(document.querySelector('.body')?document.querySelector('.body').scrollTop:'-');
       let box=document.getElementById('vpDiagBox');
       if(!box){ box=document.createElement('pre'); box.id='vpDiagBox';
-        box.style.cssText='position:fixed;left:6px;right:6px;top:60px;z-index:99999;background:#111;color:#9f9;font:11px/1.45 monospace;padding:10px;border-radius:8px;white-space:pre-wrap;box-shadow:0 4px 20px rgba(0,0,0,.4)';
-        box.onclick=()=>box.remove(); document.body.appendChild(box); }
-      box.textContent=txt+'\n\n(tippen zum Schließen)';
+        box.style.cssText='position:fixed;left:6px;right:6px;top:60px;max-height:70vh;overflow:auto;z-index:99999;background:#111;color:#9f9;font:11px/1.45 monospace;padding:10px;border-radius:8px;white-space:pre-wrap;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+        document.body.appendChild(box);
+        const bar=document.createElement('div'); bar.style.cssText='position:fixed;right:10px;top:22px;z-index:100000;display:flex;gap:6px';
+        bar.innerHTML='<button id="vpDiagRun" style="padding:6px 10px;font-weight:800;border-radius:6px;border:none;background:#22c55e;color:#000">↻ messen</button><button id="vpDiagX" style="padding:6px 10px;font-weight:800;border-radius:6px;border:none;background:#ef4444;color:#fff">✕</button>';
+        document.body.appendChild(bar);
+        document.getElementById('vpDiagRun').onclick=()=>window._vpDiag&&window._vpDiag();
+        document.getElementById('vpDiagX').onclick=()=>{ box.remove(); bar.remove(); };
+      }
+      box.textContent=txt+extra;
     }catch(err){ alert('Diag-Fehler: '+err.message); }
   };
-  window.addEventListener('load',()=>{ setTimeout(_diag,2500); setTimeout(_diag,6000); });
+  window._vpDiag=_diag;
+  window.addEventListener('load',()=>{ setTimeout(_diag,2500); setTimeout(_diag,7000); setTimeout(_diag,12000); });
 }
 function vpMoreToggle(){ const m=document.getElementById('vpMore'); if(m) m.classList.toggle('show'); }
 function vpMoreClose(){ const m=document.getElementById('vpMore'); if(m) m.classList.remove('show'); }
