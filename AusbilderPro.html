@@ -264,7 +264,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   .mob-pool-btn{display:flex;}
   .pool-sb-close{display:none;}
   .pool-sidebar .pool-mob-top{display:flex!important;background:#fff;}
-  .ov{z-index:400;}   /* v941: Dialoge (TN-Detail, Wiederholer...) VOR den Schubladen */
+  .ov{z-index:400!important;}   /* v942: Dialoge VOR den Schubladen (Grundregel steht spaeter im Stylesheet) */
   .pool-sidebar{width:82vw;max-width:310px;}
 }
 .pool-mob-top{display:none;}
@@ -2033,7 +2033,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v941';
+const APP_VERSION = 'v942';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -12255,12 +12255,11 @@ function renderMobKatList(){
       const tog=document.createElement('div');
       tog.style.cssText='font-size:.7rem;font-weight:800;color:#475569;padding:10px 12px;cursor:pointer;letter-spacing:.03em;display:flex;align-items:center;gap:6px;border-top:1px solid #e2e8f0;margin-top:4px;user-select:none;background:rgba(148,163,184,.10);border-radius:6px';
       tog.innerHTML='<span class="altpfeil" style="font-size:.8rem;transition:transform .15s;display:inline-block">▼</span> '+_vergM.length+' vergangene Lehrgänge';
-      _altBoxM=document.createElement('div'); _altBoxM.style.display='none';
+      _altBoxM=document.createElement('div'); _altBoxM.style.display='none'; _altBoxM.previousToggle=tog;
       tog.addEventListener('click',e=>{ e.stopPropagation();
         const auf=_altBoxM.style.display!=='none';
         _altBoxM.style.display=auf?'none':'';
         tog.querySelector('.altpfeil').style.transform=auf?'':'rotate(180deg)'; });
-      ch.appendChild(tog); ch.appendChild(_altBoxM);
     }
     sorted.forEach(([iid,inst])=>{
       const sDate=inst.sY+'-'+String(inst.sM).padStart(2,'0')+'-'+String(inst.sD).padStart(2,'0');
@@ -12284,6 +12283,8 @@ function renderMobKatList(){
       ir.addEventListener('click',()=>{ selInst(id,iid); drawerClose(); });
       (isPast&&_altBoxM?_altBoxM:ch).appendChild(ir);
     });
+    // v942: Klappbereich erst NACH den aktuellen/kommenden Lehrgaengen einhaengen
+    if(_altBoxM){ ch.appendChild(_altBoxM.previousToggle); ch.appendChild(_altBoxM); }
     list.appendChild(ch);
     const addBtn=document.createElement('div');
     addBtn.className='kat-newinst'+(k.open?' show':'');
