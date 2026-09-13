@@ -164,6 +164,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .grid2>.card .dash-status-body{flex:1;overflow-y:auto;}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
 @media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr;}}
+/* Build 403: untere Handy-Leiste (wie AusbilderPro) */
+.vp-bnav{display:none;position:fixed;left:0;right:0;bottom:0;height:62px;background:#fff;border-top:1px solid var(--brd);z-index:350;align-items:stretch;justify-content:space-around;padding-bottom:env(safe-area-inset-bottom);}
+.vp-bnav-btn{flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-family:'JetBrains Mono',monospace;font-size:.58rem;font-weight:700;color:var(--mu);cursor:pointer;position:relative;}
+.vp-bnav-btn .bni{font-size:1.15rem;line-height:1;}
+.vp-bnav-btn.active{color:var(--acc);}
+.vp-more{display:none;position:fixed;left:0;right:0;bottom:62px;background:#fff;border-top:1px solid var(--brd);border-radius:14px 14px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.12);z-index:360;padding:10px 12px 12px;}
+.vp-more.show{display:block;}
+.vp-more-item{display:flex;align-items:center;gap:12px;width:100%;padding:12px 10px;border:none;background:none;border-radius:8px;font-family:'Sora',sans-serif;font-size:.85rem;font-weight:700;color:var(--tx);cursor:pointer;text-align:left;}
+.vp-more-item:active{background:rgba(37,99,235,.08);}
+.vp-more-item .mi{width:30px;text-align:center;font-size:1.05rem;}
 
 /* STAT */
 .stat-card{background:#f1f5f9;border:1px solid var(--brd);border-radius:13px;padding:18px;display:flex;flex-direction:column;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
@@ -515,10 +525,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 .hdr-burger{display:none;background:none;border:none;color:#e2e8f0;font-size:1.4rem;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1;}
 .hdr-burger:hover{background:rgba(255,255,255,.1);}
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:149;}
-@media(max-width:768px){
+/* Build 403: Handy-Ansicht gilt auf Touchgeraeten bis 1100px auch im Querformat; PC (Maus) nie betroffen */
+@media(max-width:768px), (pointer:coarse) and (max-width:1100px){
   #dashCharts{grid-template-columns:1fr!important;}
   #dashStatusGrid{grid-template-columns:1fr!important;}
-  .hdr-burger{display:block;}
+  .hdr-burger{display:none;}          /* Build 403: Menue jetzt unten in der Leiste */
+  .vp-bnav{display:flex;}
+  .main{padding-bottom:78px!important;}
+  .sb{top:54px;bottom:62px;}
+  .sb .sb-bot{display:none;}
+  .ov{z-index:400!important;}
   .hdr-search-wrap{max-width:none;margin:0 6px;}
   .hdr-badge{display:none;}
   .hdr-user{display:none;}
@@ -690,6 +706,21 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
   </div>
   <div class="body">
     <div class="sb-overlay" id="sbOverlay" onclick="toggleMobileSb()"></div>
+<!-- Build 403: untere Handy-Leiste -->
+<div class="vp-bnav" id="vpBnav">
+  <button class="vp-bnav-btn" onclick="vpMoreClose();toggleMobileSb()" title="Menü"><span class="bni">☰</span>Menü</button>
+  <button class="vp-bnav-btn" id="bnav-dashboard" onclick="vpMoreClose();closeMobileSb();showPage('dashboard')"><span class="bni">📊</span>Dashboard</button>
+  <button class="vp-bnav-btn" id="bnav-kursplanung" onclick="vpMoreClose();closeMobileSb();showPage('kursplanung')"><span class="bni">📅</span>Planung</button>
+  <button class="vp-bnav-btn" id="bnav-agverwaltung" onclick="vpMoreClose();closeMobileSb();showPage('agverwaltung')"><span class="bni">🏢</span>Betriebe</button>
+  <button class="vp-bnav-btn" onclick="vpMoreToggle()" title="Mehr"><span class="bni">⚙</span>Mehr</button>
+</div>
+<div class="vp-more" id="vpMore">
+  <button class="vp-more-item" onclick="vpMoreClose();closeMobileSb();showPage('fortschritt')"><span class="mi">📈</span>Kursfortschritt</button>
+  <button class="vp-more-item" onclick="vpMoreClose();closeMobileSb();showPage('urlaub')"><span class="mi">🏖</span>Urlaub</button>
+  <button class="vp-more-item" onclick="vpMoreClose();closeMobileSb();showPage('einstellungen')"><span class="mi">⚙</span>Einstellungen</button>
+  <button class="vp-more-item" onclick="vpMoreClose();showHVHilfe()"><span class="mi">❓</span>Hilfe</button>
+  <button class="vp-more-item" onclick="vpMoreClose();doLogout()" style="color:#b91c1c"><span class="mi">⎋</span>Abmelden</button>
+</div>
     <!-- SIDEBAR NAV -->
     <div class="sb">
       <!-- APP-LAUNCHER (nur Mobile, nur Admin) -->
@@ -1776,10 +1807,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 402';
+const APP_VERSION = 'Build 403';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 403', d:'13.09.2026', items:['📱 Handy-Ansicht wie AusbilderPro: untere Leiste mit Menü · Dashboard · Planung · Betriebe · Mehr (Kursfortschritt, Urlaub, Einstellungen, Hilfe, Abmelden). Gilt auf Touchgeräten auch im Querformat; PC unverändert']},
   {v:'Build 402', d:'11.09.2026', items:['✅ Nachbearbeitung sichtbar: Im Kursdetail steht bei beendeten Kursen „✓ bearbeitet [Datum · Wer]" bzw. „⏳ Bearbeitung offen"; in der Kursliste unter dem Ausbilder erscheint bei bearbeiteten Kursen ein grünes Häkchen']},
   {v:'Build 401', d:'11.09.2026', items:['🏛 Innung wird jetzt auch bei älteren Kursen gefunden, die den Ausbilder nur per Name oder E-Mail statt per ID kennen']},
   {v:'Build 400', d:'11.09.2026', items:['✅ Neue Dashboard-Karte „Abgeschlossen – zu bearbeiten": alle beendeten Kurse, die noch nachbearbeitet werden müssen (Unterlagen, Listen, Ablage). Per Häkchen abhaken – erledigte verschwinden aus der Liste, mit Datum und Bearbeiter am Kurs vermerkt; optional einblendbar']},
@@ -2452,6 +2484,13 @@ document.addEventListener('keydown', function(e){
   }
 });
 
+// Build 403: untere Handy-Leiste
+function vpMoreToggle(){ const m=document.getElementById('vpMore'); if(m) m.classList.toggle('show'); }
+function vpMoreClose(){ const m=document.getElementById('vpMore'); if(m) m.classList.remove('show'); }
+function vpBnavMark(page){
+  document.querySelectorAll('.vp-bnav-btn').forEach(b=>b.classList.remove('active'));
+  const b=document.getElementById('bnav-'+page); if(b) b.classList.add('active');
+}
 function toggleMobileSb(){
   const sb=document.querySelector('.sb');
   const ov=document.getElementById('sbOverlay');
@@ -2493,6 +2532,7 @@ window.addEventListener('popstate',e=>{
   else{_navFromPop=true;showPage('dashboard');history.replaceState({page:'dashboard'},'');}
 });
 function showPage(id){
+  try{ vpBnavMark(id); }catch(e){}
   if(!_navFromPop&&id!==_curPage) history.pushState({page:id},'');
   _curPage=id; _navFromPop=false;
   closeMobileSb();
