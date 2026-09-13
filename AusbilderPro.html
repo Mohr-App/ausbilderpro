@@ -2011,7 +2011,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v931';
+const APP_VERSION = 'v932';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2026,6 +2026,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v932', d:'13.09.2026', items:['📥 „Neue HBZ-Kurse" in der Seitenleiste: Tippen/Klicken öffnet jetzt „Lehrgänge abrufen" (mit Dublettenprüfung und Verwerfen) statt direkt zu verknüpfen – ein Weg für alle. Ziehen auf einen Kurs am PC bleibt möglich']},
   {v:'v931', d:'12.09.2026', items:['⏳ Beim Start zeigt die App „Lehrgänge werden geladen…" statt kurz einen leeren Sitzplan – bis der Cloud-Stand da ist']},
   {v:'v930', d:'11.09.2026', items:['📄 Die Kursbeschreibung aus VerwaltungPro (Inhalt der Kursart) wird beim Übernehmen eines Lehrgangs jetzt mitgenommen und erscheint auf der Teilnahmebescheinigung hinter dem Kurskürzel. Bei bereits übernommenen Kursen ohne Beschreibung wird sie beim nächsten Abruf nachgezogen']},
   {v:'v929', d:'11.09.2026', items:['🏛 Innung wird jetzt auch bei älteren Kursen gefunden, die den Ausbilder nur per Name oder E-Mail statt per ID kennen']},
@@ -3428,6 +3429,8 @@ function loadHBZKurse(){
           e.dataTransfer.effectAllowed='copy';
           e.dataTransfer.setData('text/plain', k.id); // Firefox-Pflicht
         });
+        card.addEventListener('click',()=>{ if(!_hbzDragKursId) openLehrgangAbrufen(); });
+        card.title='Klicken: Lehrgänge abrufen (mit Prüfung) · Ziehen auf einen Kurs: direkt dort einordnen';
         card.addEventListener('dragend',()=>{
           card.classList.remove('dragging');
           _hbzDragKursId=null; _hbzDragData=null;
@@ -3476,12 +3479,9 @@ function loadHBZKurse(){
             +'<div class="hbz-kurs-dates">'+esc(vonBis)+'</div>'
             +'</div>'
             +'<span style="font-size:.6rem;color:var(--acc);font-weight:700;margin-left:auto">Tippen →</span>';
-          card.addEventListener('click',()=>{
-            if(confirm('Kurs "'+lgart+'" ('+vonBis+') verknüpfen?')){
-              drawerClose();
-              linkHBZKurs(k.id, k, null);
-            }
-          });
+          // v932: kein Schnellweg mehr am Dublettencheck vorbei - der Tipp oeffnet das
+          // Abrufen-Fenster (mit Pruefung und Verwerfen), die Karte bleibt nur der Hinweis.
+          card.addEventListener('click',()=>{ drawerClose(); openLehrgangAbrufen(); });
           sectionMob.appendChild(card);
         });
         const mDiv=document.createElement('div'); mDiv.style.cssText='border-bottom:1px solid var(--brd);margin:4px 0';
