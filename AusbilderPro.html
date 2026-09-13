@@ -897,7 +897,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 </div>
 <div class="hdr">
   <button class="mob-hamburger" id="mobHamBtn" onclick="drawerOpen()" title="Menü öffnen">☰</button>
-  <button class="mob-pool-btn" id="mobPoolBtn" onclick="poolDrawerOpen()" title="Teilnehmerpool öffnen">👥<span class="cnt" id="mobPoolCnt"></span></button>
   <div class="logo">Ausbilder<span>Pro</span></div>
   <div class="ausbilder-wrap">
     <div class="ausbilder-label">Ausbilder</div>
@@ -1138,6 +1137,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 <div class="mob-bottom-nav" id="mobBottomNav">
   <button class="mob-nav-toggle" id="mobBnavToggle" onclick="toggleMobBnav()" title="Navigation einklappen/ausklappen" aria-label="Navigation umschalten">▼</button>
   <button class="mob-nav-btn" id="mobNavChatBtn" onclick="openChatModal()" title="Ausbilder-Chat" style="display:none;position:relative"><span class="mni">💬</span>Chat<span id="mobNavChatBadge" style="display:none;position:absolute;top:2px;right:6px;background:#ef4444;color:#fff;font-size:.55rem;font-weight:800;padding:1px 5px;border-radius:8px;min-width:14px;text-align:center;line-height:1.2">0</span></button>
+  <button class="mob-nav-btn" id="mobNavPoolBtn" onclick="poolDrawerOpen()" title="Teilnehmerpool" style="position:relative"><span class="mni">👥</span>Pool<span id="mobNavPoolBadge" style="display:none;position:absolute;top:2px;right:14px;background:#2563eb;color:#fff;font-size:.55rem;font-weight:800;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px"></span></button>
   <button class="mob-nav-btn" onclick="openMobMoreMenu()" title="Mehr Optionen"><span class="mni">⚙</span>Mehr</button>
 </div>
 <div class="copyright" style="display:none">© AusbilderPro v3.29.32 ─ by S. Mohr ─ <a href="#" title="Was ist neu? (Changelog)" onclick="event.preventDefault();showChangelog()" style="color:var(--acc);text-decoration:none;font-size:.6rem">Was ist neu?</a></div>
@@ -2022,7 +2022,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v933';
+const APP_VERSION = 'v934';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2037,6 +2037,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v934', d:'13.09.2026', items:['📱 Pool-Knopf jetzt in der unteren Handy-Leiste zwischen „Chat" und „Mehr" (der Knopf im Kopf war auf dem Handy nicht sichtbar). Mit Zähler für noch nicht platzierte Teilnehmer']},
   {v:'v933', d:'13.09.2026', items:['📱 Teilnehmerpool auf Handy/Tablet erreichbar: neuer 👥-Knopf im Kopf öffnet den Pool als Schublade von rechts (bisher war er auf schmalen Bildschirmen einfach ausgeblendet)']},
   {v:'v932', d:'13.09.2026', items:['📥 „Neue HBZ-Kurse" in der Seitenleiste: Tippen/Klicken öffnet jetzt „Lehrgänge abrufen" (mit Dublettenprüfung und Verwerfen) statt direkt zu verknüpfen – ein Weg für alle. Ziehen auf einen Kurs am PC bleibt möglich']},
   {v:'v931', d:'12.09.2026', items:['⏳ Beim Start zeigt die App „Lehrgänge werden geladen…" statt kurz einen leeren Sitzplan – bis der Cloud-Stand da ist']},
@@ -13612,6 +13613,11 @@ function loadPool(){
       _poolTNCache=[];
       snap.forEach(doc=>{ const dd=doc.data(); if(!dd) return; if(dd.wiederholer===true){ _tnStatusMap[doc.id]='wiederholer'; } else if(dd.status){ _tnStatusMap[doc.id]=dd.status; }
         _poolTNCache.push({id:doc.id, name:((dd.vorname||'')+' '+(dd.nachname||'')).trim()||dd.name||'?', firma:dd.firma||'', addedAt:dd.addedAt||0}); });
+      // v934: Zaehler fuer den Pool-Knopf in der unteren Handy-Leiste (noch nicht platzierte TN)
+      try{ const _seats=(curInst()||{}).seats||{};
+        const _pl=new Set(Object.values(_seats).filter(d=>d&&d.poolTnId).map(d=>d.poolTnId));
+        const _offen=_poolTNCache.filter(t=>!_pl.has(t.id)&&(_tnStatusMap[t.id]||'')!=='wiederholer'&&(_tnStatusMap[t.id]||'')!=='absent').length;
+        const b=document.getElementById('mobNavPoolBadge'); if(b){ b.textContent=_offen; b.style.display=_offen?'flex':'none'; } }catch(e){}
       // Sitze neu zeichnen, damit Wiederholer/Nicht-angetreten sofort ausgegraut werden (Map ist jetzt aktuell)
       try{ renderSeats(); }catch(e){}
       // Duplikat-Check (manuell angelegt vs. selbst registriert)
