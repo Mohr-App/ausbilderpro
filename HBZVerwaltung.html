@@ -611,6 +611,13 @@ body.vp-login .vp-bnav, body.vp-login .vp-more{display:none!important;}  /* Buil
 <body>
 
 <!-- LOGIN -->
+<!-- Build 410: Ladebildschirm - sichtbar, bis Anmeldung und Rollenpruefung durch sind -->
+<div id="vpSplash" style="position:fixed;inset:0;z-index:5000;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:'Sora',sans-serif">
+  <div style="font-size:1.2rem;font-weight:800;color:#1e293b">Verwaltung<span style="color:#2563eb">Pro</span></div>
+  <div style="width:34px;height:34px;border:3px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:vpSpin .9s linear infinite"></div>
+  <div id="vpSplashTxt" style="font-size:.78rem;color:#64748b">Wird geladen…</div>
+  <style>@keyframes vpSpin{to{transform:rotate(360deg)}}</style>
+</div>
 <div id="loginWrap">
   <div class="login-box" id="loginBox">
     <div class="login-logo">Verwaltung<span>Pro</span></div>
@@ -1793,10 +1800,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 409';
+const APP_VERSION = 'Build 410';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 410', d:'13.09.2026', items:['⏳ Ladebildschirm beim Start statt weißer Fläche, bis Anmeldung und Rollenprüfung durch sind. Rollenprüfung wiederholt sich bei Netzproblemen bis zu dreimal; schlägt sie endgültig fehl, ist die „Kein Zugang"-Meldung jetzt sichtbar statt einer leeren Seite']},
   {v:'Build 405', d:'13.09.2026', items:['📱 VerwaltungPro passt sich jetzt wirklich an das Handy an (Viewport auf Gerätebreite statt fester 1280px) – damit greifen die Handy-Regeln und die untere Leiste erscheint']},
   {v:'Build 403', d:'13.09.2026', items:['📱 Handy-Ansicht wie AusbilderPro: untere Leiste mit Menü · Dashboard · Planung · Betriebe · Mehr (Kursfortschritt, Urlaub, Einstellungen, Hilfe, Abmelden). Gilt auf Touchgeräten auch im Querformat; PC unverändert']},
   {v:'Build 402', d:'11.09.2026', items:['✅ Nachbearbeitung sichtbar: Im Kursdetail steht bei beendeten Kursen „✓ bearbeitet [Datum · Wer]" bzw. „⏳ Bearbeitung offen"; in der Kursliste unter dem Ausbilder erscheint bei bearbeiteten Kursen ein grünes Häkchen']},
@@ -2180,7 +2188,14 @@ auth.onAuthStateChanged(u => {
     // Stefan-Whitelist: Immer Admin-Zugang
     const stefanWhitelist=['s.mohr@ish.de'];
     // 1. Prüfe bestehende Rolle
-    db.collection('users').doc(_uid).get().then(doc => {
+    // Build 410: bis zu 3 Versuche mit Wartezeit - auf dem Handy (Funkloch, Netzwechsel) schlug
+    // der erste Lesezugriff gelegentlich fehl und die App landete im "Kein Zugang"-Zweig.
+    vpSplashText('Anmeldung wird geprüft…');
+    const _leseRolle=(versuch)=>db.collection('users').doc(_uid).get().catch(err=>{
+      if(versuch<3){ vpSplashText('Verbindung… Versuch '+(versuch+1)+' von 3'); return new Promise(r=>setTimeout(r,1500*versuch)).then(()=>_leseRolle(versuch+1)); }
+      throw err;
+    });
+    _leseRolle(1).then(doc => {
       const role = doc.exists ? doc.data().role : null;
       if(role === 'admin' || role === 'verwaltung'){
         // Zugang OK
@@ -2218,6 +2233,7 @@ auth.onAuthStateChanged(u => {
     try{ document.body.classList.add('vp-login'); }catch(e){}
     document.getElementById('appWrap').style.display = 'none';
     showHBZLogin();
+    vpSplashHide();
   }
 });
 
@@ -2234,6 +2250,7 @@ function grantAccess(u, role){
   document.getElementById('loginWrap').style.display = 'none';
   try{ document.body.classList.remove('vp-login'); }catch(e){}
   document.getElementById('appWrap').style.display = 'flex';
+  vpSplashHide();
   document.getElementById('hdrUser').textContent = _email;
   // Verwaltung-Events Listener starten (Aufploppen-Notifications vom Ausbilder)
   _initVwEvents();
@@ -2288,7 +2305,16 @@ function grantAccess(u, role){
   checkDsgvoConsent();
 }
 
+// Build 410: Haengt der Start laenger als 20s, Hinweis + Neuladen-Knopf statt Endlos-Spinner
+setTimeout(()=>{ try{ const sp=document.getElementById('vpSplash'); if(sp&&sp.style.display!=='none'){
+  const t=document.getElementById('vpSplashTxt'); if(t) t.innerHTML='Die Verbindung dauert ungewöhnlich lange.<br><button onclick="location.reload()" style="margin-top:10px;padding:8px 14px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer">Neu laden</button>'; } }catch(e){} }, 20000);
+function vpSplashHide(){ try{ const sp=document.getElementById('vpSplash'); if(sp) sp.style.display='none'; }catch(e){} }
+function vpSplashText(t){ try{ const e=document.getElementById('vpSplashTxt'); if(e) e.textContent=t; }catch(e){} }
 function showNoAccessHBZ(email){
+  // Build 410: Container sichtbar machen - sonst blieb die Meldung unsichtbar (weisse Flaeche)
+  document.getElementById('loginWrap').style.display='flex';
+  try{ document.body.classList.add('vp-login'); }catch(e){}
+  vpSplashHide();
   document.getElementById('loginBox').style.display='none';
   document.getElementById('hbzRegBox').style.display='none';
   document.getElementById('hbzNoAccess').style.display='';
