@@ -2022,7 +2022,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v934';
+const APP_VERSION = 'v935';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2037,6 +2037,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v935', d:'13.09.2026', items:['📱 Pool-Schublade auf dem Handy nicht mehr verschwommen/abgedunkelt (lag unter dem Overlay)']},
   {v:'v934', d:'13.09.2026', items:['📱 Pool-Knopf jetzt in der unteren Handy-Leiste zwischen „Chat" und „Mehr" (der Knopf im Kopf war auf dem Handy nicht sichtbar). Mit Zähler für noch nicht platzierte Teilnehmer']},
   {v:'v933', d:'13.09.2026', items:['📱 Teilnehmerpool auf Handy/Tablet erreichbar: neuer 👥-Knopf im Kopf öffnet den Pool als Schublade von rechts (bisher war er auf schmalen Bildschirmen einfach ausgeblendet)']},
   {v:'v932', d:'13.09.2026', items:['📥 „Neue HBZ-Kurse" in der Seitenleiste: Tippen/Klicken öffnet jetzt „Lehrgänge abrufen" (mit Dublettenprüfung und Verwerfen) statt direkt zu verknüpfen – ein Weg für alle. Ziehen auf einen Kurs am PC bleibt möglich']},
@@ -12159,16 +12160,24 @@ function loadAusbilder(){
 
 // ── MOBILE DRAWER ──
 // v933: Pool-Schublade rechts (Handy/Tablet). Nutzt das vorhandene Overlay des Seitenmenues.
+let _poolHome=null;   // v935: urspruenglicher Platz des Pools im Layout
 function poolDrawerOpen(){
   try{ drawerClose(); }catch(e){}
+  const ps=document.getElementById('poolSidebar');
+  // v935: Der Pool liegt im Hauptbereich - dessen Ebene liegt UNTER dem Overlay, daher
+  // erschien er verschwommen. Zum Oeffnen auf die oberste Ebene (body) heben.
+  if(ps && ps.parentNode!==document.body){ _poolHome={parent:ps.parentNode, next:ps.nextSibling}; document.body.appendChild(ps); }
   const ov=document.getElementById('mobOverlay');
   if(ov){ ov.classList.add('show'); ov.dataset.pool='1'; }
-  document.getElementById('poolSidebar').classList.add('show');
+  ps.classList.add('show');
 }
 function poolDrawerClose(){
-  document.getElementById('poolSidebar').classList.remove('show');
+  const ps=document.getElementById('poolSidebar');
+  ps.classList.remove('show');
   const ov=document.getElementById('mobOverlay');
   if(ov && ov.dataset.pool){ delete ov.dataset.pool; ov.classList.remove('show'); }
+  // nach der Einblend-Animation zurueck an den alten Platz (fuer die Desktop-Ansicht)
+  setTimeout(()=>{ try{ if(_poolHome&&ps.parentNode===document.body){ _poolHome.parent.insertBefore(ps,_poolHome.next); _poolHome=null; } }catch(e){} }, 300);
 }
 function drawerOpen(){
   renderMobKatList();
