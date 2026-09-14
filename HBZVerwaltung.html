@@ -1809,10 +1809,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 413';
+const APP_VERSION = 'Build 414';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 414', d:'14.09.2026', items:['⛔ Doppelkurse verhindert: Ein Ausbilder kann nicht zwei echte Lehrgänge im selben Zeitraum haben. Beim Anlegen erscheint eine rote Sperre – der Lehrgang lässt sich stattdessen als Entwurf speichern (wird dann nicht übertragen). Entwürfe dürfen sich überschneiden und zeigen in der Planung ein „⛔ Kollision"-Zeichen; übertragen lassen sie sich erst, wenn die Kollision weg ist']},
   {v:'Build 413', d:'13.09.2026', items:['↩️ Handy-Ansicht zurückgenommen: VerwaltungPro zeigt auf dem Handy wieder die verkleinerte PC-Ansicht (fester 1280px-Viewport) wie zuvor. Geblieben: Ladebildschirm beim Start und robustere Anmeldeprüfung']},
   {v:'Build 412', d:'13.09.2026', items:['📱 Handy-Layout strukturell bereinigt: nur noch das Fenster scrollt (statt Hauptbereich und jede Karte einzeln) – behebt weiße Flächen beim Scrollen und verschwindende Leisten auf Android. Kopfzeile fest oben. PC unverändert']},
   {v:'Build 410', d:'13.09.2026', items:['⏳ Ladebildschirm beim Start statt weißer Fläche, bis Anmeldung und Rollenprüfung durch sind. Rollenprüfung wiederholt sich bei Netzproblemen bis zu dreimal; schlägt sie endgültig fehl, ist die „Kein Zugang"-Meldung jetzt sichtbar statt einer leeren Seite']},
@@ -3782,7 +3783,12 @@ function loadDashboard(){
       html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--sur2);border:1px solid var(--brd);border-radius:8px;margin-bottom:4px">';
       html+='<div class="kurs-dot" style="background:#a855f7"></div>';
       html+='<div style="flex:1;min-width:0">';
-      html+='<div style="font-size:.82rem;font-weight:700">'+esc(k.name||'?')+'</div>';
+      // Build 414: Kollisions-Zeichen - dieser Entwurf laesst sich nicht uebertragen,
+      // solange der Ausbilder im selben Zeitraum schon einen echten Lehrgang hat.
+      const _kolE = (k.ausbilderId&&k.von&&k.bis) ? vpKollisionen(k.ausbilderId, k.von, k.bis, k.id) : [];
+      html+='<div style="font-size:.82rem;font-weight:700">'+esc(k.name||'?')
+        +(_kolE.length?' <span title="Kollidiert mit: '+esc(_kolE.map(c=>(c.name||'')+' ('+fmtDE(c.von)+'–'+fmtDE(c.bis)+')').join(', '))+'" style="font-size:.6rem;font-weight:800;color:#b91c1c;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:1px 6px;vertical-align:middle">⛔ Kollision</span>':'')
+        +'</div>';
       html+='<div style="font-size:.65rem;color:var(--mu)">'+fmtDE(k.von)+' – '+fmtDE(k.bis)+(k.ausbilderName?' · '+esc(k.ausbilderName):' · <span style="color:#f59e0b">Kein Ausbilder</span>')+' · '+tnCnt+' TN</div>';
       html+='</div>';
       html+='<button class="btn-sm" title="✏ Bearbeiten" onclick="openEntwurf(\''+k.id+'\')" style="font-size:.62rem;padding:4px 8px">✏ Bearbeiten</button>';
@@ -4481,6 +4487,41 @@ function getDateFromSelects(pref) {
   return y + '-' + m + '-' + d;
 }
 
+
+// ════════════════════════════════════════════════
+//  Build 414: Kollisionsschutz - ein Ausbilder kann nicht zwei ECHTE Lehrgaenge
+//  gleichzeitig leiten. Entwuerfe duerfen sich ueberschneiden (Planung), echte Kurse nie.
+//  Genau so entstand der Doppelkurs VBA3/18 neben VBAE 3/18 (beide Dahm, 14.-18.09.).
+// ════════════════════════════════════════════════
+function vpKollisionen(ausbId, von, bis, ignoreId){
+  if(!ausbId||!von||!bis) return [];
+  return _kurse.filter(k=>{
+    if(k.id===ignoreId) return false;
+    if(k.entwurf) return false;              // Entwuerfe blockieren nicht
+    if(k.archiviert) return false;
+    if(k.ausbilderId!==ausbId) return false;
+    if(!k.von||!k.bis) return false;
+    return k.von<=bis && k.bis>=von;         // Ueberschneidung
+  });
+}
+function vpKollisionsBox(titel, ausbName, konflikte, text, aktionLabel, aktionFn){
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99990;display:flex;align-items:center;justify-content:center;padding:16px';
+  const liste=konflikte.map(k=>'<div style="font-size:.74rem;padding:5px 0;color:#7f1d1d">📋 <b>'+esc(k.name||'Kurs')+'</b> · '+fmtDE(k.von)+' – '+fmtDE(k.bis)+'</div>').join('');
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px;max-width:480px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)">'
+    +'<div style="font-size:1rem;font-weight:800;color:#b91c1c;margin-bottom:10px">⛔ '+esc(titel)+'</div>'
+    +'<div style="font-size:.82rem;color:#334155;line-height:1.55;margin-bottom:10px">'+esc(ausbName)+' hat in diesem Zeitraum bereits einen Lehrgang:</div>'
+    +'<div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:9px;padding:9px 12px;margin-bottom:12px">'+liste+'</div>'
+    +'<div style="font-size:.78rem;color:#475569;line-height:1.55;margin-bottom:16px">'+text+'</div>'
+    +'<div style="display:flex;gap:8px;align-items:center">'
+    +'<button id="vpKolAbbr" style="flex:1;padding:11px;border:1px solid var(--brd);background:#fff;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer">Abbrechen</button>'
+    +(aktionLabel?'<button id="vpKolTrotz" style="padding:8px 10px;border:none;background:none;color:#94a3b8;font-size:.66rem;text-decoration:underline;cursor:pointer">'+esc(aktionLabel)+'</button>':'')
+    +'</div></div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#vpKolAbbr').onclick=()=>ov.remove();
+  const t=ov.querySelector('#vpKolTrotz');
+  if(t) t.onclick=()=>{ ov.remove(); aktionFn&&aktionFn(); };
+}
 function createKurs(){
   const ausbObj = _ausbilder.find(a => a.id === _kursForm.ausbId);
   if (!ausbObj) { toast('Bitte Ausbilder auswählen oder anlegen', 'bad'); return; }
@@ -4489,7 +4530,19 @@ function createKurs(){
   const von = getDateFromSelects('kVon');
   const bis = getDateFromSelects('kBis');
   const name = lgartObj.name;
+  // Build 414: Kollision -> nicht als echter Kurs anlegen, nur als Entwurf erlauben
+  const _kol = vpKollisionen(ausbObj.id, von, bis, null);
+  if(_kol.length && !window._vpKursTrotzdem){
+    vpKollisionsBox('Anlegen gesperrt', ausbObj.name, _kol,
+      'Ein Ausbilder kann nicht zwei Lehrgänge gleichzeitig leiten. Bitte prüfen, ob der Lehrgang bereits existiert.<br><br>Du kannst ihn stattdessen als <b>Entwurf</b> speichern – er wird dann <b>nicht</b> an den Ausbilder übertragen.',
+      'Trotzdem als Entwurf speichern',
+      ()=>{ window._vpKursTrotzdem='entwurf'; createKurs(); });
+    return;
+  }
+  const _alsEntwurf = window._vpKursTrotzdem==='entwurf';
+  window._vpKursTrotzdem=null;
   db.collection('shared').doc('kurse').collection('list').add({
+    ...(_alsEntwurf?{entwurf:true, entwurfKollision:true}:{}),
     name,
     lehrgangsart: lgartObj.name,
     lehrgangsartId: lgartObj.id,
@@ -4502,7 +4555,7 @@ function createKurs(){
     createdBy: _uid
   }).then(() => {
     closeNewKursModal();
-    toast('Kurs erstellt ✓');
+    toast(_alsEntwurf?'⛔ Als Entwurf gespeichert (Kollision) – nicht an den Ausbilder übertragen':'Kurs erstellt ✓');
   }).catch(err => toast('Fehler: ' + err.message, 'bad'));
 }
 
@@ -11095,6 +11148,7 @@ function checkAusbilderOverlap(ausbId, von, bis, excludeKursId){
   if(!ausbId||!von||!bis) return null;
   const conflict=_kurse.find(k=>{
     if(k.id===excludeKursId) return false;
+    if(k.entwurf) return false;   // Build 414: Entwuerfe duerfen sich ueberschneiden, echte Kurse nie
     if(k.archiviert) return false;
     if(k.ausbilderId!==ausbId) return false;
     if(!k.von||!k.bis) return false;
