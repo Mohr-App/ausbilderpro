@@ -2033,7 +2033,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v942';
+const APP_VERSION = 'v943';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2048,6 +2048,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v943', d:'13.09.2026', items:['🗂 AusbilderPro Desktop: „vergangene Lehrgänge" stehen jetzt unterhalb der aktuellen/kommenden statt davor (gleiche Reihenfolge wie mobil)']},
   {v:'v941', d:'13.09.2026', items:['📱 Dialoge aus der Pool-Schublade (TN-Detail, Einstufung) erscheinen jetzt vorne statt blass dahinter. Lehrgänge-Menü auf dem Handy hat wie am PC den aufklappbaren Bereich „vergangene Lehrgänge"']},
   {v:'v940', d:'13.09.2026', items:['📱 Handy im Querformat zeigt jetzt die Handy-Ansicht (untere Leiste, Schubladen) statt einer abgeschnittenen PC-Aufteilung. Maßgeblich ist, ob es ein Touchgerät ist – am PC ändert sich nichts']},
   {v:'v939', d:'13.09.2026', items:['📱 Untere Handy-Leiste: „☰ Lehrgänge" (links) und „👥 Pool" öffnen jetzt beide Seitenleisten von unten; das Hamburger-Menü oben entfällt']},
@@ -2740,12 +2741,12 @@ function renderSidebar(){
       tog.title='Abgeschlossene Lehrgänge ein-/ausblenden';
       _altBox=document.createElement('div');
       _altBox.style.display='none';
+      _altBox.previousToggle=tog;
       tog.onclick=e=>{ e.stopPropagation();
         const auf=_altBox.style.display!=='none';
         _altBox.style.display=auf?'none':'';
         const pf=tog.querySelector('.altpfeil'); pf.style.transform=auf?'':'rotate(180deg)';
       };
-      ch.appendChild(tog); ch.appendChild(_altBox);
     }
     instEntries.forEach(([iid,inst])=>{
       const yr=inst.sY||'';
@@ -2772,6 +2773,7 @@ function renderSidebar(){
       ir.addEventListener('click',()=>selInst(id,iid));
       (isVergangen&&_altBox?_altBox:ch).appendChild(ir);
     });
+    if(_altBox){ ch.appendChild(_altBox.previousToggle); ch.appendChild(_altBox); }
     const addBtn=document.createElement('div');
     addBtn.className='kat-newinst'+(k.open?' show':'');
     addBtn.innerHTML='<span style="font-size:1rem">+</span> Neuer Lehrgang in „'+esc(k.label)+'"';
