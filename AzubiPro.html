@@ -7508,11 +7508,24 @@ function loadKurse(){
       // Sitzplatz-Feld immer anzeigen
       const spVal=_tnData?.wunschSitzplatz||'';
       const spLeer=!String(spVal).trim();
-      html+='<div onclick="event.stopPropagation()" style="margin-top:10px;padding:12px 14px;background:#ffffff;border:2px solid '+(spLeer?'#ef4444':'rgba(37,99,235,.4)')+';border-radius:10px;display:flex;align-items:center;gap:10px'+(spLeer?';box-shadow:0 0 0 1px rgba(239,68,68,.2)':'')+'">'
-        +'<span style="font-size:.78rem;font-weight:700;color:'+(spLeer?'#dc2626':'#2563eb')+'">🪑 Mein Platz:</span>'
-        +'<input id="homeSitzplatz" type="number" min="1" value="'+esc(spVal)+'" placeholder="Nr." style="width:60px;padding:6px 8px;border:2px solid '+(spLeer?'rgba(239,68,68,.5)':'rgba(59,130,246,.3)')+';border-radius:7px;font-size:.88rem;font-weight:800;text-align:center;background:var(--sur);color:var(--tx);font-family:\'Sora\',sans-serif">'
-        +'<button onclick="saveHomeSitzplatz()" style="padding:6px 14px;background:var(--acc);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif" title="Sitzplatz speichern">'+(spVal?'Ändern':'Speichern')+'</button>'
-        +(spVal?'<span style="font-size:.6rem;color:#10b981;font-weight:600">✓</span>':'<span style="font-size:.62rem;color:#dc2626;font-weight:700">fehlt</span>')
+      // v324: Hat der Ausbilder den Platz zugewiesen und ist er noch nicht bestaetigt?
+      const spZug=!!(_tnData&&_tnData.platzZugewiesenAm);
+      const spBest=!!(_tnData&&_tnData.platzBestaetigtAm);
+      const spOffen=spZug && !spBest && !spLeer;
+      const spRand=spLeer?'#ef4444':(spOffen?'#f59e0b':'rgba(37,99,235,.4)');
+      const spFarbe=spLeer?'#dc2626':(spOffen?'#b45309':'#2563eb');
+      html+='<div onclick="event.stopPropagation()" style="margin-top:10px;padding:12px 14px;background:#ffffff;border:2px solid '+spRand+';border-radius:10px">'
+        +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+        +'<span style="font-size:.78rem;font-weight:700;color:'+spFarbe+'">🪑 Mein Platz:</span>'
+        +(spOffen
+          ? '<span style="font-size:1.05rem;font-weight:800;color:#b45309">'+esc(spVal)+'</span>'
+            +'<button onclick="bestaetigePlatz()" style="padding:7px 14px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Platz bestätigen</button>'
+          : '<input id="homeSitzplatz" type="number" min="1" value="'+esc(spVal)+'" placeholder="Nr." style="width:60px;padding:6px 8px;border:2px solid '+(spLeer?'rgba(239,68,68,.5)':'rgba(59,130,246,.3)')+';border-radius:7px;font-size:.85rem;font-weight:700;text-align:center">'
+            +'<button onclick="saveHomeSitzplatz()" style="padding:6px 14px;background:var(--acc);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif" title="Sitzplatz speichern">Speichern</button>'
+            +(spVal?'<span style="font-size:.6rem;color:#10b981;font-weight:600">✓</span>':'<span style="font-size:.62rem;color:#dc2626;font-weight:700">fehlt</span>'))
+        +'</div>'
+        +(spOffen?'<div style="font-size:.66rem;color:#92400e;margin-top:7px;line-height:1.45">Dieser Platz wurde dir von deinem Ausbilder zugewiesen. Bitte kurz bestätigen.</div>':'')
+        +(spZug&&spBest?'<div style="font-size:.62rem;color:#059669;margin-top:6px">✓ vom Ausbilder zugewiesen und bestätigt</div>':'')
         +'</div>';
       // Meldung an Ausbilder
       html+='<div onclick="event.stopPropagation()" style="margin-top:10px;padding:12px 14px;background:#ffffff;border:2px solid rgba(37,99,235,.4);border-radius:10px">'
@@ -8006,6 +8019,30 @@ function openKurshistorie(){
 }
 function openKursunterlagen(){ var c=document.getElementById('docsBetriebCard'); if(c) c.style.display='none'; showPage('docs'); }
 function openAlleDokumente(){ var c=document.getElementById('docsBetriebCard'); if(c) c.style.display=''; showPage('docs'); }
+
+// ════════════════════════════════════════════════
+//  v324: Ist die eingegebene Platznummer im Sitzplan schon belegt? Dann kurzer Hinweis,
+//  statt dass die Eingabe still wirkungslos bleibt (der Ausbilder sieht sie dann zwar,
+//  aber der Platz ist besetzt und die automatische Platzierung greift nicht).
+//  Fehlt der Sitzplan oder klappt die Abfrage nicht, wird NICHT blockiert.
+// ════════════════════════════════════════════════
+function _platzBelegtVon(kursId, nr){
+  if(!kursId||!nr) return Promise.resolve(null);
+  return db.collection('shared').doc('kurse').collection('list').doc(kursId)
+    .collection('live').doc('sitzplan').get()
+    .then(function(d){
+      if(!d.exists) return null;
+      const bel=(d.data()||{}).belegung||{};
+      const ziel=String(nr).trim();
+      for(const sid in bel){
+        const e=bel[sid]||{};
+        const sidNr=(String(sid).match(/(\d+)$/)||[])[1]||'';
+        if(sidNr===ziel && e.tnId && e.tnId!==_tnId) return e.name||'jemand anderem';
+      }
+      return null;
+    })
+    .catch(function(){ return null; });
+}
 function openPlatznummer(willkommen){
   const cur=(_tnData&&_tnData.wunschSitzplatz)||'';
   const intro=willkommen
@@ -8017,11 +8054,32 @@ function openPlatznummer(willkommen){
   _showSimplePopup('Meine Platznummer', inner);
   setTimeout(function(){ var i=document.getElementById('platzInput'); if(i) i.focus(); }, 100);
 }
+// v324: Zugewiesenen Platz bestaetigen
+function bestaetigePlatz(){
+  if(!_tnId){ toast('Nicht angemeldet','bad'); return; }
+  db.collection('globalTN').doc(_tnId).update({platzBestaetigtAm:Date.now()}).then(function(){
+    if(_tnData) _tnData.platzBestaetigtAm=Date.now();
+    toast('✓ Platz '+((_tnData&&_tnData.wunschSitzplatz)||'')+' bestätigt');
+    try{ loadKurse(); }catch(e){}
+  }).catch(function(e){ toast('Fehler: '+e.message,'bad'); });
+}
 function savePlatznummerFromPopup(){
   const nr=((document.getElementById('platzInput')||{}).value||'').trim();
   if(!nr){ toast('Bitte Platznummer eingeben','bad'); return; }
   if(!_tnId){ toast('Nicht angemeldet','bad'); return; }
-  db.collection('globalTN').doc(_tnId).update({wunschSitzplatz:nr}).then(function(){
+  // v324: erst pruefen, ob der Platz schon vergeben ist
+  _platzBelegtVon(_tnData&&_tnData.aktiverKursId, nr).then(function(belegtVon){
+    if(belegtVon && !window._platzTrotzdem){
+      window._platzTrotzdem=true;
+      toast('⚠ Platz '+nr+' ist bereits vergeben ('+belegtVon+'). Bitte einen anderen wählen oder beim Ausbilder melden.','bad');
+      return;
+    }
+    window._platzTrotzdem=false;
+    _savePlatznummerJetzt(nr);
+  });
+}
+function _savePlatznummerJetzt(nr){
+  db.collection('globalTN').doc(_tnId).update({wunschSitzplatz:nr, platzBestaetigtAm:Date.now()}).then(function(){
     _tnData.wunschSitzplatz=nr;
     if(_tnData.aktiverKursId){ db.collection('shared').doc('kurse').collection('list').doc(_tnData.aktiverKursId).collection('teilnehmer').doc(_tnId).update({wunschSitzplatz:nr}).catch(function(){}); }
     // Einstempeln bei frischem QR-Scan ODER direkt nach Weg-1-Beitritt (Marker).

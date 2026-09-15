@@ -1995,7 +1995,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v948';
+const APP_VERSION = 'v949';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2010,6 +2010,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v949', d:'14.09.2026', items:['🪑 Platzierung wirkt jetzt in beide Richtungen: Wer auf einen Sitz gesetzt wird, sieht die Nummer in AzubiPro unter „Mein Platz" und muss sie dort bestätigen. Umsetzen zieht sie mit, Sitzplatz leeren entfernt sie. Platzieren macht weiterhin NICHT anwesend','🔔 Meldet sich ein als „Nicht angetreten" eingestufter Teilnehmer per QR, erscheint ein Hinweis mit „Zurückholen" – statt ihn stillschweigend zurückzuholen']},
   {v:'v948', d:'14.09.2026', items:['🐛 Wichtiger Fix zu v947: Beim Entfernen des Knopfes „Alle automatisch platzieren" blieb ein Verweis darauf stehen. Dadurch brach der Aufbau des Pools mit einem Fehler ab – Teilnehmer fehlten im Pool und die Container „Nicht angetreten" und „Wiederholer" blieben leer']},
   {v:'v947', d:'13.09.2026', items:['🗑 Knopf „Alle automatisch platzieren" entfernt – er füllte die Plätze stur der Reihe nach auf und überschrieb damit die Wunsch-Sitzplätze der Azubis. Platziert wird per Ziehen, per Klick auf den Sitz oder automatisch über den Wunsch-Sitzplatz']},
   {v:'v946', d:'13.09.2026', items:['🪑 „Alle automatisch platzieren" berücksichtigt jetzt zuerst die Wunsch-Sitzplätze der Azubis und füllt erst danach die restlichen freien Plätze auf. Bisher wurde stur der Reihe nach aufgefüllt – wer einen Platz eingegeben hatte, landete irgendwo, und die Wunsch-Platzierung kam nicht mehr zum Zug']},
@@ -11942,6 +11943,91 @@ if(${JSON.stringify(!!(ausg&&ausg.art==='mail'))}){var _bs=document.getElementBy
   });
 }
 
+
+// ════════════════════════════════════════════════
+//  v949: Sitzplatznummer zurueckschreiben.
+//  Der Sitzplatz ist eine Tatsache, kein Wunsch: Wer platziert wird, sieht die Nummer
+//  in AzubiPro unter "Mein Platz" - mit Vermerk, dass sie zugewiesen wurde, und muss
+//  sie dort bestaetigen. Beim Entfernen vom Sitz wird sie wieder geleert.
+//  WICHTIG: Platzieren setzt KEINE Anwesenheit - die entsteht weiterhin nur durch
+//  QR-Check-in am Kurstag oder manuellen Eintrag.
+// ════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════
+//  v949: Rueckkehrer-Hinweis. Meldet sich ein als "Nicht angetreten" eingestufter TN
+//  per QR, wird er NICHT automatisch zurueckgeholt - die Einstufung ist eine bewusste
+//  Entscheidung des Ausbilders (die Verwaltung wurde informiert). Stattdessen ein
+//  Hinweis mit einem Klick zum Zurueckholen.
+// ════════════════════════════════════════════════
+let _rueckkehrerGezeigt={};   // tnId -> true (nur einmal je Sitzung melden)
+function _pruefeRueckkehrer(kursId){
+  if(!kursId||!_todayCheckinMap) return;
+  Object.keys(_todayCheckinMap).forEach(tnId=>{
+    if(_rueckkehrerGezeigt[tnId]) return;
+    const st=_tnStatusMap[tnId]||'';
+    if(st!=='absent') return;                       // nur "Nicht angetreten"
+    _rueckkehrerGezeigt[tnId]=true;
+    const c=_todayCheckinMap[tnId]||{};
+    const t=(_poolTNCache||[]).find(x=>x.id===tnId);
+    _zeigeRueckkehrer(tnId, kursId, (t&&t.name)||'Teilnehmer', c.zeit||'');
+  });
+}
+function _zeigeRueckkehrer(tnId, kursId, name, zeit){
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99990;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px;max-width:430px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)">'
+    +'<div style="font-size:1rem;font-weight:800;margin-bottom:10px">🔔 '+esc(name)+' hat sich gemeldet</div>'
+    +'<div style="font-size:.82rem;color:#334155;line-height:1.55;margin-bottom:16px">'
+      +esc(name)+' hat sich'+(zeit?' um <b>'+esc(zeit)+' Uhr</b>':'')+' per QR-Code angemeldet – steht aber unter <b>„Nicht angetreten"</b>.<br><br>Soll er zurück in den Kurs?</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button id="rkJa" style="flex:1;padding:11px;border:none;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer">✓ Zurückholen</button>'
+    +'<button id="rkNein" style="padding:11px 16px;border:1px solid var(--brd);background:#fff;border-radius:8px;font-size:.8rem;cursor:pointer;color:var(--mu)">Ignorieren</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#rkNein').onclick=()=>ov.remove();
+  ov.querySelector('#rkJa').onclick=()=>{
+    ov.remove();
+    if(!_db) return;
+    // Einstufung aufheben - der TN erscheint dann wieder im Pool und kann platziert werden
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').doc(tnId).update({status:'attending'})
+      .then(()=>{ try{ syncGlobalTNStatus(tnId,'clear'); }catch(e){}
+        toast('✓ '+name+' ist zurück im Kurs – bitte einen Platz zuweisen');
+        loadPool(); })
+      .catch(err=>toast('Fehlgeschlagen: '+err.message,'bad'));
+  };
+}
+function _sitzNummerFuer(inst, seatId){
+  if(!inst||!seatId) return '';
+  const lbl=(inst.seatLabels&&inst.seatLabels[seatId]!=null&&inst.seatLabels[seatId]!=='')?String(inst.seatLabels[seatId]):'';
+  if(lbl) return lbl;
+  const m=String(seatId).match(/(\d+)$/);   // unbeschrifteter Sitz -> interne Nummer
+  return m?m[1]:'';
+}
+function _platzZuweisen(tnId, kursId, inst, seatId){
+  if(!_db||!tnId) return;
+  const nr=_sitzNummerFuer(inst, seatId);
+  if(!nr) return;
+  const daten={ wunschSitzplatz:nr, platzZugewiesenVon:(_auth&&_auth.currentUser&&_auth.currentUser.email)||'',
+                platzZugewiesenAm:Date.now(), platzBestaetigtAm:firebase.firestore.FieldValue.delete() };
+  _db.collection('globalTN').doc(tnId).update(daten)
+    .catch(err=>console.warn('[Platz] globalTN:',err&&err.message));
+  if(kursId){
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').doc(tnId).update({wunschSitzplatz:nr})
+      .catch(err=>console.warn('[Platz] Kurs-TN:',err&&err.message));
+  }
+}
+function _platzFreigeben(tnId, kursId){
+  if(!_db||!tnId) return;
+  const leer={ wunschSitzplatz:'', platzZugewiesenVon:firebase.firestore.FieldValue.delete(),
+               platzZugewiesenAm:firebase.firestore.FieldValue.delete(), platzBestaetigtAm:firebase.firestore.FieldValue.delete() };
+  _db.collection('globalTN').doc(tnId).update(leer).catch(()=>{});
+  if(kursId){
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .collection('teilnehmer').doc(tnId).update({wunschSitzplatz:''}).catch(()=>{});
+  }
+}
 function clearSeat(){
   if(!curSeat||!S.curKat||!S.curInst)return;
   const inst = S.kats[S.curKat].instances[S.curInst];
@@ -11989,6 +12075,8 @@ function clearSeat(){
     try{ _autoPlacedIds.delete(d.poolTnId); }catch(e){}
     syncGlobalTNStatus(d.poolTnId, 'clear');
   }
+  // v949: Sitz frei -> Platznummer beim TN leeren (er sitzt ja nicht mehr dort)
+  try{ if(d&&d.poolTnId) _platzFreigeben(d.poolTnId, d.poolKursId||inst.sharedKursId); }catch(e){}
   delete inst.seats[curSeat];
   persist(); renderSeats(); updBadge(); renderSidebar(); closeModal(); loadPool();
   if(d&&d.name) toast('🗑 "'+d.name+'" entfernt – 30 Tage im Papierkorb');
@@ -13350,6 +13438,7 @@ function mergeDupLocalSeat(seatId, selfId, kursId){
         poolTnId: selfId,
         poolKursId: kursId
       };
+      try{ _platzZuweisen(selfId, kursId, inst, seatId); }catch(e){}   // v949
       persist();
       renderSeats();
       // Status auf 'attending' setzen (TN ist platziert)
@@ -13594,6 +13683,7 @@ function loadPool(){
       _todayCheckinMap={};
       snap.forEach(doc=>{ const c=doc.data(); if(c&&c.tnId&&c.datum){ _todayCheckinMap[c.tnId]=c; } });
       _applyCheckinsToSeats(true);
+      try{ _pruefeRueckkehrer(kursId); }catch(e){}   // v949
     },err=>console.warn('Checkin error:',err));
     _poolUnsub = kursRef.collection('teilnehmer').orderBy('nachname').onSnapshot(snap=>{
       // ── Snapshot-Guard ──
@@ -13805,6 +13895,7 @@ function _applyPoolToSeat(seatId){
       .collection('teilnehmer').doc(_poolDragTnId)
       .update({status:'attending'}).then(()=>loadPool()).catch(()=>loadPool());
     syncGlobalTNStatus(_poolDragTnId, 'clear');
+    _platzZuweisen(_poolDragTnId, _poolDragKursId, inst, seatId);   // v949
   } else {
     loadPool();
   }
