@@ -1995,7 +1995,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v949';
+const APP_VERSION = 'v950';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2010,6 +2010,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v950', d:'15.09.2026', items:['🪑 Umsetzen im laufenden Kurs schreibt beiden Beteiligten die neue Platznummer zurück – ohne erneute Bestätigung (die gilt nur einmal je Kurs, beim ersten Check-in). AzubiPro zeigt den Wechsel als Hinweis']},
   {v:'v949', d:'14.09.2026', items:['🪑 Platzierung wirkt jetzt in beide Richtungen: Wer auf einen Sitz gesetzt wird, sieht die Nummer in AzubiPro unter „Mein Platz" und muss sie dort bestätigen. Umsetzen zieht sie mit, Sitzplatz leeren entfernt sie. Platzieren macht weiterhin NICHT anwesend','🔔 Meldet sich ein als „Nicht angetreten" eingestufter Teilnehmer per QR, erscheint ein Hinweis mit „Zurückholen" – statt ihn stillschweigend zurückzuholen']},
   {v:'v948', d:'14.09.2026', items:['🐛 Wichtiger Fix zu v947: Beim Entfernen des Knopfes „Alle automatisch platzieren" blieb ein Verweis darauf stehen. Dadurch brach der Aufbau des Pools mit einem Fehler ab – Teilnehmer fehlten im Pool und die Container „Nicht angetreten" und „Wiederholer" blieben leer']},
   {v:'v947', d:'13.09.2026', items:['🗑 Knopf „Alle automatisch platzieren" entfernt – er füllte die Plätze stur der Reihe nach auf und überschrieb damit die Wunsch-Sitzplätze der Azubis. Platziert wird per Ziehen, per Klick auf den Sitz oder automatisch über den Wunsch-Sitzplatz']},
@@ -5279,6 +5280,12 @@ function swapSeats(aId,bId){
   const b = inst.seats[bId];
   if(b === undefined){ delete inst.seats[aId]; } else { inst.seats[aId] = b; }
   if(a === undefined){ delete inst.seats[bId]; } else { inst.seats[bId] = a; }
+  // v950: beiden Beteiligten ihre neue Platznummer zurueckschreiben
+  try{
+    const kid=inst.sharedKursId;
+    if(inst.seats[aId]&&inst.seats[aId].poolTnId) _platzZuweisen(inst.seats[aId].poolTnId, inst.seats[aId].poolKursId||kid, inst, aId);
+    if(inst.seats[bId]&&inst.seats[bId].poolTnId) _platzZuweisen(inst.seats[bId].poolTnId, inst.seats[bId].poolKursId||kid, inst, bId);
+  }catch(e){}
   persist(); renderSeats();
 }
 
@@ -12008,8 +12015,10 @@ function _platzZuweisen(tnId, kursId, inst, seatId){
   if(!_db||!tnId) return;
   const nr=_sitzNummerFuer(inst, seatId);
   if(!nr) return;
+  // v950: Bestaetigung NICHT antasten - sie gilt einmal je Kurs (beim ersten Check-in).
+  // Ein Umsetzen im laufenden Kurs aendert nur die Nummer; AzubiPro zeigt den Wechsel an.
   const daten={ wunschSitzplatz:nr, platzZugewiesenVon:(_auth&&_auth.currentUser&&_auth.currentUser.email)||'',
-                platzZugewiesenAm:Date.now(), platzBestaetigtAm:firebase.firestore.FieldValue.delete() };
+                platzZugewiesenAm:Date.now() };
   _db.collection('globalTN').doc(tnId).update(daten)
     .catch(err=>console.warn('[Platz] globalTN:',err&&err.message));
   if(kursId){
