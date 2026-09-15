@@ -7511,7 +7511,11 @@ function loadKurse(){
       // v324: Hat der Ausbilder den Platz zugewiesen und ist er noch nicht bestaetigt?
       const spZug=!!(_tnData&&_tnData.platzZugewiesenAm);
       const spBest=!!(_tnData&&_tnData.platzBestaetigtAm);
+      // v325: Bestaetigen ist die Anwesenheitsmeldung - und die gibt es nur nach dem QR-Scan
+      // am Kurstag (wie bisher die Nummerneingabe). Vorher wird der zugewiesene Platz nur angezeigt.
+      const spScan=(function(){ try{ return _sitzplatzDarfStempeln(); }catch(e){ return false; } })();
       const spOffen=spZug && !spBest && !spLeer;
+      const spOffenScan=spOffen && spScan;
       const spRand=spLeer?'#ef4444':(spOffen?'#f59e0b':'rgba(37,99,235,.4)');
       const spFarbe=spLeer?'#dc2626':(spOffen?'#b45309':'#2563eb');
       html+='<div onclick="event.stopPropagation()" style="margin-top:10px;padding:12px 14px;background:#ffffff;border:2px solid '+spRand+';border-radius:10px">'
@@ -7519,12 +7523,15 @@ function loadKurse(){
         +'<span style="font-size:.78rem;font-weight:700;color:'+spFarbe+'">🪑 Mein Platz:</span>'
         +(spOffen
           ? '<span style="font-size:1.05rem;font-weight:800;color:#b45309">'+esc(spVal)+'</span>'
-            +'<button onclick="bestaetigePlatz()" style="padding:7px 14px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Platz bestätigen</button>'
+            +(spOffenScan
+              ? '<button onclick="bestaetigePlatz()" style="padding:7px 14px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif">✓ Platz bestätigen</button>'
+              : '')
           : '<input id="homeSitzplatz" type="number" min="1" value="'+esc(spVal)+'" placeholder="Nr." style="width:60px;padding:6px 8px;border:2px solid '+(spLeer?'rgba(239,68,68,.5)':'rgba(59,130,246,.3)')+';border-radius:7px;font-size:.85rem;font-weight:700;text-align:center">'
             +'<button onclick="saveHomeSitzplatz()" style="padding:6px 14px;background:var(--acc);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Sora\',sans-serif" title="Sitzplatz speichern">Speichern</button>'
             +(spVal?'<span style="font-size:.6rem;color:#10b981;font-weight:600">✓</span>':'<span style="font-size:.62rem;color:#dc2626;font-weight:700">fehlt</span>'))
         +'</div>'
-        +(spOffen?'<div style="font-size:.66rem;color:#92400e;margin-top:7px;line-height:1.45">Dieser Platz wurde dir von deinem Ausbilder zugewiesen. Bitte kurz bestätigen.</div>':'')
+        +(spOffenScan?'<div style="font-size:.66rem;color:#92400e;margin-top:7px;line-height:1.45">Dieser Platz wurde dir von deinem Ausbilder zugewiesen. Bitte bestätigen – damit bist du für heute angemeldet.</div>':'')
+        +(spOffen&&!spScan?'<div style="font-size:.66rem;color:#92400e;margin-top:7px;line-height:1.45">Dein Ausbilder hat dir diesen Platz zugewiesen. Am Kurstag: QR-Code scannen, dann hier bestätigen.</div>':'')
         +(spZug&&spBest?'<div style="font-size:.62rem;color:#059669;margin-top:6px">✓ vom Ausbilder zugewiesen und bestätigt</div>':'')
         +'</div>';
       // Meldung an Ausbilder
@@ -8045,23 +8052,27 @@ function _platzBelegtVon(kursId, nr){
 }
 function openPlatznummer(willkommen){
   const cur=(_tnData&&_tnData.wunschSitzplatz)||'';
-  const intro=willkommen
+  // v325: vom Ausbilder zugewiesen -> nur bestaetigen (oder korrigieren)
+  const zugewiesen=!!(_tnData&&_tnData.platzZugewiesenAm&&cur);
+  const intro=zugewiesen
+    ? '<div style="font-size:.78rem;color:#b45309;font-weight:700;margin-bottom:6px">Dein Ausbilder hat dir Platz '+esc(cur)+' zugewiesen</div><div style="font-size:.75rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Bitte bestätigen – damit bist du für heute angemeldet. Sitzt du woanders, trag die richtige Nummer ein.</div>'
+    : willkommen
     ? '<div style="font-size:.78rem;color:#065f46;font-weight:700;margin-bottom:6px">Willkommen im Lehrgang! 🎉</div><div style="font-size:.75rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Trag deine Platznummer ein – damit bist du für heute anwesend gemeldet. Dein Ausbilder nennt dir die Nummer.</div>'
     : '<div style="font-size:.75rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Dein Ausbilder nennt dir deine Platznummer. Trag sie hier ein.</div>';
   const inner=intro
     +'<input id="platzInput" class="fi" type="number" min="1" inputmode="numeric" placeholder="z.B. 12" value="'+esc(cur)+'" style="margin-bottom:10px;text-align:center;font-size:1.1rem;font-weight:800">'
-    +'<button onclick="savePlatznummerFromPopup()" class="btn" style="width:100%" title="Platz speichern">✓ Platz speichern</button>';
+    +'<button onclick="savePlatznummerFromPopup()" class="btn" style="width:100%" title="Platz speichern">'+(zugewiesen?'✓ Platz '+esc(cur)+' bestätigen':'✓ Platz speichern')+'</button>';
   _showSimplePopup('Meine Platznummer', inner);
   setTimeout(function(){ var i=document.getElementById('platzInput'); if(i) i.focus(); }, 100);
 }
-// v324: Zugewiesenen Platz bestaetigen
+// v325: Zugewiesenen Platz bestaetigen = Anwesenheitsmeldung. Laeuft durch dieselbe
+// Kette wie die eigene Nummerneingabe (inkl. Check-in), nur ohne Tippen.
 function bestaetigePlatz(){
   if(!_tnId){ toast('Nicht angemeldet','bad'); return; }
-  db.collection('globalTN').doc(_tnId).update({platzBestaetigtAm:Date.now()}).then(function(){
-    if(_tnData) _tnData.platzBestaetigtAm=Date.now();
-    toast('✓ Platz '+((_tnData&&_tnData.wunschSitzplatz)||'')+' bestätigt');
-    try{ loadKurse(); }catch(e){}
-  }).catch(function(e){ toast('Fehler: '+e.message,'bad'); });
+  const nr=(_tnData&&_tnData.wunschSitzplatz)||'';
+  if(!nr){ toast('Kein Platz zugewiesen','bad'); return; }
+  if(!_sitzplatzDarfStempeln()){ toast('Bitte zuerst den QR-Code des Kurses scannen','bad'); return; }
+  _savePlatznummerJetzt(nr);
 }
 function savePlatznummerFromPopup(){
   const nr=((document.getElementById('platzInput')||{}).value||'').trim();
