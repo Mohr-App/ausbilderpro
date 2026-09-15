@@ -1809,10 +1809,12 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 416';
+const APP_VERSION = 'Build 418';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 418', d:'15.09.2026', items:['📋 Anwesenheitsliste: Berufsschultage werden jetzt mit „B" markiert (gilt für den ganzen Kurs)']},
+  {v:'Build 417', d:'15.09.2026', items:['📋 Anwesenheitsliste zeigt jetzt auch Fehlgründe je Tag: K (krank), UE (unentschuldigt), E (entschuldigt) – nicht mehr nur das ✓ für Anwesenheit']},
   {v:'Build 416', d:'15.09.2026', items:['🐛 Anwesenheitsliste in VerwaltungPro meldete bei beendeten Kursen fälschlich „Keine TN im Kurs" – sie suchte über den Magneten der Teilnehmer statt über die Kurs-Teilnehmerliste. Funktioniert jetzt für laufende und beendete Kurse gleichermaßen']},
   {v:'Build 415', d:'15.09.2026', items:['🪑 Sitzplatznummer wird bei jeder Kurszuweisung geleert – sie gehört zum Kurs, nicht zur Person. So kommt in AzubiPro am ersten Tag jedes neuen Lehrgangs die Platzabfrage; hat der Ausbilder vorher schon platziert, steht die Nummer zur Bestätigung bereit']},
   {v:'Build 414', d:'14.09.2026', items:['⛔ Doppelkurse verhindert: Ein Ausbilder kann nicht zwei echte Lehrgänge im selben Zeitraum haben. Beim Anlegen erscheint eine rote Sperre – der Lehrgang lässt sich stattdessen als Entwurf speichern (wird dann nicht übertragen). Entwürfe dürfen sich überschneiden und zeigen in der Planung ein „⛔ Kollision"-Zeichen; übertragen lassen sie sich erst, wenn die Kollision weg ist']},
@@ -7572,9 +7574,17 @@ function generateAnwListe(){
       const nFP=_noteFuer(d,['noten_praxis','noten_fachpraxis'],'praxis');
       const ft=_noteFuer(d,['noten_theorie','noten_fachtheorie'],'theorie');
       let tds='';
+      // Build 417: Fehlgrund je Tag mitausgeben (K/UE/E) - kommt aus attAbsentDetails
+      // (von AusbilderPro pro Sitz/Tag gepflegt und an den Kurs-TN-Eintrag gesendet).
+      const abwMap={};
+      (d.attAbsentDetails||[]).forEach(a=>{ if(a&&a.d) abwMap[a.d]=a.typ; });
+      const _kuerzelFuer={absent_e:'E', absent_u:'UE', sick:'K'};
+      const _bsSet=new Set(kurs.berufsschultage||[]);   // gilt fuer den ganzen Kurs, nicht pro TN
       for(let c=0;c<SP;c++){
         const dt=tage[c];
-        if(dt && anw.has(t.id+'_'+dt)) tds+='<td class="c dz">✓</td>';
+        if(dt && _bsSet.has(dt)) tds+='<td class="c dz" style="font-weight:800;color:#7c3aed">B</td>';
+        else if(dt && anw.has(t.id+'_'+dt)) tds+='<td class="c dz">✓</td>';
+        else if(dt && abwMap[dt]) tds+='<td class="c dz" style="font-weight:800;color:#b91c1c">'+(_kuerzelFuer[abwMap[dt]]||'')+'</td>';
         else tds+='<td class="c dz"><span'+ED+'>&nbsp;</span></td>';
       }
       return '<tr>'
