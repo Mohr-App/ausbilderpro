@@ -1995,7 +1995,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v950';
+const APP_VERSION = 'v951';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2010,6 +2010,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v951', d:'15.09.2026', items:['🐛 Wichtiger Fix: Tagesdetails zu Krank/Entschuldigt/Unentschuldigt/Verspätung wurden bisher nur über einen mobilen Zeitgeber synchronisiert, nie über den normalen Speicherweg. Dadurch fehlten Fehlgründe in der VerwaltungPro-Anwesenheitsliste, obwohl lokal korrekt erfasst. Jetzt schreibt jeder Speichervorgang die Details mit']},
   {v:'v950', d:'15.09.2026', items:['🪑 Umsetzen im laufenden Kurs schreibt beiden Beteiligten die neue Platznummer zurück – ohne erneute Bestätigung (die gilt nur einmal je Kurs, beim ersten Check-in). AzubiPro zeigt den Wechsel als Hinweis']},
   {v:'v949', d:'14.09.2026', items:['🪑 Platzierung wirkt jetzt in beide Richtungen: Wer auf einen Sitz gesetzt wird, sieht die Nummer in AzubiPro unter „Mein Platz" und muss sie dort bestätigen. Umsetzen zieht sie mit, Sitzplatz leeren entfernt sie. Platzieren macht weiterhin NICHT anwesend','🔔 Meldet sich ein als „Nicht angetreten" eingestufter Teilnehmer per QR, erscheint ein Hinweis mit „Zurückholen" – statt ihn stillschweigend zurückzuholen']},
   {v:'v948', d:'14.09.2026', items:['🐛 Wichtiger Fix zu v947: Beim Entfernen des Knopfes „Alle automatisch platzieren" blieb ein Verweis darauf stehen. Dadurch brach der Aufbau des Pools mit einem Fehler ab – Teilnehmer fehlten im Pool und die Container „Nicht angetreten" und „Wiederholer" blieben leer']},
@@ -7345,6 +7346,19 @@ function syncAttendanceToFirestore(seatId){
     syncData.attSick=sick; syncData.attBerufsschule=berufsschule;
     syncData.attLate=late; syncData.attEarly=early;
     syncData.attPercent=attPercent;
+    // v951: Tagesdetails (welcher Tag krank/entschuldigt/unentschuldigt/verspaetet) bisher
+    // NUR von syncMobileAttToFirestore berechnet, die ausschliesslich ueber einen mobilen
+    // Zeitgeber laeuft. Der normale, ueberall genutzte Sync-Weg schrieb sie nie mit - daher
+    // fehlten Fehlgruende in der VP-Anwesenheitsliste trotz korrekt lokal erfasster Daten.
+    const _bsSyncD=_bsDates(inst, seatAtt);
+    syncData.attLateDetails=(seatAtt||[])
+      .filter(e=>e&&e.type==='present'&&(parseInt(e.lateMins)||0)>0)
+      .map(e=>({t:_kurstagNr(inst,e.date,_bsSyncD)||0, d:String(e.date||''), m:parseInt(e.lateMins)||0}))
+      .sort((a,b)=>(a.d||'').localeCompare(b.d||''));
+    syncData.attAbsentDetails=(seatAtt||[])
+      .filter(e=>e&&(e.type==='absent_e'||e.type==='absent_u'||e.type==='sick'))
+      .map(e=>({t:_kurstagNr(inst,e.date,_bsSyncD)||0, d:String(e.date||''), typ:String(e.type)}))
+      .sort((a,b)=>(a.d||'').localeCompare(b.d||''));
   }
   _db.collection('shared').doc('kurse').collection('list').doc(kursId)
     .collection('teilnehmer').doc(tnId).set(syncData,{merge:true}).catch(err=>console.warn('Sync error:',err));
