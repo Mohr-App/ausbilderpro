@@ -1864,15 +1864,12 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <div class="tp-section-hd">📊 Notenübersicht</div>
           <p style="font-size:.73rem;color:var(--mu);margin-bottom:12px">Note: 1 = sehr gut &nbsp;·&nbsp; 6 = ungenügend</p>
           <div id="gradesFields"></div>
-          <div class="fg" style="margin-top:12px"><label class="fl" style="color:#2563eb">💬 Besondere Bemerkungen</label><textarea class="fi ni" id="iBemerkung" placeholder="Erscheint auf der Teilnahmebescheinigung – und in der Kurshistorie für andere Ausbilder…" style="border-color:rgba(37,99,235,.25);background:rgba(37,99,235,.03)"></textarea><div style="font-size:.66rem;color:var(--mu);margin-top:4px;line-height:1.4">Achtung: Dieser Text wird auf der Teilnahmebescheinigung <b>gedruckt</b> und ist zugleich in der Kurshistorie für andere Ausbilder sichtbar. Für rein private Notizen den Punkt „Notiz (privat, nur für dich)" im Reiter Person nutzen.</div></div>
-          <div class="fg" style="margin-top:12px"><label class="fl" style="color:#059669">📋 Bemerkung für Anwesenheitsliste</label><textarea class="fi ni" id="iBemerkungAnwListe" placeholder="Wird bei der VerwaltungPro-Anwesenheitsliste unter „Bemerkung" eingefügt" style="border-color:rgba(5,150,105,.25);background:rgba(5,150,105,.03)"></textarea><div style="font-size:.66rem;color:var(--mu);margin-top:4px;line-height:1.4">Eigenständiges Feld – unabhängig von „Besondere Bemerkungen" oben. Erscheint NICHT auf der Bescheinigung, sondern ausschließlich in der Anwesenheitsliste, die die Verwaltung druckt.</div></div>
-        </div>
-        <div class="tp-section">
-          <div class="tp-section-hd">➕ Eigene Notenart</div>
-          <div style="display:flex;gap:7px">
+          <div style="display:flex;gap:7px;margin-top:12px">
             <input class="fi" type="text" id="newGradeName" placeholder="Neuer Notenname…" style="flex:1;font-size:.8rem;padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:7px;" onkeydown="if(event.key==='Enter')addCustomGrade()">
             <button class="katml-add" title="Eigene Notenart hinzufügen" onclick="addCustomGrade()" style="padding:7px 12px;font-size:.8rem;">+ Hinzufügen</button>
           </div>
+          <div class="fg" style="margin-top:16px"><label class="fl" style="color:#2563eb">💬 Besondere Bemerkungen</label><textarea class="fi ni" id="iBemerkung" placeholder="Erscheint auf der Teilnahmebescheinigung – und in der Kurshistorie für andere Ausbilder…" style="border-color:rgba(37,99,235,.25);background:rgba(37,99,235,.03)"></textarea><div style="font-size:.66rem;color:var(--mu);margin-top:4px;line-height:1.4">Achtung: Dieser Text wird auf der Teilnahmebescheinigung <b>gedruckt</b> und ist zugleich in der Kurshistorie für andere Ausbilder sichtbar. Für rein private Notizen den Punkt „Notiz (privat, nur für dich)" im Reiter Person nutzen.</div></div>
+          <div class="fg" style="margin-top:12px"><label class="fl" style="color:#059669">📋 Bemerkung für Anwesenheitsliste</label><textarea class="fi ni" id="iBemerkungAnwListe" maxlength="60" oninput="_bemAnwListeCount()" placeholder="Kurzer Hinweis – passt in eine Druckzeile" style="border-color:rgba(5,150,105,.25);background:rgba(5,150,105,.03);font-size:.74rem"></textarea><div style="display:flex;justify-content:space-between;font-size:.62rem;color:var(--mu);margin-top:4px;line-height:1.4"><span>Eigenständig – erscheint NICHT auf der Bescheinigung, nur in der Anwesenheitsliste (eine Druckzeile, daher kurz halten).</span><span id="bemAnwListeCount" style="flex-shrink:0;margin-left:8px;font-weight:700">0/60</span></div></div>
         </div>
         <div class="tp-section">
           <div class="tp-section-hd">👁 Vorschau</div>
@@ -1996,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v953';
+const APP_VERSION = 'v954';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2011,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v954', d:'15.09.2026', items:['📊 „Eigene Notenart" steht jetzt direkt unter den vorhandenen Noten statt weiter unten. Die Bemerkung für die Anwesenheitsliste ist auf 60 Zeichen begrenzt (eine Druckzeile), mit Zähler']},
   {v:'v953', d:'15.09.2026', items:['📋 Neues, eigenständiges Feld im Noten-Reiter: „Bemerkung für Anwesenheitsliste" – unabhängig von „Besondere Bemerkungen" (die weiterhin nur auf der Bescheinigung erscheinen). Wird an die VerwaltungPro-Anwesenheitsliste übertragen']},
   {v:'v952', d:'15.09.2026', items:['💬 Hinweis bei „Besondere Bemerkungen" ergänzt: erscheint jetzt auch in der VerwaltungPro-Anwesenheitsliste']},
   {v:'v951', d:'15.09.2026', items:['🐛 Wichtiger Fix: Tagesdetails zu Krank/Entschuldigt/Unentschuldigt/Verspätung wurden bisher nur über einen mobilen Zeitgeber synchronisiert, nie über den normalen Speicherweg. Dadurch fehlten Fehlgründe in der VerwaltungPro-Anwesenheitsliste, obwohl lokal korrekt erfasst. Jetzt schreibt jeder Speichervorgang die Details mit']},
@@ -5962,6 +5960,7 @@ function openModal(id){
   document.getElementById('iCo').value=d.company||'';
   { const _ag=document.getElementById('iAgEmail'); if(_ag) _ag.value=d.agEmail||''; }
   { const _bal=document.getElementById('iBemerkungAnwListe'); if(_bal) _bal.value=d.bemerkungAnwListe||''; }
+  try{ _bemAnwListeCount(); }catch(e){}
   // E-Mail + Telefon werden gleich async aus globalTN gefuellt (sobald geladen) - erstmal leer
   document.getElementById('iEmail').value='';
   document.getElementById('iTelefon').value='';
@@ -6422,6 +6421,14 @@ function renderGradesTab(d){
   updGrades();
 }
 
+// v954: Zeichenzaehler fuer die Anwesenheitslisten-Bemerkung (eine Druckzeile)
+function _bemAnwListeCount(){
+  const el=document.getElementById('iBemerkungAnwListe'); const c=document.getElementById('bemAnwListeCount');
+  if(!el||!c) return;
+  const n=(el.value||'').length;
+  c.textContent=n+'/60';
+  c.style.color = n>=60 ? '#dc2626' : n>=50 ? '#d97706' : '#94a3b8';
+}
 function addCustomGrade(){
   const inst=curInst(); if(!inst)return;
   const inp=document.getElementById('newGradeName');
