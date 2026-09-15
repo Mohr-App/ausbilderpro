@@ -1221,7 +1221,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v328'; // v327: wird kuenftig bei jedem Deploy automatisch mit sw-azubi.js gleichgezogen
+const AZUBI_VERSION='v329'; // v327: wird kuenftig bei jedem Deploy automatisch mit sw-azubi.js gleichgezogen
 // v322: enablePersistence kann in Browsern ohne Speicherzugriff auch SYNCHRON werfen
 try{ db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code||e.message)); }
 catch(e){ console.warn('Offline-Cache nicht verfügbar:', e&&e.message); }
@@ -1402,6 +1402,7 @@ function findTN(email){
       _tnId=doc.id; _tnData=doc.data();
       try{ _syncEmailStatus(); }catch(e){}
       try{ setTimeout(_magnetNachDatum, 1200); }catch(e){}
+      try{ setTimeout(_platzWechselPruefen, 1500); }catch(e){}
       return true;
     }
     // 2) Fallback: Suche über E-Mail (z.B. Bestand-TN vor erster Verknüpfung)
@@ -3733,7 +3734,7 @@ function _refreshAuthStatusOnReturn(){
   _lastAuthRefresh=now;
   u.reload().then(()=>{ try{ _syncEmailStatus(); }catch(e){} try{ refreshEmailHint(); }catch(e){} }).catch(()=>{});
 }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ _refreshAuthStatusOnReturn(); try{ _magnetNachDatum(); }catch(e){} } });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ _refreshAuthStatusOnReturn(); try{ _magnetNachDatum(); }catch(e){} try{ _platzWechselPruefen(); }catch(e){} } });
 window.addEventListener('focus', _refreshAuthStatusOnReturn);
 
 function checkSitzplatzPopup(){
@@ -7510,14 +7511,8 @@ function loadKurse(){
       // Sitzplatz-Feld immer anzeigen
       const spVal=_tnData?.wunschSitzplatz||'';
       const spLeer=!String(spVal).trim();
-      // v328: Sitzplatzwechsel anzeigen - Nummer weicht von der zuletzt gesehenen ab
-      let spWechsel=false;
-      try{
-        const key='azPlatzGesehen_'+(_tnData?.aktiverKursId||'');
-        const gesehen=localStorage.getItem(key)||'';
-        if(spVal && gesehen && gesehen!==String(spVal) && _tnData?.platzBestaetigtAm) spWechsel=true;
-        if(spVal) localStorage.setItem(key, String(spVal));
-      }catch(e){}
+      // v329: Sitzplatzwechsel wird als Popup gezeigt (_platzWechselPruefen), nicht in der Karte
+      const spWechsel=false;
       // v324: Hat der Ausbilder den Platz zugewiesen und ist er noch nicht bestaetigt?
       const spZug=!!(_tnData&&_tnData.platzZugewiesenAm);
       const spBest=!!(_tnData&&_tnData.platzBestaetigtAm);
@@ -7542,8 +7537,7 @@ function loadKurse(){
         +'</div>'
         +(spOffenScan?'<div style="font-size:.66rem;color:#92400e;margin-top:7px;line-height:1.45">Dieser Platz wurde dir von deinem Ausbilder zugewiesen. Bitte bestätigen – damit bist du für heute angemeldet.</div>':'')
         +(spOffen&&!spScan?'<div style="font-size:.66rem;color:#92400e;margin-top:7px;line-height:1.45">Dein Ausbilder hat dir diesen Platz zugewiesen. Am Kurstag: QR-Code scannen, dann hier bestätigen.</div>':'')
-        +(spWechsel?'<div style="font-size:.72rem;font-weight:700;color:#b45309;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:7px;padding:7px 9px;margin-top:8px">🪑 Sitzplatzwechsel: Dein neuer Platz ist <b>'+esc(spVal)+'</b></div>':'')
-        +(spZug&&spBest&&!spWechsel?'<div style="font-size:.62rem;color:#059669;margin-top:6px">✓ vom Ausbilder zugewiesen und bestätigt</div>':'')
+        +(spZug&&spBest?'<div style="font-size:.62rem;color:#059669;margin-top:6px">✓ vom Ausbilder zugewiesen und bestätigt</div>':'')
         +'</div>';
       // Meldung an Ausbilder
       html+='<div onclick="event.stopPropagation()" style="margin-top:10px;padding:12px 14px;background:#ffffff;border:2px solid rgba(37,99,235,.4);border-radius:10px">'
@@ -8072,6 +8066,26 @@ function _platzNachCheckin(){
     const bestaetigt=!!_tnData.platzBestaetigtAm;
     if(nr && bestaetigt) return;                       // alles erledigt
     setTimeout(function(){ try{ openPlatznummer(!nr); }catch(e){} }, 600);
+  }catch(e){}
+}
+
+// v329: Sitzplatzwechsel im laufenden Kurs -> Popup "Dein neuer Platz ist X" (nur OK).
+// Greift, sobald die Nummer von der zuletzt gesehenen abweicht. Keine Bestaetigung noetig -
+// die gilt nur einmal je Kurs beim ersten Check-in.
+function _platzWechselPruefen(){
+  try{
+    if(!_tnData||!_tnData.aktiverKursId) return;
+    const nr=String(_tnData.wunschSitzplatz||'').trim();
+    const key='azPlatzGesehen_'+_tnData.aktiverKursId;
+    const gesehen=localStorage.getItem(key)||'';
+    if(nr) localStorage.setItem(key, nr);
+    if(!nr||!gesehen||gesehen===nr) return;          // erster Stand oder unveraendert
+    if(window._platzWechselGezeigt===nr) return;
+    window._platzWechselGezeigt=nr;
+    const inner='<div style="font-size:1.6rem;font-weight:800;color:#b45309;text-align:center;margin:6px 0 10px">Platz '+esc(nr)+'</div>'
+      +'<div style="font-size:.78rem;color:var(--mu);text-align:center;margin-bottom:14px;line-height:1.5">Dein Ausbilder hat dich umgesetzt. Bitte ab jetzt an diesem Platz sitzen.</div>'
+      +'<button onclick="_closeSimplePopup()" class="btn" style="width:100%">OK</button>';
+    setTimeout(function(){ _showSimplePopup('🪑 Sitzplatzwechsel', inner); }, 500);
   }catch(e){}
 }
 function openPlatznummer(willkommen){
