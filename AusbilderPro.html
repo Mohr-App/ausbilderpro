@@ -1865,6 +1865,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
           <p style="font-size:.73rem;color:var(--mu);margin-bottom:12px">Note: 1 = sehr gut &nbsp;·&nbsp; 6 = ungenügend</p>
           <div id="gradesFields"></div>
           <div class="fg" style="margin-top:12px"><label class="fl" style="color:#2563eb">💬 Besondere Bemerkungen</label><textarea class="fi ni" id="iBemerkung" placeholder="Erscheint auf der Teilnahmebescheinigung – und in der Kurshistorie für andere Ausbilder…" style="border-color:rgba(37,99,235,.25);background:rgba(37,99,235,.03)"></textarea><div style="font-size:.66rem;color:var(--mu);margin-top:4px;line-height:1.4">Achtung: Dieser Text wird auf der Teilnahmebescheinigung <b>gedruckt</b> und ist zugleich in der Kurshistorie für andere Ausbilder sichtbar. Für rein private Notizen den Punkt „Notiz (privat, nur für dich)" im Reiter Person nutzen.</div></div>
+          <div class="fg" style="margin-top:12px"><label class="fl" style="color:#059669">📋 Bemerkung für Anwesenheitsliste</label><textarea class="fi ni" id="iBemerkungAnwListe" placeholder="Wird bei der VerwaltungPro-Anwesenheitsliste unter „Bemerkung" eingefügt" style="border-color:rgba(5,150,105,.25);background:rgba(5,150,105,.03)"></textarea><div style="font-size:.66rem;color:var(--mu);margin-top:4px;line-height:1.4">Eigenständiges Feld – unabhängig von „Besondere Bemerkungen" oben. Erscheint NICHT auf der Bescheinigung, sondern ausschließlich in der Anwesenheitsliste, die die Verwaltung druckt.</div></div>
         </div>
         <div class="tp-section">
           <div class="tp-section-hd">➕ Eigene Notenart</div>
@@ -1995,7 +1996,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v951';
+const APP_VERSION = 'v953';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2010,6 +2011,8 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v953', d:'15.09.2026', items:['📋 Neues, eigenständiges Feld im Noten-Reiter: „Bemerkung für Anwesenheitsliste" – unabhängig von „Besondere Bemerkungen" (die weiterhin nur auf der Bescheinigung erscheinen). Wird an die VerwaltungPro-Anwesenheitsliste übertragen']},
+  {v:'v952', d:'15.09.2026', items:['💬 Hinweis bei „Besondere Bemerkungen" ergänzt: erscheint jetzt auch in der VerwaltungPro-Anwesenheitsliste']},
   {v:'v951', d:'15.09.2026', items:['🐛 Wichtiger Fix: Tagesdetails zu Krank/Entschuldigt/Unentschuldigt/Verspätung wurden bisher nur über einen mobilen Zeitgeber synchronisiert, nie über den normalen Speicherweg. Dadurch fehlten Fehlgründe in der VerwaltungPro-Anwesenheitsliste, obwohl lokal korrekt erfasst. Jetzt schreibt jeder Speichervorgang die Details mit']},
   {v:'v950', d:'15.09.2026', items:['🪑 Umsetzen im laufenden Kurs schreibt beiden Beteiligten die neue Platznummer zurück – ohne erneute Bestätigung (die gilt nur einmal je Kurs, beim ersten Check-in). AzubiPro zeigt den Wechsel als Hinweis']},
   {v:'v949', d:'14.09.2026', items:['🪑 Platzierung wirkt jetzt in beide Richtungen: Wer auf einen Sitz gesetzt wird, sieht die Nummer in AzubiPro unter „Mein Platz" und muss sie dort bestätigen. Umsetzen zieht sie mit, Sitzplatz leeren entfernt sie. Platzieren macht weiterhin NICHT anwesend','🔔 Meldet sich ein als „Nicht angetreten" eingestufter Teilnehmer per QR, erscheint ein Hinweis mit „Zurückholen" – statt ihn stillschweigend zurückzuholen']},
@@ -5824,7 +5827,7 @@ function openModal(id){
     el.style.cursor=sperrePerson?'not-allowed':'';
   });
   // Snapshot für Dirty-Check
-  _modalSnapshot={name:d.name||'',company:d.company||'',agEmail:d.agEmail||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',geburtsdatum:'',attLen:(d.attendance||[]).length};
+  _modalSnapshot={name:d.name||'',company:d.company||'',agEmail:d.agEmail||'',profession:d.profession||'',ausbjahr:d.ausbjahr||'',note:d.note||'',bemerkung:d.bemerkung||'',bemerkungAnwListe:d.bemerkungAnwListe||'',geburtsdatum:'',attLen:(d.attendance||[]).length};
   const inst_=curInst();
   const seatLabel=(inst_&&inst_.seatLabels&&inst_.seatLabels[id]!=null&&inst_.seatLabels[id]!=='')?inst_.seatLabels[id]:null;
   // Titel-Zusammensetzung: "Sitzplatz 5 (Ma. Mu.)" wenn belegt, sonst nur "Sitzplatz 5"
@@ -5958,6 +5961,7 @@ function openModal(id){
   document.getElementById('iName').value=d.name||'';
   document.getElementById('iCo').value=d.company||'';
   { const _ag=document.getElementById('iAgEmail'); if(_ag) _ag.value=d.agEmail||''; }
+  { const _bal=document.getElementById('iBemerkungAnwListe'); if(_bal) _bal.value=d.bemerkungAnwListe||''; }
   // E-Mail + Telefon werden gleich async aus globalTN gefuellt (sobald geladen) - erstmal leer
   document.getElementById('iEmail').value='';
   document.getElementById('iTelefon').value='';
@@ -6983,6 +6987,7 @@ function saveSeat(){ if(lockGuard())return;
     note:document.getElementById('iNote').value.trim(),
     bemerkung:document.getElementById('iBemerkung').value.trim(),
     photo:_tmpPhoto!==undefined ? _tmpPhoto : (oldSeat.photo||null),
+    bemerkungAnwListe:(document.getElementById('iBemerkungAnwListe')?.value||'').trim(),
     mitarbeit:fixed.mitarbeit,
     fuehrung:fixed.fuehrung,
     praxis:fixed.praxis,
@@ -7338,7 +7343,8 @@ function syncAttendanceToFirestore(seatId){
     werkzeugStatus:d.werkzeugStatus||'',
     werkzeugFehlt:d.werkzeugFehlt||'',
     bemerkung:d.bemerkung||'',
-    bemerkungVon:d.bemerkung?(_auth?.currentUser?.email?.split('@')[0]||''):''
+    bemerkungVon:d.bemerkung?(_auth?.currentUser?.email?.split('@')[0]||''):'',
+    bemerkungAnwListe:d.bemerkungAnwListe||''
   };
   if(total){
     syncData.attTotal=total; syncData.attPresent=present;
