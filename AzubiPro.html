@@ -4892,6 +4892,7 @@ function _tryQRCheckin(){
           ts:Date.now()
         }).then(()=>{
           _checkinBanner('ok','✓ Eingecheckt um '+zeit+' Uhr – dein Ausbilder sieht deine Anwesenheit.'); try{ loadCheckinHistory(); }catch(e){}
+          _platzNachCheckin();   // v326
         }).catch(e=>{ _handleCheckinError(e, ciRef); });
         return;
       }
@@ -4909,6 +4910,7 @@ function _tryQRCheckin(){
           ts:Date.now()
         }).then(()=>{
           _checkinBanner('ok','✓ Eingecheckt um '+zeit+' Uhr – dein Ausbilder sieht deine Anwesenheit.'); try{ loadCheckinHistory(); }catch(e){}
+          _platzNachCheckin();   // v326
         }).catch(e=>{
           _handleCheckinError(e, ciRef);
         });
@@ -8049,6 +8051,19 @@ function _platzBelegtVon(kursId, nr){
       return null;
     })
     .catch(function(){ return null; });
+}
+
+// v326: Nach dem QR-Check-in die Platzabfrage oeffnen - solange keine Nummer da ist oder
+// die zugewiesene noch nicht bestaetigt wurde. Nach Umsetzen durch den Ausbilder wird die
+// Bestaetigung zurueckgesetzt (platzBestaetigtAm geloescht) -> Popup kommt wieder.
+function _platzNachCheckin(){
+  try{
+    if(!_tnData) return;
+    const nr=String(_tnData.wunschSitzplatz||'').trim();
+    const bestaetigt=!!_tnData.platzBestaetigtAm;
+    if(nr && bestaetigt) return;                       // alles erledigt
+    setTimeout(function(){ try{ openPlatznummer(!nr); }catch(e){} }, 600);
+  }catch(e){}
 }
 function openPlatznummer(willkommen){
   const cur=(_tnData&&_tnData.wunschSitzplatz)||'';

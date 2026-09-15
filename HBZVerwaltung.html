@@ -1809,10 +1809,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 414';
+const APP_VERSION = 'Build 415';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 415', d:'15.09.2026', items:['🪑 Sitzplatznummer wird bei jeder Kurszuweisung geleert – sie gehört zum Kurs, nicht zur Person. So kommt in AzubiPro am ersten Tag jedes neuen Lehrgangs die Platzabfrage; hat der Ausbilder vorher schon platziert, steht die Nummer zur Bestätigung bereit']},
   {v:'Build 414', d:'14.09.2026', items:['⛔ Doppelkurse verhindert: Ein Ausbilder kann nicht zwei echte Lehrgänge im selben Zeitraum haben. Beim Anlegen erscheint eine rote Sperre – der Lehrgang lässt sich stattdessen als Entwurf speichern (wird dann nicht übertragen). Entwürfe dürfen sich überschneiden und zeigen in der Planung ein „⛔ Kollision"-Zeichen; übertragen lassen sie sich erst, wenn die Kollision weg ist']},
   {v:'Build 413', d:'13.09.2026', items:['↩️ Handy-Ansicht zurückgenommen: VerwaltungPro zeigt auf dem Handy wieder die verkleinerte PC-Ansicht (fester 1280px-Viewport) wie zuvor. Geblieben: Ladebildschirm beim Start und robustere Anmeldeprüfung']},
   {v:'Build 412', d:'13.09.2026', items:['📱 Handy-Layout strukturell bereinigt: nur noch das Fenster scrollt (statt Hauptbereich und jede Karte einzeln) – behebt weiße Flächen beim Scrollen und verschwindende Leisten auf Android. Kopfzeile fest oben. PC unverändert']},
@@ -8743,6 +8744,17 @@ function statusClearDecision(tn, neuerKurs){
   return result;
 }
 
+
+// ════════════════════════════════════════════════
+//  Build 415: Die Sitzplatznummer gehoert zum Kurs, nicht zur Person. Bei jeder Zuweisung
+//  in einen (neuen) Kurs wird sie samt Bestaetigung geleert - sonst zoege eine Nummer aus
+//  dem Vorkurs mit und AzubiPro wuerde am ersten Kurstag keine Platzabfrage zeigen.
+//  Was der Ausbilder DANACH zuweist, bleibt selbstverstaendlich stehen.
+// ════════════════════════════════════════════════
+function vpPlatzReset(){
+  const del=firebase.firestore.FieldValue.delete();
+  return { wunschSitzplatz:'', platzZugewiesenVon:del, platzZugewiesenAm:del, platzBestaetigtAm:del };
+}
 function dropTNIntoKurs(e){
   e.preventDefault();
   const dz=document.getElementById('kursTNDropZone');if(dz)dz.classList.remove('drop-active');
@@ -8770,7 +8782,7 @@ function dropTNIntoKurs(e){
   // Beim Hinzufügen zu neuem Kurs: alte Status-Marker nur entfernen wenn der TN
   // jetzt den GLEICHEN Lehrgang wiederholt für den der Status gesetzt wurde.
   const decision=statusClearDecision(tn, kurs);
-  const tnUpdate={ aktiverKursId:kursId };
+  const tnUpdate={ aktiverKursId:kursId, ...vpPlatzReset() };
   if(!_histSchonDrin(tn,kursId,vonD,bisD)) tnUpdate.kursHistory=firebase.firestore.FieldValue.arrayUnion(histEntry);
   if(decision.clearStatus) tnUpdate.status=firebase.firestore.FieldValue.delete();
   if(decision.clearWiederholer) tnUpdate.wiederholer=firebase.firestore.FieldValue.delete();
@@ -10870,7 +10882,7 @@ function kliUebernehmen(){
     const vonLi=kurs?.von||new Date().toISOString().slice(0,10), bisLi=kurs?.bis||'';
     okRows.forEach(r=>{
       const tn=r.tn;
-      const upd={aktiverKursId:kursId};
+      const upd={aktiverKursId:kursId, ...vpPlatzReset()};
       if(!_histSchonDrin(tn,kursId,vonLi,bisLi)) upd.kursHistory=firebase.firestore.FieldValue.arrayUnion({kursId, kursName:kurs?.name||'', von:vonLi, bis:bisLi, ausbilderName:kurs?.ausbilderName||'', lehrgangsartId:kurs?.lehrgangsartId||'', addedAt:Date.now()});
       db.collection('globalTN').doc(tn.id).update(upd).catch(()=>{});
       db.collection('shared').doc('kurse').collection('list').doc(kursId)
@@ -11028,7 +11040,7 @@ function pickTNForKurs(tnId){
   // Direkt in Firestore zuweisen
   const kurs=_kurse.find(k=>k.id===kursId);
   const vonPk=kurs?.von||new Date().toISOString().slice(0,10), bisPk=kurs?.bis||'';
-  const updPk={aktiverKursId: kursId};
+  const updPk={aktiverKursId: kursId, ...vpPlatzReset()};
   if(!_histSchonDrin(tn,kursId,vonPk,bisPk)) updPk.kursHistory=firebase.firestore.FieldValue.arrayUnion({kursId, kursName:kurs?.name||'', von:vonPk, bis:bisPk, ausbilderName:kurs?.ausbilderName||'', lehrgangsartId:kurs?.lehrgangsartId||'', addedAt:Date.now()});
   db.collection('globalTN').doc(tnId).update(updPk);
   db.collection('shared').doc('kurse').collection('list').doc(kursId)
@@ -11326,7 +11338,7 @@ function transferEntwurf(kursId){
     const markedHist=markOldHistoryAbsent(tn, tn.aktiverKursId);
     const basisHist=markedHist||tn.kursHistory||[];
     const schonDrin=basisHist.some(h=>h&&h.kursId===kursId&&h.von===k.von&&h.bis===k.bis);
-    const tnUpdate={aktiverKursId:kursId, entwurfKursId:firebase.firestore.FieldValue.delete()};
+    const tnUpdate={aktiverKursId:kursId, entwurfKursId:firebase.firestore.FieldValue.delete(), ...vpPlatzReset()};
     if(schonDrin){ if(markedHist) tnUpdate.kursHistory=markedHist; }
     else { tnUpdate.kursHistory = markedHist ? markedHist.concat([histEntry]) : firebase.firestore.FieldValue.arrayUnion(histEntry); }
     if(tn.status) tnUpdate.status=firebase.firestore.FieldValue.delete();
@@ -11389,7 +11401,7 @@ async function transferAlleEntwuerfe(){
         const markedHist=markOldHistoryAbsent(tn, tn.aktiverKursId);
         const basisHist5=markedHist||tn.kursHistory||[];
         const schonDrin5=basisHist5.some(h=>h&&h.kursId===k.id&&h.von===k.von&&h.bis===k.bis);
-        const tnUpdate={aktiverKursId:k.id,entwurfKursId:firebase.firestore.FieldValue.delete()};
+        const tnUpdate={aktiverKursId:k.id,entwurfKursId:firebase.firestore.FieldValue.delete(), ...vpPlatzReset()};
         if(schonDrin5){ if(markedHist) tnUpdate.kursHistory=markedHist; }
         else { tnUpdate.kursHistory = markedHist ? markedHist.concat([histEntry]) : firebase.firestore.FieldValue.arrayUnion(histEntry); }
         if(tn.status) tnUpdate.status=firebase.firestore.FieldValue.delete();
@@ -11504,7 +11516,7 @@ function bldUebertragen(){
         const markedHist=markOldHistoryAbsent(tn, tn.aktiverKursId);
         const basisHist6=markedHist||tn.kursHistory||[];
         const schonDrin6=basisHist6.some(h=>h&&h.kursId===kursId&&h.von===von&&h.bis===bis);
-        const tnUpdate = { aktiverKursId: kursId };
+        const tnUpdate = { aktiverKursId: kursId, ...vpPlatzReset() };
         if(schonDrin6){ if(markedHist) tnUpdate.kursHistory=markedHist; }
         else { tnUpdate.kursHistory = markedHist ? markedHist.concat([histEntry]) : firebase.firestore.FieldValue.arrayUnion(histEntry); }
         if(tn.status) tnUpdate.status = firebase.firestore.FieldValue.delete();
