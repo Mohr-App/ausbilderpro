@@ -1221,7 +1221,7 @@ const auth=firebase.auth();
 auth.languageCode='de';
 const _acs={ url:'https://ausbilderpro.de/AzubiPro.html', handleCodeInApp:false };
 const db=firebase.firestore();
-const AZUBI_VERSION='v331'; // v327: wird kuenftig bei jedem Deploy automatisch mit sw-azubi.js gleichgezogen
+const AZUBI_VERSION='v332'; // v327: wird kuenftig bei jedem Deploy automatisch mit sw-azubi.js gleichgezogen
 // v322: enablePersistence kann in Browsern ohne Speicherzugriff auch SYNCHRON werfen
 try{ db.enablePersistence({synchronizeTabs:false}).catch(e=>console.warn('Offline-Cache:',e.code||e.message)); }
 catch(e){ console.warn('Offline-Cache nicht verfügbar:', e&&e.message); }
@@ -8098,11 +8098,14 @@ function openPlatznummer(willkommen){
     : willkommen
     ? '<div style="font-size:.78rem;color:#065f46;font-weight:700;margin-bottom:6px">Willkommen im Lehrgang! 🎉</div><div style="font-size:.75rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Trag deine Platznummer ein – damit bist du für heute anwesend gemeldet. Dein Ausbilder nennt dir die Nummer.</div>'
     : '<div style="font-size:.75rem;color:var(--mu);margin-bottom:10px;line-height:1.5">Dein Ausbilder nennt dir deine Platznummer. Trag sie hier ein.</div>';
+  // v332: zugewiesen -> keine Eingabe mehr, nur Anzeige + Bestaetigen (wie das Startfeld)
   const inner=intro
-    +'<input id="platzInput" class="fi" type="number" min="1" inputmode="numeric" placeholder="z.B. 12" value="'+esc(cur)+'" style="margin-bottom:10px;text-align:center;font-size:1.1rem;font-weight:800">'
+    +(zugewiesen
+      ? '<div style="font-size:2rem;font-weight:800;color:#b45309;text-align:center;margin:4px 0 14px">'+esc(cur)+'</div>'
+      : '<input id="platzInput" class="fi" type="number" min="1" inputmode="numeric" placeholder="z.B. 12" value="'+esc(cur)+'" style="margin-bottom:10px;text-align:center;font-size:1.1rem;font-weight:800">')
     +'<button onclick="savePlatznummerFromPopup()" class="btn" style="width:100%" title="Platz speichern">'+(zugewiesen?'✓ Platz '+esc(cur)+' bestätigen':'✓ Platz speichern')+'</button>';
   _showSimplePopup('Meine Platznummer', inner);
-  setTimeout(function(){ var i=document.getElementById('platzInput'); if(i) i.focus(); }, 100);
+  if(!zugewiesen) setTimeout(function(){ var i=document.getElementById('platzInput'); if(i) i.focus(); }, 100);
 }
 // v325: Zugewiesenen Platz bestaetigen = Anwesenheitsmeldung. Laeuft durch dieselbe
 // Kette wie die eigene Nummerneingabe (inkl. Check-in), nur ohne Tippen.
@@ -8114,7 +8117,9 @@ function bestaetigePlatz(){
   _savePlatznummerJetzt(nr);
 }
 function savePlatznummerFromPopup(){
-  const nr=((document.getElementById('platzInput')||{}).value||'').trim();
+  // v332: bei zugewiesenem Platz gibt es kein Eingabefeld mehr - dann gilt die aktuelle Nummer
+  const feld=document.getElementById('platzInput');
+  const nr=feld?feld.value.trim():String((_tnData&&_tnData.wunschSitzplatz)||'').trim();
   if(!nr){ toast('Bitte Platznummer eingeben','bad'); return; }
   if(!_tnId){ toast('Nicht angemeldet','bad'); return; }
   // v324: erst pruefen, ob der Platz schon vergeben ist
