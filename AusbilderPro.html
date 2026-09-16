@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v957';
+const APP_VERSION = 'v958';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v958', d:'16.09.2026', items:['🐛 „Zurückholen" (Rückkehrer-Hinweis) entfernt den Teilnehmer jetzt auch aus dem lokalen „Nicht angetreten"-Container – bisher blieb er dort sichtbar, obwohl er bereits wieder im Kurs war']},
   {v:'v957', d:'16.09.2026', items:['🐛 TN-Liste und Betriebsliste meldeten bei Zukunfts- oder beendeten Kursen fälschlich „Keine TN im Kurs" – sie suchten über den Magneten der Teilnehmer statt über die Kurs-Teilnehmerliste. Funktionieren jetzt für alle Kurse, in denen die TN stehen (gleiche Korrektur wie in VerwaltungPro)']},
   {v:'v956', d:'16.09.2026', items:['🐛 Wichtiger Fix: Frisch platzierte Teilnehmer verschwanden am ersten Kurstag wieder vom Sitz – ein veralteter Live-Sync-Stand löschte die lokale Platzierung, bevor der eigene Push in der Cloud war. Jetzt darf ein Cloud-Stand einen Sitz nur ändern, wenn er jünger ist als die lokale Platzierung']},
   {v:'v955', d:'15.09.2026', items:['📋 Bemerkung für Anwesenheitsliste: 75 statt 60 Zeichen – die Druckspalte bleibt jetzt einzeilig mit kleinerer Schrift statt umzubrechen und die Zeile zu verbreitern']},
@@ -12049,6 +12050,10 @@ function _zeigeRueckkehrer(tnId, kursId, name, zeit){
     _db.collection('shared').doc('kurse').collection('list').doc(kursId)
       .collection('teilnehmer').doc(tnId).update({status:'attending'})
       .then(()=>{ try{ syncGlobalTNStatus(tnId,'clear'); }catch(e){}
+        // v958: auch aus der LOKALEN "Nicht angetreten"-Liste nehmen - sonst blieb der TN
+        // dort sichtbar, obwohl der Cloud-Status schon wieder auf "im Kurs" stand
+        try{ const inst=curInst(); if(inst&&inst.fehltStudents){
+          inst.fehltStudents=inst.fehltStudents.filter(f=>f.poolTnId!==tnId && f.name!==name); persist(); } }catch(e){}
         toast('✓ '+name+' ist zurück im Kurs – bitte einen Platz zuweisen');
         loadPool(); })
       .catch(err=>toast('Fehlgeschlagen: '+err.message,'bad'));
