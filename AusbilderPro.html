@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v958';
+const APP_VERSION = 'v959';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v959', d:'16.09.2026', items:['🐛 Namen in TN- und Betriebsliste kommen jetzt aus dem Kurs-Eintrag statt aus der Kammerliste – dort waren mehrteilige Vornamen teils falsch getrennt („Thuy"/„Huong Le" statt „Thuy Huong"/„Le"), was Schreibweise und alphabetische Reihenfolge verfälschte']},
   {v:'v958', d:'16.09.2026', items:['🐛 „Zurückholen" (Rückkehrer-Hinweis) entfernt den Teilnehmer jetzt auch aus dem lokalen „Nicht angetreten"-Container – bisher blieb er dort sichtbar, obwohl er bereits wieder im Kurs war']},
   {v:'v957', d:'16.09.2026', items:['🐛 TN-Liste und Betriebsliste meldeten bei Zukunfts- oder beendeten Kursen fälschlich „Keine TN im Kurs" – sie suchten über den Magneten der Teilnehmer statt über die Kurs-Teilnehmerliste. Funktionieren jetzt für alle Kurse, in denen die TN stehen (gleiche Korrektur wie in VerwaltungPro)']},
   {v:'v956', d:'16.09.2026', items:['🐛 Wichtiger Fix: Frisch platzierte Teilnehmer verschwanden am ersten Kurstag wieder vom Sitz – ein veralteter Live-Sync-Stand löschte die lokale Platzierung, bevor der eigene Push in der Cloud war. Jetzt darf ein Cloud-Stand einen Sitz nur ändern, wenn er jünger ist als die lokale Platzierung']},
@@ -11037,8 +11038,12 @@ async function _kursTnFuerListen(kursId){
     if(k.status==='absent'||k.status==='wiederholer'||k.wiederholer===true) return;
     let g={};
     try{ const gd=await _db.collection('globalTN').doc(d.id).get(); if(gd.exists) g=gd.data()||{}; }catch(e){}
+    // v959: Name aus dem KURS-Eintrag bevorzugen - dort ist die Aufteilung Vor-/Nachname
+    // korrekt (aus der Kammerliste uebernommen). In globalTN sind mehrteilige Vornamen
+    // teils falsch getrennt ("Thuy"/"Huong Le" statt "Thuy Huong"/"Le"), was Schreibweise
+    // UND alphabetische Sortierung verfaelschte.
     out.push(Object.assign({id:d.id}, g, {
-      vorname:g.vorname||k.vorname||'', nachname:g.nachname||k.nachname||'',
+      vorname:k.vorname||g.vorname||'', nachname:k.nachname||g.nachname||'',
       firma:g.firma||k.firma||'', beruf:g.beruf||k.beruf||'', ausbjahr:g.ausbjahr||k.ausbjahr||''
     }));
   }));
