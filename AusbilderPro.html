@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v955';
+const APP_VERSION = 'v956';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v956', d:'16.09.2026', items:['🐛 Wichtiger Fix: Frisch platzierte Teilnehmer verschwanden am ersten Kurstag wieder vom Sitz – ein veralteter Live-Sync-Stand löschte die lokale Platzierung, bevor der eigene Push in der Cloud war. Jetzt darf ein Cloud-Stand einen Sitz nur ändern, wenn er jünger ist als die lokale Platzierung']},
   {v:'v955', d:'15.09.2026', items:['📋 Bemerkung für Anwesenheitsliste: 75 statt 60 Zeichen – die Druckspalte bleibt jetzt einzeilig mit kleinerer Schrift statt umzubrechen und die Zeile zu verbreitern']},
   {v:'v954', d:'15.09.2026', items:['📊 „Eigene Notenart" steht jetzt direkt unter den vorhandenen Noten statt weiter unten. Die Bemerkung für die Anwesenheitsliste ist auf 60 Zeichen begrenzt (eine Druckzeile), mit Zähler']},
   {v:'v953', d:'15.09.2026', items:['📋 Neues, eigenständiges Feld im Noten-Reiter: „Bemerkung für Anwesenheitsliste" – unabhängig von „Besondere Bemerkungen" (die weiterhin nur auf der Bescheinigung erscheinen). Wird an die VerwaltungPro-Anwesenheitsliste übertragen']},
@@ -5283,6 +5284,7 @@ function swapSeats(aId,bId){
   const b = inst.seats[bId];
   if(b === undefined){ delete inst.seats[aId]; } else { inst.seats[aId] = b; }
   if(a === undefined){ delete inst.seats[bId]; } else { inst.seats[bId] = a; }
+  try{ if(inst.seats[aId]) inst.seats[aId]._setztAm=Date.now(); if(inst.seats[bId]) inst.seats[bId]._setztAm=Date.now(); }catch(e){}
   // v950: beiden Beteiligten ihre neue Platznummer zurueckschreiben
   try{
     const kid=inst.sharedKursId;
@@ -13861,7 +13863,7 @@ function loadPool(){
             if(!inst3.seatLabels) inst3.seatLabels={};
             inst3.seatLabels[seatId]=wunsch;
           }
-          inst3.seats[seatId]={...(inst3.seats[seatId]||{}), name:t.name, company:t.company, profession:t.profession, ausbjahr:t.ausbjahr, poolTnId:t.id, poolKursId:kursId};
+          inst3.seats[seatId]={...(inst3.seats[seatId]||{}), name:t.name, company:t.company, profession:t.profession, ausbjahr:t.ausbjahr, poolTnId:t.id, poolKursId:kursId, _setztAm:Date.now()};
           placedTnIds.add(t.id);
           placedNames.add(normName(t.name));
           _autoPlacedIds.add(t.id);
@@ -13918,6 +13920,7 @@ function _applyPoolToSeat(seatId){
              || document.querySelector('.fehlt-card[data-name="'+CSS.escape(_poolDragId)+'"]');
   const fehltEntry = inst.fehltStudents ? inst.fehltStudents.find(f=>f.name===_poolDragId) : null;
   const newSeatData = { ...existing,
+    _setztAm:  Date.now(),   // v956: lokale Platzierung datieren (Schutz vor veraltetem Live-Sync)
     name:      _poolDragId,
     company:   card?.dataset.company    || fehltEntry?.company    || existing.company    || '',
     profession:card?.dataset.profession || fehltEntry?.profession || existing.profession || '',
@@ -15634,8 +15637,15 @@ function _liveApplyDocs(inst, docs, initial){
         const lokalSid={}; Object.entries(inst.seats||{}).forEach(([sid,d])=>{ if(d&&d.poolTnId) lokalSid[d.poolTnId]=sid; });
         if(!inst.seats) inst.seats={};
         // entfernen/verschieben/anlegen
+        // v956: Ein Cloud-Stand darf einen lokalen Sitz nur loeschen/verschieben, wenn er
+        // JUENGER ist als die lokale Platzierung. Sonst loeschte ein veralteter Snapshot (der
+        // im 400ms-Fenster vor dem eigenen Push eintraf) frisch gesetzte TN wieder - am ersten
+        // Kurstag, wenn viele hintereinander scannen, gewann dieses Loeschen regelmaessig.
+        const _cloudTs=sp.ts||0;
         Object.entries(lokalSid).forEach(([tnId,sid])=>{
           const ziel=zielSid[tnId];
+          const lokalTs=(inst.seats[sid]&&inst.seats[sid]._setztAm)||0;
+          if(lokalTs && lokalTs>_cloudTs) return;          // lokal ist juenger -> stehen lassen
           if(!ziel){ delete inst.seats[sid]; changed=true; }
           else if(ziel!==sid){ inst.seats[ziel]=inst.seats[sid]; delete inst.seats[sid]; changed=true; }
         });
