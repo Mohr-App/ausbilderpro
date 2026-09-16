@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v956';
+const APP_VERSION = 'v957';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v957', d:'16.09.2026', items:['🐛 TN-Liste und Betriebsliste meldeten bei Zukunfts- oder beendeten Kursen fälschlich „Keine TN im Kurs" – sie suchten über den Magneten der Teilnehmer statt über die Kurs-Teilnehmerliste. Funktionieren jetzt für alle Kurse, in denen die TN stehen (gleiche Korrektur wie in VerwaltungPro)']},
   {v:'v956', d:'16.09.2026', items:['🐛 Wichtiger Fix: Frisch platzierte Teilnehmer verschwanden am ersten Kurstag wieder vom Sitz – ein veralteter Live-Sync-Stand löschte die lokale Platzierung, bevor der eigene Push in der Cloud war. Jetzt darf ein Cloud-Stand einen Sitz nur ändern, wenn er jünger ist als die lokale Platzierung']},
   {v:'v955', d:'15.09.2026', items:['📋 Bemerkung für Anwesenheitsliste: 75 statt 60 Zeichen – die Druckspalte bleibt jetzt einzeilig mit kleinerer Schrift statt umzubrechen und die Zeile zu verbreitern']},
   {v:'v954', d:'15.09.2026', items:['📊 „Eigene Notenart" steht jetzt direkt unter den vorhandenen Noten statt weiter unten. Die Bemerkung für die Anwesenheitsliste ist auf 60 Zeichen begrenzt (eine Druckzeile), mit Zähler']},
@@ -11019,6 +11020,29 @@ function _execAusbilderSpaeter(inst, kursId, kursLabel, ausbilderName, datum, da
 }
 
 // ─── TEILNEHMENDENLISTE SA 181 NRW (Ausbilder) ───
+
+// ════════════════════════════════════════════════
+//  v957: Kurs-Teilnehmer fuer Listen laden - ueber die KURS-Teilnehmerliste, nicht ueber
+//  den Magneten (aktiverKursId). Der zeigt je TN nur auf EINEN Kurs; ein TN kann aber in
+//  mehreren Zukunfts- oder beendeten Kursen stehen. Liefert je TN den vollen globalTN-
+//  Datensatz (Betrieb, Telefon, Beruf, Lehrjahr...) plus die Kurs-Felder (status etc.).
+//  Wiederholer/Nicht angetreten werden ausgelassen.
+// ════════════════════════════════════════════════
+async function _kursTnFuerListen(kursId){
+  const ts=await _db.collection('shared').doc('kurse').collection('list').doc(kursId).collection('teilnehmer').get();
+  const out=[];
+  await Promise.all(ts.docs.map(async d=>{
+    const k=d.data()||{};
+    if(k.status==='absent'||k.status==='wiederholer'||k.wiederholer===true) return;
+    let g={};
+    try{ const gd=await _db.collection('globalTN').doc(d.id).get(); if(gd.exists) g=gd.data()||{}; }catch(e){}
+    out.push(Object.assign({id:d.id}, g, {
+      vorname:g.vorname||k.vorname||'', nachname:g.nachname||k.nachname||'',
+      firma:g.firma||k.firma||'', beruf:g.beruf||k.beruf||'', ausbjahr:g.ausbjahr||k.ausbjahr||''
+    }));
+  }));
+  return out;
+}
 function generateTNListeAusbilder(){
   const inst=curInst();if(!inst)return;
   const kursId=inst.sharedKursId;
@@ -11026,14 +11050,12 @@ function generateTNListeAusbilder(){
   _db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(doc=>{
     if(!doc.exists){toast('Kurs nicht gefunden','bad');return;}
     const kurs=doc.data();
-    // Alle Kurs-TN = Sitzplätze + Pool (von Verena zugewiesen, ggf. noch nicht platziert)
-    _db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
+    // v957: Kurs-TN aus der Kurs-Teilnehmerliste (Pool UND platzierte), nicht ueber den Magneten
+    _kursTnFuerListen(kursId).then(liste=>{
       const map=new Map();
-      // 1) Kurs-Mitglieder aus globalTN (deckt Pool UND platzierte ab)
-      snap.forEach(g=>{
-        const t=g.data();
+      liste.forEach(t=>{
         const nm=((t.vorname||'')+' '+(t.nachname||'')).trim();
-        if(nm) map.set(g.id,{name:nm,poolTnId:g.id});
+        if(nm) map.set(t.id,{name:nm,poolTnId:t.id});
       });
       // 2) Sitzplätze ergänzen (z.B. direkt am Sitz angelegte TN ohne aktiverKursId)
       Object.values(inst.seats||{}).filter(s=>s&&s.name).forEach(s=>{
@@ -11060,9 +11082,7 @@ function generateBetriebslisteAusbilder(){
   _db.collection('shared').doc('kurse').collection('list').doc(kursId).get().then(doc=>{
     if(!doc.exists){toast('Kurs nicht gefunden','bad');return;}
     const kurs=doc.data();
-    _db.collection('globalTN').where('aktiverKursId','==',kursId).get().then(snap=>{
-      const tns=[];
-      snap.forEach(g=>tns.push(Object.assign({id:g.id}, g.data())));
+    _kursTnFuerListen(kursId).then(tns=>{   // v957: Kurs-Teilnehmerliste statt Magnet
       tns.sort((a,b)=>(a.nachname||'').localeCompare(b.nachname||'','de'));
       if(!tns.length){toast('Keine TN im Kurs','bad');return;}
       const kursName=kurs.lehrgangsart||(kurs.name||'');
