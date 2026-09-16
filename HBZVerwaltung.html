@@ -1809,10 +1809,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 421';
+const APP_VERSION = 'Build 422';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 422', d:'16.09.2026', items:['📥 TN-Import korrigiert jetzt falsch getrennte Namen: Steht derselbe volle Name in der Liste nur anders getrennt („Thi"/„Mai Huong Ngo" statt „Thi Mai Huong"/„Ngo"), wird die Trennung der Kammerliste übernommen. Echte Namensänderungen und anonymisierte Datensätze bleiben unangetastet; die Vorschau weist die Korrektur aus']},
   {v:'Build 421', d:'16.09.2026', items:['📋 Anwesenheitsliste nutzt die Namensschreibweise aus dem Kurs-Eintrag (korrekte Trennung von Vor- und Nachname) – dadurch stimmen Schreibweise und alphabetische Reihenfolge wieder mit der Kammer-Teilnehmendenliste überein']},
   {v:'Build 420', d:'15.09.2026', items:['📋 Bemerkungsspalte der Anwesenheitsliste bleibt einzeilig (kleinere Schrift statt Umbruch) – ein langer Text macht die Zeile nicht mehr höher']},
   {v:'Build 419', d:'15.09.2026', items:['📋 Anwesenheitsliste übernimmt ein eigenes Bemerkungsfeld aus AusbilderPro (separat von der Bescheinigung) in die Bemerkungsspalte – von Hand weiterhin ergänzbar']},
@@ -5630,6 +5631,19 @@ function impAnalysiere(){
       // Beruf: Die KH-Liste hat absolute Hoheit - Listenwert (inkl. Fachrichtung) ersetzt
       // auch manuell eingegebene Berufe, sobald er abweicht. Nur leerer Listenwert laesst den Bestand in Ruhe.
       if(_berufVoll && _berufVoll!==hitBest.beruf) bfUpd.beruf=_berufVoll;
+      // Build 422: Trennstelle Vor-/Nachname aus der Liste uebernehmen - aber NUR, wenn der
+      // volle Name identisch ist (also lediglich falsch getrennt wurde, z.B. "Thi"/"Mai Huong
+      // Ngo" statt "Thi Mai Huong"/"Ngo"). Echte Namensaenderungen und anonymisierte
+      // Datensaetze (Kuerzel mit Punkt) bleiben unangetastet.
+      try{
+        const _voll=x=>String(x||'').replace(/\s+/g,' ').trim().toLowerCase();
+        const _anon=x=>/\.$/.test(String(x||'').trim());
+        if(vn && nn && !_anon(hitBest.vorname) && !_anon(hitBest.nachname)
+           && _voll(vn+' '+nn)===_voll((hitBest.vorname||'')+' '+(hitBest.nachname||''))
+           && (vn!==hitBest.vorname || nn!==hitBest.nachname)){
+          bfUpd.vorname=vn; bfUpd.nachname=nn; bfUpd._nameKorrigiert=true;
+        }
+      }catch(e){}
       if(Object.keys(bfUpd).length) backfill[i]=Object.assign({id:hitBest.id, name:vn+' '+nn}, bfUpd);
       // (3b) Loser Selbst-Eintrag -> offizielle Liste gewinnt (Name/Firma/Beruf/Adresse), Lehrjahr bleibt vom TN,
       //      Eintrag wird befoerdert (selfRegistered:false). Konto/Kurs/Anwesenheit/E-Mail bleiben unberuehrt.
@@ -5721,7 +5735,7 @@ function impRenderBericht(a){
     const bf=Object.values(a.backfill);
     h+='<details style="margin-top:6px"><summary style="cursor:pointer;color:#16a34a;font-size:.7rem">Daten werden ergänzt/korrigiert ('+bf.length+') – Lehrjahr/Daten nur wo leer, Telefon &amp; Firma laut Liste</summary>';
     h+='<div style="font-size:.66rem;margin-top:4px">'+bf.map(t=>{
-      const teile=[]; if(t.ausbjahr) teile.push('Lehrjahr '+t.ausbjahr); if(t.anfang) teile.push('Beginn '+t.anfang); if(t.endeVorgesehen) teile.push('Ende '+t.endeVorgesehen); if(t.betriebTelefon!==undefined) teile.push('☎ '+t.betriebTelefon); if(t.firma!==undefined) teile.push('Firma → '+t.firma);
+      const teile=[]; if(t._nameKorrigiert) teile.push('Name getrennt: '+t.vorname+' / '+t.nachname); if(t.ausbjahr) teile.push('Lehrjahr '+t.ausbjahr); if(t.anfang) teile.push('Beginn '+t.anfang); if(t.endeVorgesehen) teile.push('Ende '+t.endeVorgesehen); if(t.betriebTelefon!==undefined) teile.push('☎ '+t.betriebTelefon); if(t.firma!==undefined) teile.push('Firma → '+t.firma);
       return esc(t.name)+' → '+esc(teile.join(', '));
     }).join('<br>')+'</div></details>';
   }
