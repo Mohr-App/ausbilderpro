@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v963';
+const APP_VERSION = 'v964';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v964', d:'17.09.2026', items:['🔐 Wichtig beim Zusammenführen von Dubletten: Die Anmeldung des Azubis (Kontoverknüpfung, E-Mail, DSGVO-Zustimmung) wird jetzt auf den bleibenden Eintrag übernommen. Vorher wäre sie mit dem gelöschten Eintrag verschwunden und der Azubi hätte sich angemeldet, ohne seine Daten zu finden']},
   {v:'v963', d:'17.09.2026', items:['🔔 Dubletten-Hinweis erkennt jetzt auch selbst eingetragene Teilnehmer (bisher nur manuell angelegte) – genau der Fall, wenn jemand sich wegen eines Schreibfehlers nicht findet und neu anlegt','💡 Der Hinweis benennt den Unterschied im Klartext („u ↔ ü", „doppelter Buchstabe"), damit der Ausbilder gezielt nachfragen kann, und zeigt Beruf/Betrieb des vorhandenen Eintrags']},
   {v:'v962', d:'17.09.2026', items:['🐛 Ursache gefunden: Unterschrift/Stempel ließen sich bei größeren Bildern nicht speichern („Maximum call stack size exceeded", angezeigt als „Falsche PIN"). Die Verschlüsselung verarbeitet die Daten jetzt blockweise – die Bildgröße spielt keine Rolle mehr']},
   {v:'v961', d:'17.09.2026', items:['🔎 Beim Speichern von Unterschrift/Stempel wird jetzt der echte Fehlergrund angezeigt statt pauschal „Falsche PIN" – das verdeckte bisher andere Ursachen wie abgelehnte Schreibvorgänge']},
@@ -13602,7 +13603,7 @@ function ignoreDupTN(ignoreKey){
 
 function mergeDupTN(manualId, selfId, kursId){
   if(!_db){toast('Nicht verbunden','bad');return;}
-  if(!confirm('Manuellen Eintrag mit dem selbst-registrierten Eintrag zusammenführen?\n\nDer selbst-registrierte Eintrag bleibt erhalten. Fehlende Felder (Beruf, Firma etc.) werden vom manuellen Eintrag uebernommen. Der manuelle Eintrag wird danach gelöscht.')){
+  if(!confirm('Die beiden Einträge zu einem zusammenführen?\n\nDer Eintrag mit den Kursdaten (Anwesenheit, Noten, Sitzplatz) bleibt erhalten. Fehlende Angaben – und die Anmeldung des Azubis, falls vorhanden – werden übernommen. Der doppelte Eintrag wird danach gelöscht.\n\nDas lässt sich nicht rückgängig machen.')){
     return;
   }
   const kursRef = _db.collection('shared').doc('kurse').collection('list').doc(kursId);
@@ -13619,7 +13620,7 @@ function mergeDupTN(manualId, selfId, kursId){
       const mG = mGtn.exists ? mGtn.data() : {};
       const sG = sGtn.exists ? sGtn.data() : {};
 
-      // Felder die uebernommen werden wenn beim selbst-registrierten leer
+      // Felder die uebernommen werden wenn beim bleibenden Eintrag leer
       const fieldsToFill = ['firma','beruf','berufGruppeId','ausbjahr','kontaktEmail','kontaktTelefon'];
       const subUpdate = {};
       const gtnUpdate = {};
@@ -13631,7 +13632,14 @@ function mergeDupTN(manualId, selfId, kursId){
       // Aber Stefan wollte Option B: selbst-registrierter Sitz bleibt -> kein Sitzplatz-Override
       // wunschSitzplatz hilft hier nicht, weil Sitz schon gerendert ist
 
-      // Markiere selbst-registriertes Doc als "merged"
+      // v964: KONTO MITNEHMEN. Der zu loeschende Eintrag kann die Anmeldung des Azubis
+      // tragen (verknuepftUid). Ohne Uebernahme wuerde er sich anmelden und nichts mehr
+      // finden - seine App haenge dann an einem geloeschten Datensatz.
+      const kontoFelder=['verknuepftUid','email','emailBestaetigt','verknuepftAm','verknuepftFreigegebenAm','dsgvoZustimmung','selfRegistered'];
+      kontoFelder.forEach(f=>{ if(!sG[f] && mG[f]!==undefined && mG[f]!=='' && mG[f]!==null) gtnUpdate[f]=mG[f]; });
+      if(mG.verknuepftUid && !sG.verknuepftUid) console.log('[Merge] Konto übernommen:', mG.email||mG.verknuepftUid);
+
+      // Markiere bleibendes Doc als "merged"
       subUpdate.mergedFromManual = manualId;
       gtnUpdate.mergedFromManual = manualId;
 
