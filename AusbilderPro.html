@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v961';
+const APP_VERSION = 'v962';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v962', d:'17.09.2026', items:['🐛 Ursache gefunden: Unterschrift/Stempel ließen sich bei größeren Bildern nicht speichern („Maximum call stack size exceeded", angezeigt als „Falsche PIN"). Die Verschlüsselung verarbeitet die Daten jetzt blockweise – die Bildgröße spielt keine Rolle mehr']},
   {v:'v961', d:'17.09.2026', items:['🔎 Beim Speichern von Unterschrift/Stempel wird jetzt der echte Fehlergrund angezeigt statt pauschal „Falsche PIN" – das verdeckte bisher andere Ursachen wie abgelehnte Schreibvorgänge']},
   {v:'v960', d:'16.09.2026', items:['🐛 „Falsche PIN" beim ERSTEN Speichern von Unterschrift/Stempel behoben: Ein automatisch übernommener Firmenstempel blockierte die erste eigene PIN-Vergabe. Nicht entschlüsselbare Altdaten werden jetzt verworfen, wenn gerade neue gesetzt werden – die Fehlermeldung kommt nur noch, wenn wirklich nichts Neues gespeichert wird']},
   {v:'v959', d:'16.09.2026', items:['🐛 Namen in TN- und Betriebsliste kommen jetzt aus dem Kurs-Eintrag statt aus der Kammerliste – dort waren mehrteilige Vornamen teils falsch getrennt („Thuy"/„Huong Le" statt „Thuy Huong"/„Le"), was Schreibweise und alphabetische Reihenfolge verfälschte']},
@@ -8387,7 +8388,14 @@ async function _encryptString(plaintext, pin){
   const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(plaintext));
   const buf=new Uint8Array(salt.length+iv.length+ct.byteLength);
   buf.set(salt,0); buf.set(iv,salt.length); buf.set(new Uint8Array(ct),salt.length+iv.length);
-  return btoa(String.fromCharCode.apply(null,buf));
+  // v962: blockweise umwandeln. Vorher wurde der gesamte Datenstrom als Einzelargumente
+  // uebergeben (String.fromCharCode.apply) - bei groesseren Bildern lief dabei der
+  // Aufrufstapel des Browsers ueber ("Maximum call stack size exceeded"), was faelschlich
+  // als "Falsche PIN" angezeigt wurde.
+  let bin='';
+  const BLOCK=0x8000;
+  for(let i=0;i<buf.length;i+=BLOCK) bin+=String.fromCharCode.apply(null,buf.subarray(i,i+BLOCK));
+  return btoa(bin);
 }
 async function _decryptString(b64, pin){
   const data=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
