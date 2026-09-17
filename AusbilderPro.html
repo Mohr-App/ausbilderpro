@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v964';
+const APP_VERSION = 'v965';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v965', d:'17.09.2026', items:['🎓 Berufsschultag: Datum jetzt frei wählbar (vorbelegt mit heute) – Nachtragen und Vormerken möglich. Bereits eingetragene Tage stehen im selben Fenster und lassen sich einzeln wieder entfernen']},
   {v:'v964', d:'17.09.2026', items:['🔐 Wichtig beim Zusammenführen von Dubletten: Die Anmeldung des Azubis (Kontoverknüpfung, E-Mail, DSGVO-Zustimmung) wird jetzt auf den bleibenden Eintrag übernommen. Vorher wäre sie mit dem gelöschten Eintrag verschwunden und der Azubi hätte sich angemeldet, ohne seine Daten zu finden']},
   {v:'v963', d:'17.09.2026', items:['🔔 Dubletten-Hinweis erkennt jetzt auch selbst eingetragene Teilnehmer (bisher nur manuell angelegte) – genau der Fall, wenn jemand sich wegen eines Schreibfehlers nicht findet und neu anlegt','💡 Der Hinweis benennt den Unterschied im Klartext („u ↔ ü", „doppelter Buchstabe"), damit der Ausbilder gezielt nachfragen kann, und zeigt Beruf/Betrieb des vorhandenen Eintrags']},
   {v:'v962', d:'17.09.2026', items:['🐛 Ursache gefunden: Unterschrift/Stempel ließen sich bei größeren Bildern nicht speichern („Maximum call stack size exceeded", angezeigt als „Falsche PIN"). Die Verschlüsselung verarbeitet die Daten jetzt blockweise – die Bildgröße spielt keine Rolle mehr']},
@@ -5173,31 +5174,81 @@ function markAlleAnwesend(){ if(lockGuard())return;
 
 function markBerufsschultag(){ if(lockGuard())return;
   const inst=curInst(); if(!inst) return;
-  const today=new Date().toISOString().slice(0,10);
-  if(!confirm('🎓 Berufsschultag für alle Schüler eintragen?\n\nDatum: '+new Date(today).toLocaleDateString('de-DE'))) return;
+  const heute=new Date().toISOString().slice(0,10);
+  // v965: Datum frei waehlbar (vorbelegt mit heute) und bereits gesetzte Tage entfernbar.
+  // Bisher galt der Knopf immer nur fuer den heutigen Tag - Nachtragen war nicht moeglich.
+  const gesetzt=(inst.berufsschultage||[]).slice().sort();
+  const liste = gesetzt.length
+    ? '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--brd)">'
+      +'<div style="font-size:.7rem;font-weight:700;color:var(--mu);margin-bottom:7px">Bereits eingetragen</div>'
+      +gesetzt.map(dt=>'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9">'
+          +'<span style="font-size:.78rem;font-weight:700">🎓 '+fmtD(dt)+'</span>'
+          +'<button onclick="berufsschultagEntfernen(\''+dt+'\')" style="padding:5px 10px;font-size:.66rem;font-weight:700;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;cursor:pointer">Entfernen</button>'
+        +'</div>').join('')
+      +'</div>'
+    : '';
+  const ov=document.createElement('div');
+  ov.id='bsOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99990;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px;max-width:420px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)" onclick="event.stopPropagation()">'
+    +'<div style="font-size:1rem;font-weight:800;margin-bottom:12px">🎓 Berufsschultag</div>'
+    +'<div style="font-size:.78rem;color:#334155;line-height:1.5;margin-bottom:10px">Alle Teilnehmer dieses Lehrgangs werden an diesem Tag als <b>Berufsschule</b> geführt. Der Tag zählt nicht als Kurstag.</div>'
+    +'<label style="font-size:.7rem;font-weight:700;color:var(--mu);display:block;margin-bottom:4px">Datum</label>'
+    +'<input type="date" id="bsDatum" value="'+heute+'" style="width:100%;padding:9px 11px;border:1.5px solid var(--brd);border-radius:8px;font-size:.85rem;font-weight:700;font-family:inherit">'
+    +liste
+    +'<div style="display:flex;gap:8px;margin-top:16px">'
+    +'<button onclick="document.getElementById(\'bsOv\').remove()" style="flex:1;padding:11px;border:1px solid var(--brd);background:#fff;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer">Abbrechen</button>'
+    +'<button onclick="berufsschultagSetzen()" style="flex:1;padding:11px;border:none;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer">🎓 Eintragen</button>'
+    +'</div></div>';
+  ov.onclick=()=>ov.remove();
+  document.body.appendChild(ov);
+}
+function berufsschultagSetzen(){
+  const inst=curInst(); if(!inst) return;
+  const datum=(document.getElementById('bsDatum')||{}).value||'';
+  if(!datum){ toast('Bitte ein Datum wählen','bad'); return; }
+  const ov=document.getElementById('bsOv'); if(ov) ov.remove();
   let count=0;
-  const rows=getRows(inst);
-  rows.forEach(r=>{
-    r.seats.forEach(sid=>{
-      const d=inst.seats[sid];
-      if(!d||!d.name) return;
-      if(!d.attendance) d.attendance=[];
-      // Prüfe ob heute schon ein Eintrag existiert
-      if(d.attendance.some(a=>a.date===today)) return;
-      d.attendance.push({type:'berufsschule',date:today});
-      count++;
-      // Firestore sync
-      syncAttendanceToFirestore(sid);
-    });
-  });
+  getRows(inst).forEach(r=>r.seats.forEach(sid=>{
+    const d=inst.seats[sid];
+    if(!d||!d.name) return;
+    if(!d.attendance) d.attendance=[];
+    if(d.attendance.some(a=>a.date===datum)) return;     // Tag schon belegt -> nicht ueberschreiben
+    d.attendance.push({type:'berufsschule',date:datum});
+    count++;
+    syncAttendanceToFirestore(sid);
+  }));
+  if(!inst.berufsschultage) inst.berufsschultage=[];
+  if(!inst.berufsschultage.includes(datum)) inst.berufsschultage.push(datum);
   persist(); renderSeats();
   if(_mobileListMode) renderMobileList();
-  toast('🎓 '+count+' Schüler als Berufsschultag markiert');
-  // Berufsschultag-Datum auf Kurs-Dokument speichern (für ArbeitgeberPro)
+  toast('🎓 '+fmtD(datum)+': '+count+' Schüler als Berufsschule markiert');
   const kursId=inst.sharedKursId;
   if(_db&&kursId){
     _db.collection('shared').doc('kurse').collection('list').doc(kursId)
-      .update({berufsschultage:firebase.firestore.FieldValue.arrayUnion(today)}).catch(()=>{});
+      .update({berufsschultage:firebase.firestore.FieldValue.arrayUnion(datum)}).catch(()=>{});
+  }
+}
+function berufsschultagEntfernen(datum){
+  const inst=curInst(); if(!inst) return;
+  if(!confirm('🎓 Berufsschultag am '+fmtD(datum)+' wieder entfernen?\n\nDie Berufsschul-Einträge dieses Tages werden bei allen Teilnehmern gelöscht. Andere Einträge (anwesend, krank …) bleiben unberührt.')) return;
+  const ov=document.getElementById('bsOv'); if(ov) ov.remove();
+  let count=0;
+  getRows(inst).forEach(r=>r.seats.forEach(sid=>{
+    const d=inst.seats[sid];
+    if(!d||!d.attendance) return;
+    const vor=d.attendance.length;
+    d.attendance=d.attendance.filter(a=>!(a&&a.date===datum&&a.type==='berufsschule'));
+    if(d.attendance.length!==vor){ count++; syncAttendanceToFirestore(sid); }
+  }));
+  inst.berufsschultage=(inst.berufsschultage||[]).filter(x=>x!==datum);
+  persist(); renderSeats();
+  if(_mobileListMode) renderMobileList();
+  toast('🎓 '+fmtD(datum)+' entfernt ('+count+' Schüler)');
+  const kursId=inst.sharedKursId;
+  if(_db&&kursId){
+    _db.collection('shared').doc('kurse').collection('list').doc(kursId)
+      .update({berufsschultage:firebase.firestore.FieldValue.arrayRemove(datum)}).catch(()=>{});
   }
 }
 
