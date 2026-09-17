@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v959';
+const APP_VERSION = 'v960';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v960', d:'16.09.2026', items:['🐛 „Falsche PIN" beim ERSTEN Speichern von Unterschrift/Stempel behoben: Ein automatisch übernommener Firmenstempel blockierte die erste eigene PIN-Vergabe. Nicht entschlüsselbare Altdaten werden jetzt verworfen, wenn gerade neue gesetzt werden – die Fehlermeldung kommt nur noch, wenn wirklich nichts Neues gespeichert wird']},
   {v:'v959', d:'16.09.2026', items:['🐛 Namen in TN- und Betriebsliste kommen jetzt aus dem Kurs-Eintrag statt aus der Kammerliste – dort waren mehrteilige Vornamen teils falsch getrennt („Thuy"/„Huong Le" statt „Thuy Huong"/„Le"), was Schreibweise und alphabetische Reihenfolge verfälschte']},
   {v:'v958', d:'16.09.2026', items:['🐛 „Zurückholen" (Rückkehrer-Hinweis) entfernt den Teilnehmer jetzt auch aus dem lokalen „Nicht angetreten"-Container – bisher blieb er dort sichtbar, obwohl er bereits wieder im Kurs war']},
   {v:'v957', d:'16.09.2026', items:['🐛 TN-Liste und Betriebsliste meldeten bei Zukunfts- oder beendeten Kursen fälschlich „Keine TN im Kurs" – sie suchten über den Magneten der Teilnehmer statt über die Kurs-Teilnehmerliste. Funktionieren jetzt für alle Kurse, in denen die TN stehen (gleiche Korrektur wie in VerwaltungPro)']},
@@ -8607,9 +8608,24 @@ function apSigDrawClear(){const c=document.getElementById('apSigDrawCanvas');_ap
 function apSigDrawCancel(){document.getElementById('apSigDrawOverlay').style.display='none';}
 async function _persistSigStempel(pin){
   const store=_getSigStempelStore();
-  // Vorhandenes mit PIN uebernehmen/verifizieren, damit nichts verloren geht (wirft bei falscher PIN)
-  if(store.encSig && !_apSigDataUrl) _apSigDataUrl=await _decryptString(store.encSig,pin);
-  if(store.encStempel && !_apStempelDataUrl) _apStempelDataUrl=await _decryptString(store.encStempel,pin);
+  // Vorhandenes mit PIN uebernehmen, damit nichts verloren geht.
+  // v960: Scheitert das Entschluesseln, ist das NUR dann ein Fehler, wenn der Nutzer
+  // nichts Neues setzt. Sonst blockierte ein automatisch uebernommener Firmenstempel
+  // (v882+, mit anderer/ohne PIN abgelegt) die erste eigene PIN-Vergabe mit "Falsche PIN",
+  // obwohl der Kollege zum ersten Mal speichert.
+  const setztNeues = !!(_apSigDataUrl || _apStempelDataUrl || _apSigVec);
+  if(store.encSig && !_apSigDataUrl){
+    try{ _apSigDataUrl=await _decryptString(store.encSig,pin); }
+    catch(e){ if(!setztNeues) throw e;
+      console.warn('[Signatur] Alte Unterschrift nicht entschlüsselbar – wird durch die neue ersetzt');
+      delete store.encSig; delete store.encSigVec; }
+  }
+  if(store.encStempel && !_apStempelDataUrl){
+    try{ _apStempelDataUrl=await _decryptString(store.encStempel,pin); }
+    catch(e){ if(!setztNeues) throw e;
+      console.warn('[Signatur] Alter Stempel nicht entschlüsselbar – wird verworfen');
+      delete store.encStempel; }
+  }
   if(_apSigDataUrl) store.encSig=await _encryptString(_apSigDataUrl,pin);
   if(_apSigVec) store.encSigVec=await _encryptString(JSON.stringify(_apSigVec),pin);
   if(_apStempelDataUrl) store.encStempel=await _encryptString(_apStempelDataUrl,pin);
