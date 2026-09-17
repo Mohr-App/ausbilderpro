@@ -1809,10 +1809,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 423';
+const APP_VERSION = 'Build 424';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 424', d:'17.09.2026', items:['📋 Anwesenheitsliste: unentschuldigte Fehltage werden mit „U" statt „UE" markiert – zweistellig passte nicht in die Tagesspalte und war nicht lesbar']},
   {v:'Build 423', d:'17.09.2026', items:['🐛 Nachbesserung zu Build 422: Die Namenskorrektur wurde zwar erkannt, beim Schreiben aber nicht übernommen – die Felder fehlten in der Speicherliste. Falsch getrennte Namen werden jetzt tatsächlich korrigiert']},
   {v:'Build 422', d:'16.09.2026', items:['📥 TN-Import korrigiert jetzt falsch getrennte Namen: Steht derselbe volle Name in der Liste nur anders getrennt („Thi"/„Mai Huong Ngo" statt „Thi Mai Huong"/„Ngo"), wird die Trennung der Kammerliste übernommen. Echte Namensänderungen und anonymisierte Datensätze bleiben unangetastet; die Vorschau weist die Korrektur aus']},
   {v:'Build 421', d:'16.09.2026', items:['📋 Anwesenheitsliste nutzt die Namensschreibweise aus dem Kurs-Eintrag (korrekte Trennung von Vor- und Nachname) – dadurch stimmen Schreibweise und alphabetische Reihenfolge wieder mit der Kammer-Teilnehmendenliste überein']},
@@ -7603,7 +7604,9 @@ function generateAnwListe(){
       // (von AusbilderPro pro Sitz/Tag gepflegt und an den Kurs-TN-Eintrag gesendet).
       const abwMap={};
       (d.attAbsentDetails||[]).forEach(a=>{ if(a&&a.d) abwMap[a.d]=a.typ; });
-      const _kuerzelFuer={absent_e:'E', absent_u:'UE', sick:'K'};
+      // Build 424: "U" statt "UE" - die Tagesspalte ist 5,8 mm breit und auf EIN Zeichen
+      // ausgelegt; zweistellig wurde das Kuerzel abgeschnitten und war nicht lesbar.
+      const _kuerzelFuer={absent_e:'E', absent_u:'U', sick:'K'};
       const _bsSet=new Set(kurs.berufsschultage||[]);   // gilt fuer den ganzen Kurs, nicht pro TN
       for(let c=0;c<SP;c++){
         const dt=tage[c];
@@ -7777,6 +7780,8 @@ ${Array(Math.max(0,13-tnRows.length)).fill(0).map((_,i)=>'<tr><td class="nr">'+(
   <div class="legend-grid">
     <div class="legend-col">
       <div>K = krank</div>
+      <div>U = unentschuldigt gefehlt</div>
+      <div>B = Berufsschultag</div>
       <div>E = entschuldigt; Fehlgrund liegt nicht im Einflussbereich des Lehrlings (z.B. Gerichtstermin, Beerdigung, Sonderurlaub, Nachholen Gesellenprüfung)</div>
       <div>NF = nicht förderfähig, muss zur Erreichung der Förderfähigkeit zwingend nachgeholt werden (Berufschultag, Arbeit im Betrieb, Erholungsurlaub etc.)</div>
       <div class="legend-mt">teilweise anwesend:</div>
