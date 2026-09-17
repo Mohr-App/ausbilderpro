@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v960';
+const APP_VERSION = 'v961';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v961', d:'17.09.2026', items:['🔎 Beim Speichern von Unterschrift/Stempel wird jetzt der echte Fehlergrund angezeigt statt pauschal „Falsche PIN" – das verdeckte bisher andere Ursachen wie abgelehnte Schreibvorgänge']},
   {v:'v960', d:'16.09.2026', items:['🐛 „Falsche PIN" beim ERSTEN Speichern von Unterschrift/Stempel behoben: Ein automatisch übernommener Firmenstempel blockierte die erste eigene PIN-Vergabe. Nicht entschlüsselbare Altdaten werden jetzt verworfen, wenn gerade neue gesetzt werden – die Fehlermeldung kommt nur noch, wenn wirklich nichts Neues gespeichert wird']},
   {v:'v959', d:'16.09.2026', items:['🐛 Namen in TN- und Betriebsliste kommen jetzt aus dem Kurs-Eintrag statt aus der Kammerliste – dort waren mehrteilige Vornamen teils falsch getrennt („Thuy"/„Huong Le" statt „Thuy Huong"/„Le"), was Schreibweise und alphabetische Reihenfolge verfälschte']},
   {v:'v958', d:'16.09.2026', items:['🐛 „Zurückholen" (Rückkehrer-Hinweis) entfernt den Teilnehmer jetzt auch aus dem lokalen „Nicht angetreten"-Container – bisher blieb er dort sichtbar, obwohl er bereits wieder im Kurs war']},
@@ -8743,7 +8744,17 @@ async function saveAusbilderSigStempel(){
     _updateSigStempelUI();
     toast(_autoStempel?'✅ Gespeichert – 🏢 Firmenstempel deines Standorts automatisch übernommen':'✅ Stempel + Signatur verschlüsselt gespeichert','ok');
     pinEl.value='';
-  } catch(e){errEl.textContent='Falsche PIN — kann gespeicherte Daten nicht entschlüsseln.';errEl.style.display='block';}
+  } catch(e){
+    // v961: ehrliche Fehlermeldung. Bisher wurde JEDER Fehler als "Falsche PIN" angezeigt -
+    // auch abgelehnte Cloud-Schreibvorgaenge oder Speicherfehler. Das verdeckte die Ursache.
+    console.error('[Signatur/Stempel] Speichern fehlgeschlagen:', e);
+    const msg=String((e&&(e.message||e.code))||e||'');
+    const istPin=/decrypt|OperationError|Cipher|integrity/i.test(msg) || (e&&e.name==='OperationError');
+    errEl.textContent = istPin
+      ? 'Die PIN passt nicht zu den bereits gespeicherten Daten.'
+      : 'Speichern fehlgeschlagen: '+(msg||'unbekannter Fehler')+' (Details in der Konsole)';
+    errEl.style.display='block';
+  }
 }
 window._getDefaultSigStempel=async function(pin){
   let store=_getSigStempelStore();
