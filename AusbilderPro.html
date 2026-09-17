@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v962';
+const APP_VERSION = 'v963';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v963', d:'17.09.2026', items:['🔔 Dubletten-Hinweis erkennt jetzt auch selbst eingetragene Teilnehmer (bisher nur manuell angelegte) – genau der Fall, wenn jemand sich wegen eines Schreibfehlers nicht findet und neu anlegt','💡 Der Hinweis benennt den Unterschied im Klartext („u ↔ ü", „doppelter Buchstabe"), damit der Ausbilder gezielt nachfragen kann, und zeigt Beruf/Betrieb des vorhandenen Eintrags']},
   {v:'v962', d:'17.09.2026', items:['🐛 Ursache gefunden: Unterschrift/Stempel ließen sich bei größeren Bildern nicht speichern („Maximum call stack size exceeded", angezeigt als „Falsche PIN"). Die Verschlüsselung verarbeitet die Daten jetzt blockweise – die Bildgröße spielt keine Rolle mehr']},
   {v:'v961', d:'17.09.2026', items:['🔎 Beim Speichern von Unterschrift/Stempel wird jetzt der echte Fehlergrund angezeigt statt pauschal „Falsche PIN" – das verdeckte bisher andere Ursachen wie abgelehnte Schreibvorgänge']},
   {v:'v960', d:'16.09.2026', items:['🐛 „Falsche PIN" beim ERSTEN Speichern von Unterschrift/Stempel behoben: Ein automatisch übernommener Firmenstempel blockierte die erste eigene PIN-Vergabe. Nicht entschlüsselbare Altdaten werden jetzt verworfen, wenn gerade neue gesetzt werden – die Fehlermeldung kommt nur noch, wenn wirklich nichts Neues gespeichert wird']},
@@ -13386,6 +13387,28 @@ let _autoPlacedIds = new Set(); // Verhindert doppelte Toast-Meldungen
 // Ausbilder zum Zusammenfuehren.
 // Fuzzy-Matching: Umlaut-Normalisierung + Levenshtein-Distanz <=2 fuer
 // 1-2 Tippfehler-Toleranz (Schmidt/Schmitt, Mueller/Müller, etc.)
+
+// v963: Worin unterscheiden sich zwei Schreibweisen? Liefert einen Klartext-Hinweis,
+// damit der Ausbilder den Teilnehmer gezielt fragen kann ("hast du dich vertippt?").
+function _nameUnterschied(a, b){
+  const A=String(a||'').trim(), B=String(b||'').trim();
+  const umlautPaare=[['ä','a'],['ö','o'],['ü','u'],['ä','ae'],['ö','oe'],['ü','ue'],['ß','ss']];
+  const kl=x=>x.toLowerCase();
+  // v963: Gross-/Kleinschreibung zuerst pruefen - sonst meldet die Umlautpruefung
+  // faelschlich einen Umlautfehler, obwohl die Buchstaben identisch sind.
+  if(kl(A)===kl(B)) return 'Unterschied: nur <b>Groß-/Kleinschreibung</b>.';
+  for(const [uml,ers] of umlautPaare){
+    if(kl(A).replace(new RegExp(uml,'g'),ers)===kl(B) || kl(B).replace(new RegExp(uml,'g'),ers)===kl(A))
+      return 'Unterschied: <b>'+uml+' ↔ '+ers+'</b> – vermutlich ein Tippfehler bei den Umlauten.';
+  }
+  // Doppelbuchstabe
+  const entdoppelt=x=>kl(x).replace(/(.)\1+/g,'$1');
+  if(entdoppelt(A)===entdoppelt(B)) return 'Unterschied: <b>doppelter Buchstabe</b> – z.B. „'+esc(A)+'" gegen „'+esc(B)+'".';
+  // Gross-/Kleinschreibung
+  if(kl(A)===kl(B)) return 'Unterschied: nur <b>Groß-/Kleinschreibung</b>.';
+  // Sonst: abweichende Zeichen benennen
+  return 'Unterschied in der Schreibweise: <b>'+esc(A)+'</b> gegen <b>'+esc(B)+'</b>.';
+}
 function _normNameFuzzy(v,n){
   let s=((v||'').trim()+' '+(n||'').trim()).replace(/\s+/g,' ').trim().toLowerCase();
   // Umlaut-Normalisierung
@@ -13427,8 +13450,11 @@ function checkDuplicateTNs(snapDocs, kursId){
   });
   // Matches: jeder manuelle vs. jeder andere; Levenshtein <=2
   const matches = [];
-  const manuelle = active.filter(t=>t.manuellAngelegt);
-  const andere   = active.filter(t=>!t.manuellAngelegt);
+  // v963: Auch SELBST REGISTRIERTE gegen die von der Verwaltung zugewiesenen pruefen.
+  // Bisher wurden nur "manuell angelegte" verglichen - ein Azubi, der sich wegen eines
+  // Schreibfehlers selbst eintrug (Muller statt Mueller), fiel komplett durch das Raster.
+  const manuelle = active.filter(t=>t.manuellAngelegt || t.selfRegistered);
+  const andere   = active.filter(t=>!t.manuellAngelegt && !t.selfRegistered);
   manuelle.forEach(m=>{
     andere.forEach(a=>{
       if(m.id===a.id) return;
@@ -13499,10 +13525,16 @@ function checkDuplicateTNs(snapDocs, kursId){
       mergeBtn = '<button onclick="mergeDupLocalSeat(\''+m.seatId+'\',\''+m.selbst.id+'\',\''+kursId+'\')" style="flex:1;min-width:120px;padding:8px 12px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.7rem">✓ Auf Sitz '+esc(m.seatLabel)+' übernehmen</button>';
     } else {
       // Pool-vs-Pool (manuell + selbst registriert)
-      const sub = [m.manuell.beruf, m.manuell.firma].filter(Boolean).join(' · ');
+      const sub = [m.selbst.beruf, m.selbst.firma].filter(Boolean).join(' · ');
+      // v963: Klartext - wer hat sich selbst eingetragen, wer steht schon im Kurs, was ist anders
+      const selbstEingetragen = m.manuell.selfRegistered ? 'hat sich selbst eingetragen' : 'wurde manuell angelegt';
       headline = isFuzzy
-        ? '<b>'+esc(m.displayName)+'</b> (registriert) ähnelt <b>'+esc(m.manualDisplay)+'</b> (manuell). <span style="color:#b45309">Eventuell ein Tippfehler?</span>'
-        : '<b>'+esc(m.displayName)+'</b> hat sich gerade registriert.';
+        ? '<b>'+esc(m.manualDisplay)+'</b> '+selbstEingetragen+'.<br>'
+          +'Im Kurs steht bereits: <b>'+esc(m.displayName)+'</b>'+(sub?' ('+esc(sub)+')':'')+'<br>'
+          +'<span style="color:#b45309">'+_nameUnterschied(m.manualDisplay, m.displayName)+'</span><br>'
+          +'<span style="font-size:.68rem;color:var(--mu)">Bitte beim Teilnehmer nachfragen, ob es dieselbe Person ist.</span>'
+        : '<b>'+esc(m.manualDisplay)+'</b> '+selbstEingetragen+' – <b>gleicher Name</b> wie ein bereits vorhandener Teilnehmer'+(sub?' ('+esc(sub)+')':'')+'.<br>'
+          +'<span style="font-size:.68rem;color:var(--mu)">Zwei verschiedene Personen (z.B. Zwillinge) sind möglich – bitte kurz prüfen.</span>';
       subInfo = sub ? '<div style="font-size:.62rem;color:var(--mu);margin-bottom:8px">Manuell angelegt: '+esc(sub)+'</div>' : '';
       mergeBtn = '<button onclick="mergeDupTN(\''+m.manuell.id+'\',\''+m.selbst.id+'\',\''+kursId+'\')" style="flex:1;min-width:120px;padding:8px 12px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;font-size:.7rem">✓ Zusammenführen</button>';
     }
