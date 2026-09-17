@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v965';
+const APP_VERSION = 'v966';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v966', d:'17.09.2026', items:['📋 Anwesenheitsliste in AusbilderPro zeigt jetzt auch die Fehlgründe je Tag: B (Berufsschule), K (krank), U (unentschuldigt), E (entschuldigt) – bisher nur das ✓ für Anwesenheit']},
   {v:'v965', d:'17.09.2026', items:['🎓 Berufsschultag: Datum jetzt frei wählbar (vorbelegt mit heute) – Nachtragen und Vormerken möglich. Bereits eingetragene Tage stehen im selben Fenster und lassen sich einzeln wieder entfernen']},
   {v:'v964', d:'17.09.2026', items:['🔐 Wichtig beim Zusammenführen von Dubletten: Die Anmeldung des Azubis (Kontoverknüpfung, E-Mail, DSGVO-Zustimmung) wird jetzt auf den bleibenden Eintrag übernommen. Vorher wäre sie mit dem gelöschten Eintrag verschwunden und der Azubi hätte sich angemeldet, ohne seine Daten zu finden']},
   {v:'v963', d:'17.09.2026', items:['🔔 Dubletten-Hinweis erkennt jetzt auch selbst eingetragene Teilnehmer (bisher nur manuell angelegte) – genau der Fall, wenn jemand sich wegen eines Schreibfehlers nicht findet und neu anlegt','💡 Der Hinweis benennt den Unterschied im Klartext („u ↔ ü", „doppelter Buchstabe"), damit der Ausbilder gezielt nachfragen kann, und zeigt Beruf/Betrieb des vorhandenen Eintrags']},
@@ -7618,7 +7619,22 @@ function apSpeichereInnung(lgartId, text){
 let _anwCtx=null;
 function _anwZeileSitz(i, sid, d, nameCell, ort, firma){
   const {inst, tage, SP, ftCid, ED, anwesend, _wert, _cidF, _cidM, _cidFP, _cidFT}=_anwCtx;
-  let tds=''; for(let c=0;c<SP;c++){ const dt=tage[c]; tds+= (dt&&anwesend(sid,dt))?'<td class="c dz">✓</td>':'<td class="c dz"><span'+ED+'>&nbsp;</span></td>'; }
+  // v966: Fehlgruende mitdrucken (wie in der VerwaltungPro-Liste): B Berufsschule,
+  // K krank, U unentschuldigt, E entschuldigt. Daten liegen lokal am Sitz vor.
+  const _att=(d&&d.attendance)||[];
+  const _typAm={}; _att.forEach(e=>{ if(e&&e.date&&e.type) _typAm[e.date]=e.type; });
+  const _bsKurs=new Set(inst.berufsschultage||[]);
+  const _kuerzel={absent_e:'E', absent_u:'U', sick:'K', berufsschule:'B'};
+  let tds='';
+  for(let c=0;c<SP;c++){
+    const dt=tage[c];
+    if(!dt){ tds+='<td class="c dz"><span'+ED+'>&nbsp;</span></td>'; continue; }
+    if(_bsKurs.has(dt) || _typAm[dt]==='berufsschule'){ tds+='<td class="c dz" style="font-weight:700">B</td>'; continue; }
+    if(anwesend(sid,dt)){ tds+='<td class="c dz">✓</td>'; continue; }
+    const k=_kuerzel[_typAm[dt]];
+    tds+= k ? '<td class="c dz" style="font-weight:700">'+k+'</td>'
+            : '<td class="c dz"><span'+ED+'>&nbsp;</span></td>';
+  }
   const _noten=[_wert(d,'fuehrung',_cidF), _wert(d,'mitarbeit',_cidM), _wert(d,'praxis',_cidFP), _wert(d,'__none__',_cidFT)];
   return '<tr><td class="c lfd">'+(i+1)+'</td><td class="tn">'+nameCell+ort+'</td><td class="bt">'+firma+'</td>'+tds
     +_noten.map(n=>'<td class="c nz">'+(n?esc(String(n)):'<span'+ED+'>&nbsp;</span>')+'</td>').join('')
@@ -11332,6 +11348,8 @@ ${Array(Math.max(0,13-tnRows.length)).fill(0).map((_,i)=>'<tr><td class="nr">'+(
   <div class="legend-grid">
     <div class="legend-col">
       <div>K = krank</div>
+      <div>U = unentschuldigt gefehlt</div>
+      <div>B = Berufsschultag</div>
       <div>E = entschuldigt; Fehlgrund liegt nicht im Einflussbereich des Lehrlings (z.B. Gerichtstermin, Beerdigung, Sonderurlaub, Nachholen Gesellenprüfung)</div>
       <div>NF = nicht förderfähig, muss zur Erreichung der Förderfähigkeit zwingend nachgeholt werden (Berufschultag, Arbeit im Betrieb, Erholungsurlaub etc.)</div>
       <div class="legend-mt">teilweise anwesend:</div>
