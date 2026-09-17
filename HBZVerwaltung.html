@@ -1809,10 +1809,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 422';
+const APP_VERSION = 'Build 423';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 423', d:'17.09.2026', items:['🐛 Nachbesserung zu Build 422: Die Namenskorrektur wurde zwar erkannt, beim Schreiben aber nicht übernommen – die Felder fehlten in der Speicherliste. Falsch getrennte Namen werden jetzt tatsächlich korrigiert']},
   {v:'Build 422', d:'16.09.2026', items:['📥 TN-Import korrigiert jetzt falsch getrennte Namen: Steht derselbe volle Name in der Liste nur anders getrennt („Thi"/„Mai Huong Ngo" statt „Thi Mai Huong"/„Ngo"), wird die Trennung der Kammerliste übernommen. Echte Namensänderungen und anonymisierte Datensätze bleiben unangetastet; die Vorschau weist die Korrektur aus']},
   {v:'Build 421', d:'16.09.2026', items:['📋 Anwesenheitsliste nutzt die Namensschreibweise aus dem Kurs-Eintrag (korrekte Trennung von Vor- und Nachname) – dadurch stimmen Schreibweise und alphabetische Reihenfolge wieder mit der Kammer-Teilnehmendenliste überein']},
   {v:'Build 420', d:'15.09.2026', items:['📋 Bemerkungsspalte der Anwesenheitsliste bleibt einzeilig (kleinere Schrift statt Umbruch) – ein langer Text macht die Zeile nicht mehr höher']},
@@ -5832,6 +5833,12 @@ async function doImport(){
         if(bf.betriebTelefon!==undefined) upd.betriebTelefon=bf.betriebTelefon;
         if(bf.firma!==undefined) upd.firma=bf.firma;
         if(bf.beruf!==undefined) upd.beruf=bf.beruf;
+        // Build 423: Namenskorrektur mitschreiben. In Build 422 wurde sie zwar in der Analyse
+        // gesetzt (_nameKorrigiert), beim Schreiben aber nicht uebernommen - die Felder fehlten
+        // in dieser Liste, daher blieb die falsche Trennung bestehen.
+        if(bf._nameKorrigiert && bf.vorname!==undefined && bf.nachname!==undefined){
+          upd.vorname=bf.vorname; upd.nachname=bf.nachname;
+        }
         if(Object.keys(upd).length){
           try{ await db.collection('globalTN').doc(bf.id).update(upd); bfDone++; }
           catch(e){ console.warn('Backfill '+bf.id+':',e); }
