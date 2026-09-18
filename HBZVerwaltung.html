@@ -1809,10 +1809,12 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 426';
+const APP_VERSION = 'Build 428';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 428', d:'18.09.2026', items:['⛔ Kollisionsschutz greift jetzt auch, wenn am Lehrgang keine Ausbilder-ID hinterlegt ist – dann wird über den Ausbildernamen verglichen. So konnte trotz Sperre ein zweiter Lehrgang im selben Zeitraum entstehen']},
+  {v:'Build 427', d:'18.09.2026', items:['🔍 Dublette zusammenführen findet jetzt auch bei Tippfehlern: Liefert die Wortsuche nichts, wird zusätzlich nach ähnlichen Namen und gleichem Geburtsdatum gesucht („Snidach" findet „Sniadach", „Tim Noah" findet „Tim Herchenbach")']},
   {v:'Build 426', d:'17.09.2026', items:['📥 Namenskorrekturen aus dem Import werden jetzt auch in die Kurs-Einträge übernommen – bisher standen sie nur in den Stammdaten, während Anwesenheits-, TN- und Betriebsliste weiter die alte Schreibweise zeigten']},
   {v:'Build 425', d:'17.09.2026', items:['📋 Unentschuldigte Fehltage werden mit einem roten „X" markiert statt mit „U" – „U" steht am HBZ für Urlaub']},
   {v:'Build 424', d:'17.09.2026', items:['📋 Anwesenheitsliste: unentschuldigte Fehltage werden mit „U" statt „UE" markiert – zweistellig passte nicht in die Tagesspalte und war nicht lesbar']},
@@ -4507,15 +4509,23 @@ function getDateFromSelects(pref) {
 // ════════════════════════════════════════════════
 function vpKollisionen(ausbId, von, bis, ignoreId){
   if(!ausbId||!von||!bis) return [];
+  // Build 428: Auch ueber den NAMEN vergleichen. Bei manchen Kursen fehlt die ausbilderId
+  // (je nach Anlageweg oder Altbestand) - dann fand die Pruefung keine Kollision und ein
+  // zweiter Lehrgang desselben Ausbilders im selben Zeitraum konnte entstehen.
+  const _a=_ausbilder.find(x=>x.id===ausbId);
+  const _nm=_normAusbName(_a&&_a.name);
   return _kurse.filter(k=>{
     if(k.id===ignoreId) return false;
     if(k.entwurf) return false;              // Entwuerfe blockieren nicht
     if(k.archiviert) return false;
-    if(k.ausbilderId!==ausbId) return false;
+    const passtId   = k.ausbilderId && k.ausbilderId===ausbId;
+    const passtName = !k.ausbilderId && _nm && _normAusbName(k.ausbilderName)===_nm;
+    if(!passtId && !passtName) return false;
     if(!k.von||!k.bis) return false;
     return k.von<=bis && k.bis>=von;         // Ueberschneidung
   });
 }
+function _normAusbName(n){ return String(n||'').replace(/\s+/g,' ').trim().toLowerCase(); }
 function vpKollisionsBox(titel, ausbName, konflikte, text, aktionLabel, aktionFn){
   const ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99990;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -9291,11 +9301,36 @@ function tnMergeSearch(){
   if(q.length<2){ box.innerHTML=''; return; }
   const words=q.split(/\s+/).filter(Boolean);
   const q0=_globalTN.find(x=>x.id===_mergeQuelleId)||{};
-  const hits=_globalTN.filter(t=>t.id!==_mergeQuelleId && !t.archived && words.every(w=>((t.vorname||'')+' '+(t.nachname||'')+' '+(t.firma||'')).toLowerCase().includes(w)));
+  let hits=_globalTN.filter(t=>t.id!==_mergeQuelleId && !t.archived && words.every(w=>((t.vorname||'')+' '+(t.nachname||'')+' '+(t.firma||'')).toLowerCase().includes(w)));
+  // Build 427: Findet die Wortsuche nichts, zusaetzlich nach AEHNLICHEN Namen suchen -
+  // Tippfehler ("Snidach" statt "Sniadach") oder ein weggelassener Namensteil ("Tim Noah"
+  // statt "Tim Herchenbach") fielen bisher komplett durch, obwohl das Geburtsdatum passte.
+  if(!hits.length){
+    const nah=(a,b)=>{ a=_impNorm(a); b=_impNorm(b);
+      if(!a||!b) return false;
+      if(a===b) return true;
+      if(Math.abs(a.length-b.length)>2) return false;
+      let d=0,i=0,j=0;
+      while(i<a.length&&j<b.length){ if(a[i]===b[j]){i++;j++;continue;}
+        d++; if(d>2) return false;
+        if(a.length>b.length) i++; else if(b.length>a.length) j++; else {i++;j++;} }
+      return d+(a.length-i)+(b.length-j)<=2;
+    };
+    const qTeile=words;
+    hits=_globalTN.filter(t=>{
+      if(t.id===_mergeQuelleId || t.archived) return false;
+      const gleichesGeb = q0.geburtsdatum && t.geburtsdatum===q0.geburtsdatum;
+      const tTeile=((t.vorname||'')+' '+(t.nachname||'')).toLowerCase().split(/\s+/).filter(Boolean);
+      const einTeilAehnlich = qTeile.some(w=>tTeile.some(x=>nah(w,x)));
+      // Treffer, wenn Geburtsdatum passt ODER ein Namensteil sehr aehnlich ist
+      return gleichesGeb || einTeilAehnlich;
+    });
+    if(hits.length) console.log('[Merge] Wortsuche leer – '+hits.length+' ähnliche Kandidaten (Tippfehler/Geburtsdatum)');
+  }
   // Kandidaten mit gleichem Geburtsdatum zuerst, dann Nachname
   hits.sort((a,b)=>{ const ga=(q0.geburtsdatum&&a.geburtsdatum===q0.geburtsdatum)?0:1, gb=(q0.geburtsdatum&&b.geburtsdatum===q0.geburtsdatum)?0:1; return ga-gb || ((a.nachname||'')+(a.vorname||'')).localeCompare((b.nachname||'')+(b.vorname||''),'de'); });
   const shown=hits.slice(0,30);
-  if(!hits.length){ box.innerHTML='<div style="font-size:.7rem;color:var(--mu);padding:6px">Kein Treffer – anders suchen (nur Vorname, nur Betrieb …).</div>'; return; }
+  if(!hits.length){ box.innerHTML='<div style="font-size:.7rem;color:var(--mu);padding:6px">Kein Treffer – anders suchen (nur Vorname, nur Nachname, nur Betrieb …).<br>Tipp: Bei Tippfehlern im Namen nur den sicheren Namensteil eingeben.</div>'; return; }
   box.innerHTML=(hits.length>shown.length?'<div style="font-size:.62rem;color:var(--mu);padding:4px 9px">'+hits.length+' Treffer – die ersten '+shown.length+'. Bitte Suche eingrenzen.</div>':'')
     +shown.map(t=>'<button type="button" onclick="tnMergePick(\''+t.id+'\')" style="display:block;width:100%;text-align:left;padding:7px 9px;border:none;border-bottom:1px solid var(--brd);background:#fff;cursor:pointer;font-family:inherit;font-size:.72rem;color:#111">'
     +esc(_tnKurz(t))
@@ -11233,11 +11268,16 @@ function ekCheckDates(){
 // ─── AUSBILDER ZEITRAUM-KOLLISIONSPRÜFUNG ───
 function checkAusbilderOverlap(ausbId, von, bis, excludeKursId){
   if(!ausbId||!von||!bis) return null;
+  // Build 428: Rueckfall auf den Ausbildernamen, wenn am Kurs keine ausbilderId steht
+  const _a0=_ausbilder.find(x=>x.id===ausbId);
+  const _nm0=_normAusbName(_a0&&_a0.name);
   const conflict=_kurse.find(k=>{
     if(k.id===excludeKursId) return false;
     if(k.entwurf) return false;   // Build 414: Entwuerfe duerfen sich ueberschneiden, echte Kurse nie
     if(k.archiviert) return false;
-    if(k.ausbilderId!==ausbId) return false;
+    const _passtId   = k.ausbilderId && k.ausbilderId===ausbId;
+    const _passtName = !k.ausbilderId && _nm0 && _normAusbName(k.ausbilderName)===_nm0;
+    if(!_passtId && !_passtName) return false;
     if(!k.von||!k.bis) return false;
     // Zeitraum-Überschneidung: kurs.von <= bis && kurs.bis >= von
     return k.von<=bis && k.bis>=von;
