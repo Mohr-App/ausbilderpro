@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v970';
+const APP_VERSION = 'v971';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v971', d:'18.09.2026', items:['📋 Teilnehmendenliste: Der Ausbildername erscheint jetzt automatisch über der Unterschriftenzeile (das Profil speichert ihn im Feld „name", danach wurde bisher nicht gefragt). Ort ist vorbelegt, das Datum lässt sich direkt in der Liste ändern']},
   {v:'v970', d:'18.09.2026', items:['📋 Teilnehmerliste: Unter „Name, Vorname der Ausbilderin / des Ausbilders" steht jetzt der vollständige Name aus dem Profil statt des E-Mail-Kürzels']},
   {v:'v969', d:'17.09.2026', items:['📋 Anwesenheitsliste nutzt die Namensschreibweise aus dem Kurs-Eintrag (korrekte Trennung von Vor- und Nachname) – Korrekturen aus dem TN-Import wirken damit auch hier, ohne Sitzplätze nachzupflegen']},
   {v:'v968', d:'17.09.2026', items:['📋 Unentschuldigte Fehltage werden in der Anwesenheitsliste jetzt mit einem roten „X" markiert statt mit „U" – „U" steht am HBZ für Urlaub und hätte zu Verwechslungen geführt']},
@@ -11277,7 +11278,15 @@ function openTNListeWindowAusbilder(kurs, tns){
   if(_matched.length) kursName=_matched.join(' ');
   const standort='Kreishandwerkerschaft Bonn-Rhein-Sieg - Siegburg';
   const dauer=fmtDE(von)+' - '+fmtDE(bis);
-  const ausbName=_auth?.currentUser?.displayName||(getAusbilderProfil().vorname?(getAusbilderProfil().vorname+' '+(getAusbilderProfil().nachname||'')).trim():'')||'';
+  // v971: Das Profil speichert den Namen im Feld "name" - danach wurde bisher gar nicht
+  // gefragt, deshalb blieb die Unterschriftenzeile leer. Reihenfolge: Profil-Name,
+  // Vor-/Nachname, Kursdaten, zuletzt das E-Mail-Kuerzel.
+  const _prof=(typeof getAusbilderProfil==='function')?(getAusbilderProfil()||{}):{};
+  const ausbName=(_prof.name||'').trim()
+    ||(_prof.vorname?((_prof.vorname+' '+(_prof.nachname||'')).trim()):'')
+    ||_auth?.currentUser?.displayName
+    ||(curInst()?.ausbilderName||'')
+    ||(_auth?.currentUser?.email?.split('@')[0]||'');
   const heute=new Date().toLocaleDateString('de-DE');
   const ortDatum='Siegburg, den '+heute;
   const startDate=new Date(von+'T00:00:00');
@@ -11355,6 +11364,7 @@ ${Array(Math.max(0,13-tnRows.length)).fill(0).map((_,i)=>'<tr><td class="nr">'+(
 <div class="confirm-text">Hiermit bestätige ich, dass die Eintragungen vollständig und richtig sind und dass der Lehrling seine Unterschrift eigenhändig und lehrgangstäglich geleistet hat und der gesamte Lehrstoff vermittelt wurde.</div>
 <div class="footer-sig-row">
   <div class="footer-sig-block">
+    <div class="footer-sig-name">Siegburg, den <span class="ed-datum" contenteditable="true">${heute}</span></div>
     <div class="footer-sig-line"></div>
     <div class="footer-sig-label">Ort der Bildungsstätte, Datum</div>
   </div>
@@ -11434,6 +11444,8 @@ thead tr:first-child th[rowspan]{border-bottom:1px solid #333;}
 .footer-sig-line.short{margin-top:5mm;}
 .footer-sig-label{font-size:7.5pt;color:#444;padding-top:1px;}
 .footer-sig-name{font-size:9pt;margin-bottom:0;text-align:center;}
+.ed-datum{background:#fffbe6;padding:0 2mm;min-width:18mm;display:inline-block;}
+@media print{.ed-datum{background:#fff!important;}}
 .footer-legend{margin-top:2.5mm;font-size:7pt;line-height:1.35;}
 .legend-title{margin-bottom:1mm;text-decoration:underline;}
 .legend-grid{display:flex;gap:8mm;}
