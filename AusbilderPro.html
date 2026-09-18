@@ -1993,7 +1993,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--tx);min-heig
 
 <script>
 const PREDEF = [];  // Keine Vorgaben – Benutzer legt eigene Kurse an
-const APP_VERSION = 'v969';
+const APP_VERSION = 'v970';
 function _qrDataUrl(text,px){
   // Lokale QR-Erzeugung (DSGVO): Bild entsteht im Browser, kein externer Dienst.
   // Fallback: schlaegt die lokale Erzeugung fehl, greift der alte qrserver-Weg.
@@ -2008,6 +2008,7 @@ function _qrDataUrl(text,px){
 }
 const APP_BUILD = '2026-07-04';
 const CHANGELOG = [
+  {v:'v970', d:'18.09.2026', items:['📋 Teilnehmerliste: Unter „Name, Vorname der Ausbilderin / des Ausbilders" steht jetzt der vollständige Name aus dem Profil statt des E-Mail-Kürzels']},
   {v:'v969', d:'17.09.2026', items:['📋 Anwesenheitsliste nutzt die Namensschreibweise aus dem Kurs-Eintrag (korrekte Trennung von Vor- und Nachname) – Korrekturen aus dem TN-Import wirken damit auch hier, ohne Sitzplätze nachzupflegen']},
   {v:'v968', d:'17.09.2026', items:['📋 Unentschuldigte Fehltage werden in der Anwesenheitsliste jetzt mit einem roten „X" markiert statt mit „U" – „U" steht am HBZ für Urlaub und hätte zu Verwechslungen geführt']},
   {v:'v967', d:'17.09.2026', items:['🐛 Anwesenheitsliste zeigte weiter ein Häkchen, wenn ein Teilnehmer nachträglich von anwesend auf einen Fehlgrund umgestellt wurde. Der Eintrag am Sitzplatz hat jetzt Vorrang vor dem Tagesraster']},
@@ -7883,7 +7884,13 @@ function generateAlleBescheinigungenAusbilder(){
     const isBonn=standortLow.includes('bonn');
     const isSieg=!isBonn; // Siegburg als Default falls Bonn nicht explizit
     const heute=new Date().toLocaleDateString('de-DE');
-    const ausbName=_auth?.currentUser?.displayName||_auth?.currentUser?.email?.split('@')[0]||'';
+    // v970: wie in den anderen Listen - Profil (Vor-/Nachname) statt E-Mail-Kuerzel.
+  // Vorher stand hier "mohr" statt "Stefan Mohr".
+  const _pA=(typeof getAusbilderProfil==='function')?(getAusbilderProfil()||{}):{};
+  const ausbName=_auth?.currentUser?.displayName
+    ||(_pA.vorname?((_pA.vorname+' '+(_pA.nachname||'')).trim()):'')
+    ||(curInst()?.ausbilderName)||''
+    ||_auth?.currentUser?.email?.split('@')[0]||'';
     const tnDocs=results.slice(1, 1+seats.length);
     const syncDocs=results.slice(1+seats.length);
     let sigCount=0;
