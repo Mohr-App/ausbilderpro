@@ -1809,10 +1809,11 @@ Lisa    | Schmidt  | Firma AG    | <a href="/cdn-cgi/l/email-protection" class="
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── Version ──
-const APP_VERSION = 'Build 425';
+const APP_VERSION = 'Build 426';
 window.addEventListener('DOMContentLoaded',()=>{ try{ document.querySelectorAll('.appVer').forEach(el=>el.textContent=APP_VERSION); }catch(e){} });
 const APP_BUILD = '2026-05-13';
 const CHANGELOG = [
+  {v:'Build 426', d:'17.09.2026', items:['📥 Namenskorrekturen aus dem Import werden jetzt auch in die Kurs-Einträge übernommen – bisher standen sie nur in den Stammdaten, während Anwesenheits-, TN- und Betriebsliste weiter die alte Schreibweise zeigten']},
   {v:'Build 425', d:'17.09.2026', items:['📋 Unentschuldigte Fehltage werden mit einem roten „X" markiert statt mit „U" – „U" steht am HBZ für Urlaub']},
   {v:'Build 424', d:'17.09.2026', items:['📋 Anwesenheitsliste: unentschuldigte Fehltage werden mit „U" statt „UE" markiert – zweistellig passte nicht in die Tagesspalte und war nicht lesbar']},
   {v:'Build 423', d:'17.09.2026', items:['🐛 Nachbesserung zu Build 422: Die Namenskorrektur wurde zwar erkannt, beim Schreiben aber nicht übernommen – die Felder fehlten in der Speicherliste. Falsch getrennte Namen werden jetzt tatsächlich korrigiert']},
@@ -5845,6 +5846,11 @@ async function doImport(){
           try{ await db.collection('globalTN').doc(bf.id).update(upd); bfDone++; }
           catch(e){ console.warn('Backfill '+bf.id+':',e); }
         }
+        // Build 426: Namenskorrektur in die Kurs-Eintraege durchreichen
+        if(bf._nameKorrigiert && bf.vorname!==undefined && bf.nachname!==undefined){
+          const anz=await vpNameInKurseUebernehmen(bf.id, bf.vorname, bf.nachname);
+          if(anz) console.log('[Import] Name korrigiert in '+anz+' Kurs-Eintrag/Einträgen:', bf.vorname, bf.nachname);
+        }
       }
       // Loser Selbst-Eintrag -> offizielle Liste gewinnt (Name/Firma/Beruf/Adresse), Lehrjahr bleibt,
       // Eintrag wird befoerdert. Konto/Kurs/Anwesenheit/E-Mail unberuehrt.
@@ -8800,6 +8806,26 @@ function statusClearDecision(tn, neuerKurs){
 //  dem Vorkurs mit und AzubiPro wuerde am ersten Kurstag keine Platzabfrage zeigen.
 //  Was der Ausbilder DANACH zuweist, bleibt selbstverstaendlich stehen.
 // ════════════════════════════════════════════════
+
+// Build 426: Eine Namenskorrektur auch in alle KURS-Eintraege dieses TN uebernehmen.
+// Sonst steht die richtige Schreibweise nur in den Stammdaten, waehrend Anwesenheits-,
+// TN- und Betriebsliste (die den Kurs-Eintrag bevorzugen) die alte Trennung weiterzeigen.
+async function vpNameInKurseUebernehmen(tnId, vorname, nachname){
+  let n=0;
+  try{
+    const kurse=await db.collection('shared').doc('kurse').collection('list').get();
+    for(const k of kurse.docs){
+      const ref=k.ref.collection('teilnehmer').doc(tnId);
+      const t=await ref.get();
+      if(!t.exists) continue;
+      const x=t.data()||{};
+      if(x.vorname===vorname && x.nachname===nachname) continue;
+      await ref.update({vorname, nachname});
+      n++;
+    }
+  }catch(e){ console.warn('[Import] Name in Kursen:', e && e.message); }
+  return n;
+}
 function vpPlatzReset(){
   const del=firebase.firestore.FieldValue.delete();
   return { wunschSitzplatz:'', platzZugewiesenVon:del, platzZugewiesenAm:del, platzBestaetigtAm:del };
